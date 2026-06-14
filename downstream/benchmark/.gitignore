@@ -1,0 +1,16 @@
+# 生成的数据集与评测产物（仅保留 split_manifest.json 等小元数据需手动 -f 添加）
+data/**
+!data/.gitkeep
+!data/**/split_manifest.json
+outputs/**
+!outputs/.gitkeep
+
+# baseline 第三方仓库（以 submodule / 单独 clone 管理，不纳入本仓）
+baselines/*/
+!baselines/.gitkeep
+!baselines/README.md
+
+# AppleDouble / 缓存
+._*
+__pycache__/
+*.pyc

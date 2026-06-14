@@ -137,3 +137,25 @@ dmypy.json
 /wandb/
 /.logs/
 /.models/
+/data/
+/model_weights/
+/logs/
+/examples/
+/output/
+
+# IRBench：只提交脚本，忽略 clone 的 baseline / 生成数据 / 评测产物
+/downstream/benchmark/baselines/
+/downstream/benchmark/data/
+/downstream/benchmark/outputs/
+*.ckpt 
+*.pt 
+*.pickle
+*.json
+*.yaml
+*.yml
+*.csv
+*.txt
+*.log
+*.err
+*.out
+
