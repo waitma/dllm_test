@@ -306,3 +306,225 @@
 - Updated the same plan with a `Fast Downstream Validation Plan`: Tier 0 held-out diffusion sanity, Tier 1 frozen-embedding IRBench, Tier 2 generation/infill, and Tier 3 task-specific fine-tuning.
 - Fixed `/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/common/model_api.py` so `BioSeqEmbedder` can load current DDP checkpoints containing `backbone_state_dict`, generic `state_dict`, or a plain state dict. This makes `--embedder bioseq:/abs/path/final.pt` compatible with checkpoints produced by `/vepfs-mlp2/c20250601/251105016/project/dllm_test/examples/bioseq/train_bioseq_ddp.py`.
 - Verified the edited benchmark model API with `python -m py_compile` and a lightweight factory import check.
+
+## 2026-06-14 data format audit for Qwen-style BioSeq
+
+- User asked to first quantify the current `/vepfs-mlp2/c20250601/251105016/project/dllm_test/data` formats before adapting Qwen into an immune receptor diffusion foundation model.
+- Added `/vepfs-mlp2/c20250601/251105016/project/dllm_test/DATA_FORMAT_AUDIT.md` with top-level data sizes, file-format inventory, current JSONL schema, OAS/OTS/nanobody clean CSV schemas and row counts, TCR specificity resources, TCRdb2.0 raw schema, PPI Arrow schema, downstream benchmark formats, and model-input implications.
+- Key conclusion: current `processed`/`processed_v2` JSONL is only a partial unified format for PPI + TCR-epitope; the large clean OAS, OTS, nanobody, and TCRdb2.0 pools are not fully merged into one canonical BioSeq training corpus yet.
+- Qwen adaptation should target a stable `bioseq.v1` boundary with `chains`, `task_type`, `complex_type`, `chain_roles`, `targets`, `regions`, `metadata`, plus tensor fields for `chain_ids`, `chain_role_ids`, inner/outer position ids, `diffusion_loss_mask`, and `fixed_context_mask`.
+- Refined the schema after user pointed out chain-level `targets` is too simple. `targets` is now treated as a coarse default only; real training/inference must use `generation_spec` or a sampled task view that resolves to token-level `visible_mask`, `fixed_context_mask`, `diffusion_target_mask`, and `diffusion_loss_mask`. Required supported views include heavy-to-light, beta+epitope-to-alpha, FR-conditioned CDR infilling, single-CDR infilling, and CDR-conditioned FR generation.
+
+## 2026-06-14 Qwen3-VL architecture migration
+
+- User asked to migrate only the latest Qwen architecture code from `/vepfs-mlp2/c20250601/251105016/project/dllm_test/base_model` into `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines` before BioSeq-specific modifications.
+- Added `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch` with only dense and MoE Qwen3-VL architecture files: `configuration`, `modeling`, and `modular` for `qwen3_vl` and `qwen3_vl_moe`.
+- Intentionally did not migrate Qwen2/Qwen2.5, processors, video processors, finetuning scripts, data loaders, demo assets, cookbooks, evaluation scripts, or Docker files.
+- Adjusted the migrated architecture imports so shared Hugging Face utilities resolve through `transformers.*`; local dense/MoE Qwen3-VL imports remain relative inside the migrated package.
+- Verified the migrated files with `python -m py_compile` and package-level imports for `dllm.pipelines.qwen3_vl_arch`, `qwen3_vl`, and `qwen3_vl_moe`.
+- Current runtime `transformers==4.48.1` is older than the Qwen3-VL snapshot and lacks newer internal APIs such as `transformers.masking_utils`, `transformers.modeling_layers`, `transformers.vision_utils`, `transformers.utils.output_capturing`, `transformers.initialization`, `RopeParameters`, and `auto_docstring`, so concrete model/config imports will need a matching newer Transformers version or local compatibility shims before execution.
+
+## 2026-06-14 Qwen3-VL BioSeq data loader
+
+- User chose to prioritize a training-time loader instead of full offline conversion to JSON/JSONL.
+- Added `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/data` with canonical records, source loaders, mixture datasets, view sampler, ESM-family tokenizers, and Qwen-style diffusion collator.
+- First-version sources cover OAS paired antibody CSV, OTS paired TCR CSV, nanobody CSV, existing processed JSONL for PPI/TCR-epitope, and an optional PPI Arrow source.
+- Loader output is `BioSeqRecord`; masking is deferred to `BioSeqViewSampler` and `BioSeqQwenDataCollator`, which emit `visible_mask`, `fixed_context_mask`, `diffusion_target_mask`, and `diffusion_loss_mask`.
+- Encoding defaults to ESM2/MINT-compatible token ids through `Esm2SequenceTokenizer`; the collator also emits per-chain `encoder_input_ids`, `encoder_attention_mask`, `encoder_residue_mask`, `encoder_chain_mask`, and `encoder_chain_role_ids` for future ESM2/ESMC encoder-conditioned training.
+- Verified with `python -m pytest /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/tests/bioseq -q`: 27 passed.
+
+## 2026-06-14 ESM tokenizer and multi-chain paper verification
+
+- Verified local ESM2 tokenizer files under `/c20250601/mj/model_weights/esm2/esm2_t30_150M_UR50D`, `/c20250601/mj/model_weights/esm2/esm2_t33_650M_UR50D`, and `/c20250601/mj/model_weights/esm2/esm2_t36_3B_UR50D`: ids 0-32 are `<cls>`, `<pad>`, `<eos>`, `<unk>`, `L`, `A`, `G`, `V`, `S`, `E`, `R`, `T`, `I`, `D`, `P`, `K`, `Q`, `N`, `F`, `Y`, `M`, `H`, `W`, `C`, `X`, `B`, `U`, `Z`, `O`, `.`, `-`, `<null_1>`, `<mask>`.
+- Verified local ESMC tokenizer files under `/c20250601/mj/model_weights/esmc/ESMC-300M`, `/c20250601/mj/model_weights/esmc/ESMC-600M`, and `/c20250601/mj/model_weights/esmc/ESMC-6B`: ids 0-30 and 32 match the ESM2 amino-acid/special-token ids above, but id 31 is `|` rather than `<null_1>`, and `special_tokens_map.json` marks `|` as an additional special token.
+- Updated `/vepfs-mlp2/c20250601/251105016/project/dllm_test/BIOSEQ_MODEL_PLAN.md` and `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/data/README.md` with the tokenizer rule: use `Esm2SequenceTokenizer` for Ophiuchus-Ab/MINT/ESM2 paths; use the local Hugging Face tokenizer adapter or an ESMC-specific tokenizer for ESMC encoder paths.
+- Re-extracted `/tmp/esm_protein.pdf` to `/tmp/esm_protein.txt` with Ghostscript and checked the ESMC/ESMFold2 preprint. The paper's ESMC section describes a masked language model over protein sequences and single-chain contact evaluation; the explicit multi-chain treatment appears in ESMFold2.
+- Paper-specific conclusion: ESMFold2 uses frozen ESMC 6B representations. For multiple protein chains, each chain is encoded independently by ESMC, then ESMFold2 crops/concatenates chain representations into a complex-level folding trunk with pair representations and atom-level diffusion. Therefore BioSeq should keep multi-chain interaction learning in the decoder/collator/attention or an ESMFold2-style pair module, not assume ESMC alone models cross-chain interactions.
+
+## 2026-06-14 Qwen3-VL BioSeq view-mask correction
+
+- User clarified that `full_denoise` must not include antigen or pMHC context chains in diffusion loss.
+- Updated `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/data/view_sampler.py`: `full_denoise` now targets only eligible chains. It honors explicit `metadata["targets"]` when present, then filters out antigen, peptide, MHC, HLA-like, and epitope roles as fixed context.
+- Updated `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/data/sources.py` so `processed_json_to_record` only writes `metadata["targets"]` when the source row explicitly provides `targets`; rows without targets now let the view sampler infer eligible chains from roles.
+- Added coverage in `/vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/tests/bioseq/test_qwen3_vl_data_loader.py` to verify that `full_denoise` keeps peptide, MHC, and antigen fixed even when metadata accidentally lists all chains as targets.
+- Updated `/vepfs-mlp2/c20250601/251105016/project/dllm_test/BIOSEQ_MODEL_PLAN.md`, `/vepfs-mlp2/c20250601/251105016/project/dllm_test/DATA_FORMAT_AUDIT.md`, and `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/data/README.md` with the corrected `full_denoise` semantics.
+
+## 2026-06-14 Qwen3-VL BioSeq data reading diagnostic
+
+- Added temporary diagnostic script `/vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/debug/inspect_qwen3_vl_data_reading.py`.
+- The script samples local sources through the current Qwen3-VL BioSeq loader, then checks source parsing, record roles/tasks, `full_denoise` masks, default random views, empty-loss examples, collator errors, and whether fixed context roles accidentally enter `diffusion_loss_mask`.
+- Verified syntax with `python -m py_compile /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/debug/inspect_qwen3_vl_data_reading.py`.
+- Ran `python /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/debug/inspect_qwen3_vl_data_reading.py --limit-per-source 512 --batch-size 16 --max-chain-length 512`. OAS, OTS, nanobody, and `processed_v2` all yielded 512 records with no unknown roles/tasks, no collator errors, no empty-loss examples, and `full_denoise context_loss_tokens=0`.
+- Observed and fixed a data-shape issue: first 512 `processed_v2` records included PPI chains mostly as role `other` rather than `protein_a`/`protein_b`. Updated `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/data/sources.py` so `source=ppi` records normalize the first two chains to `protein_a` and `protein_b`.
+- Added coverage in `/vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/tests/bioseq/test_qwen3_vl_data_loader.py` for PPI partner role normalization; `python -m pytest /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/tests/bioseq/test_qwen3_vl_data_loader.py -q` now reports `8 passed`.
+- Re-ran processed_v2 diagnostics after the fix: first 512 records now report roles `protein_a=411`, `protein_b=411`, `tcr_alpha=42`, `tcr_beta=101`, and `antigen=86`; issues remain `none`.
+- Optional PPI Arrow source check failed with `ImportError: PpiArrowSource requires the datasets package`; the default CSV/JSONL loader path does not depend on this package.
+
+## 2026-06-14 MHC-conditioned peptide/TCR view
+
+- Clarified terminology: `full_denoise` is a mask/view policy for denoising eligible target residues; `chain` means a biological sequence entity such as antibody heavy/light, TCR alpha/beta, peptide, MHC, antigen, or PPI partner, while `residue` means one amino-acid token inside a chain.
+- User requested the TCR-pMHC case where MHC is fixed while peptide and TCR chains both participate in diffusion.
+- Added `mhc_to_peptide_tcr` to `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/data/view_sampler.py`. It requires an MHC/HLA-like chain as context and targets available `tcr_alpha`, `tcr_beta`, `peptide`, and `epitope` chains. For `tcr_epitope` or `tcr_pmhc` records, an `antigen` role is treated as peptide/epitope target when this view is selected.
+- Added `tcr_mhc_to_peptide` for fixed TCR alpha/beta plus MHC/HLA designing peptide or epitope.
+- Added `pmhc_to_tcr` for fixed peptide or epitope plus MHC/HLA designing TCR alpha/beta.
+- Confirmed current FR/CDR views are not antibody-only. They are region-driven and apply to TCR full-chain data whenever the source adapter preserves `FR*` and `CDR*` region annotations.
+- Added test coverage in `/vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/tests/bioseq/test_qwen3_vl_data_loader.py` verifying that `mhc_to_peptide_tcr` puts alpha/beta/peptide in `diffusion_loss_mask` and keeps MHC in `fixed_context_mask`.
+- Added tests for `tcr_mhc_to_peptide` and `pmhc_to_tcr`, verifying peptide-only target masks and alpha/beta-only target masks respectively.
+- Updated `/vepfs-mlp2/c20250601/251105016/project/dllm_test/BIOSEQ_MODEL_PLAN.md`, `/vepfs-mlp2/c20250601/251105016/project/dllm_test/DATA_FORMAT_AUDIT.md`, and `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/data/README.md` with this view.
+- Verified `python -m pytest /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/tests/bioseq/test_qwen3_vl_data_loader.py -q`: `11 passed`.
+- Re-ran the temporary data diagnostic with `python /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/debug/inspect_qwen3_vl_data_reading.py --limit-per-source 128 --batch-size 16 --max-chain-length 512`; OAS, OTS, nanobody, and `processed_v2` all reported `issues: none`.
+
+## 2026-06-14 Antibody-antigen and nanobody-antigen views
+
+- User clarified that the same fixed/target logic used for TCR alpha/beta should also apply to antibody-antigen and nanobody-antigen cases.
+- Added antibody/nanobody antigen-conditioned views to `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/data/view_sampler.py`:
+  - `antigen_to_antibody`: fixed antigen, target available antibody heavy/light chains.
+  - `antigen_to_nanobody`: fixed antigen, target nanobody VHH.
+  - `heavy_antigen_to_light`: fixed antibody heavy plus antigen, target antibody light.
+  - `light_antigen_to_heavy`: fixed antibody light plus antigen, target antibody heavy.
+- Added task ids for `antibody_antigen` and `nanobody_antigen` in `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/data/records.py`.
+- Added tests in `/vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/tests/bioseq/test_qwen3_vl_data_loader.py` for antigen-to-antibody, heavy+antigen-to-light, and antigen-to-nanobody masks.
+- Updated `/vepfs-mlp2/c20250601/251105016/project/dllm_test/BIOSEQ_MODEL_PLAN.md`, `/vepfs-mlp2/c20250601/251105016/project/dllm_test/DATA_FORMAT_AUDIT.md`, and `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/data/README.md` with antibody/nanobody antigen view semantics.
+- Verified `python -m pytest /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/tests/bioseq/test_qwen3_vl_data_loader.py -q`: `15 passed`.
+- Re-ran the temporary data diagnostic with `python /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/debug/inspect_qwen3_vl_data_reading.py --limit-per-source 128 --batch-size 16 --max-chain-length 512`; OAS, OTS, nanobody, and `processed_v2` all reported `issues: none`.
+
+## 2026-06-14 Remove antibody inverse-antigen views
+
+- User clarified that antibody and nanobody inverse antigen-generation views are not needed for the current antibody design setting.
+- Removed `antibody_to_antigen` and `nanobody_to_antigen` from `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/data/view_sampler.py` default and build path.
+- Removed the nanobody-to-antigen mask test from `/vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/tests/bioseq/test_qwen3_vl_data_loader.py`.
+- Updated `/vepfs-mlp2/c20250601/251105016/project/dllm_test/BIOSEQ_MODEL_PLAN.md`, `/vepfs-mlp2/c20250601/251105016/project/dllm_test/DATA_FORMAT_AUDIT.md`, and `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/data/README.md`: antigen is fixed conditioning context for antibody/nanobody receptor generation and does not receive diffusion loss by default.
+- Verified `python -m pytest /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/tests/bioseq/test_qwen3_vl_data_loader.py -q`: `14 passed`.
+- Re-ran `/vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/debug/inspect_qwen3_vl_data_reading.py --limit-per-source 128 --batch-size 16 --max-chain-length 512`; OAS, OTS, nanobody, and `processed_v2` all reported `issues: none`.
+
+## 2026-06-14 Antibody/TCR generation task survey
+
+- Surveyed current antibody generation tasks: DiffAb, RFdiffusion antibody design, AbX, IgLM, Ophiuchus-Ab notes, and paired antibody language models all support prioritizing receptor-side generation or infilling: CDR generation, full heavy/light generation, heavy-light pairing/completion, antigen-conditioned antibody design, and optional framework/humanization-style infilling.
+- Conclusion for antibody/nanobody views: keep antigen as fixed clean context; train diffusion loss on antibody heavy/light, VHH, or CDR/FR spans. Do not include default inverse antigen generation.
+- Surveyed current TCR generation tasks: TCR-TRANSLATE, TCRdesign, TCR-pMHC binding task definitions, and paired alpha/beta TCR structure analyses support pMHC/epitope-conditioned TCR generation and paired alpha/beta completion as primary training/evaluation directions.
+- Conclusion for TCR views: prioritize `pmhc_to_tcr`, alpha/beta paired-chain completion, and CDR/FR infilling when annotations exist. Keep peptide/epitope generation views as lower-weight or downstream-specific because they are useful but less central than receptor generation.
+- Updated `/vepfs-mlp2/c20250601/251105016/project/dllm_test/BIOSEQ_MODEL_PLAN.md` with the view priority and source list.
+
+## 2026-06-14 Task-specific BioSeq view profiles
+
+- User clarified that antibody-antigen generation also includes fixed antigen plus antibody FR regions generating CDR regions, so views must be divided by data/task type rather than treated as one flat global list.
+- Updated `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/data/view_sampler.py` so default sampling uses task-specific profiles for antibody, antibody-antigen, nanobody-antigen, TCR, TCR-epitope, TCR-pMHC, PPI, and generic records.
+- Added `antigen_fr_to_cdr` and `antigen_single_cdr`: fixed antigen plus receptor non-target residues generate antibody/nanobody CDR spans.
+- Added `pmhc_fr_to_cdr` and `pmhc_single_cdr`: fixed peptide/epitope plus MHC/HLA and non-target TCR residues generate TCR CDR spans.
+- Kept `allowed_views` override behavior for ablations and downstream-specific training, including lower-priority peptide-generation/co-design views such as `tcr_mhc_to_peptide` and `mhc_to_peptide_tcr`.
+- Updated `/vepfs-mlp2/c20250601/251105016/project/dllm_test/BIOSEQ_MODEL_PLAN.md`, `/vepfs-mlp2/c20250601/251105016/project/dllm_test/DATA_FORMAT_AUDIT.md`, and `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/data/README.md` with the task-specific profile semantics.
+- Verified syntax with `python -m py_compile /vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/data/view_sampler.py`.
+- Verified `python -m pytest /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/tests/bioseq/test_qwen3_vl_data_loader.py -q`: `17 passed`.
+- Re-ran `/vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/debug/inspect_qwen3_vl_data_reading.py --limit-per-source 128 --batch-size 16 --max-chain-length 512`; OAS, OTS, nanobody, and `processed_v2` all reported `issues: none` under the new default profiles.
+
+## 2026-06-14 Task-homogeneous training batches
+
+- User raised a training-stability requirement: a batch should not mix different task/view objectives.
+- Added `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/data/mixture.py::TaskHomogeneousBatchDataset`. It wraps any BioSeq record stream and groups records by BioSeq task group.
+- Added `bioseq_task_group` and `bioseq_record_fingerprint` helpers. `bioseq_task_group` separates nanobody from paired antibody, and separates antibody-antigen/nanobody-antigen from generic antibody records based on chain roles.
+- Updated `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/data/collator.py`: `BioSeqQwenDataCollator` now samples one shared generation view per batch by default through `BioSeqViewSampler.sample_batch`, and can enforce homogeneous task groups with `require_homogeneous_task=True`.
+- Updated `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/data/view_sampler.py` with `sample_batch`, `compatible_views`, and public `build` helpers.
+- Updated `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/data/README.md` and `/vepfs-mlp2/c20250601/251105016/project/dllm_test/BIOSEQ_MODEL_PLAN.md` with the required training path: source stream -> `TaskHomogeneousBatchDataset` -> `DataLoader(batch_size=None)` -> `BioSeqQwenDataCollator(require_homogeneous_task=True)`.
+- Training-stability note: physical microbatches should be homogeneous, but optimizer steps should accumulate gradients across several task-homogeneous microbatches or use a later weighted task scheduler to avoid high-variance single-task updates.
+- Verified syntax with `python -m py_compile` for `mixture.py`, `collator.py`, and `view_sampler.py`.
+- Verified `python -m pytest /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/tests/bioseq/test_qwen3_vl_data_loader.py -q`: `20 passed`.
+- Re-ran `/vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/debug/inspect_qwen3_vl_data_reading.py --limit-per-source 128 --batch-size 16 --max-chain-length 512`; OAS, OTS, nanobody, and `processed_v2` all reported `issues: none`.
+
+## 2026-06-14 Batch de-duplication boundary correction
+
+- User clarified that sample de-duplication is already handled during data processing, so batch-level de-duplication should not be part of the default training path.
+- Updated `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/data/mixture.py::TaskHomogeneousBatchDataset`: `deduplicate_within_batch` now defaults to `False`; setting it to `True` is only a defensive option for debugging untrusted/overlapping streams.
+- Updated `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/data/README.md` and `/vepfs-mlp2/c20250601/251105016/project/dllm_test/BIOSEQ_MODEL_PLAN.md` to clarify the boundary: data processing owns de-duplication, while the training batcher owns task/view homogeneity.
+- Verified syntax with `python -m py_compile /vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/data/mixture.py`.
+- Verified `python -m pytest /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/tests/bioseq/test_qwen3_vl_data_loader.py -q`: `21 passed`.
+
+## 2026-06-14 Simple view sampling probability
+
+- User clarified that view sampling should stay simple: keep `full_denoise` high, and randomly sample other condition views from the remaining probability mass.
+- Updated `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/data/view_sampler.py`: `BioSeqViewSampler` now has `full_denoise_probability=0.5` by default.
+- Sampling rule: if `full_denoise` and at least one condition view are compatible, sample `full_denoise` with probability `0.5`, otherwise sample uniformly from compatible condition views with probability `0.5`. If no condition view is compatible, fall back to `full_denoise`.
+- The same rule is used for both single-record sampling and batch-level shared-view sampling.
+- Updated `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/data/README.md` and `/vepfs-mlp2/c20250601/251105016/project/dllm_test/BIOSEQ_MODEL_PLAN.md` with the default probability rule.
+- Verified syntax with `python -m py_compile /vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/data/view_sampler.py`.
+- Verified `python -m pytest /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/tests/bioseq/test_qwen3_vl_data_loader.py -q`: `24 passed`.
+- Re-ran `/vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/debug/inspect_qwen3_vl_data_reading.py --limit-per-source 128 --batch-size 16 --max-chain-length 512`; OAS, OTS, nanobody, and `processed_v2` all reported `issues: none`. OAS/OTS/nanobody each sampled `full_denoise` for `80/128` examples in the deterministic diagnostic run, reflecting the new high full-denoise rate under batch-level shared-view sampling.
+
+## 2026-06-14 PPI and interaction task data ingestion
+
+- User requested downloading and consolidating PPI/interaction task datasets covering STRING/MINT, Figshare gold-standard PPI, HumanPPI, YeastPPI, SKEMPI, PDBbind, SWING MutInt, FLAb, SARS-CoV-2 antibody binding, TDC TCR-epitope, PISTE, TEIM, oncoPPI, and CoV-AbDab.
+- Created the raw data root `/vepfs-mlp2/c20250601/251105016/project/dllm_test/data/ppi_task_raw` with per-source raw directories, manifests, logs, and processed outputs.
+- Added `/vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/build_ppi_interaction_csv.py` to rebuild:
+  - `/vepfs-mlp2/c20250601/251105016/project/dllm_test/data/ppi_task_raw/processed/interaction_sources_manifest.csv`
+  - `/vepfs-mlp2/c20250601/251105016/project/dllm_test/data/ppi_task_raw/processed/interaction_records_summary.csv`
+  - `/vepfs-mlp2/c20250601/251105016/project/dllm_test/data/ppi_task_raw/processed/interaction_records_unified.csv`
+- The unified CSV currently contains `6271559` row-level records plus header. Source counts: FLAb `4606793`, PISTE `1051227`, Figshare gold-standard PPI `274500`, oncoPPI `106536`, HumanPPI `68945`, TDC TCR-epitope `47182`, TEIM `45603`, YeastPPI `38158`, CoV-AbDab `12918`, SWING MutInt `12612`, and SKEMPI `7085`.
+- HumanPPI and YeastPPI were downloaded as LMDB split zip files, extracted under their source raw directories, and parsed through a pickle/LMDB reader mapping `primary_1`, `primary_2`, and `interaction` into the unified schema.
+- Figshare files and SKEMPI files initially hit transient `502` or unsupported range-download errors; they were successfully re-downloaded with single-connection `curl` retries.
+- CoV-AbDab CSV, numbering JSON, and bibliography were downloaded. The PDB structures tarball was stopped as a partial optional structure attachment because it was not needed for the current CSV and was still a slow long-tail download.
+- STRING-DB v12.0 physical links/sequences were identified as multi-GB files (`protein.physical.links.v12.0.txt.gz`, `protein.physical.links.full.v12.0.txt.gz`, `protein.sequences.v12.0.fa.gz`) and remain partial rather than blocking this task.
+- PDBbind+ remains blocked by login/subscription through its site API. The SARS-CoV-2 binding bioRxiv supplement remains blocked by HTTP 403 from this environment.
+- Validation: no active download/conversion processes remained; `wc -l` on the unified CSV returned `6271560`, and the summary record sum returned `6271559`.
+
+## 2026-06-14 Qwen3-VL BioSeq training model layer
+
+- User request: start building the trainable model architecture under `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch`, with both a no-encoder version and an ESMC/ESM encoder-conditioned version. Encoder-conditioned training should follow the BioSeq diffusion loss/noise rules.
+- Added `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/modeling_bioseq.py`.
+- Implemented `BioSeqDiffusionTransformerConfig`, `BioSeqDiffusionDecoder`, `BioSeqNoEncoderDiffusionModel`, and `BioSeqEncoderDiffusionModel`.
+- Implemented BioSeq diffusion utilities in the same module:
+  - `sample_bioseq_diffusion_noise`: samples timestep corruption only from `diffusion_loss_mask` / `diffusion_target_mask`, keeps fixed context residues clean, guarantees at least one corrupted target residue per eligible row, and returns noised decoder ids plus labels.
+  - `apply_decoder_corruption_to_encoder`: maps corrupted decoder residues back to per-chain encoder residues and masks those encoder tokens before the encoder forward pass.
+  - `compute_masked_cross_entropy`: computes denoising cross-entropy only on corrupted target positions.
+- The no-encoder model computes diffusion loss directly over the qwen3_vl_arch collator output.
+- The encoder-conditioned model runs a per-chain encoder, pools residue states into chain features, gathers those features back to decoder token positions by `chain_ids`, and conditions the decoder through a projection. Encoder parameters are trainable by default; `freeze_encoder=True` is available for ablations.
+- Important leakage rule implemented: when a target residue is corrupted for decoder diffusion, the corresponding residue token in `encoder_input_ids` is also replaced with `<mask>` before encoder forward. Fixed context chains such as antigen remain clean and can condition target denoising.
+- Exported the new model/loss utilities from `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/__init__.py`.
+- Added `/vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/tests/bioseq/test_qwen3_vl_bioseq_model.py`.
+- Test coverage verifies decoder-only loss, encoder-conditioned loss, encoder target masking, fixed antigen preservation, trainable encoder gradients, frozen encoder behavior, extra collator-field tolerance, and diffusion sampler mask boundaries.
+- Local ESMC loading check: `/c20250601/mj/model_weights/esmc/ESMC-300M/config.json` declares `model_type="esmc"` and `transformers_version="4.57.6"`. Current environment has `transformers==4.48.1`, so `transformers.AutoModel.from_pretrained("/c20250601/mj/model_weights/esmc/ESMC-300M")` fails because this Transformers version does not recognize ESMC.
+- Resulting constraint at this point was that unit tests used a tiny differentiable encoder to validate the training path. This was later resolved by adding the local Biohub `esm==3.2.3` ESMC loader documented in the 2026-06-14 compatibility fix section below.
+- Verified syntax:
+  - `python -m py_compile /vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/modeling_bioseq.py /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/tests/bioseq/test_qwen3_vl_bioseq_model.py`
+- Verified tests:
+  - `python -m pytest /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/tests/bioseq/test_qwen3_vl_bioseq_model.py -q`: `5 passed`
+  - `python -m pytest /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/tests/bioseq/test_qwen3_vl_data_loader.py /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/tests/bioseq/test_qwen3_vl_bioseq_model.py -q`: `29 passed`
+
+## 2026-06-14 Qwen3-VL BioSeq DDP training path
+
+- User clarified that training needs to support multi-node/multi-GPU execution.
+- Updated `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/data/mixture.py` so iterable record streams are DDP-aware. `SequentialMultiSourceDataset` and `WeightedMixtureDataset` now shard source rows with `global_shard_index = rank * num_workers + worker_id` and `num_shards = world_size * num_workers`.
+- Added `/vepfs-mlp2/c20250601/251105016/project/dllm_test/examples/bioseq/train_qwen3_vl_bioseq_ddp.py`.
+- The new trainer supports:
+  - `torchrun` single-node and multi-node launch through environment variables `RANK`, `WORLD_SIZE`, and `LOCAL_RANK`.
+  - decoder-only `--model-type no_encoder` training today.
+  - encoder-conditioned `--model-type encoder` through `BioSeqEncoderDiffusionModel.from_esmc(...)`, now backed by the local Biohub ESMC fallback loader when Hugging Face `AutoModel` cannot recognize `model_type="esmc"`.
+  - task-homogeneous BioSeq batches from `TaskHomogeneousBatchDataset`.
+  - shared-view collation through `BioSeqQwenDataCollator(require_homogeneous_task=True)`.
+  - `--device auto|cuda|cpu`, so CPU DDP smoke tests can run even on nodes with fewer visible GPUs than requested local ranks.
+  - bf16 autocast, gradient accumulation, grad clipping, warmup, rank-0 logging, optional wandb, checkpoint save/resume, and separate encoder LR when an encoder model is active.
+- Added `/vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/tests/bioseq/test_qwen3_vl_ddp_training.py`, which runs a one-step single-process no-encoder training smoke on real local OAS data and checks that `final.pt` is saved.
+- Added cluster template `/vepfs-mlp2/c20250601/251105016/project/dllm_test/train_jobs/qwen3_vl_bioseq_16gpu_smoke.yml` for a 2-node x 8-GPU no-encoder qwen3_vl_arch smoke run.
+- Local first `torchrun --standalone --nproc_per_node=2` attempt failed because the current node reports CUDA available but has fewer visible CUDA devices than local ranks; rank 1 could not bind `cuda:1`. This is an environment/resource issue, not a DDP code issue.
+- Added `--device cpu` and re-ran local CPU DDP:
+  - `torchrun --standalone --nproc_per_node=2 /vepfs-mlp2/c20250601/251105016/project/dllm_test/examples/bioseq/train_qwen3_vl_bioseq_ddp.py --device cpu --model-type no_encoder --sources oas --limit-per-source 16 --batch-size 2 --max-steps 2 --max-chain-length 64 --max-sequence-length 256 --hidden-size 32 --num-hidden-layers 1 --num-attention-heads 4 --intermediate-size 64 --dropout 0.0 --num-workers 0 --save-interval 1 --resume none --wandb-mode disabled --output-dir /tmp/qwen3_vl_bioseq_ddp_smoke`
+  - Result: `world_size=2`, DDP initialized with gloo, two optimizer steps completed, `latest.pt` and `final.pt` saved.
+- Verified syntax:
+  - `python -m py_compile /vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/data/mixture.py /vepfs-mlp2/c20250601/251105016/project/dllm_test/examples/bioseq/train_qwen3_vl_bioseq_ddp.py /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/tests/bioseq/test_qwen3_vl_ddp_training.py`
+- Verified tests:
+  - `python -m pytest /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/tests/bioseq/test_qwen3_vl_bioseq_model.py /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/tests/bioseq/test_qwen3_vl_data_loader.py /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/tests/bioseq/test_qwen3_vl_ddp_training.py -q`: `30 passed`
+
+## 2026-06-14 Local ESMC loader compatibility fix
+
+- User reported that `transformers==4.48.1` does not recognize `model_type="esmc"` for local ESMC checkpoints.
+- Confirmed that installing a newer `transformers` alone does not make `AutoModel.from_pretrained("/c20250601/mj/model_weights/esmc/ESMC-300M")` work for these local snapshots. The working local path is Biohub `esm==3.2.3` with native `esm.models.esmc.ESMC`.
+- Installed/confirmed Biohub `esm==3.2.3` in the active development environment and the task environment `/vepfs-mlp2/c20250601/251105016/conda/envs/protenix_abtcr`, keeping `transformers==4.48.1`.
+- Added `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/modeling_bioseq.py::LocalESMCEncoder`, `_convert_biohub_esmc_state_dict`, and `load_local_esmc_encoder`.
+- The loader reads `/c20250601/mj/model_weights/esmc/<model>/config.json` and `model.safetensors`, builds native Biohub ESMC with `d_model`, `n_heads`, and `n_layers`, maps local Hugging Face-style keys into native `esm` keys, and loads with `strict=True`.
+- Updated `BioSeqEncoderDiffusionModel.from_esmc(...)` so it still tries Hugging Face `AutoModel` first, but falls back to `load_local_esmc_encoder(...)` when `AutoModel` cannot recognize ESMC.
+- Added `--encoder-use-flash-attn` to `/vepfs-mlp2/c20250601/251105016/project/dllm_test/examples/bioseq/train_qwen3_vl_bioseq_ddp.py` and exported the local ESMC loader from `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/__init__.py`.
+- Verified syntax:
+  - `python -m py_compile /vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/modeling_bioseq.py /vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/__init__.py /vepfs-mlp2/c20250601/251105016/project/dllm_test/examples/bioseq/train_qwen3_vl_bioseq_ddp.py /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/tests/bioseq/test_qwen3_vl_bioseq_model.py`
+- Verified tests:
+  - `python -m pytest /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/tests/bioseq/test_qwen3_vl_bioseq_model.py /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/tests/bioseq/test_qwen3_vl_data_loader.py /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/tests/bioseq/test_qwen3_vl_ddp_training.py -q`: `31 passed`
+- Verified real ESMC-300M local loading in both current Python and `/vepfs-mlp2/c20250601/251105016/conda/envs/protenix_abtcr/bin/python`: `LocalESMCEncoder`, hidden size `960`, output shape `(1, 5, 960)`.
+- Added a stricter ESMC-300M state-dict validation: raw local safetensors have `398` keys including wrapper metadata/extra-state entries; converted native ESMC state dict has `308` keys; native Biohub `ESMC(d_model=960, n_heads=15, n_layers=30)` also has `308` keys. Missing keys, unexpected keys, and shape mismatches are all `0`, and parameter numel matches exactly at `332997184`. Forward output with padding mask is finite with shape `(2, 7, 960)`.
+- Verified ESMC-600M with the same strict check. Config is `d_model=1152`, `n_heads=18`, `n_layers=36`, `vocab_size=64`, `mask_token_id=32`, and `pad_token_id=1`. Raw local safetensors have `476` keys; converted native ESMC state dict has `368` keys; native Biohub `ESMC(d_model=1152, n_heads=18, n_layers=36)` also has `368` keys. Missing keys, unexpected keys, and shape mismatches are all `0`, and parameter numel matches exactly at `575036992`. `strict=True` load passed, and wrapper forward output is finite with shape `(2, 7, 1152)`.
