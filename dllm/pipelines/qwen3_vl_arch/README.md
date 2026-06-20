@@ -45,14 +45,19 @@ Training models for this path live in:
 
 Current exported entry points:
 
-- `BioSeqNoEncoderDiffusionModel`: decoder-only masked diffusion over the token stream emitted by `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/data/collator.py`.
-- `BioSeqEncoderDiffusionModel`: ESMC/ESM-conditioned masked diffusion. Decoder target residues that are corrupted are also masked in the per-chain encoder input before the encoder forward pass, so clean target residues cannot leak through encoder features.
-- `BioSeqDiffusionTransformerConfig`: vocabulary/model/loss config. Use `vocab_size=33` for the local ESM2/MINT tokenizer and `vocab_size=64` when training with ESMC tokenization.
+- `BioSeqNoEncoderDiffusionModel`: no-encoder masked diffusion over the token stream emitted by `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/data/collator.py`. This path uses bidirectional self-attention and has no ESM/ESMC encoder; it is not a causal/autoregressive LM.
+- `BioSeqEncoderDiffusionModel`: ESMC/ESM feature-conditioned masked diffusion. ESMC runs on the current per-chain diffusion state `x_t` and returns token-level features; the BioSeq denoiser still runs over the concatenated multi-chain token stream and models chain-chain denoising jointly.
+- `BioSeqDiffusionTransformerConfig`: vocabulary/model/loss config. The local
+  ESM2 and ESMC sequence tokenizers expose 33 active ids. `grammar_v1` appends
+  23 structural/relation ids for a decoder vocabulary of 56.
 - `load_local_esmc_encoder`: local Biohub ESMC loader for `/c20250601/mj/model_weights/esmc/<model>` checkpoints when Hugging Face `AutoModel` does not recognize `model_type="esmc"`.
 - `sample_bioseq_diffusion_noise`: BioSeq diffusion corruption over `diffusion_loss_mask`.
-- `apply_decoder_corruption_to_encoder`: maps corrupted decoder residues back to per-chain encoder residues.
+- `apply_decoder_corruption_to_encoder`: builds the per-chain ESMC `x_t` by mapping the decoder corruption state back to encoder residue positions.
 
 The encoder model keeps the biological encoder trainable by default. Use `freeze_encoder=True` only for ablations or debugging.
+
+The structured multi-entity representation and Arrow preprocessing contract
+are documented in [GRAMMAR_V1.md](GRAMMAR_V1.md).
 
 Known environment constraint: local ESMC checkpoints under `/c20250601/mj/model_weights/esmc/ESMC-300M`, `/c20250601/mj/model_weights/esmc/ESMC-600M`, and `/c20250601/mj/model_weights/esmc/ESMC-6B` declare `model_type="esmc"`, but this environment uses `transformers==4.48.1`, which does not recognize that type through `AutoModel`. The project loader handles this by falling back to Biohub `esm==3.2.3`, instantiating native `esm.models.esmc.ESMC`, and converting local safetensor keys before strict state-dict loading.
 
@@ -65,13 +70,17 @@ python -m pytest /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/tests
 
 ## DDP Training
 
-The Qwen3-VL-style BioSeq DDP trainer is:
+The BioSeq foundation-model DDP trainer is:
 
 `/vepfs-mlp2/c20250601/251105016/project/dllm_test/examples/bioseq/train_qwen3_vl_bioseq_ddp.py`
 
 It should be launched with `torchrun` for multi-node/multi-GPU training. The
 streaming data path is rank-aware: `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/data/mixture.py`
 combines DDP rank and DataLoader worker id when sharding iterable source files.
+The default foundation objective is `full_denoise`: every eligible target
+residue is part of the diffusion target mask, and train/validation loss is
+computed only on corrupted target residues. The DDP trainer hard-codes that
+view and does not route foundation training through conditional-view ablations.
 
 Local CPU DDP smoke:
 

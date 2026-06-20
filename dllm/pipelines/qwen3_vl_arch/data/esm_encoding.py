@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, Protocol
@@ -89,6 +90,53 @@ class Esm2SequenceTokenizer:
         return "".join(pieces)
 
 
+class TokenizersEsmTokenizer:
+    """Small wrapper for local ``tokenizer.json`` snapshots.
+
+    Some ESMC releases declare ``ESMCTokenizer``, which older Transformers
+    versions cannot import. The underlying ``tokenizer.json`` is still a normal
+    tokenizers file, so this wrapper provides the small API the collator needs.
+    """
+
+    def __init__(self, tokenizer: object) -> None:
+        self.tokenizer = tokenizer
+        self.cls_token_id = self._token_id("<cls>")
+        self.pad_token_id = self._token_id("<pad>")
+        self.eos_token_id = self._token_id("<eos>")
+        self.unk_token_id = self._token_id("<unk>")
+        self.mask_token_id = self._token_id("<mask>")
+
+    @classmethod
+    def from_file(cls, path: str | Path) -> "TokenizersEsmTokenizer":
+        from tokenizers import Tokenizer
+
+        return cls(Tokenizer.from_file(str(path)))
+
+    @property
+    def vocab_size(self) -> int:
+        return int(self.tokenizer.get_vocab_size())
+
+    def _token_id(self, token: str) -> int:
+        token_id = self.tokenizer.token_to_id(token)
+        if token_id is None:
+            raise ValueError(f"tokenizer is missing required token: {token}")
+        return int(token_id)
+
+    def encode(self, sequence: str, add_special_tokens: bool = True, **kwargs) -> list[int]:
+        encoding = self.tokenizer.encode(sequence, add_special_tokens=add_special_tokens)
+        token_ids = list(encoding.ids)
+        max_length = kwargs.get("max_length")
+        if max_length is not None and len(token_ids) > int(max_length):
+            max_length = int(max_length)
+            if max_length < 2:
+                raise ValueError("max_length must leave room for <cls> and <eos>")
+            if add_special_tokens and token_ids[0] == self.cls_token_id and token_ids[-1] == self.eos_token_id:
+                token_ids = [token_ids[0]] + token_ids[1 : max_length - 1] + [token_ids[-1]]
+            else:
+                token_ids = token_ids[:max_length]
+        return token_ids
+
+
 @dataclass
 class HuggingFaceEsmTokenizerAdapter:
     """Adapter for local ESM-family Hugging Face tokenizers.
@@ -102,9 +150,19 @@ class HuggingFaceEsmTokenizerAdapter:
 
     @classmethod
     def from_pretrained(cls, path: str | Path, local_files_only: bool = True) -> "HuggingFaceEsmTokenizerAdapter":
-        from transformers import AutoTokenizer
+        path = Path(path)
+        tokenizer_json = path / "tokenizer.json"
+        if tokenizer_json.is_file() and _prefer_tokenizer_json(path):
+            return cls(TokenizersEsmTokenizer.from_file(tokenizer_json))
 
-        tokenizer = AutoTokenizer.from_pretrained(str(path), local_files_only=local_files_only)
+        try:
+            from transformers import AutoTokenizer
+
+            tokenizer = AutoTokenizer.from_pretrained(str(path), local_files_only=local_files_only)
+        except Exception as exc:
+            if not tokenizer_json.is_file():
+                raise
+            tokenizer = TokenizersEsmTokenizer.from_file(tokenizer_json)
         return cls(tokenizer)
 
     @property
@@ -123,6 +181,13 @@ class HuggingFaceEsmTokenizerAdapter:
     def mask_token_id(self) -> int:
         return int(self.tokenizer.mask_token_id)
 
+    @property
+    def vocab_size(self) -> int:
+        value = getattr(self.tokenizer, "vocab_size", None)
+        if value is not None:
+            return int(value)
+        return int(len(self.tokenizer))
+
     def encode_chain(self, sequence: str, max_length: int | None = None) -> tuple[list[int], list[int]]:
         kwargs = {"add_special_tokens": True}
         if max_length is not None:
@@ -134,3 +199,19 @@ class HuggingFaceEsmTokenizerAdapter:
                 residue_mask[index] = 1
         return token_ids, residue_mask
 
+
+def _prefer_tokenizer_json(path: Path) -> bool:
+    config_path = path / "config.json"
+    tokenizer_config_path = path / "tokenizer_config.json"
+    for candidate in (config_path, tokenizer_config_path):
+        if not candidate.is_file():
+            continue
+        try:
+            data = json.loads(candidate.read_text())
+        except json.JSONDecodeError:
+            continue
+        model_type = str(data.get("model_type", "")).lower()
+        tokenizer_class = str(data.get("tokenizer_class", "")).lower()
+        if model_type == "esmc" or tokenizer_class == "esmctokenizer":
+            return True
+    return False

@@ -4,6 +4,8 @@ import json
 import sys
 from pathlib import Path
 
+import pytest
+
 PROJECT_ROOT = Path("/vepfs-mlp2/c20250601/251105016/project/dllm_test")
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
@@ -16,6 +18,7 @@ from dllm.pipelines.qwen3_vl_arch.data import (
     CsvBioSeqSource,
     CsvSourceConfig,
     Esm2SequenceTokenizer,
+    HuggingFaceEsmTokenizerAdapter,
     JsonlSourceConfig,
     ProcessedJsonlSource,
     SequentialMultiSourceDataset,
@@ -27,6 +30,7 @@ from dllm.pipelines.qwen3_vl_arch.data import (
     oas_row_to_record,
     ots_row_to_record,
 )
+from dllm.pipelines.qwen3_vl_arch.data.sources import default_source_configs
 
 
 def test_oas_and_ots_sources_orient_chain_roles(tmp_path):
@@ -51,6 +55,40 @@ def test_oas_and_ots_sources_orient_chain_roles(tmp_path):
     ots_record = next(iter(ots_source))
     assert ots_record.sequences == ["CCCCCC", "AAAAAA"]
     assert ots_record.chain_roles == ["tcr_beta", "tcr_alpha"]
+
+
+def test_oas_label_schema_maps_heavy_light_regions_and_default_path():
+    record = oas_row_to_record(
+        {
+            "cleaned_h_sequence": "AAACCCGGG",
+            "cleaned_l_sequence": "TTTDDDFFF",
+            "l_locus": "K",
+            "h_fwr1": "AAA",
+            "h_cdr1": "CCC",
+            "h_fwr2": "GGG",
+            "l_fwr1": "TTT",
+            "l_cdr1": "DDD",
+            "l_fwr2": "FFF",
+            "h_v_call": "IGHV3-23*01",
+            "h_j_call": "IGHJ4*02",
+            "l_v_call": "IGKV1-5*03",
+            "l_j_call": "IGKJ1*01",
+            "source": "OAS",
+            "split": "train",
+        },
+        split="train",
+    )
+
+    assert record is not None
+    assert record.sequences == ["AAACCCGGG", "TTTDDDFFF"]
+    assert record.chain_roles == ["antibody_heavy", "antibody_light"]
+    assert record.chains[0].regions == {"FR1": "AAA", "CDR1": "CCC", "FR2": "GGG"}
+    assert record.chains[1].regions == {"FR1": "TTT", "CDR1": "DDD", "FR2": "FFF"}
+    assert record.chains[0].metadata["h_v_call"] == "IGHV3-23*01"
+    assert record.chains[1].metadata["l_locus"] == "K"
+
+    oas_config = next(config for config in default_source_configs(split="valid") if config.name == "oas")
+    assert oas_config.path.name == "cleaned_merged_data_step_clustered_valid_oas_label.csv"
 
 
 def test_processed_jsonl_source_keeps_multichain_roles(tmp_path):
@@ -198,6 +236,7 @@ def test_collator_samples_one_generation_view_per_batch():
             allowed_views=["antigen_to_antibody", "antigen_fr_to_cdr"],
             seed=0,
         ),
+        single_view_per_batch=True,
         require_homogeneous_task=True,
     )
     batch = collator(records)
@@ -227,12 +266,69 @@ def test_collator_can_reject_mixed_task_groups():
         raise AssertionError("Expected mixed task groups to be rejected")
 
 
+def test_collator_default_allows_mixed_tasks_with_per_record_views():
+    records = [
+        BioSeqRecord(
+            chains=[BioSeqChain("HHHH", "antibody_heavy"), BioSeqChain("LLLL", "antibody_light")],
+            task_type="antibody",
+            source="unit",
+        ),
+        BioSeqRecord(
+            chains=[
+                BioSeqChain("HHHA", "antibody_heavy"),
+                BioSeqChain("LLLA", "antibody_light"),
+                BioSeqChain("ANTG", "antigen"),
+            ],
+            task_type="antibody_antigen",
+            source="unit",
+        ),
+    ]
+    collator = BioSeqQwenDataCollator(
+        view_sampler=BioSeqViewSampler(allowed_views=["antigen_to_antibody"], seed=0),
+    )
+
+    batch = collator(records)
+
+    assert batch["view_names"] == ["full_denoise", "antigen_to_antibody"]
+    assert batch["task_groups"] == ["antibody", "antibody_antigen"]
+    assert batch["task_types"] == ["antibody", "antibody_antigen"]
+    assert batch["input_ids"].shape[0] == 2
+    assert batch["diffusion_loss_mask"][0].sum().item() == len("HHHH") + len("LLLL")
+    assert batch["diffusion_loss_mask"][1].sum().item() == len("HHHA") + len("LLLA")
+    assert batch["fixed_context_mask"][1].sum().item() == len("ANTG")
+
+
+def test_collator_falls_back_when_truncation_removes_view_targets():
+    record = BioSeqRecord(
+        chains=[
+            BioSeqChain(
+                "A" * 20 + "CCC" + "G" * 5,
+                "antibody_heavy",
+                regions={"FR1": "A" * 20, "CDR1": "CCC", "FR2": "G" * 5},
+            ),
+        ],
+        task_type="antibody",
+        source="unit",
+    )
+    collator = BioSeqQwenDataCollator(
+        max_chain_length=16,
+        view_sampler=BioSeqViewSampler(allowed_views=["single_cdr"], seed=0),
+    )
+
+    batch = collator([record])
+
+    assert batch["view_names"] == ["full_denoise"]
+    assert batch["diffusion_loss_mask"].sum().item() == 14
+
+
 def test_view_sampler_uses_full_denoise_probability_for_single_records():
     record = BioSeqRecord(
         chains=[BioSeqChain("HHHH", "antibody_heavy"), BioSeqChain("LLLL", "antibody_light")],
         task_type="antibody",
         source="unit",
     )
+
+    assert BioSeqViewSampler(seed=0).sample(record).name == "full_denoise"
 
     full_sampler = BioSeqViewSampler(seed=0, full_denoise_probability=1.0)
     assert [full_sampler.sample(record).name for _ in range(5)] == ["full_denoise"] * 5
@@ -404,12 +500,29 @@ def test_default_view_profile_is_task_specific_for_antibody_antigen():
 def test_esm2_tokenizer_matches_local_vocab_snapshot():
     vocab_path = Path("/c20250601/mj/model_weights/esm2/esm2_t33_650M_UR50D/vocab.txt")
     tokenizer = Esm2SequenceTokenizer()
-    assert vocab_path.is_file()
+    if not vocab_path.is_file():
+        pytest.skip(f"local ESM2 vocab snapshot is not mounted: {vocab_path}")
     assert tuple(vocab_path.read_text().splitlines()) == tokenizer.tokens
     assert tokenizer.cls_token_id == 0
     assert tokenizer.pad_token_id == 1
     assert tokenizer.eos_token_id == 2
     assert tokenizer.mask_token_id == 32
+
+
+def test_esmc_tokenizer_adapter_loads_local_tokenizer_json_without_auto_tokenizer():
+    tokenizer_path = Path(
+        "/vepfs-mlp2/c20250601/251105016/project/dllm_test/model_weights/esmc/ESMC-300M"
+    )
+    tokenizer = HuggingFaceEsmTokenizerAdapter.from_pretrained(tokenizer_path, local_files_only=True)
+
+    assert tokenizer.cls_token_id == 0
+    assert tokenizer.pad_token_id == 1
+    assert tokenizer.eos_token_id == 2
+    assert tokenizer.mask_token_id == 32
+    assert tokenizer.vocab_size == 33
+    token_ids, residue_mask = tokenizer.encode_chain("ACD", max_length=5)
+    assert token_ids == [0, 5, 23, 13, 2]
+    assert residue_mask == [0, 1, 1, 1, 0]
 
 
 def test_full_denoise_keeps_antigen_and_pmhc_context_fixed():

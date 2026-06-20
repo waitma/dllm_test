@@ -1,5 +1,16 @@
 from .collator import BioSeqQwenDataCollator
 from .esm_encoding import Esm2SequenceTokenizer, HuggingFaceEsmTokenizerAdapter
+from .grammar import (
+    DEFAULT_GRAMMAR_DATA_DIR,
+    GRAMMAR_RELATIONS,
+    GRAMMAR_TOKENS,
+    GrammarArrowSource,
+    GrammarArrowSourceConfig,
+    GrammarBioSeqCollator,
+    GrammarRenderer,
+    GrammarTokenizer,
+    TOKEN_CLASS_NAMES,
+)
 from .mixture import (
     SequentialMultiSourceDataset,
     SourceWithWeight,
@@ -34,6 +45,13 @@ __all__ = [
     "CsvSourceConfig",
     "Esm2SequenceTokenizer",
     "GenerationView",
+    "GRAMMAR_RELATIONS",
+    "GRAMMAR_TOKENS",
+    "GrammarArrowSource",
+    "GrammarArrowSourceConfig",
+    "GrammarBioSeqCollator",
+    "GrammarRenderer",
+    "GrammarTokenizer",
     "HuggingFaceEsmTokenizerAdapter",
     "JsonlSourceConfig",
     "PpiArrowSource",
@@ -42,8 +60,10 @@ __all__ = [
     "ResidueSpan",
     "SequentialMultiSourceDataset",
     "SourceWithWeight",
+    "TOKEN_CLASS_NAMES",
     "TaskHomogeneousBatchDataset",
     "WeightedMixtureDataset",
+    "DEFAULT_GRAMMAR_DATA_DIR",
     "bioseq_record_fingerprint",
     "bioseq_task_group",
     "default_source_configs",

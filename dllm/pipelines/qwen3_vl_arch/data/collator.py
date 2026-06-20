@@ -20,7 +20,7 @@ def _span_contains(spans: list[ResidueSpan], chain_index: int, residue_index: in
 
 @dataclass
 class BioSeqQwenDataCollator:
-    """Collate BioSeq records for Qwen-style diffusion with ESM-family ids.
+    """Collate BioSeq records for foundation diffusion with ESM-family ids.
 
     The decoder stream and the per-chain encoder tensors use the same tokenizer
     by default. This keeps the batch compatible with ESM2/MINT today and allows
@@ -33,7 +33,7 @@ class BioSeqQwenDataCollator:
     max_sequence_length: int | None = None
     chain_role_to_id: dict[str, int] = field(default_factory=lambda: dict(CHAIN_ROLE_TO_ID))
     task_type_to_id: dict[str, int] = field(default_factory=lambda: dict(TASK_TYPE_TO_ID))
-    single_view_per_batch: bool = True
+    single_view_per_batch: bool = False
     require_homogeneous_task: bool = False
 
     def __call__(self, records: list[BioSeqRecord | dict[str, Any]]) -> dict[str, Any]:
@@ -45,13 +45,27 @@ class BioSeqQwenDataCollator:
         views = self.view_sampler.sample_batch(normalized) if self.single_view_per_batch else [
             self.view_sampler.sample(record) for record in normalized
         ]
-        encoded = [self._encode_decoder(record, view) for record, view in zip(normalized, views)]
+        encoded = []
+        resolved_views = []
+        for record, view in zip(normalized, views):
+            row = self._encode_decoder(record, view)
+            if not any(row["diffusion_loss_mask"]):
+                fallback_view = self.view_sampler.full_denoise(record)
+                fallback_row = self._encode_decoder(record, fallback_view)
+                if any(fallback_row["diffusion_loss_mask"]):
+                    view = fallback_view
+                    row = fallback_row
+            resolved_views.append(view)
+            encoded.append(row)
+        views = resolved_views
         encoder = [self._encode_encoder(record) for record in normalized]
 
         decoder_batch = self._pad_decoder(encoded)
         encoder_batch = self._pad_encoder(encoder)
         decoder_batch.update(encoder_batch)
         decoder_batch["view_names"] = [view.name for view in views]
+        decoder_batch["task_groups"] = [bioseq_task_group(record) for record in normalized]
+        decoder_batch["task_types"] = [record.task_type for record in normalized]
         decoder_batch["sources"] = [record.source for record in normalized]
         decoder_batch["weights"] = torch.tensor([record.weight for record in normalized], dtype=torch.float32).unsqueeze(-1)
         return decoder_batch

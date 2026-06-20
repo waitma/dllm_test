@@ -1,0 +1,82 @@
+TaskName: "qwen3_vl_bioseq_grammar_v1_no_encoder_300m"
+Description: "Grammar-v1 BioSeq no-encoder 300M training on OAS, OTS, TCR/epitope and canonical STRING PPI Arrow data. 1 node x 8 GPU."
+
+Storages:
+  - Type: "Vepfs"
+    MountPath: "/vepfs-mlp2/c20250601/251105016"
+    VepfsId: "vepfs-cnbj2c98dea54433"
+    SubPath: "c20250601/251105016"
+
+Entrypoint: |
+  set -euo pipefail
+  cd /vepfs-mlp2/c20250601/251105016/project/dllm_test
+  source activate /vepfs-mlp2/c20250601/251105016/conda/envs/protenix_abtcr
+  export PYTHONPATH=/vepfs-mlp2/c20250601/251105016/project/dllm_test
+  export OMP_NUM_THREADS=8
+  export NCCL_TIMEOUT_SECOND=1800
+  export NCCL_DEBUG=WARN
+  if [ -f /vepfs-mlp2/c20250601/251105016/.secrets/wandb_api_key ]; then
+    export WANDB_API_KEY="$(cat /vepfs-mlp2/c20250601/251105016/.secrets/wandb_api_key)"
+  fi
+
+  DATA_DIR=/vepfs-mlp2/c20250601/251105016/project/dllm_test/data/bioseq_grammar_v1
+  TOKENIZER_DIR=/vepfs-mlp2/c20250601/251105016/project/dllm_test/model_weights/esmc/ESMC-300M
+  OUTPUT_DIR=/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/grammar_v1_no_encoder_300m
+  export WANDB_DIR="${OUTPUT_DIR}/wandb"
+  test -f "${DATA_DIR}/manifest.json"
+  test -f "${TOKENIZER_DIR}/tokenizer.json"
+  python -m pytest scripts/tests/bioseq/test_qwen3_vl_grammar.py -q
+
+  torchrun \
+      --nnodes=${MLP_WORKER_NUM} \
+      --nproc_per_node=${MLP_WORKER_GPU} \
+      --node_rank=${MLP_ROLE_INDEX} \
+      --master_addr=${MLP_WORKER_0_HOST} \
+      --master_port=${MLP_WORKER_0_PORT} \
+      examples/bioseq/train_qwen3_vl_bioseq_ddp.py \
+          --input-format grammar_v1 \
+          --grammar-data-dir "${DATA_DIR}" \
+          --model-type no_encoder \
+          --tokenizer-path "${TOKENIZER_DIR}" \
+          --sources oas,ots,tcr,ppi \
+          --batch-size 1 \
+          --grad-accum 8 \
+          --max-steps 50000 \
+          --max-sequence-length 2112 \
+          --max-position-embeddings 2304 \
+          --hidden-size 1024 \
+          --num-hidden-layers 18 \
+          --num-attention-heads 16 \
+          --intermediate-size 4096 \
+          --dropout 0.1 \
+          --gradient-checkpointing \
+          --lr 1e-4 \
+          --warmup-steps 1000 \
+          --grad-clip 1.0 \
+          --bf16 \
+          --num-workers 2 \
+          --log-interval 20 \
+          --val-interval 1000 \
+          --val-batches 10 \
+          --val-split valid \
+          --save-interval 500 \
+          --resume none \
+          --output-dir "${OUTPUT_DIR}" \
+          --wandb-mode online \
+          --wandb-project bioseq-qwen3-vl \
+          --wandb-run-name grammar_v1_no_encoder_300m \
+          --wandb-dir "${WANDB_DIR}"
+
+Tags: [bioseq, grammar_v1, no_encoder, 300m, 8gpu, oas, ots, tcr, ppi]
+ImageUrl: "cr-mlp-cn-beijing.cr.volces.com/public/airgen:v1"
+Framework: "Custom"
+ResourceQueueName: "c20250601"
+TaskRoleSpecs:
+  - RoleName: "worker"
+    RoleReplicas: 1
+    Flavor: "ml.pni2.28xlarge"
+ActiveDeadlineSeconds: 604800
+DelayExitTimeSeconds: 0
+AccessType: "Private"
+Preemptible: false
+Priority: 6

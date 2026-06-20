@@ -216,7 +216,7 @@ class BioSeqViewSampler:
         self,
         allowed_views: Sequence[str] | None = None,
         seed: int = 0,
-        full_denoise_probability: float = 0.5,
+        full_denoise_probability: float = 1.0,
     ) -> None:
         if not 0.0 <= full_denoise_probability <= 1.0:
             raise ValueError("full_denoise_probability must be between 0 and 1")

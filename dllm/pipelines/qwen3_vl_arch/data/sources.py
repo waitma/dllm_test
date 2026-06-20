@@ -23,11 +23,12 @@ from .records import (
 csv.field_size_limit(min(sys.maxsize, 2**31 - 1))
 
 DEFAULT_DATA_ROOT = Path("/vepfs-mlp2/c20250601/251105016/project/dllm_test/data")
-DEFAULT_OAS_DIR = DEFAULT_DATA_ROOT / "oas_previous_clean/splits/compat_for_current_loader_oasrule"
+DEFAULT_OAS_DIR = DEFAULT_DATA_ROOT / "oas_previous_clean/splits"
 DEFAULT_OTS_DIR = DEFAULT_DATA_ROOT / "ots_paired_clean/final"
 DEFAULT_NANOBODY_DIR = DEFAULT_DATA_ROOT / "nanobody_processed/step6_final"
 DEFAULT_PROCESSED_V2_DIR = DEFAULT_DATA_ROOT / "processed_v2"
 DEFAULT_PPI_DIR = DEFAULT_DATA_ROOT / "ppi/string_model_org_90_90_split"
+OAS_LABEL_FILE_TEMPLATE = "cleaned_merged_data_step_clustered_{split}_oas_label.csv"
 
 
 def _is_heavy(row: dict[str, Any], prefix: str) -> bool:
@@ -50,6 +51,23 @@ def _regions(row: dict[str, Any], prefix: str) -> dict[str, str]:
     }
 
 
+def _oas_label_regions(row: dict[str, Any], prefix: str) -> dict[str, str]:
+    fields = {
+        "FR1": "fwr1",
+        "CDR1": "cdr1",
+        "FR2": "fwr2",
+        "CDR2": "cdr2",
+        "FR3": "fwr3",
+        "CDR3": "cdr3",
+        "FR4": "fwr4",
+    }
+    return {
+        region: normalize_sequence(row.get(f"{prefix}_{field}"))
+        for region, field in fields.items()
+        if normalize_sequence(row.get(f"{prefix}_{field}"))
+    }
+
+
 def _chain_metadata(row: dict[str, Any], prefix: str) -> dict[str, Any]:
     return compact_metadata(
         row,
@@ -64,11 +82,68 @@ def _chain_metadata(row: dict[str, Any], prefix: str) -> dict[str, Any]:
     )
 
 
+def _oas_label_chain_metadata(row: dict[str, Any], prefix: str) -> dict[str, Any]:
+    if prefix == "h":
+        keys = ("h_v_call", "h_d_call", "h_j_call", "H_cluster_id", "h_region_labels")
+    else:
+        keys = ("l_locus", "l_v_call", "l_j_call", "L_cluster_id", "l_region_labels")
+    return compact_metadata(row, keys)
+
+
 def _split_path(path: Path, split: str) -> Path:
     return path if path.is_file() else path / f"{split}.csv"
 
 
+def _canonical_csv_split(split: str) -> str:
+    normalized = str(split).strip().lower()
+    if normalized in {"val", "valid", "validation"}:
+        return "valid"
+    return normalized or "train"
+
+
+def _oas_label_split_path(split: str) -> Path:
+    return DEFAULT_OAS_DIR / OAS_LABEL_FILE_TEMPLATE.format(split=_canonical_csv_split(split))
+
+
+def _is_oas_label_row(row: dict[str, Any]) -> bool:
+    return "cleaned_h_sequence" in row and "cleaned_l_sequence" in row
+
+
+def _oas_label_light_role(row: dict[str, Any]) -> str:
+    locus = str(row.get("l_locus", "")).strip().upper()
+    if locus == "H":
+        return "antibody_heavy"
+    return "antibody_light"
+
+
 def oas_row_to_record(row: dict[str, Any], split: str | None = None, weight: float = 1.0) -> BioSeqRecord | None:
+    if _is_oas_label_row(row):
+        heavy = normalize_sequence(row.get("cleaned_h_sequence"))
+        light = normalize_sequence(row.get("cleaned_l_sequence"))
+        if not is_valid_protein_sequence(heavy) or not is_valid_protein_sequence(light):
+            return None
+        return BioSeqRecord(
+            chains=[
+                BioSeqChain(heavy, "antibody_heavy", _oas_label_regions(row, "h"), _oas_label_chain_metadata(row, "h")),
+                BioSeqChain(light, _oas_label_light_role(row), _oas_label_regions(row, "l"), _oas_label_chain_metadata(row, "l")),
+            ],
+            task_type="antibody",
+            source="oas_paired",
+            split=str(row.get("split") or split or "").strip() or None,
+            metadata=compact_metadata(
+                row,
+                (
+                    "species",
+                    "source",
+                    "l_locus",
+                    "ab_cluster_key",
+                    "ab_cluster_id",
+                    "ab_cluster_id_counts",
+                ),
+            ),
+            weight=weight,
+        )
+
     chain1 = normalize_sequence(row.get("cleaned_chain1_seq"))
     chain2 = normalize_sequence(row.get("cleaned_chain2_seq"))
     if not is_valid_protein_sequence(chain1) or not is_valid_protein_sequence(chain2):
@@ -280,7 +355,7 @@ class PpiArrowSource(IterableDataset):
 
 def default_source_configs(split: str = "train", max_records: int | None = None) -> list[CsvSourceConfig | JsonlSourceConfig]:
     return [
-        CsvSourceConfig("oas", DEFAULT_OAS_DIR, oas_row_to_record, split=split, max_records=max_records),
+        CsvSourceConfig("oas", _oas_label_split_path(split), oas_row_to_record, split=split, max_records=max_records),
         CsvSourceConfig("ots", DEFAULT_OTS_DIR, ots_row_to_record, split=split, max_records=max_records),
         CsvSourceConfig("nanobody", DEFAULT_NANOBODY_DIR, nanobody_row_to_record, split=split, max_records=max_records),
         JsonlSourceConfig("processed_v2", DEFAULT_PROCESSED_V2_DIR, split="val" if split in {"valid", "validation"} else split, max_records=max_records),

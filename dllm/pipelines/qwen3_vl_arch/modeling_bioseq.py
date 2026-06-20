@@ -10,6 +10,7 @@ from typing import Any
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.utils.checkpoint import checkpoint
 
 
 @dataclass
@@ -35,6 +36,8 @@ class BioSeqDiffusionTransformerConfig:
     time_epsilon: float = 1e-3
     loss_norm: str = "token"
     condition_hidden_size: int | None = None
+    gradient_checkpointing: bool = False
+    initializer_range: float = 0.02
 
 
 @dataclass
@@ -47,6 +50,7 @@ class BioSeqDiffusionOutput:
     corruption_mask: torch.Tensor | None = None
     timesteps: torch.Tensor | None = None
     noised_encoder_input_ids: torch.Tensor | None = None
+    encoder_condition: torch.Tensor | None = None
 
 
 class BioSeqRMSNorm(nn.Module):
@@ -97,14 +101,16 @@ class BioSeqSelfAttention(nn.Module):
         key = self._shape(self.k_proj(hidden_states), batch_size, seq_len)
         value = self._shape(self.v_proj(hidden_states), batch_size, seq_len)
 
-        scores = torch.matmul(query, key.transpose(-1, -2)) * self.scale
-        if attention_mask is not None:
-            key_mask = attention_mask.bool()[:, None, None, :]
-            scores = scores.masked_fill(~key_mask, torch.finfo(scores.dtype).min)
-
-        probs = F.softmax(scores, dim=-1)
-        probs = self.dropout(probs)
-        context = torch.matmul(probs, value)
+        key_mask = attention_mask.bool()[:, None, None, :] if attention_mask is not None else None
+        context = F.scaled_dot_product_attention(
+            query,
+            key,
+            value,
+            attn_mask=key_mask,
+            dropout_p=self.dropout.p if self.training else 0.0,
+            is_causal=False,
+            scale=self.scale,
+        )
         context = context.transpose(1, 2).contiguous().view(batch_size, seq_len, hidden_size)
         return self.o_proj(context)
 
@@ -171,18 +177,23 @@ def sample_bioseq_diffusion_noise(
 
     input_ids = batch["input_ids"]
     attention_mask = batch.get("attention_mask")
-    residue_mask = batch.get("residue_mask")
     loss_mask = batch.get("diffusion_loss_mask", batch.get("diffusion_target_mask"))
     if loss_mask is None:
         raise KeyError("batch requires diffusion_loss_mask or diffusion_target_mask")
 
-    eligible_mask = loss_mask.bool()
+    explicit_eligible_mask = batch.get("diffusion_eligible_mask")
+    eligible_mask = (
+        explicit_eligible_mask.bool()
+        if explicit_eligible_mask is not None
+        else loss_mask.bool()
+    )
     if attention_mask is not None:
         eligible_mask = eligible_mask & attention_mask.bool()
-    if residue_mask is not None:
+    residue_mask = batch.get("residue_mask")
+    if explicit_eligible_mask is None and residue_mask is not None:
         eligible_mask = eligible_mask & residue_mask.bool()
     if not eligible_mask.any():
-        raise ValueError("batch has no eligible diffusion target residues")
+        raise ValueError("batch has no eligible diffusion target tokens")
 
     batch_size, seq_len = input_ids.shape
     timesteps = torch.empty(batch_size, device=input_ids.device, dtype=torch.float32).uniform_(time_epsilon, 1.0)
@@ -213,6 +224,25 @@ def apply_decoder_corruption_to_encoder(
     """
 
     encoder_input_ids = batch["encoder_input_ids"]
+    encoder_position_ids = batch.get("encoder_position_ids")
+    if encoder_position_ids is not None:
+        noised_encoder_input_ids = encoder_input_ids.clone()
+        batch_size, max_chains, encoder_len = encoder_input_ids.shape
+        if max_chains != 1:
+            raise ValueError("Direct encoder_position_ids mapping requires a single proxy stream")
+        for batch_index in range(batch_size):
+            decoder_positions = torch.nonzero(corruption_mask[batch_index], as_tuple=False).flatten()
+            if decoder_positions.numel() == 0:
+                continue
+            encoder_positions = encoder_position_ids[batch_index, decoder_positions]
+            valid = encoder_positions.ge(0) & encoder_positions.lt(encoder_len)
+            noised_encoder_input_ids[
+                batch_index,
+                0,
+                encoder_positions[valid],
+            ] = int(mask_token_id)
+        return noised_encoder_input_ids
+
     encoder_residue_mask = batch["encoder_residue_mask"]
     chain_ids = batch["chain_ids"]
     position_ids_inner = batch["position_ids_inner"]
@@ -269,18 +299,56 @@ class LocalESMCEncoder(nn.Module):
 
     def forward(
         self,
-        input_ids: torch.Tensor,
+        input_ids: torch.Tensor | None = None,
         attention_mask: torch.Tensor | None = None,
+        inputs_embeds: torch.Tensor | None = None,
+        diffusion_state: torch.Tensor | None = None,
         **_: Any,
     ) -> SimpleNamespace:
-        output = self.esmc(
-            sequence_tokens=input_ids,
-            sequence_id=attention_mask.bool() if attention_mask is not None else None,
-        )
+        if inputs_embeds is not None or diffusion_state is not None:
+            if getattr(self.esmc, "_use_flash_attn", False):
+                raise ValueError("ESMC inputs_embeds/diffusion_state path does not support flash attention")
+            embeddings = inputs_embeds if inputs_embeds is not None else self._embed_diffusion_state(diffusion_state)
+            if attention_mask is None:
+                sequence_id = torch.ones(embeddings.shape[:2], device=embeddings.device, dtype=torch.bool)
+            else:
+                sequence_id = attention_mask.bool()
+            hidden_states, _, all_hidden_states = self.esmc.transformer(embeddings, sequence_id=sequence_id)
+            output = SimpleNamespace(
+                embeddings=hidden_states,
+                hidden_states=torch.stack(all_hidden_states, dim=0),
+                sequence_logits=self.esmc.sequence_head(hidden_states),
+            )
+        else:
+            if input_ids is None:
+                raise ValueError("LocalESMCEncoder requires input_ids, inputs_embeds, or diffusion_state")
+            output = self.esmc(
+                sequence_tokens=input_ids,
+                sequence_id=attention_mask.bool() if attention_mask is not None else None,
+            )
         return SimpleNamespace(
             last_hidden_state=output.embeddings,
             hidden_states=output.hidden_states,
             logits=output.sequence_logits,
+        )
+
+    def _embed_diffusion_state(self, diffusion_state: torch.Tensor | None) -> torch.Tensor:
+        if diffusion_state is None:
+            raise ValueError("diffusion_state is required")
+        if not torch.is_floating_point(diffusion_state):
+            return self.esmc.embed(diffusion_state.long())
+        if diffusion_state.dim() != 3:
+            raise ValueError(
+                "Floating diffusion_state must have shape [batch, seq, vocab] "
+                "or [batch, seq, hidden]"
+            )
+        if diffusion_state.shape[-1] == self.esmc.embed.num_embeddings:
+            return torch.matmul(diffusion_state.to(self.esmc.embed.weight.dtype), self.esmc.embed.weight)
+        if diffusion_state.shape[-1] == self.esmc.embed.embedding_dim:
+            return diffusion_state.to(self.esmc.embed.weight.dtype)
+        raise ValueError(
+            "Floating diffusion_state last dimension must match ESMC vocab size "
+            f"({self.esmc.embed.num_embeddings}) or hidden size ({self.esmc.embed.embedding_dim})"
         )
 
 
@@ -354,7 +422,7 @@ def load_local_esmc_encoder(
 
 
 class BioSeqDiffusionDecoder(nn.Module):
-    """Qwen-style bidirectional decoder used for BioSeq diffusion training."""
+    """Bidirectional transformer stack used for BioSeq foundation diffusion."""
 
     def __init__(self, config: BioSeqDiffusionTransformerConfig) -> None:
         super().__init__()
@@ -373,11 +441,30 @@ class BioSeqDiffusionDecoder(nn.Module):
         self.layers = nn.ModuleList([BioSeqTransformerBlock(config) for _ in range(config.num_hidden_layers)])
         self.final_layernorm = BioSeqRMSNorm(config.hidden_size)
         self.lm_head = nn.Linear(config.hidden_size, config.vocab_size, bias=False)
+        self.apply(self._init_weights)
+        residual_std = config.initializer_range / math.sqrt(2.0 * max(config.num_hidden_layers, 1))
+        for layer in self.layers:
+            nn.init.normal_(layer.self_attn.o_proj.weight, mean=0.0, std=residual_std)
+            nn.init.normal_(layer.mlp.down_proj.weight, mean=0.0, std=residual_std)
         self.lm_head.weight = self.token_embeddings.weight
+
+    def _init_weights(self, module: nn.Module) -> None:
+        if isinstance(module, nn.Linear):
+            nn.init.normal_(module.weight, mean=0.0, std=self.config.initializer_range)
+            if module.bias is not None:
+                nn.init.zeros_(module.bias)
+        elif isinstance(module, nn.Embedding):
+            nn.init.normal_(module.weight, mean=0.0, std=self.config.initializer_range)
+            if module.padding_idx is not None:
+                with torch.no_grad():
+                    module.weight[module.padding_idx].zero_()
+        elif isinstance(module, BioSeqRMSNorm):
+            nn.init.ones_(module.weight)
 
     def forward(
         self,
-        input_ids: torch.Tensor,
+        input_ids: torch.Tensor | None = None,
+        diffusion_state: torch.Tensor | None = None,
         attention_mask: torch.Tensor | None = None,
         chain_role_ids: torch.Tensor | None = None,
         position_ids_inner: torch.Tensor | None = None,
@@ -386,17 +473,23 @@ class BioSeqDiffusionDecoder(nn.Module):
         timesteps: torch.Tensor | None = None,
         encoder_condition: torch.Tensor | None = None,
     ) -> BioSeqDiffusionOutput:
-        batch_size, seq_len = input_ids.shape
+        if input_ids is None and diffusion_state is None:
+            raise ValueError("BioSeqDiffusionDecoder requires input_ids or diffusion_state")
+        batch_size, seq_len = (diffusion_state.shape[:2] if diffusion_state is not None else input_ids.shape)
         if seq_len > self.config.max_position_embeddings:
             raise ValueError(
                 f"Sequence length {seq_len} exceeds max_position_embeddings "
                 f"{self.config.max_position_embeddings}"
             )
 
-        hidden_states = self.token_embeddings(input_ids)
+        hidden_states = (
+            self._embed_diffusion_state(diffusion_state)
+            if diffusion_state is not None
+            else self.token_embeddings(input_ids)
+        )
 
         if position_ids_inner is None:
-            position_ids_inner = torch.arange(seq_len, device=input_ids.device).unsqueeze(0).expand(batch_size, -1)
+            position_ids_inner = torch.arange(seq_len, device=hidden_states.device).unsqueeze(0).expand(batch_size, -1)
         safe_inner = position_ids_inner.clamp(min=0, max=self.config.max_position_embeddings - 1)
         inner_valid = position_ids_inner.ge(0).to(hidden_states.dtype).unsqueeze(-1)
         hidden_states = hidden_states + self.inner_position_embeddings(safe_inner) * inner_valid
@@ -426,7 +519,15 @@ class BioSeqDiffusionDecoder(nn.Module):
             hidden_states = hidden_states * attention_mask.to(hidden_states.dtype).unsqueeze(-1)
 
         for layer in self.layers:
-            hidden_states = layer(hidden_states, attention_mask=attention_mask)
+            if self.config.gradient_checkpointing and self.training:
+                hidden_states = checkpoint(
+                    layer,
+                    hidden_states,
+                    attention_mask,
+                    use_reentrant=False,
+                )
+            else:
+                hidden_states = layer(hidden_states, attention_mask=attention_mask)
             if attention_mask is not None:
                 hidden_states = hidden_states * attention_mask.to(hidden_states.dtype).unsqueeze(-1)
 
@@ -434,9 +535,30 @@ class BioSeqDiffusionDecoder(nn.Module):
         logits = self.lm_head(hidden_states)
         return BioSeqDiffusionOutput(loss=None, logits=logits, hidden_states=hidden_states)
 
+    def _embed_diffusion_state(self, diffusion_state: torch.Tensor) -> torch.Tensor:
+        if not torch.is_floating_point(diffusion_state):
+            return self.token_embeddings(diffusion_state.long())
+        if diffusion_state.dim() != 3:
+            raise ValueError(
+                "Floating diffusion_state must have shape [batch, seq, vocab] "
+                "or [batch, seq, hidden]"
+            )
+        if diffusion_state.shape[-1] == self.config.vocab_size:
+            return torch.matmul(diffusion_state.to(self.token_embeddings.weight.dtype), self.token_embeddings.weight)
+        if diffusion_state.shape[-1] == self.config.hidden_size:
+            return diffusion_state.to(self.token_embeddings.weight.dtype)
+        raise ValueError(
+            "Floating diffusion_state last dimension must match vocab_size "
+            f"({self.config.vocab_size}) or hidden_size ({self.config.hidden_size})"
+        )
+
 
 class BioSeqNoEncoderDiffusionModel(nn.Module):
-    """Decoder-only BioSeq masked diffusion model."""
+    """No-encoder BioSeq masked diffusion model.
+
+    This branch has no ESM/ESMC encoder and uses bidirectional self-attention,
+    not a causal/autoregressive language-model architecture.
+    """
 
     def __init__(self, config: BioSeqDiffusionTransformerConfig) -> None:
         super().__init__()
@@ -445,7 +567,8 @@ class BioSeqNoEncoderDiffusionModel(nn.Module):
 
     def forward(
         self,
-        input_ids: torch.Tensor,
+        input_ids: torch.Tensor | None = None,
+        diffusion_state: torch.Tensor | None = None,
         attention_mask: torch.Tensor | None = None,
         chain_role_ids: torch.Tensor | None = None,
         position_ids_inner: torch.Tensor | None = None,
@@ -456,6 +579,7 @@ class BioSeqNoEncoderDiffusionModel(nn.Module):
     ) -> BioSeqDiffusionOutput:
         return self.decoder(
             input_ids=input_ids,
+            diffusion_state=diffusion_state,
             attention_mask=attention_mask,
             chain_role_ids=chain_role_ids,
             position_ids_inner=position_ids_inner,
@@ -501,7 +625,12 @@ def infer_encoder_hidden_size(encoder: nn.Module) -> int:
 
 
 class BioSeqEncoderDiffusionModel(nn.Module):
-    """ESM-family encoder conditioned BioSeq diffusion model."""
+    """ESM-family feature-conditioned BioSeq diffusion model.
+
+    ESMC/ESM runs on the current diffusion state ``x_t`` and emits token-level
+    features. The BioSeq denoiser still runs over the concatenated multi-chain
+    token stream, so cross-chain denoising remains in the diffusion decoder.
+    """
 
     def __init__(
         self,
@@ -529,9 +658,21 @@ class BioSeqEncoderDiffusionModel(nn.Module):
         freeze_encoder: bool = False,
         use_flash_attn: bool = False,
     ) -> "BioSeqEncoderDiffusionModel":
+        encoder_path = Path(encoder_name_or_path)
+        config_path = encoder_path / "config.json"
+        if config_path.is_file():
+            try:
+                with config_path.open() as handle:
+                    config = json.load(handle)
+            except json.JSONDecodeError:
+                config = {}
+            if str(config.get("model_type", "")).lower() == "esmc":
+                encoder = load_local_esmc_encoder(encoder_name_or_path, use_flash_attn=use_flash_attn)
+                return cls(decoder_config=decoder_config, encoder=encoder, freeze_encoder=freeze_encoder)
+
         try:
             from transformers import AutoModel
-        except ImportError as exc:
+        except Exception:
             encoder = load_local_esmc_encoder(encoder_name_or_path, use_flash_attn=use_flash_attn)
             return cls(decoder_config=decoder_config, encoder=encoder, freeze_encoder=freeze_encoder)
 
@@ -541,13 +682,14 @@ class BioSeqEncoderDiffusionModel(nn.Module):
                 local_files_only=local_files_only,
                 trust_remote_code=trust_remote_code,
             )
-        except (OSError, ValueError, KeyError):
+        except (OSError, ValueError, KeyError, RuntimeError):
             encoder = load_local_esmc_encoder(encoder_name_or_path, use_flash_attn=use_flash_attn)
         return cls(decoder_config=decoder_config, encoder=encoder, freeze_encoder=freeze_encoder)
 
     def forward(
         self,
-        input_ids: torch.Tensor,
+        input_ids: torch.Tensor | None = None,
+        diffusion_state: torch.Tensor | None = None,
         attention_mask: torch.Tensor | None = None,
         chain_ids: torch.Tensor | None = None,
         chain_role_ids: torch.Tensor | None = None,
@@ -559,24 +701,43 @@ class BioSeqEncoderDiffusionModel(nn.Module):
         encoder_attention_mask: torch.Tensor | None = None,
         encoder_residue_mask: torch.Tensor | None = None,
         encoder_chain_mask: torch.Tensor | None = None,
+        encoder_position_ids: torch.Tensor | None = None,
         encoder_kwargs: dict[str, Any] | None = None,
         **_: Any,
     ) -> BioSeqDiffusionOutput:
+        if input_ids is None and diffusion_state is None:
+            raise ValueError("BioSeqEncoderDiffusionModel requires input_ids or diffusion_state")
         if encoder_input_ids is None:
             raise ValueError("encoder_input_ids are required for BioSeqEncoderDiffusionModel")
-        if chain_ids is None:
-            raise ValueError("chain_ids are required to gather per-chain encoder conditions")
+        if encoder_position_ids is None and chain_ids is None:
+            raise ValueError("chain_ids or encoder_position_ids are required for encoder conditions")
+        if encoder_position_ids is None and position_ids_inner is None:
+            raise ValueError("position_ids_inner is required for per-chain encoder conditions")
 
-        chain_condition = self.encode_chains(
+        chain_token_condition = self.encode_chain_tokens(
             encoder_input_ids=encoder_input_ids,
             encoder_attention_mask=encoder_attention_mask,
             encoder_residue_mask=encoder_residue_mask,
             encoder_chain_mask=encoder_chain_mask,
             encoder_kwargs=encoder_kwargs,
         )
-        token_condition = self.gather_chain_condition(chain_condition, chain_ids=chain_ids, attention_mask=attention_mask)
+        if encoder_position_ids is not None:
+            token_condition = self.gather_proxy_token_condition(
+                chain_token_condition,
+                encoder_position_ids=encoder_position_ids,
+                attention_mask=attention_mask,
+            )
+        else:
+            token_condition = self.gather_token_condition(
+                chain_token_condition,
+                chain_ids=chain_ids,
+                position_ids_inner=position_ids_inner,
+                attention_mask=attention_mask,
+                encoder_residue_mask=encoder_residue_mask,
+            )
         output = self.decoder(
             input_ids=input_ids,
+            diffusion_state=diffusion_state,
             attention_mask=attention_mask,
             chain_role_ids=chain_role_ids,
             position_ids_inner=position_ids_inner,
@@ -585,9 +746,9 @@ class BioSeqEncoderDiffusionModel(nn.Module):
             timesteps=timesteps,
             encoder_condition=token_condition,
         )
-        return output
+        return replace(output, encoder_condition=token_condition)
 
-    def encode_chains(
+    def encode_chain_tokens(
         self,
         encoder_input_ids: torch.Tensor,
         encoder_attention_mask: torch.Tensor | None,
@@ -595,6 +756,8 @@ class BioSeqEncoderDiffusionModel(nn.Module):
         encoder_chain_mask: torch.Tensor | None,
         encoder_kwargs: dict[str, Any] | None = None,
     ) -> torch.Tensor:
+        """Run the biological encoder on per-chain ``x_t`` and keep token features."""
+
         batch_size, max_chains, chain_len = encoder_input_ids.shape
         flat_input_ids = encoder_input_ids.reshape(batch_size * max_chains, chain_len)
         flat_attention_mask = (
@@ -617,46 +780,83 @@ class BioSeqEncoderDiffusionModel(nn.Module):
 
         hidden_size = flat_hidden.shape[-1]
         chain_hidden = flat_hidden.reshape(batch_size, max_chains, chain_len, hidden_size)
-        if encoder_residue_mask is None:
-            pool_mask = encoder_attention_mask
-        else:
-            pool_mask = encoder_residue_mask
-            if encoder_attention_mask is not None:
-                pool_mask = pool_mask & encoder_attention_mask.bool()
-        if pool_mask is None:
-            pool_mask = torch.ones(
-                batch_size,
-                max_chains,
-                chain_len,
-                device=encoder_input_ids.device,
-                dtype=torch.bool,
-            )
+        if encoder_attention_mask is not None:
+            chain_hidden = chain_hidden * encoder_attention_mask.to(chain_hidden.dtype).unsqueeze(-1)
         if encoder_chain_mask is not None:
-            pool_mask = pool_mask & encoder_chain_mask.bool().unsqueeze(-1)
+            chain_hidden = chain_hidden * encoder_chain_mask.to(chain_hidden.dtype).unsqueeze(-1).unsqueeze(-1)
+        return chain_hidden
 
-        pool_mask_float = pool_mask.to(chain_hidden.dtype).unsqueeze(-1)
-        pooled = (chain_hidden * pool_mask_float).sum(dim=2) / pool_mask_float.sum(dim=2).clamp_min(1.0)
-        if encoder_chain_mask is not None:
-            pooled = pooled * encoder_chain_mask.to(pooled.dtype).unsqueeze(-1)
-        return pooled
-
-    def gather_chain_condition(
+    def gather_token_condition(
         self,
-        chain_condition: torch.Tensor,
+        chain_token_condition: torch.Tensor,
         chain_ids: torch.Tensor,
+        position_ids_inner: torch.Tensor,
+        attention_mask: torch.Tensor | None,
+        encoder_residue_mask: torch.Tensor | None,
+    ) -> torch.Tensor:
+        """Align per-chain encoder residue features back to decoder token positions.
+
+        Special tokens receive zero encoder condition. Residue tokens keep their
+        own ESMC feature instead of a pooled chain summary, while the downstream
+        decoder still attends across the full concatenated multi-chain stream.
+        """
+
+        batch_size, seq_len = chain_ids.shape
+        _, max_chains, _, hidden_size = chain_token_condition.shape
+        token_condition = chain_token_condition.new_zeros(batch_size, seq_len, hidden_size)
+        valid_decoder = chain_ids.ge(0) & chain_ids.lt(max_chains) & position_ids_inner.ge(0)
+        if attention_mask is not None:
+            valid_decoder = valid_decoder & attention_mask.bool()
+
+        for batch_index in range(batch_size):
+            for chain_index in range(max_chains):
+                decoder_positions = torch.nonzero(
+                    valid_decoder[batch_index] & chain_ids[batch_index].eq(chain_index),
+                    as_tuple=False,
+                ).flatten()
+                if decoder_positions.numel() == 0:
+                    continue
+                if encoder_residue_mask is None:
+                    residue_token_positions = torch.arange(
+                        chain_token_condition.shape[2],
+                        device=chain_token_condition.device,
+                    )
+                else:
+                    residue_token_positions = torch.nonzero(
+                        encoder_residue_mask[batch_index, chain_index],
+                        as_tuple=False,
+                    ).flatten()
+                residue_indices = position_ids_inner[batch_index, decoder_positions]
+                in_bounds = residue_indices.lt(residue_token_positions.numel())
+                if not in_bounds.any():
+                    continue
+                decoder_positions = decoder_positions[in_bounds]
+                encoder_positions = residue_token_positions[residue_indices[in_bounds]]
+                token_condition[batch_index, decoder_positions] = chain_token_condition[
+                    batch_index,
+                    chain_index,
+                    encoder_positions,
+                ]
+        return token_condition
+
+    def gather_proxy_token_condition(
+        self,
+        chain_token_condition: torch.Tensor,
+        encoder_position_ids: torch.Tensor,
         attention_mask: torch.Tensor | None,
     ) -> torch.Tensor:
-        _, max_chains, hidden_size = chain_condition.shape
-        safe_chain_ids = chain_ids.clamp(min=0, max=max_chains - 1)
-        token_condition = torch.gather(
-            chain_condition,
-            dim=1,
-            index=safe_chain_ids.unsqueeze(-1).expand(-1, -1, hidden_size),
-        )
-        valid = chain_ids.ge(0) & chain_ids.lt(max_chains)
+        """Gather features from the single ESMC proxy stream without target leakage."""
+
+        batch_size, max_chains, encoder_len, hidden_size = chain_token_condition.shape
+        if max_chains != 1:
+            raise ValueError("Proxy token conditioning expects one encoder stream per record")
+        batch_indices = torch.arange(batch_size, device=chain_token_condition.device).unsqueeze(1)
+        valid = encoder_position_ids.ge(0) & encoder_position_ids.lt(encoder_len)
         if attention_mask is not None:
             valid = valid & attention_mask.bool()
-        return token_condition * valid.to(token_condition.dtype).unsqueeze(-1)
+        safe_positions = encoder_position_ids.clamp(min=0, max=encoder_len - 1)
+        gathered = chain_token_condition[batch_indices, 0, safe_positions]
+        return gathered * valid.to(gathered.dtype).unsqueeze(-1)
 
     def compute_loss(self, batch: dict[str, Any]) -> BioSeqDiffusionOutput:
         noised_input_ids, labels, corruption_mask, timesteps = sample_bioseq_diffusion_noise(
@@ -682,6 +882,7 @@ class BioSeqEncoderDiffusionModel(nn.Module):
             encoder_attention_mask=batch.get("encoder_attention_mask"),
             encoder_residue_mask=batch.get("encoder_residue_mask"),
             encoder_chain_mask=batch.get("encoder_chain_mask"),
+            encoder_position_ids=batch.get("encoder_position_ids"),
         )
         loss = compute_masked_cross_entropy(output.logits, labels, loss_norm=self.config.loss_norm)
         return BioSeqDiffusionOutput(
@@ -693,4 +894,5 @@ class BioSeqEncoderDiffusionModel(nn.Module):
             corruption_mask=corruption_mask,
             timesteps=timesteps,
             noised_encoder_input_ids=noised_encoder_input_ids,
+            encoder_condition=output.encoder_condition,
         )
