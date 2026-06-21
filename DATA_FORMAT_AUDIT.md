@@ -80,42 +80,38 @@ Important limitation: this JSONL does not include the large cleaned OAS, OTS, na
 
 Final/current path:
 
-`/vepfs-mlp2/c20250601/251105016/project/dllm_test/data/oas_previous_clean/splits/compat_for_current_loader_oasrule`
+`/vepfs-mlp2/c20250601/251105016/project/dllm_test/data/oas_previous_clean/splits/cleaned_merged_data_step_clustered_{train,valid,holdout}_oas_label.csv`
 
 Rows:
 
 | Split | Lines including header | Examples |
 |---|---:|---:|
-| train | 2,486,415 | 2,486,414 |
+| train | 2,486,443 | 2,486,442 |
 | valid | 12,554 | 12,553 |
 | holdout | 12,654 | 12,653 |
 
 CSV schema:
 
 ```text
-cleaned_chain1_seq, cleaned_chain2_seq,
-chain1_cdr3, chain2_cdr3,
-chain1_anarci_type, chain2_anarci_type,
-chain1_FR1, chain2_FR1, chain1_CDR1, chain2_CDR1,
-chain1_FR2, chain2_FR2, chain1_CDR2, chain2_CDR2,
-chain1_FR3, chain2_FR3, chain1_CDR3, chain2_CDR3,
-chain1_FR4, chain2_FR4,
-species, data_type,
-chain1_type, chain2_type,
-chain1_v, chain1_j, chain2_v, chain2_j,
-source_file,
-chain1_cluster, chain2_cluster, pair_cluster, cluster_id, split
+h_sequence, l_sequence, species, l_locus,
+h_v_call, h_d_call, h_j_call, l_v_call, l_j_call,
+source,
+h_fwr1, h_cdr1, h_fwr2, h_cdr2, h_fwr3, h_cdr3, h_fwr4,
+l_fwr1, l_cdr1, l_fwr2, l_cdr2, l_fwr3, l_cdr3, l_fwr4,
+cleaned_h_sequence, cleaned_l_sequence,
+H_cluster_id, L_cluster_id, ab_cluster_key, ab_cluster_id,
+ab_cluster_id_counts, split, h_region_labels, l_region_labels
 ```
 
 Semantics:
 
-- `data_type=antibody`
-- `chain*_type` is usually heavy/kappa/lambda
-- `chain*_anarci_type` is H/L/K-like chain type
+- `source=OAS`
+- `cleaned_h_sequence` is the heavy chain sequence
+- `cleaned_l_sequence` is the paired light-chain-side sequence; `l_locus` is usually K or L
 - FR/CDR fields preserve region-level segmentation
 - cluster fields support leakage-aware split/grouping
 
-For Qwen-style BioSeq, this should map to:
+For BioSeq foundation, this should map to:
 
 - `task_type="antibody"`
 - `complex_type="<type_ab>"`
@@ -162,7 +158,7 @@ Semantics:
 - `chain*_anarci_type` is B/A
 - V/J metadata and FR/CDR segmentation are available
 
-For Qwen-style BioSeq, this should map to:
+For BioSeq foundation, this should map to:
 
 - `task_type="tcr"`
 - `complex_type="<type_tcr>"`
@@ -192,7 +188,7 @@ FR1, CDR1, FR2, CDR2, FR3, CDR3, FR4,
 cluster_id, split
 ```
 
-For Qwen-style BioSeq, this should map to:
+For BioSeq foundation, this should map to:
 
 - `task_type="antibody"`
 - `complex_type="<type_nb>"` or `<type_ab>` with `chain_roles=["nanobody_vhh"]`
@@ -215,7 +211,7 @@ Representative formats:
 
 These are not in a single unified schema yet. Existing `processed_v2` already contains a subset converted from VDJdb/McPAS/MIRA into `chains/types/targets/source`.
 
-For Qwen-style BioSeq, these should map to:
+For BioSeq foundation, these should map to:
 
 - `task_type="tcr_pmhc"`
 - `complex_type="<type_tcr_pmhc>"`
@@ -257,7 +253,7 @@ Healthy reference CSV schema:
 AASeq, Vregion, Dregion, Jregion, cloneFraction, cloneCount
 ```
 
-For Qwen-style BioSeq, this should map to single-chain or beta/alpha repertoire records first:
+For BioSeq foundation, this should map to single-chain or beta/alpha repertoire records first:
 
 - `task_type="tcr_repertoire"` or `task_type="tcr"`
 - `complex_type="<type_tcr>"`
@@ -300,7 +296,7 @@ Current `processed` converts this to:
 - `targets=[0,1]`
 - `source="ppi"`
 
-For Qwen-style BioSeq:
+For BioSeq foundation:
 
 - `task_type="ppi"`
 - `complex_type="<type_ppi>"`
@@ -361,7 +357,7 @@ The current collator does not yet emit:
 - `position_ids` split into inner residue position and outer chain index
 - explicit `target_chain_mask`
 - fixed-context mask for antigen/MHC/context chains
-- Qwen-style complex header token ids
+- BioSeq foundation complex header token ids
 - `chain_role_ids`
 
 ## Implication for Adapting Qwen
@@ -429,11 +425,11 @@ The view sampler should support at least these target constructions:
 - Inverse region infilling: fixed six CDR regions generate FR regions.
 - Conditional receptor generation: fixed antigen/peptide/MHC/PPI partner generates selected receptor chains.
 
-`full_denoise` in the Qwen-style loader should be read as full denoising over eligible target chains, not all biological chains. Antigen, peptide, MHC, and HLA-like chains are fixed context by default. They are visible conditioning residues but should not be remasked or included in `diffusion_loss_mask`.
+`full_denoise` in the BioSeq foundation loader should be read as full denoising over eligible target chains, not all biological chains. Antigen, peptide, MHC, and HLA-like chains are fixed context by default. They are visible conditioning residues but should not be remasked or included in `diffusion_loss_mask`.
 
 ## Encoder Tokenizer Boundary
 
-The Qwen-style loader under `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/data` should keep the canonical biological record independent from any one encoder tokenizer. Tokenization is a collator/encoder concern.
+The BioSeq foundation loader under `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/data` should keep the canonical biological record independent from any one encoder tokenizer. Tokenization is a collator/encoder concern.
 
 Local tokenizer verification:
 
@@ -447,4 +443,4 @@ Implementation rule:
 - Use the encoder's own local Hugging Face tokenizer when an ESMC encoder is active.
 - Do not infer multi-chain interaction capability from the `|` token alone. The ESMC/ESMFold2 paper places explicit multi-chain complex modeling in ESMFold2, where each chain is encoded independently by frozen ESMC 6B and then fused through downstream pair/folding/diffusion modules.
 
-The immediate gap is data normalization: large clean OAS/OTS/nanobody and TCRdb2.0 should be converted into the same `bioseq.v1` format before building a Qwen-style architecture around them.
+The immediate gap is data normalization: large clean OAS/OTS/nanobody and TCRdb2.0 should be converted into the same `bioseq.v1` format before building a BioSeq foundation architecture around them.

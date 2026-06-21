@@ -1,5 +1,12 @@
 from __future__ import annotations
 
+"""DEPRECATED: legacy BioSeq JSONL / mixed-task collator path.
+
+Prefer ``grammar_v1`` Arrow data and ``dllm/pipelines/qwen3_vl_arch/data/grammar_collator.py``.
+This module remains for backward compatibility with ``--input-format legacy`` only.
+"""
+
+
 import json
 import random
 from collections.abc import Sequence as SequenceABC

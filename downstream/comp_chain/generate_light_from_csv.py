@@ -20,9 +20,18 @@ from dllm.pipelines.bioseq import Esm2ProteinTokenizer, ophiuchus_ab_checkpoint_
 
 
 class PairDataset(Dataset):
-    def __init__(self, csv_path: str, heavy_col: str = "h_sequence", light_col: str = "l_sequence"):
+    def __init__(
+        self,
+        csv_path: str,
+        heavy_col: str = "h_sequence",
+        light_col: str = "l_sequence",
+        start_index: int = 0,
+        end_index: int | None = None,
+    ):
         self.df = pd.read_csv(csv_path)
         self.df = self.df[~self.df[heavy_col].isna()].copy()
+        self.df["_input_row_idx"] = self.df.index
+        self.df = self.df.iloc[start_index:end_index].copy()
         self.heavy_col = heavy_col
         self.light_col = light_col
         self.heavy_list = self.df[heavy_col].astype(str).str.replace("-", "").tolist()
@@ -35,7 +44,7 @@ class PairDataset(Dataset):
         return len(self.heavy_list)
 
     def __getitem__(self, idx: int):
-        return self.heavy_list[idx], self.light_list[idx]
+        return self.heavy_list[idx], self.light_list[idx], self.df.iloc[idx].to_dict()
 
 
 def save_results(rows: list[dict], output_fpath: str, num_seqs: int) -> str:
@@ -49,9 +58,28 @@ def save_results(rows: list[dict], output_fpath: str, num_seqs: int) -> str:
     return output_with_n
 
 
-def generate_for_single_sequence(
+def build_result_row(
     heavy_str: str,
     raw_light_str: str,
+    gen_light: str,
+    variant_idx: int,
+    metadata: dict | None = None,
+) -> dict:
+    row = {
+        "h_sequence": heavy_str,
+        "gen_l_sequence": gen_light,
+        "raw_l_sequence": raw_light_str,
+        "variant_idx": variant_idx,
+    }
+    if metadata:
+        for key, value in metadata.items():
+            if key not in {"h_sequence", "l_sequence", "gen_l_sequence", "raw_l_sequence"}:
+                row[key] = value
+    return row
+
+
+def generate_for_batch(
+    samples: list[tuple[str, str, dict]],
     num_seqs: int,
     model,
     tokenizer: Esm2ProteinTokenizer,
@@ -63,8 +91,15 @@ def generate_for_single_sequence(
     sampling_strategy: str,
     light_prompt_tokens: int,
 ):
-    batch = [(heavy_str, raw_light_str) for _ in range(num_seqs)]
-    heavy_sequences, light_sequences = zip(*batch)
+    heavy_sequences = []
+    light_sequences = []
+    metadata_rows = []
+    for heavy_str, raw_light_str, metadata in samples:
+        for variant_idx in range(num_seqs):
+            heavy_sequences.append(heavy_str)
+            light_sequences.append(raw_light_str)
+            metadata_rows.append((heavy_str, raw_light_str, variant_idx, metadata))
+
     input_ids, chain_ids, meta = collator.stack_chains(
         heavy_sequences,
         light_sequences,
@@ -86,17 +121,41 @@ def generate_for_single_sequence(
 
     heavy_max_len = meta["heavy_max_len"]
     results = []
-    for i in range(num_seqs):
+    for i, (heavy_str, raw_light_str, variant_idx, metadata) in enumerate(metadata_rows):
         light_core = output_tokens[i, heavy_max_len + 1 :]
         gen_light = tokenizer.decode(light_core.tolist(), skip_special_tokens=True)
-        results.append(
-            {
-                "h_sequence": heavy_str,
-                "gen_l_sequence": gen_light,
-                "raw_l_sequence": raw_light_str,
-            }
-        )
+        results.append(build_result_row(heavy_str, raw_light_str, gen_light, variant_idx, metadata))
     return results
+
+
+def generate_for_single_sequence(
+    heavy_str: str,
+    raw_light_str: str,
+    num_seqs: int,
+    model,
+    tokenizer: Esm2ProteinTokenizer,
+    collator: ChainPaddingCollator,
+    device: torch.device,
+    temperature: float,
+    max_iter: int,
+    cfg_scale: float,
+    sampling_strategy: str,
+    light_prompt_tokens: int,
+    metadata: dict | None = None,
+):
+    return generate_for_batch(
+        [(heavy_str, raw_light_str, metadata or {})],
+        num_seqs=num_seqs,
+        model=model,
+        tokenizer=tokenizer,
+        collator=collator,
+        device=device,
+        temperature=temperature,
+        max_iter=max_iter,
+        cfg_scale=cfg_scale,
+        sampling_strategy=sampling_strategy,
+        light_prompt_tokens=light_prompt_tokens,
+    )
 
 
 def run_generation(
@@ -108,11 +167,14 @@ def run_generation(
     light_col: str = "l_sequence",
     temperature: float = 1.0,
     sampling_strategy: str = "gumbel_argmax",
-    max_iter: int = 124,
-    cfg_scale: float = 1.5,
+    max_iter: int = 32,
+    cfg_scale: float = 0.0,
     device: str = "auto",
     seed: int | None = 42,
-    light_prompt_tokens: int = 4,
+    light_prompt_tokens: int = 3,
+    heavy_batch_size: int = 1,
+    start_index: int = 0,
+    end_index: int | None = None,
 ):
     if seed is not None:
         torch.manual_seed(seed)
@@ -127,15 +189,21 @@ def run_generation(
     model = load_model(checkpoint_path, device=device_obj)
     tokenizer = model.tokenizer
     collator = ChainPaddingCollator(tokenizer=tokenizer)
-    dataset = PairDataset(df_path, heavy_col=heavy_col, light_col=light_col)
+    dataset = PairDataset(
+        df_path,
+        heavy_col=heavy_col,
+        light_col=light_col,
+        start_index=start_index,
+        end_index=end_index,
+    )
+    heavy_batch_size = max(1, heavy_batch_size)
 
     all_rows = []
-    for seq_idx in tqdm(range(len(dataset)), desc="heavy2light"):
-        heavy_str, raw_light_str = dataset[seq_idx]
+    for start_idx in tqdm(range(0, len(dataset), heavy_batch_size), desc="heavy2light"):
+        batch_samples = [dataset[seq_idx] for seq_idx in range(start_idx, min(start_idx + heavy_batch_size, len(dataset)))]
         all_rows.extend(
-            generate_for_single_sequence(
-                heavy_str=heavy_str,
-                raw_light_str=raw_light_str,
+            generate_for_batch(
+                samples=batch_samples,
                 num_seqs=num_seqs,
                 model=model,
                 tokenizer=tokenizer,
@@ -162,12 +230,15 @@ def parse_args():
     parser.add_argument("--light-col", type=str, default="l_sequence")
     parser.add_argument("--temperature", type=float, default=1.0)
     parser.add_argument("--sampling-strategy", type=str, default="gumbel_argmax")
-    parser.add_argument("--max-iter", type=int, default=124)
-    parser.add_argument("--cfg-scale", type=float, default=1.5)
+    parser.add_argument("--max-iter", type=int, default=32)
+    parser.add_argument("--cfg-scale", type=float, default=0.0)
     parser.add_argument("--device", type=str, default="auto")
     parser.add_argument("--num-seqs", type=int, default=8)
     parser.add_argument("--seed", type=int, default=42)
-    parser.add_argument("--light-prompt-tokens", type=int, default=4)
+    parser.add_argument("--light-prompt-tokens", type=int, default=3)
+    parser.add_argument("--heavy-batch-size", type=int, default=1)
+    parser.add_argument("--start-index", type=int, default=0)
+    parser.add_argument("--end-index", type=int, default=None)
     return parser.parse_args()
 
 
@@ -187,6 +258,9 @@ def main():
         device=args.device,
         seed=args.seed,
         light_prompt_tokens=args.light_prompt_tokens,
+        heavy_batch_size=args.heavy_batch_size,
+        start_index=args.start_index,
+        end_index=args.end_index,
     )
 
 

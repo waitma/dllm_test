@@ -37,27 +37,63 @@ from dllm.pipelines.qwen3_vl_arch.data.records import (  # noqa: E402
     normalize_sequence,
 )
 from dllm.pipelines.qwen3_vl_arch.data.sources import DEFAULT_PPI_DIR  # noqa: E402
+from dllm.pipelines.qwen3_vl_arch.data.ppi_relations import infer_grammar_relation  # noqa: E402
+from dllm.pipelines.qwen3_vl_arch.data.ppi_splits import (  # noqa: E402
+    BERNETT_STRING_90_90,
+    normalize_split_name,
+    splits_allowed_for_grammar_mix,
+    validate_split,
+)
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_GRAMMAR_DATA_DIR)
     parser.add_argument("--splits", default="train,valid")
-    parser.add_argument("--sources", default="oas,ots,tcr,ppi")
+    parser.add_argument(
+        "--sources",
+        default="oas,ots,tcr,ppi",
+        help=(
+            "Comma-separated sources: oas, ots, tcr, ppi, mint_ppi, neutralization. "
+            "mint_ppi requires prebuilt shards (build_mint_grammar_shards.py). "
+            "neutralization uses unified CSV or prebuilt shards."
+        ),
+    )
     parser.add_argument("--ppi-max-protein-length", type=int, default=1024)
     parser.add_argument("--max-records-per-source", type=int, default=None)
     parser.add_argument("--force", action="store_true")
+    parser.add_argument(
+        "--ppi-split-policy",
+        default=BERNETT_STRING_90_90.policy_id,
+        help=(
+            "Canonical PPI split policy (default: bernett_string_90_90_hf). "
+            "For MINT-scale pretraining use mint_string_pretrain_v1 via build_mint_string_splits.py."
+        ),
+    )
     return parser.parse_args()
 
 
-def semantic_row(record: BioSeqRecord, split: str) -> dict[str, Any]:
+def assert_ppi_splits_allowed(requested_splits: list[str], policy_id: str) -> None:
+    allowed = set(splits_allowed_for_grammar_mix("string_model_org_90_90_split"))
+    for split in requested_splits:
+        normalized = normalize_split_name(split)
+        if normalized not in allowed:
+            raise ValueError(
+                f"PPI split {split!r} is not allowed for grammar mixing under {policy_id}. "
+                f"Allowed: {', '.join(sorted(allowed))}. "
+                "Do not merge published test/eval splits into training."
+            )
+        validate_split("string_model_org_90_90_split", normalized, policy_id=policy_id)
+
+
+def semantic_row(record: BioSeqRecord, split: str, *, default_relation: str = "unknown") -> dict[str, Any]:
     return {
         "chains": record.sequences,
         "roles": record.chain_roles,
         "task_type": record.task_type,
         "source": record.source,
         "split": split,
-        "relation": str(record.labels.get("relation", "binding")),
+        "relation": str(record.labels.get("relation", default_relation)),
         "weight": float(record.weight),
     }
 
@@ -70,7 +106,8 @@ def iter_oas_or_ots(name: str, split: str, limit: int | None) -> Iterator[dict[s
     )
     source = CsvBioSeqSource(config)
     for record in source.iter_records():
-        yield semantic_row(record, split)
+        record.labels.setdefault("relation", "binding")
+        yield semantic_row(record, split, default_relation="binding")
 
 
 def iter_tcr(split: str, limit: int | None) -> Iterator[dict[str, Any]]:
@@ -84,7 +121,8 @@ def iter_tcr(split: str, limit: int | None) -> Iterator[dict[str, Any]]:
             continue
         if not (record.task_type.startswith("tcr") or {"tcr_alpha", "tcr_beta"} & set(record.chain_roles)):
             continue
-        yield semantic_row(record, split)
+        record.labels.setdefault("relation", "binding")
+        yield semantic_row(record, split, default_relation="binding")
         kept += 1
         if limit is not None and kept >= limit:
             break
@@ -141,12 +179,95 @@ def iter_ppi(split: str, limit: int | None, max_protein_length: int) -> Iterator
             task_type="ppi",
             source="string_ppi",
             split=split,
-            labels={"relation": "binding", "score": row.get("score")},
+            labels={
+                "relation": infer_grammar_relation(
+                    source_id="string_model_org_90_90_split",
+                    task_family="ppi_binary",
+                    string_channel="physical",
+                ),
+                "score": row.get("score"),
+            },
         )
         yield semantic_row(record, split)
         kept += 1
         if limit is not None and kept >= limit:
             break
+
+
+def verify_prebuilt_shard(name: str, split: str, output_dir: Path, force: bool) -> dict[str, Any]:
+    from datasets import Dataset
+
+    target = output_dir / name / split
+    if not target.exists():
+        raise FileNotFoundError(
+            f"Missing prebuilt shard {target}. "
+            f"Run scripts/data/build_{name}_grammar_shards.py first."
+        )
+    if force:
+        raise ValueError(
+            f"Source {name} is prebuilt externally; rebuild with the dedicated script, not --force here."
+        )
+    dataset = Dataset.load_from_disk(str(target))
+    return {"source": name, "split": split, "rows": len(dataset), "path": str(target), "prebuilt": True}
+
+
+def build_neutralization_shard(
+    split: str,
+    output_dir: Path,
+    limit: int | None,
+    force: bool,
+) -> dict[str, Any]:
+    unified_csv = PROJECT_ROOT / "data/ppi_task_raw/processed/interaction_records_unified.csv"
+    prebuilt = output_dir / "neutralization" / split
+    if prebuilt.exists() and not force:
+        from datasets import Dataset
+
+        dataset = Dataset.load_from_disk(str(prebuilt))
+        return {"source": "neutralization", "split": split, "rows": len(dataset), "path": str(prebuilt)}
+    if not unified_csv.exists():
+        raise FileNotFoundError(
+            f"Missing {unified_csv}. Run scripts/data/build_ppi_unified_csv.py first."
+        )
+
+    import csv
+
+    from dllm.pipelines.qwen3_vl_arch.data.grammar_builders import (
+        antibody_neutralization_record,
+        semantic_row,
+    )
+
+    def generator() -> Iterator[dict[str, Any]]:
+        kept = 0
+        with unified_csv.open(newline="") as handle:
+            reader = csv.DictReader(handle)
+            for row in reader:
+                if row.get("source_id") != "covabdab_neutralization":
+                    continue
+                heavy = str(row.get("antibody_heavy") or "").strip()
+                light = str(row.get("antibody_light") or "").strip()
+                ab_type = str(row.get("entity_a_id") or "").lower()
+                is_nanobody = "nb" in ab_type
+                record = antibody_neutralization_record(
+                    heavy,
+                    light or None,
+                    split=split,
+                    is_nanobody=is_nanobody,
+                )
+                if record is None:
+                    continue
+                yield semantic_row(record, split)
+                kept += 1
+                if limit is not None and kept >= limit:
+                    break
+
+    from datasets import Dataset
+
+    if prebuilt.exists() and force:
+        shutil.rmtree(prebuilt)
+    prebuilt.parent.mkdir(parents=True, exist_ok=True)
+    dataset = Dataset.from_generator(generator, cache_dir=str(output_dir / ".cache"))
+    dataset.save_to_disk(str(prebuilt), max_shard_size="128MB")
+    return {"source": "neutralization", "split": split, "rows": len(dataset), "path": str(prebuilt)}
 
 
 def build_source(
@@ -161,6 +282,11 @@ def build_source(
         from datasets import Dataset
     except ImportError as exc:
         raise ImportError("Building grammar Arrow data requires the `datasets` package") from exc
+
+    if name == "mint_ppi":
+        return verify_prebuilt_shard("mint_ppi", split, output_dir, force)
+    if name == "neutralization":
+        return build_neutralization_shard(split, output_dir, limit, force)
 
     target = output_dir / name / split
     if target.exists():
@@ -188,10 +314,13 @@ def main() -> None:
     args = parse_args()
     splits = [item.strip() for item in args.splits.split(",") if item.strip()]
     sources = [item.strip() for item in args.sources.split(",") if item.strip()]
+    if "ppi" in sources:
+        assert_ppi_splits_allowed(splits, args.ppi_split_policy)
     args.output_dir.mkdir(parents=True, exist_ok=True)
     manifest: dict[str, Any] = {
         "format": "bioseq_grammar_v1_semantic_arrow",
         "ppi_max_protein_length": args.ppi_max_protein_length,
+        "ppi_split_policy": args.ppi_split_policy if "ppi" in sources else None,
         "datasets": [],
     }
     for split in splits:

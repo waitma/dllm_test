@@ -18,9 +18,20 @@ from downstream.common import Sab23H2Collator, load_model, run_generate
 from dllm.pipelines.bioseq import ophiuchus_ab_checkpoint_path
 
 
+SAB23H2_MODE_DIRS = {
+    "cdrh1": "h_cdr1",
+    "cdrh2": "h_cdr2",
+    "cdrh3": "h_cdr3",
+    "cdrl1": "l_cdr1",
+    "cdrl2": "l_cdr2",
+    "cdrl3": "l_cdr3",
+}
+
+
 class SAb23H2Dataset(Dataset):
     def __init__(self, file_path: str, mode: str):
-        self.design_path = os.path.join(file_path, "fasta.files.design", mode)
+        design_mode = SAB23H2_MODE_DIRS.get(mode, mode)
+        self.design_path = os.path.join(file_path, "fasta.files.design", design_mode)
         self.native_path = os.path.join(file_path, "fasta.files.native")
         with open(os.path.join(file_path, "prot_ids.txt"), encoding="utf-8") as handle:
             self.prot_ids = [line.strip() for line in handle.readlines()]
@@ -85,8 +96,8 @@ def main():
     parser.add_argument("--checkpoint-path", type=str, default=str(ophiuchus_ab_checkpoint_path()))
     parser.add_argument("--test-set", type=str, required=True)
     parser.add_argument("--temperature", type=float, default=1.0)
-    parser.add_argument("--sampling-strategy", type=str, default="gumbel_argmax")
-    parser.add_argument("--max-iter", type=int, default=500)
+    parser.add_argument("--sampling-strategy", type=str, default="argmax")
+    parser.add_argument("--max-iter", type=int, default=4)
     parser.add_argument("--cfg-scale", type=float, default=0.0)
     args = parser.parse_args()
     pprint(vars(args))

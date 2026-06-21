@@ -1,0 +1,42 @@
+---
+description: Volc 训练任务提交/取消后必须更新 PROJECT_PROCESS.md；终态任务从活跃表删除
+alwaysApply: true
+---
+
+# Volc 训练任务日志规则
+
+日志文件：`/vepfs-mlp2/c20250601/251105016/project/dllm_test/PROJECT_PROCESS.md`
+
+## 每次 submit / cancel 后（必须，不可跳过）
+
+1. 在 `## Active Volc Training Tasks` 表格中增删对应行。
+2. 在文件末尾追加 dated 章节（`## YYYY-MM-DD ...`），记录：
+   - 操作类型（submit / cancel / resubmit）
+   - `task_id`（如 `t-20260621185805-78pr8`）
+   - 任务名、`train_jobs/*.yml` 绝对路径
+   - 初始或最终状态（`Queue` / `Running` / `Killed` 等）
+   - `Preemptible` 是否为闲时资源
+3. 更新 Active 表中的 `Last updated` 时间。
+
+## 活跃任务表维护
+
+- 表格只保留**非终态**任务：`Initialized`、`Queue`、`Staging`、`Running`、`Killing`。
+- 任务进入终态（`Success`、`Failed`、`Killed`）后，**从 Active 表删除该行**；终态详情只留在 dated 历史章节，不在 Active 表重复。
+- 查询活跃任务时使用非交互命令：
+  `volc ml_task list -n bioseq --status Initialized,Queue,Staging,Running,Killing -o json --limit 100`
+  （禁止裸跑 `volc ml_task list` / `get`，会进入 TUI 卡住。）
+
+## Volc CLI 要点
+
+- 取消任务：`volc ml_task cancel -i <task_id>`（无 `kill` 动词）
+- 提交任务：`volc ml_task submit --conf /vepfs-mlp2/c20250601/251105016/project/dllm_test/train_jobs/<file>.yml`
+- `--limit` 不得超过 300
+
+## 示例：submit 后追加
+
+```markdown
+## 2026-06-21 Resubmitted grammar_v1 on preemptible resources
+
+- Submitted `qwen3_vl_bioseq_grammar_v1_esmc300m` via `train_jobs/qwen3_vl_bioseq_grammar_v1_esmc300m.yml`
+- `task_id=t-20260621185805-78pr8`, initial status `Queue`, `Preemptible: true`
+```

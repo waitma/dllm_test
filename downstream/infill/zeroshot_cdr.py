@@ -21,6 +21,7 @@ from dllm.pipelines.bioseq import Esm2ProteinTokenizer, ophiuchus_ab_checkpoint_
 
 class SAbDabDataset(Dataset):
     def __init__(self, file_path: str, mode: str, fold: int = 0):
+        self.mode = mode
         data = pd.read_json(os.path.join(file_path, mode, f"fold_{fold}", "test.json"), lines=True)
         self.heavy = data["heavy_chain_seq"].astype(str).str.replace("J", "L").tolist()
         self.light = data["light_chain_seq"].astype(str).str.replace("J", "L").tolist()
@@ -31,7 +32,7 @@ class SAbDabDataset(Dataset):
         return len(self.heavy)
 
     def __getitem__(self, index: int):
-        return self.heavy[index], self.light[index], self.target[index], self.pos[index]
+        return self.heavy[index], self.light[index], self.target[index], self.pos[index], self.mode
 
 
 def evaluate(args):
@@ -81,8 +82,8 @@ def main():
     parser.add_argument("--test-set", type=str, required=True)
     parser.add_argument("--mode", type=str, required=True)
     parser.add_argument("--temperature", type=float, default=1.0)
-    parser.add_argument("--sampling-strategy", type=str, default="gumbel_argmax")
-    parser.add_argument("--max-iter", type=int, default=500)
+    parser.add_argument("--sampling-strategy", type=str, default="argmax")
+    parser.add_argument("--max-iter", type=int, default=4)
     parser.add_argument("--cfg-scale", type=float, default=0.0)
     args = parser.parse_args()
     pprint(vars(args))

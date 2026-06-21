@@ -42,6 +42,10 @@ Entrypoint: |
           --encoder-path "${ESMC_DIR}" \
           --tokenizer-path "${ESMC_DIR}" \
           --sources oas,ots,tcr,ppi \
+          --oas-weight 3.9 \
+          --ots-weight 3.6 \
+          --ppi-weight 1.4 \
+          --tcr-weight 1.0 \
           --batch-size 1 \
           --grad-accum 8 \
           --max-steps 50000 \
@@ -83,5 +87,5 @@ TaskRoleSpecs:
 ActiveDeadlineSeconds: 604800
 DelayExitTimeSeconds: 0
 AccessType: "Private"
-Preemptible: false
+Preemptible: true
 Priority: 6

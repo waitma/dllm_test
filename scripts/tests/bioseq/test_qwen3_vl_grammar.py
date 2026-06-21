@@ -1,4 +1,4 @@
-"""Tests for the grammar-v1 BioSeq training representation.
+"""Tests for the grammar-v2 BioSeq training representation.
 
 Run with::
 
@@ -7,6 +7,7 @@ Run with::
 
 from __future__ import annotations
 
+import random
 from types import SimpleNamespace
 
 import torch
@@ -20,6 +21,7 @@ from dllm.pipelines.qwen3_vl_arch.data import (
     GrammarRenderer,
     GrammarTokenizer,
 )
+from dllm.pipelines.qwen3_vl_arch.data.grammar import CHAIN_ID_FIXED_CONTEXT, CHAIN_ID_OBJECT_A, CHAIN_ID_OBJECT_B
 from dllm.pipelines.qwen3_vl_arch.modeling_bioseq import (
     BioSeqDiffusionTransformerConfig,
     BioSeqEncoderDiffusionModel,
@@ -29,9 +31,9 @@ from dllm.pipelines.qwen3_vl_arch.modeling_bioseq import (
 )
 
 
-def rendered_tokens(record: BioSeqRecord) -> tuple[list[str], dict]:
+def rendered_tokens(record: BioSeqRecord, *, rng: random.Random | None = None) -> tuple[list[str], dict]:
     tokenizer = GrammarTokenizer(Esm2SequenceTokenizer())
-    row = GrammarRenderer(tokenizer).encode(record)
+    row = GrammarRenderer(tokenizer, rng=rng).encode(record)
     return tokenizer.decode_tokens(row["input_ids"]), row
 
 
@@ -57,33 +59,47 @@ def test_grammar_renders_oas_and_ots_in_canonical_chain_order() -> None:
     tcr_tokens, _ = rendered_tokens(tcr)
 
     assert antibody_tokens == [
-        "<generate>",
-        "<proas>",
+        "<prots>",
         "H",
         "H",
         "H",
-        "<proae>",
-        "<binding>",
-        "<probs>",
+        "<prote>",
+        "<pairs>",
+        "<prots>",
         "L",
         "L",
         "L",
-        "<probd>",
+        "<prote>",
     ]
     assert tcr_tokens == [
-        "<generate>",
-        "<proas>",
+        "<prots>",
         "A",
         "A",
         "A",
-        "<proae>",
-        "<binding>",
-        "<probs>",
+        "<prote>",
+        "<pairs>",
+        "<prots>",
         "B",
         "B",
         "B",
-        "<probd>",
+        "<prote>",
     ]
+
+
+def test_single_entity_uses_prots_without_generate_or_relation() -> None:
+    nanobody = BioSeqRecord(
+        chains=[BioSeqChain("VHHVHH", "nanobody_vhh")],
+        task_type="nanobody",
+        source="unit",
+    )
+
+    tokens, row = rendered_tokens(nanobody)
+
+    assert tokens == ["<prots>", "V", "H", "H", "V", "H", "H", "<prote>"]
+    assert "<generate>" not in tokens
+    assert "<pairs>" not in tokens
+    assert "<binding>" not in tokens
+    assert not any(row["fixed_context_mask"])
 
 
 def test_antibody_pair_keeps_both_chains_when_oas_labels_both_as_heavy() -> None:
@@ -99,18 +115,17 @@ def test_antibody_pair_keeps_both_chains_when_oas_labels_both_as_heavy() -> None
     tokens, _ = rendered_tokens(record)
 
     assert tokens == [
-        "<generate>",
-        "<proas>",
+        "<prots>",
         "A",
         "A",
         "A",
-        "<proae>",
-        "<binding>",
-        "<probs>",
+        "<prote>",
+        "<pairs>",
+        "<prots>",
         "C",
         "C",
         "C",
-        "<probd>",
+        "<prote>",
     ]
 
 
@@ -127,18 +142,17 @@ def test_tcr_pair_keeps_both_chains_when_ots_labels_both_as_beta() -> None:
     tokens, _ = rendered_tokens(record)
 
     assert tokens == [
-        "<generate>",
-        "<proas>",
+        "<prots>",
         "C",
         "C",
         "C",
-        "<proae>",
-        "<binding>",
-        "<probs>",
+        "<prote>",
+        "<pairs>",
+        "<prots>",
         "B",
         "B",
         "B",
-        "<probd>",
+        "<prote>",
     ]
 
 
@@ -159,40 +173,125 @@ def test_grammar_renders_tcr_peptide_and_ppi() -> None:
         ],
         task_type="ppi",
         source="string_ppi",
+        labels={"relation": "binding"},
     )
 
     tcr_tokens, _ = rendered_tokens(tcr)
-    ppi_tokens, _ = rendered_tokens(ppi)
+    ppi_tokens, _ = rendered_tokens(ppi, rng=random.Random(1))
 
     assert tcr_tokens[:5] == ["<peptides>", "P", "E", "P", "<peptided>"]
     assert tcr_tokens[5:] == [
         "<generate>",
-        "<proas>",
+        "<prots>",
         "A",
         "A",
         "A",
-        "<proae>",
-        "<binding>",
-        "<probs>",
+        "<prote>",
+        "<pairs>",
+        "<prots>",
         "B",
         "B",
         "B",
-        "<probd>",
+        "<prote>",
     ]
     assert ppi_tokens == [
-        "<protas>",
+        "<prots>",
         "A",
         "A",
         "A",
         "A",
-        "<protad>",
+        "<prote>",
         "<binding>",
-        "<protbs>",
+        "<prots>",
         "C",
         "C",
         "C",
         "C",
-        "<protbd>",
+        "<prote>",
+    ]
+
+
+def test_ppi_binding_can_render_fixed_chain_conditional_layout() -> None:
+    record = BioSeqRecord(
+        chains=[
+            BioSeqChain("AAAA", "protein_a"),
+            BioSeqChain("CCCC", "protein_b"),
+        ],
+        task_type="ppi",
+        source="string_ppi",
+        labels={"relation": "binding"},
+    )
+
+    _, fix_a = rendered_tokens(record, rng=random.Random(0))
+    _, fix_b = rendered_tokens(record, rng=random.Random(5))
+
+    assert GrammarTokenizer(Esm2SequenceTokenizer()).decode_tokens(fix_a["input_ids"]) == [
+        "<fixs>",
+        "A",
+        "A",
+        "A",
+        "A",
+        "<fixd>",
+        "<binding>",
+        "<generate>",
+        "<prots>",
+        "C",
+        "C",
+        "C",
+        "C",
+        "<prote>",
+    ]
+    assert GrammarTokenizer(Esm2SequenceTokenizer()).decode_tokens(fix_b["input_ids"]) == [
+        "<fixs>",
+        "C",
+        "C",
+        "C",
+        "C",
+        "<fixd>",
+        "<binding>",
+        "<generate>",
+        "<prots>",
+        "A",
+        "A",
+        "A",
+        "A",
+        "<prote>",
+    ]
+
+
+def test_antigen_antibody_uses_binding_generate_and_pairs() -> None:
+    record = BioSeqRecord(
+        chains=[
+            BioSeqChain("ANT", "antigen"),
+            BioSeqChain("HHH", "antibody_heavy"),
+            BioSeqChain("LLL", "antibody_light"),
+        ],
+        task_type="antibody_antigen",
+        source="unit",
+        labels={"relation": "binding"},
+    )
+
+    tokens, _ = rendered_tokens(record)
+
+    assert tokens == [
+        "<fixs>",
+        "A",
+        "N",
+        "T",
+        "<fixd>",
+        "<binding>",
+        "<generate>",
+        "<prots>",
+        "H",
+        "H",
+        "H",
+        "<prote>",
+        "<pairs>",
+        "<prots>",
+        "L",
+        "L",
+        "L",
+        "<prote>",
     ]
 
 
@@ -214,6 +313,11 @@ def test_only_fix_span_is_protected_from_diffusion() -> None:
         bool(fixed) != bool(eligible)
         for fixed, eligible in zip(row["fixed_context_mask"], row["diffusion_eligible_mask"])
     )
+    assert tokens[fixed_positions[-1] + 1 : fixed_positions[-1] + 4] == [
+        "<unknown>",
+        "<generate>",
+        "<prots>",
+    ]
 
     tokenizer = GrammarTokenizer(Esm2SequenceTokenizer())
     batch = GrammarBioSeqCollator(tokenizer)([record])
@@ -281,7 +385,7 @@ def test_encoder_proxy_uses_current_noisy_grammar_stream() -> None:
     assert output.encoder_condition.shape[:2] == batch["input_ids"].shape
 
 
-def test_grammar_batch_uses_no_chain_role_embedding_or_boundary_leakage() -> None:
+def test_grammar_batch_assigns_real_chain_indices() -> None:
     tokenizer = GrammarTokenizer(Esm2SequenceTokenizer())
     record = BioSeqRecord(
         chains=[
@@ -293,10 +397,28 @@ def test_grammar_batch_uses_no_chain_role_embedding_or_boundary_leakage() -> Non
     )
     batch = GrammarBioSeqCollator(tokenizer)([record])
     active = batch["attention_mask"]
+    chain_ids = batch["position_ids_chain"][active]
 
     assert "chain_role_ids" not in batch
-    assert batch["position_ids_chain"][active].unique().tolist() == [0]
+    assert chain_ids[chain_ids == CHAIN_ID_OBJECT_A].numel() == 6
+    assert chain_ids[chain_ids == CHAIN_ID_OBJECT_B].numel() == 5
     assert batch["position_ids_chain"][~active].unique().tolist() in ([], [-1])
+
+    antigen_record = BioSeqRecord(
+        chains=[
+            BioSeqChain("ANT", "antigen"),
+            BioSeqChain("HHH", "antibody_heavy"),
+            BioSeqChain("LLL", "antibody_light"),
+        ],
+        task_type="antibody_antigen",
+        source="unit",
+    )
+    antigen_batch = GrammarBioSeqCollator(tokenizer)([antigen_record])
+    fixed_mask = antigen_batch["fixed_context_mask"][0]
+    assert (
+        antigen_batch["position_ids_chain"][0][fixed_mask].unique().tolist()
+        == [CHAIN_ID_FIXED_CONTEXT]
+    )
 
     config = BioSeqDiffusionTransformerConfig(
         vocab_size=tokenizer.vocab_size,
@@ -307,12 +429,12 @@ def test_grammar_batch_uses_no_chain_role_embedding_or_boundary_leakage() -> Non
         dropout=0.0,
         max_position_embeddings=128,
         mask_token_id=tokenizer.mask_token_id,
-        use_chain_role_embeddings=False,
     )
     model = BioSeqNoEncoderDiffusionModel(config)
     output = model.compute_loss(batch)
     assert output.loss is not None
     output.loss.backward()
 
-    assert model.decoder.chain_role_embeddings is None
+    assert not hasattr(model.decoder, "chain_role_embeddings")
+    assert not hasattr(model.decoder, "task_embeddings")
     assert model.decoder.chain_position_embeddings.weight.grad is not None

@@ -140,7 +140,7 @@ dmypy.json
 /data/
 /model_weights/
 /logs/
-/examples/
+# /examples/
 /output/
 
 # IRBench：只提交脚本，忽略 clone 的 baseline / 生成数据 / 评测产物

@@ -71,6 +71,7 @@ from dllm.pipelines.qwen3_vl_arch.modeling_bioseq import (  # noqa: E402
     BioSeqNoEncoderDiffusionModel,
     apply_decoder_corruption_to_encoder,
     compute_masked_cross_entropy,
+    forbidden_diffusion_target_token_ids,
     sample_bioseq_diffusion_noise,
 )
 
@@ -82,9 +83,9 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
 
     data = parser.add_argument_group("data")
-    data.add_argument("--input-format", choices=["legacy", "grammar_v1"], default="legacy")
+    data.add_argument("--input-format", choices=["legacy", "grammar_v1"], default="grammar_v1")
     data.add_argument("--split", type=str, default="train")
-    data.add_argument("--sources", type=str, default="oas,ots,nanobody,processed_v2")
+    data.add_argument("--sources", type=str, default="oas,ots,tcr,ppi")
     data.add_argument("--limit-per-source", type=int, default=None)
     data.add_argument("--epoch-size", type=int, default=None, help="Records emitted per rank/worker epoch; None means infinite stream.")
     data.add_argument("--batch-size", type=int, default=8, help="Mixed-task microbatch size per process.")
@@ -123,6 +124,7 @@ def parse_args() -> argparse.Namespace:
     model.add_argument("--num-attention-heads", type=int, default=8)
     model.add_argument("--intermediate-size", type=int, default=2048)
     model.add_argument("--dropout", type=float, default=0.1)
+    model.add_argument("--qk-norm", action="store_true", help="Apply RMSNorm to query/key per head for attention stability.")
     model.add_argument("--gradient-checkpointing", action="store_true")
     model.add_argument("--initializer-range", type=float, default=0.02)
     model.add_argument("--max-position-embeddings", type=int, default=4096)
@@ -283,11 +285,11 @@ def build_config(args: argparse.Namespace, tokenizer: Any) -> BioSeqDiffusionTra
         max_chain_positions=args.max_chain_positions,
         max_chain_roles=args.max_chain_roles,
         max_task_types=args.max_task_types,
-        use_chain_role_embeddings=args.input_format != "grammar_v1",
         pad_token_id=int(tokenizer.pad_token_id),
         mask_token_id=int(tokenizer.mask_token_id),
         time_epsilon=args.time_epsilon,
         loss_norm=args.loss_norm,
+        qk_norm=args.qk_norm,
         gradient_checkpointing=args.gradient_checkpointing,
         initializer_range=args.initializer_range,
     )
@@ -467,13 +469,14 @@ def compute_training_output(
     kwargs: dict[str, Any] = {
         "input_ids": noised_input_ids,
         "attention_mask": batch.get("attention_mask"),
-        "chain_ids": batch.get("chain_ids"),
-        "chain_role_ids": batch.get("chain_role_ids"),
         "position_ids_inner": batch.get("position_ids_inner"),
         "position_ids_chain": batch.get("position_ids_chain"),
-        "task_type_ids": batch.get("task_type_ids"),
         "timesteps": timesteps,
     }
+    if batch.get("chain_ids") is not None:
+        kwargs["chain_ids"] = batch.get("chain_ids")
+    if batch.get("encoder_position_ids") is not None:
+        kwargs["residue_mask"] = batch.get("residue_mask")
     noised_encoder_input_ids = None
     if isinstance(module, BioSeqEncoderDiffusionModel):
         noised_encoder_input_ids = apply_decoder_corruption_to_encoder(
@@ -491,7 +494,13 @@ def compute_training_output(
             }
         )
     output = train_model(**kwargs)
-    loss = compute_masked_cross_entropy(output.logits, labels, loss_norm=config.loss_norm)
+    forbidden = forbidden_diffusion_target_token_ids(config)
+    loss = compute_masked_cross_entropy(
+        output.logits,
+        labels,
+        loss_norm=config.loss_norm,
+        forbidden_token_ids=forbidden,
+    )
     return replace(
         output,
         loss=loss,

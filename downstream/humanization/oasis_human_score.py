@@ -110,14 +110,24 @@ def main():
     """
     Main function to convert CSV to FASTA and run OASis scoring.
     """
-    if len(sys.argv) < 3:
-        print("Usage: python oasis_human_score.py <csv_path> <oasis_db_path> [output.xlsx]")
-        print("Example: python oasis_human_score.py task_output.csv OASis_9mers_v1.db oasis_scores.xlsx")
+    if len(sys.argv) < 2:
+        print("Usage: python oasis_human_score.py <csv_path> [oasis_db_path] [output.xlsx]")
+        print("Example: python oasis_human_score.py task_output.csv /vepfs-mlp2/c20250601/251105016/project/oasis/db/OASis_9mers_v1.db oasis_scores.xlsx")
         sys.exit(1)
 
     csv_file = sys.argv[1]
-    oasis_db = sys.argv[2]
-    output = sys.argv[3] if len(sys.argv) > 3 else "oasis_scores.xlsx"
+    if len(sys.argv) > 3:
+        oasis_db = sys.argv[2]
+        output = sys.argv[3]
+    elif len(sys.argv) > 2:
+        oasis_db = sys.argv[2]
+        output = "oasis_scores.xlsx"
+    else:
+        oasis_db = os.environ.get(
+            "OASIS_DB_PATH",
+            "/vepfs-mlp2/c20250601/251105016/project/oasis/db/OASis_9mers_v1.db",
+        )
+        output = "oasis_scores.xlsx"
     
     # Generate FASTA file name from CSV file name
     fasta_file = csv_file.replace('.csv', '_sequences.fasta')

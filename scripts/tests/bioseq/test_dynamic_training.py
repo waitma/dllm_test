@@ -13,10 +13,12 @@ from dllm.pipelines.bioseq import Esm2ProteinTokenizer, MultiChainDynamicCollato
 from dllm.pipelines.bioseq.datasets import (
     ImmuneCsvDataset,
     ImmuneSourceSpec,
+    default_immune_specs,
     nanobody_row_to_record,
     oas_paired_row_to_record,
     ots_paired_row_to_record,
 )
+from examples.bioseq.train_bioseq_ddp import select_source_specs
 
 
 def test_dynamic_collator_variable_length_paired():
@@ -102,3 +104,8 @@ def test_invalid_rows_are_skipped(tmp_path):
     )
     assert len(dataset) == 1
     assert dataset[0]["chains"] == ["QVQLVESGGG"]
+
+
+def test_train_ddp_sources_can_select_oas_and_ots_only():
+    selected = select_source_specs(default_immune_specs(), "oas,ots")
+    assert [spec.name for spec in selected] == ["oas", "ots"]

@@ -20,6 +20,9 @@ from dllm.pipelines.qwen3_vl_arch.modeling_bioseq import (
     BioSeqNoEncoderDiffusionModel,
     _convert_biohub_esmc_state_dict,
     apply_decoder_corruption_to_encoder,
+    compute_masked_cross_entropy,
+    forbidden_diffusion_target_token_ids,
+    mask_forbidden_target_logits,
     sample_bioseq_diffusion_noise,
 )
 
@@ -267,18 +270,14 @@ def test_denoiser_accepts_soft_diffusion_state_without_internal_one_hot() -> Non
         from_ids = model(
             input_ids=batch["input_ids"],
             attention_mask=batch["attention_mask"],
-            chain_role_ids=batch["chain_role_ids"],
             position_ids_inner=batch["position_ids_inner"],
             position_ids_chain=batch["position_ids_chain"],
-            task_type_ids=batch["task_type_ids"],
         )
         from_soft_state = model(
             diffusion_state=soft_state,
             attention_mask=batch["attention_mask"],
-            chain_role_ids=batch["chain_role_ids"],
             position_ids_inner=batch["position_ids_inner"],
             position_ids_chain=batch["position_ids_chain"],
-            task_type_ids=batch["task_type_ids"],
         )
 
     assert torch.allclose(from_soft_state.logits, from_ids.logits, atol=1e-5)
@@ -298,6 +297,23 @@ def test_noise_sampler_masks_only_diffusion_loss_positions() -> None:
     assert timesteps.shape == (batch["input_ids"].shape[0],)
     assert (corruption_mask & ~batch["diffusion_loss_mask"]).sum().item() == 0
     assert (labels.ne(-100) == corruption_mask).all()
+
+
+def test_compute_masked_cross_entropy_forbids_mask_token_predictions() -> None:
+    config = tiny_config(vocab_size=64, mask_token_id=32, pad_token_id=1)
+    forbidden = forbidden_diffusion_target_token_ids(config)
+    assert 32 in forbidden
+
+    logits = torch.zeros(1, 2, config.vocab_size)
+    logits[..., 32] = 100.0
+    labels = torch.tensor([[4, 5]])
+
+    masked_logits = mask_forbidden_target_logits(logits, forbidden)
+    assert masked_logits.argmax(dim=-1).eq(32).sum().item() == 0
+
+    loss = compute_masked_cross_entropy(logits, labels, forbidden_token_ids=forbidden)
+    assert torch.isfinite(loss)
+    assert loss.item() > 0.0
 
 
 def test_biohub_esmc_state_dict_key_conversion() -> None:

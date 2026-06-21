@@ -33,6 +33,16 @@ The following files were copied for reference and evaluation utilities. They may
 
 Prefer the aligned scripts in the first table for Ophiuchus-Ab inference and embedding extraction.
 
+## Recommended decoding configs (Ophiuchus-Ab checkpoint)
+
+| Task | sampling_strategy | max_iter | cfg_scale | Notes |
+|------|-------------------|----------|-----------|-------|
+| CDR infilling | `argmax` | 4 | 0.0 | Mask one CDR region at a time |
+| Light-chain pairing | `gumbel_argmax` | 32 | 0.0 | Optional `light_prompt_tokens=3` (first 3 light residues fixed) |
+| Humanization | `gumbel_argmax` | 32 | 0.0 | FR regions masked; light C-terminal 3 residues kept native |
+
+CDR infilling uses short deterministic decoding; full-length generation tasks (pairing, humanization) match AirGen defaults with longer iterative refinement.
+
 ## Examples
 
 ```bash

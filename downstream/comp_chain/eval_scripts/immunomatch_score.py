@@ -149,26 +149,31 @@ def alloc_light_chain_type(df: pd.DataFrame, l_col: str, type_col: str, n_jobs: 
     existing_col = col_mapping.get(l_col)
     
     
-    if existing_col is not None:
+    if existing_col is not None and existing_col in df.columns:
         print(f"Found existing chain type column: {existing_col} (mapped from {l_col})")
         # Use existing chain type data
         df[type_col] = df[existing_col]
         
-        # Count None values
-        none_count = df[type_col].isna().sum()
-        
-        # Convert to string and standardize format
-        df[type_col] = df[type_col].astype(str).str.upper()
-        df[type_col] = df[type_col].replace(['NAN', 'NONE', 'NAN'], None)
-        
-        # Handle lowercase versions
-        df[type_col] = df[type_col].str.lower()
-        df[type_col] = df[type_col].replace({
-            'kappa': 'K',
-            'lambda': 'L',
-        })
-        
-        # Recalculate none_count after standardization
+        df[type_col] = (
+            df[type_col]
+            .astype(str)
+            .str.strip()
+            .str.lower()
+            .replace(
+                {
+                    "k": "K",
+                    "kappa": "K",
+                    "igk": "K",
+                    "l": "L",
+                    "lambda": "L",
+                    "igl": "L",
+                    "nan": None,
+                    "none": None,
+                    "": None,
+                }
+            )
+        )
+
         none_count = df[type_col].isna().sum()
         
         print(f"Using existing chain types. None count: {none_count}")
@@ -230,6 +235,7 @@ def debug_main(
         immuno_lambda = '/mnt/nas-new/home/yangnianzu/jm/bjzgc_zyh/AirGen-Dev/ckpt/immun/immunomatch-lambda'
         
         data_df = pd.read_csv(df_dir)
+        data_df["_immunomatch_row_id"] = range(len(data_df))
         data_df, none_count = alloc_light_chain_type(data_df, lseq_col, type_col, n_jobs=-1)
         if none_count > 0:
             print(f"Warning: {none_count} light chain sequences cannot be identified by abnumber.")
@@ -259,18 +265,15 @@ def debug_main(
                 lseq_col, 
                 immuno_kappa,
             )
-            # Use heavy sequence as identifier to map results
             kappa_mapped = 0
             for _, row in k_pairing_batch_result.iterrows():
-                h_seq = row[hseq_col]
                 score = row['pairing_scores']
-                # Find corresponding heavy sequence in original data
-                mask = (result_df[hseq_col] == h_seq) & (result_df[type_col] == 'K')
+                mask = result_df["_immunomatch_row_id"] == row["_immunomatch_row_id"]
                 if mask.any():
                     result_df.loc[mask, 'pairing_scores'] = score
                     kappa_mapped += 1
                 else:
-                    print(f"Warning: Could not find matching kappa sequence for h_seq: {h_seq[:20]}...")
+                    print(f"Warning: Could not find matching kappa row_id: {row['_immunomatch_row_id']}")
             print(f"Successfully mapped {kappa_mapped}/{len(k_pairing_batch_result)} kappa scores")
         
         # Process lambda data
@@ -285,18 +288,15 @@ def debug_main(
                 lseq_col, 
                 immuno_lambda,
             )
-            # Use heavy sequence as identifier to map results
             lambda_mapped = 0
             for _, row in l_pairing_batch_result.iterrows():
-                h_seq = row[hseq_col]
                 score = row['pairing_scores']
-                # Find corresponding heavy sequence in original data
-                mask = (result_df[hseq_col] == h_seq) & (result_df[type_col] == 'L')
+                mask = result_df["_immunomatch_row_id"] == row["_immunomatch_row_id"]
                 if mask.any():
                     result_df.loc[mask, 'pairing_scores'] = score
                     lambda_mapped += 1
                 else:
-                    print(f"Warning: Could not find matching lambda sequence for h_seq: {h_seq[:20]}...")
+                    print(f"Warning: Could not find matching lambda row_id: {row['_immunomatch_row_id']}")
             print(f"Successfully mapped {lambda_mapped}/{len(l_pairing_batch_result)} lambda scores")
     
 
@@ -335,6 +335,7 @@ def main(
         immuno_lambda = '/vepfs-mlp2/mlp-public/zhuyiheng/hub/checkpoints/immunomatch-lambda'
         
         data_df = pd.read_csv(df_dir)
+        data_df["_immunomatch_row_id"] = range(len(data_df))
         data_df, none_count = alloc_light_chain_type(data_df, lseq_col, type_col, n_jobs=-1)
         if none_count > 0:
             print(f"Warning: {none_count} light chain sequences cannot be identified by abnumber.")
@@ -364,18 +365,15 @@ def main(
                 lseq_col, 
                 immuno_kappa,
             )
-            # Use heavy sequence as identifier to map results
             kappa_mapped = 0
             for _, row in k_pairing_batch_result.iterrows():
-                h_seq = row[hseq_col]
                 score = row['pairing_scores']
-                # Find corresponding heavy sequence in original data
-                mask = (result_df[hseq_col] == h_seq) & (result_df[type_col] == 'K')
+                mask = result_df["_immunomatch_row_id"] == row["_immunomatch_row_id"]
                 if mask.any():
                     result_df.loc[mask, 'pairing_scores'] = score
                     kappa_mapped += 1
                 else:
-                    print(f"Warning: Could not find matching kappa sequence for h_seq: {h_seq[:20]}...")
+                    print(f"Warning: Could not find matching kappa row_id: {row['_immunomatch_row_id']}")
             print(f"Successfully mapped {kappa_mapped}/{len(k_pairing_batch_result)} kappa scores")
         
         # Process lambda data
@@ -390,18 +388,15 @@ def main(
                 lseq_col, 
                 immuno_lambda,
             )
-            # Use heavy sequence as identifier to map results
             lambda_mapped = 0
             for _, row in l_pairing_batch_result.iterrows():
-                h_seq = row[hseq_col]
                 score = row['pairing_scores']
-                # Find corresponding heavy sequence in original data
-                mask = (result_df[hseq_col] == h_seq) & (result_df[type_col] == 'L')
+                mask = result_df["_immunomatch_row_id"] == row["_immunomatch_row_id"]
                 if mask.any():
                     result_df.loc[mask, 'pairing_scores'] = score
                     lambda_mapped += 1
                 else:
-                    print(f"Warning: Could not find matching lambda sequence for h_seq: {h_seq[:20]}...")
+                    print(f"Warning: Could not find matching lambda row_id: {row['_immunomatch_row_id']}")
             print(f"Successfully mapped {lambda_mapped}/{len(l_pairing_batch_result)} lambda scores")
     
 

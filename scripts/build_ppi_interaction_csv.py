@@ -25,6 +25,21 @@ DEFAULT_ROOT = Path(
     "/vepfs-mlp2/c20250601/251105016/project/dllm_test/data/ppi_task_raw"
 )
 
+PROJECT_ROOT = Path("/vepfs-mlp2/c20250601/251105016/project/dllm_test")
+if str(PROJECT_ROOT) not in __import__("sys").path:
+    __import__("sys").path.insert(0, str(PROJECT_ROOT))
+
+import importlib.util
+
+_ppi_relations_path = (
+    PROJECT_ROOT / "dllm/pipelines/qwen3_vl_arch/data/ppi_relations.py"
+)
+_spec = importlib.util.spec_from_file_location("ppi_relations", _ppi_relations_path)
+assert _spec and _spec.loader
+_ppi_relations = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(_ppi_relations)
+infer_grammar_relation = _ppi_relations.infer_grammar_relation
+
 FIELDNAMES = [
     "record_id",
     "source_id",
@@ -51,6 +66,8 @@ FIELDNAMES = [
     "value",
     "value_name",
     "measurement_type",
+    "grammar_relation",
+    "string_channel",
     "pdb_id",
     "chain_info",
     "raw_record_json",
@@ -206,6 +223,8 @@ def compact_json(row: Mapping[str, object]) -> str:
 
 def infer_split(path: Path, dataset_name: str) -> str:
     text = "/".join(path.parts).lower() + "/" + dataset_name.lower()
+    if re.search(r"(^|[/_.-])cross_species_test([/_.-]|$)", text):
+        return "cross_species_test"
     for split in ("train", "training", "valid", "validation", "val", "test", "dbpepneo"):
         if re.search(rf"(^|[/_.-]){split}([/_.-]|$)", text):
             return "train" if split == "training" else "valid" if split in {"validation", "val"} else split
@@ -324,7 +343,7 @@ def base_record(
     epitope, _ = first(row, ["epitope_aa", "epitope", "MT_pep", "peptide", "pep"])
     hla_type, _ = first(row, ["HLA_type", "hla_type", "hla", "mhc"])
     hla_sequence, _ = first(row, ["HLA_sequence", "hla_sequence"])
-    antibody_heavy, _ = first(row, ["heavy", "heavy_sequence", "vh", "vh_sequence", "h_seq", "hchain"])
+    antibody_heavy, _ = first(row, ["heavy", "heavy_sequence", "vh", "vh_sequence", "h_seq", "hchain", "vhor_vhh"])
     antibody_light, _ = first(row, ["light", "light_sequence", "vl", "vl_sequence", "l_seq", "lchain"])
     antigen, _ = first(row, ["antigen", "antigen_name", "antigen_sequence", "target_antigen"])
     mutation, _ = first(
@@ -353,6 +372,11 @@ def base_record(
         if value:
             break
 
+    grammar_relation = infer_grammar_relation(
+        task_family=task_family,
+        source_id=source_id,
+        label=label,
+    )
     return {
         "record_id": "",
         "source_id": source_id,
@@ -378,7 +402,9 @@ def base_record(
         "mutation": mutation,
         "value": value,
         "value_name": value_name,
-        "measurement_type": "",
+        "measurement_type": infer_measurement(Path(raw_file), raw_row.keys()),
+        "grammar_relation": grammar_relation,
+        "string_channel": "physical" if source_id == "stringdb_mint" else "",
         "pdb_id": pdb_id,
         "chain_info": chain_info,
         "raw_record_json": compact_json(raw_row),
@@ -618,6 +644,43 @@ def iter_lmdb_dir(source_id: str, path: Path) -> Iterator[Dict[str, str]]:
         env.close()
 
 
+def iter_covabdab_neutralization(raw_root: Path) -> Iterator[Dict[str, str]]:
+    source_id = "covabdab_neutralization"
+    task_family = SOURCES[source_id]["task_family"]
+    for path in sorted(raw_root.glob("*.csv")):
+        if any(path.name.endswith(suffix) for suffix in PARTIAL_SUFFIXES):
+            continue
+        reader = pd.read_csv(path, chunksize=50000, low_memory=False, on_bad_lines="skip")
+        row_offset = 0
+        for chunk in reader:
+            for local_index, raw_row in enumerate(chunk.to_dict(orient="records")):
+                row = normalized_row(raw_row)
+                heavy = clean_value(raw_row.get("VHorVHH") or row.get("vhor_vhh"))
+                light = clean_value(raw_row.get("VL") or row.get("vl"))
+                if heavy.upper() == "ND":
+                    heavy = ""
+                if light.upper() == "ND":
+                    light = ""
+                neutralising = clean_value(raw_row.get("Neutralising Vs") or row.get("neutralising_vs"))
+                record = base_record(
+                    source_id,
+                    task_family,
+                    path.stem,
+                    str(path),
+                    row_offset + local_index,
+                    "train",
+                    raw_row,
+                )
+                record["antibody_heavy"] = heavy
+                record["antibody_light"] = light
+                record["label"] = "1" if neutralising else record.get("label", "")
+                record["measurement_type"] = "neutralization"
+                record["entity_a_id"] = clean_value(raw_row.get("Ab or Nb") or row.get("ab_or_nb"))
+                if heavy or light:
+                    yield record
+            row_offset += len(chunk)
+
+
 def iter_generic_source(source_id: str, root: Path) -> Iterator[Dict[str, str]]:
     raw_root = root / SOURCES[source_id]["path"]
     if not raw_root.exists():
@@ -655,7 +718,8 @@ def iter_generic_source(source_id: str, root: Path) -> Iterator[Dict[str, str]]:
     elif source_id == "oncoppi":
         include_paths = sorted(raw_root.glob("**/*.xlsx"))
     elif source_id == "covabdab_neutralization":
-        include_paths = sorted(raw_root.glob("*.csv"))
+        yield from iter_covabdab_neutralization(raw_root)
+        return
     elif source_id in {"saprot_humanppi", "peer_yeastppi"}:
         include_paths = sorted(raw_root.glob("**/*.lmdb"))
         if not include_paths:
@@ -732,14 +796,17 @@ def build_manifest(root: Path, output_path: Path) -> List[Dict[str, str]]:
     return rows
 
 
-def build_records(root: Path, output_path: Path) -> Counter:
+def build_records(root: Path, output_path: Path, source_ids: list[str] | None = None) -> Counter:
     counts: Counter = Counter()
     output_path.parent.mkdir(parents=True, exist_ok=True)
+    selected = source_ids or list(SOURCES.keys())
     with output_path.open("w", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=FIELDNAMES)
         writer.writeheader()
         record_id = 0
-        for source_id in SOURCES:
+        for source_id in selected:
+            if source_id not in SOURCES:
+                raise ValueError(f"Unknown source_id: {source_id}")
             for record in iter_generic_source(source_id, root):
                 record_id += 1
                 record["record_id"] = str(record_id)
@@ -780,6 +847,11 @@ def main() -> None:
         action="store_true",
         help="Copy every original input row into raw_record_json. This can make the output very large.",
     )
+    parser.add_argument(
+        "--sources",
+        default="",
+        help="Comma-separated source_id subset (default: all SOURCES keys).",
+    )
     args = parser.parse_args()
     INCLUDE_RAW_RECORD_JSON = args.include_raw_record_json
 
@@ -791,8 +863,14 @@ def main() -> None:
     records_path = processed / "interaction_records_unified.csv"
     summary_path = processed / "interaction_records_summary.csv"
 
+    selected_sources = [
+        item.strip()
+        for item in args.sources.split(",")
+        if item.strip()
+    ] or list(SOURCES.keys())
+
     manifest_rows = build_manifest(root, manifest_path)
-    counts = build_records(root, records_path)
+    counts = build_records(root, records_path, selected_sources)
     write_summary(counts, manifest_rows, summary_path)
 
     print(f"wrote {manifest_path}")

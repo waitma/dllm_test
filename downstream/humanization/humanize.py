@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import argparse
-import glob
 import os
 import random
 import sys
@@ -39,21 +38,39 @@ def create_fr_mask_with_abnumber(sequence: str, scheme: str = "imgt"):
     return masked_seq, fv_seq
 
 
-def parse_pdb_chain_pairs(csv_path: str) -> dict[str, list[str]]:
+def parse_pdb_chain_pairs(csv_path: str) -> list[dict[str, str | list[str]]]:
     df = pd.read_csv(csv_path, header=None, names=["pdb_id", "chain_pair"])
-    pdb_to_chains = {}
-    for _, row in df.iterrows():
-        pdb_id = str(row["pdb_id"]).strip()
-        chains = [part.strip() for part in str(row["chain_pair"]).split("-") if part.strip()]
-        pdb_to_chains[pdb_id] = chains
-    return pdb_to_chains
+    pairs: list[dict[str, str | list[str]]] = []
+    for row_idx, row in df.iterrows():
+        pdb_id = str(row["pdb_id"]).strip().lower()
+        chain_pair = str(row["chain_pair"]).strip()
+        chains = [part.strip() for part in chain_pair.split("-") if part.strip()]
+        pairs.append(
+            {
+                "pdb_id": pdb_id,
+                "chain_pair": chain_pair,
+                "chains": chains,
+                "sample_id": f"{pdb_id}_{chain_pair.replace('-', '')}",
+                "row_idx": int(row_idx),
+            }
+        )
+    return pairs
 
 
-def extract_seq_from_mmcif(cif_file: str):
-    from Bio.PDB import MMCIFParser, PPBuilder
+def resolve_structure_file(pdb_dir: str, pdb_id: str) -> str:
+    for ext in (".cif", ".pdb"):
+        candidate = os.path.join(pdb_dir, f"{pdb_id}{ext}")
+        if os.path.exists(candidate):
+            return candidate
+    raise FileNotFoundError(f"Structure file for {pdb_id} not found under {pdb_dir}")
 
-    parser = MMCIFParser(QUIET=True)
-    structure = parser.get_structure("structure", cif_file)
+
+def extract_seq_from_structure(structure_file: str):
+    from Bio.PDB import MMCIFParser, PDBParser, PPBuilder
+
+    suffix = Path(structure_file).suffix.lower()
+    parser = MMCIFParser(QUIET=True) if suffix == ".cif" else PDBParser(QUIET=True)
+    structure = parser.get_structure("structure", structure_file)
     ppb = PPBuilder()
     chain_seqs = {}
     for model in structure:
@@ -61,26 +78,35 @@ def extract_seq_from_mmcif(cif_file: str):
             seqs = [str(pp.get_sequence()) for pp in ppb.build_peptides(chain)]
             if seqs:
                 chain_seqs[chain.id] = "".join(seqs)
-    return chain_seqs, Path(cif_file).stem
+    return chain_seqs, Path(structure_file).stem
 
 
 class HumanizationDataset(Dataset):
-    def __init__(self, pdb_dir: str, info_csv_fpath: str):
-        self.cif_list = glob.glob(os.path.join(pdb_dir, "*.cif"))
-        self.pdb_to_chains = parse_pdb_chain_pairs(info_csv_fpath)
+    def __init__(
+        self,
+        pdb_dir: str,
+        info_csv_fpath: str,
+        start_index: int = 0,
+        end_index: int | None = None,
+    ):
+        self.pdb_dir = pdb_dir
+        self.pairs = parse_pdb_chain_pairs(info_csv_fpath)[start_index:end_index]
 
     def __len__(self) -> int:
-        return len(self.cif_list)
+        return len(self.pairs)
 
     def __getitem__(self, index: int):
-        chain_seqs, pdb_id = extract_seq_from_mmcif(self.cif_list[index])
-        chain_ids = self.pdb_to_chains[pdb_id]
+        pair = self.pairs[index]
+        pdb_id = str(pair["pdb_id"])
+        chain_ids = pair["chains"]
+        structure_file = resolve_structure_file(self.pdb_dir, pdb_id)
+        chain_seqs, _ = extract_seq_from_structure(structure_file)
         heavy_seq = chain_seqs[chain_ids[0]]
         light_seq = chain_seqs[chain_ids[1]]
         heavy_masked, fv_heavy_seq = create_fr_mask_with_abnumber(heavy_seq, "imgt")
         light_masked, fv_light_seq = create_fr_mask_with_abnumber(light_seq, "imgt")
         light_masked = light_masked[:-3] + fv_light_seq[-3:]
-        return heavy_masked, light_masked, fv_heavy_seq, fv_light_seq, pdb_id
+        return heavy_masked, light_masked, fv_heavy_seq, fv_light_seq, pdb_id, str(pair["sample_id"]), str(pair["chain_pair"])
 
 
 class HumanizationCollator:
@@ -105,7 +131,12 @@ def generate(args):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = load_model(args.checkpoint_path, device=device)
     tokenizer = model.tokenizer
-    dataset = HumanizationDataset(args.pdb_dir, args.info_csv_fpath)
+    dataset = HumanizationDataset(
+        args.pdb_dir,
+        args.info_csv_fpath,
+        start_index=args.start_index,
+        end_index=args.end_index,
+    )
     collator = HumanizationCollator(tokenizer=tokenizer)
 
     all_heavy_aars = []
@@ -113,7 +144,7 @@ def generate(args):
     rows = []
 
     for idx, sample in enumerate(dataset):
-        heavy_masked, light_masked, heavy_seq, light_seq, pdb_id = sample
+        heavy_masked, light_masked, heavy_seq, light_seq, pdb_id, sample_id, chain_pair = sample
         batch_data = [sample[:4] for _ in range(args.n_sequences)]
         chains, chain_ids, labels, heavy_len = collator(batch_data)
         chains = chains.to(device)
@@ -145,13 +176,16 @@ def generate(args):
             rows.append(
                 {
                     "pdb_id": pdb_id,
+                    "sample_id": sample_id,
+                    "chain_pair": chain_pair,
+                    "variant_idx": i,
                     "heavy_native": heavy_seq,
                     "light_native": light_seq,
-                    "heavy_generated": heavy_out,
-                    "light_generated": light_out,
+                    "generated_heavy": heavy_out,
+                    "generated_light": light_out,
                 }
             )
-        print(f"[{idx + 1}/{len(dataset)}] {pdb_id} heavy_aar={heavy_aar.mean().item()*100:.2f}%")
+        print(f"[{idx + 1}/{len(dataset)}] {sample_id} heavy_aar={heavy_aar.mean().item()*100:.2f}%")
 
     print(f"Overall heavy AAR: {np.mean(all_heavy_aars) * 100:.2f}%")
     print(f"Overall light AAR: {np.mean(all_light_aars) * 100:.2f}%")
@@ -168,9 +202,11 @@ def main():
     parser.add_argument("--n-sequences", type=int, default=8)
     parser.add_argument("--temperature", type=float, default=1.0)
     parser.add_argument("--sampling-strategy", type=str, default="gumbel_argmax")
-    parser.add_argument("--max-iter", type=int, default=500)
+    parser.add_argument("--max-iter", type=int, default=32)
     parser.add_argument("--cfg-scale", type=float, default=0.0)
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--start-index", type=int, default=0)
+    parser.add_argument("--end-index", type=int, default=None)
     args = parser.parse_args()
     generate(args)
 

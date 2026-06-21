@@ -1,4 +1,7 @@
-"""Grammar-v1 BioSeq serialization and collation.
+"""Grammar-v2 BioSeq serialization and collation.
+
+Training still reads semantic records from ``bioseq_grammar_v1`` Arrow shards;
+``GrammarRenderer`` applies the v2 token layout at encode time.
 
 Build the Arrow cache with::
 
@@ -11,6 +14,7 @@ Inspect one encoded batch with::
 
 from __future__ import annotations
 
+import random
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Iterator
@@ -27,18 +31,13 @@ GRAMMAR_STRUCTURE_TOKENS = (
     "<fixs>",
     "<fixd>",
     "<generate>",
-    "<proas>",
-    "<proae>",
-    "<probs>",
-    "<probd>",
+    "<prots>",
+    "<prote>",
     "<peptides>",
     "<peptided>",
-    "<protas>",
-    "<protad>",
-    "<protbs>",
-    "<protbd>",
 )
 GRAMMAR_RELATIONS = (
+    "pairs",
     "binding",
     "activation",
     "inhibition",
@@ -48,8 +47,13 @@ GRAMMAR_RELATIONS = (
     "ptmod",
     "neutralization",
     "nonbinding",
-    "unknown_relation",
+    "unknown",
 )
+
+CHAIN_ID_OBJECT_A = 0
+CHAIN_ID_OBJECT_B = 1
+CHAIN_ID_FIXED_CONTEXT = 2
+CHAIN_ID_PEPTIDE = 3
 GRAMMAR_RELATION_TOKENS = tuple(f"<{relation}>" for relation in GRAMMAR_RELATIONS)
 GRAMMAR_TOKENS = GRAMMAR_STRUCTURE_TOKENS + GRAMMAR_RELATION_TOKENS
 
@@ -108,9 +112,15 @@ class GrammarTokenizer:
 
 
 def _relation_token(relation: str | None) -> str:
-    normalized = str(relation or "binding").strip().lower().replace(" ", "_")
-    if normalized not in GRAMMAR_RELATIONS:
-        normalized = "unknown_relation"
+    raw = str(relation or "").strip().lower().replace(" ", "_").replace("-", "_")
+    if not raw:
+        normalized = "unknown"
+    elif raw in {"unknown_relation", "unk", "unknown"}:
+        normalized = "unknown"
+    elif raw in GRAMMAR_RELATIONS:
+        normalized = raw
+    else:
+        normalized = "unknown"
     return f"<{normalized}>"
 
 
@@ -118,12 +128,67 @@ def _first_chain(record: BioSeqRecord, roles: set[str]) -> BioSeqChain | None:
     return next((chain for chain in record.chains if chain.role.lower() in roles), None)
 
 
+def _record_seed(record: BioSeqRecord) -> int:
+    payload = (
+        record.source,
+        record.task_type,
+        tuple((chain.role, chain.sequence) for chain in record.chains),
+    )
+    return hash(payload) & 0xFFFFFFFF
+
+
+def _grammar_position_ids_chain(input_ids: list[int], tokenizer: GrammarTokenizer) -> list[int]:
+    """Assign per-object chain indices from a flat grammar token stream."""
+
+    position_ids: list[int] = []
+    index = 0
+    protein_object_index = 0
+    while index < len(input_ids):
+        token = tokenizer.token(input_ids[index])
+        if token == "<fixs>":
+            position_ids.append(CHAIN_ID_FIXED_CONTEXT)
+            index += 1
+            while index < len(input_ids) and tokenizer.token(input_ids[index]) != "<fixd>":
+                position_ids.append(CHAIN_ID_FIXED_CONTEXT)
+                index += 1
+            if index < len(input_ids):
+                position_ids.append(CHAIN_ID_FIXED_CONTEXT)
+                index += 1
+            continue
+        if token == "<peptides>":
+            position_ids.append(CHAIN_ID_PEPTIDE)
+            index += 1
+            while index < len(input_ids) and tokenizer.token(input_ids[index]) != "<peptided>":
+                position_ids.append(CHAIN_ID_PEPTIDE)
+                index += 1
+            if index < len(input_ids):
+                position_ids.append(CHAIN_ID_PEPTIDE)
+                index += 1
+            continue
+        if token == "<prots>":
+            chain_id = protein_object_index
+            position_ids.append(chain_id)
+            index += 1
+            while index < len(input_ids) and tokenizer.token(input_ids[index]) != "<prote>":
+                position_ids.append(chain_id)
+                index += 1
+            if index < len(input_ids):
+                position_ids.append(chain_id)
+                index += 1
+            protein_object_index += 1
+            continue
+        position_ids.append(CHAIN_ID_OBJECT_A)
+        index += 1
+    return position_ids
+
+
 @dataclass
 class GrammarRenderer:
-    """Render a BioSeqRecord into the flat grammar-v1 token stream."""
+    """Render a BioSeqRecord into the flat grammar-v2 token stream."""
 
     tokenizer: GrammarTokenizer
     ppi_max_protein_length: int = 1024
+    rng: random.Random | None = None
 
     def encode(self, record: BioSeqRecord) -> dict[str, Any]:
         ids: list[int] = []
@@ -152,18 +217,41 @@ class GrammarRenderer:
         relation = _relation_token(record.labels.get("relation") or record.metadata.get("relation"))
         roles = {chain.role.lower() for chain in record.chains}
         grammar_name = "generic_pair"
+        rng = self.rng or random.Random(_record_seed(record))
 
         if record.task_type == "ppi" or {"protein_a", "protein_b"} <= roles:
             protein_a = _first_chain(record, {"protein_a", "other"}) or record.chains[0]
             protein_b = _first_chain(record, {"protein_b"}) or record.chains[1]
-            special("<protas>")
-            sequence(protein_a.sequence, cap=self.ppi_max_protein_length)
-            special("<protad>")
-            special(relation)
-            special("<protbs>")
-            sequence(protein_b.sequence, cap=self.ppi_max_protein_length)
-            special("<protbd>")
-            grammar_name = "ppi_pair"
+            if relation == "<binding>":
+                layout = rng.choice(["symmetric", "fix_a", "fix_b"])
+            else:
+                layout = "symmetric"
+            if layout == "symmetric":
+                self._append_ppi_pair(
+                    special,
+                    sequence,
+                    protein_a,
+                    protein_b,
+                    relation,
+                    cap=self.ppi_max_protein_length,
+                )
+                grammar_name = "ppi_pair"
+            elif layout == "fix_a":
+                fixed_sequence(protein_a)
+                special("<binding>")
+                special("<generate>")
+                special("<prots>")
+                sequence(protein_b.sequence, cap=self.ppi_max_protein_length)
+                special("<prote>")
+                grammar_name = "ppi_fix_a"
+            else:
+                fixed_sequence(protein_b)
+                special("<binding>")
+                special("<generate>")
+                special("<prots>")
+                sequence(protein_a.sequence, cap=self.ppi_max_protein_length)
+                special("<prote>")
+                grammar_name = "ppi_fix_b"
         else:
             mhc = _first_chain(record, {"mhc", "pmhc", "hla"})
             antigen = _first_chain(record, {"antigen"})
@@ -179,29 +267,49 @@ class GrammarRenderer:
             ):
                 beta, alpha = record.chains[:2]
 
-            if record.task_type in {"antibody_antigen", "nanobody_antigen"} and antigen is not None:
+            if record.task_type in {
+                "antibody_antigen",
+                "nanobody_antigen",
+                "antibody_neutralization",
+            } and antigen is not None:
                 fixed_sequence(antigen)
+                special(relation)
                 special("<generate>")
-                self._append_receptor_pair(special, sequence, heavy, light, relation)
+                self._append_antibody_pair(special, sequence, heavy, light)
                 grammar_name = "antigen_antibody"
             elif alpha is not None or beta is not None or record.task_type.startswith("tcr"):
-                if mhc is not None:
-                    fixed_sequence(mhc)
-                    special("<binding>")
                 tcr_peptide = peptide or antigen
-                if tcr_peptide is not None:
-                    special("<peptides>")
-                    sequence(tcr_peptide.sequence)
-                    special("<peptided>")
-                special("<generate>")
-                self._append_receptor_pair(special, sequence, alpha, beta, relation)
-                grammar_name = "tcr_pmhc" if mhc is not None else (
-                    "tcr_peptide" if tcr_peptide is not None else "tcr_pair"
-                )
+                has_conditional_context = mhc is not None or tcr_peptide is not None
+                if has_conditional_context:
+                    if mhc is not None:
+                        fixed_sequence(mhc)
+                        special("<binding>")
+                    if tcr_peptide is not None:
+                        special("<peptides>")
+                        sequence(tcr_peptide.sequence)
+                        special("<peptided>")
+                    special("<generate>")
+                receptor_chains = [chain for chain in (alpha, beta) if chain is not None]
+                if len(receptor_chains) == 1:
+                    self._append_single_entity(special, sequence, receptor_chains[0])
+                    grammar_name = "tcr_single"
+                else:
+                    self._append_tcr_pair(special, sequence, alpha, beta)
+                    grammar_name = "tcr_pmhc" if mhc is not None else (
+                        "tcr_peptide" if tcr_peptide is not None else "tcr_pair"
+                    )
             else:
-                special("<generate>")
-                self._append_receptor_pair(special, sequence, heavy, light, relation)
-                grammar_name = "antibody_pair"
+                receptor_chains = [chain for chain in (heavy, light) if chain is not None]
+                if len(receptor_chains) == 1 or len(record.chains) == 1:
+                    self._append_single_entity(
+                        special,
+                        sequence,
+                        receptor_chains[0] if receptor_chains else record.chains[0],
+                    )
+                    grammar_name = "single_entity"
+                else:
+                    self._append_antibody_pair(special, sequence, heavy, light)
+                    grammar_name = "antibody_pair"
 
         if not ids:
             raise ValueError(f"Grammar renderer produced an empty record for {record.source}")
@@ -219,25 +327,68 @@ class GrammarRenderer:
         }
 
     @staticmethod
-    def _append_receptor_pair(
+    def _append_ppi_pair(
+        special: Any,
+        sequence: Any,
+        protein_a: BioSeqChain,
+        protein_b: BioSeqChain,
+        relation: str,
+        *,
+        cap: int | None = None,
+    ) -> None:
+        special("<prots>")
+        sequence(protein_a.sequence, cap=cap)
+        special("<prote>")
+        special(relation)
+        special("<prots>")
+        sequence(protein_b.sequence, cap=cap)
+        special("<prote>")
+
+    @staticmethod
+    def _append_single_entity(special: Any, sequence: Any, chain: BioSeqChain) -> None:
+        special("<prots>")
+        sequence(chain.sequence)
+        special("<prote>")
+
+    @staticmethod
+    def _append_antibody_pair(
         special: Any,
         sequence: Any,
         chain_a: BioSeqChain | None,
         chain_b: BioSeqChain | None,
-        relation: str,
     ) -> None:
         if chain_a is not None:
-            special("<proas>")
+            special("<prots>")
             sequence(chain_a.sequence)
-            special("<proae>")
+            special("<prote>")
         if chain_a is not None and chain_b is not None:
-            special(relation)
+            special("<pairs>")
         if chain_b is not None:
-            special("<probs>")
+            special("<prots>")
             sequence(chain_b.sequence)
-            special("<probd>")
+            special("<prote>")
         if chain_a is None and chain_b is None:
-            raise ValueError("Receptor grammar requires at least one target chain")
+            raise ValueError("Antibody grammar requires at least one target chain")
+
+    @staticmethod
+    def _append_tcr_pair(
+        special: Any,
+        sequence: Any,
+        chain_a: BioSeqChain | None,
+        chain_b: BioSeqChain | None,
+    ) -> None:
+        if chain_a is not None:
+            special("<prots>")
+            sequence(chain_a.sequence)
+            special("<prote>")
+        if chain_a is not None and chain_b is not None:
+            special("<pairs>")
+        if chain_b is not None:
+            special("<prots>")
+            sequence(chain_b.sequence)
+            special("<prote>")
+        if chain_a is None and chain_b is None:
+            raise ValueError("TCR grammar requires at least one target chain")
 
 
 def grammar_record_from_arrow(row: dict[str, Any]) -> BioSeqRecord:
@@ -250,7 +401,7 @@ def grammar_record_from_arrow(row: dict[str, Any]) -> BioSeqRecord:
         task_type=str(row["task_type"]),
         source=str(row["source"]),
         split=str(row.get("split") or "") or None,
-        labels={"relation": row.get("relation", "binding")},
+        labels={"relation": row.get("relation", "unknown")},
         weight=float(row.get("weight", 1.0)),
     )
 
@@ -399,7 +550,9 @@ class GrammarBioSeqCollator:
             )
             batch["token_class_ids"].append(classes + [TOKEN_CLASS_PAD] * pad_len)
             batch["position_ids_inner"].append(list(range(len(input_ids))) + [-1] * pad_len)
-            batch["position_ids_chain"].append([0] * len(input_ids) + [-1] * pad_len)
+            batch["position_ids_chain"].append(
+                _grammar_position_ids_chain(input_ids, self.tokenizer) + [-1] * pad_len
+            )
             batch["encoder_position_ids"].append(list(range(len(input_ids))) + [-1] * pad_len)
             encoder_ids.append([proxy + [pad_id] * pad_len])
             encoder_attention.append([attention + [0] * pad_len])
@@ -424,7 +577,7 @@ class GrammarBioSeqCollator:
         result["encoder_residue_mask"] = result["encoder_attention_mask"].clone()
         result["encoder_chain_mask"] = torch.ones(len(rows), 1, dtype=torch.bool)
         result["grammar_names"] = [str(row["grammar_name"]) for row in rows]
-        result["view_names"] = ["grammar_v1"] * len(rows)
+        result["view_names"] = ["grammar_v2"] * len(rows)
         result["task_groups"] = [str(row["task_type"]) for row in rows]
         result["task_types"] = [str(row["task_type"]) for row in rows]
         result["sources"] = [str(row["source"]) for row in rows]

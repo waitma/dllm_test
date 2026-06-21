@@ -39,6 +39,10 @@ Entrypoint: |
           --model-type no_encoder \
           --tokenizer-path "${TOKENIZER_DIR}" \
           --sources oas,ots,tcr,ppi \
+          --oas-weight 3.9 \
+          --ots-weight 3.6 \
+          --ppi-weight 1.4 \
+          --tcr-weight 1.0 \
           --batch-size 1 \
           --grad-accum 8 \
           --max-steps 50000 \
@@ -52,6 +56,7 @@ Entrypoint: |
           --gradient-checkpointing \
           --lr 1e-4 \
           --warmup-steps 1000 \
+          --lr-scheduler cosine \
           --grad-clip 1.0 \
           --bf16 \
           --num-workers 2 \
@@ -78,5 +83,5 @@ TaskRoleSpecs:
 ActiveDeadlineSeconds: 604800
 DelayExitTimeSeconds: 0
 AccessType: "Private"
-Preemptible: false
+Preemptible: true
 Priority: 6

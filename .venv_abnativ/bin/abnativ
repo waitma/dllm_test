@@ -1,0 +1,6 @@
+#!/vepfs-mlp2/c20250601/251105016/project/dllm_test/.venv_abnativ/bin/python
+import sys
+from abnativ.__main__ import main
+if __name__ == '__main__':
+    sys.argv[0] = sys.argv[0].removesuffix('.exe')
+    sys.exit(main())

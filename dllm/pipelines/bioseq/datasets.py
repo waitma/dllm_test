@@ -30,9 +30,10 @@ csv.field_size_limit(min(sys.maxsize, 2**31 - 1))
 
 DEFAULT_DATA_ROOT = Path("/vepfs-mlp2/c20250601/251105016/project/dllm_test/data")
 
-OAS_DEFAULT_DIR = DEFAULT_DATA_ROOT / "oas_previous_clean/splits/compat_for_current_loader_oasrule"
+OAS_DEFAULT_DIR = DEFAULT_DATA_ROOT / "oas_previous_clean/splits"
 OTS_DEFAULT_DIR = DEFAULT_DATA_ROOT / "ots_paired_clean/final"
 NANOBODY_DEFAULT_DIR = DEFAULT_DATA_ROOT / "nanobody_processed/step6_final"
+OAS_LABEL_FILE_TEMPLATE = "cleaned_merged_data_step_clustered_{split}_oas_label.csv"
 
 
 @dataclass
@@ -52,7 +53,33 @@ def _is_beta(anarci_type: str, chain_type: str) -> bool:
     return anarci_type.strip().upper() == "B" or chain_type.strip().lower() in {"beta", "trb"}
 
 
+def _canonical_csv_split(split: str) -> str:
+    normalized = str(split).strip().lower()
+    if normalized in {"val", "valid", "validation"}:
+        return "valid"
+    return normalized or "train"
+
+
+def _source_split_path(spec: ImmuneSourceSpec, split: str) -> Path:
+    if spec.path.is_file():
+        return spec.path
+    if spec.name == "oas":
+        return spec.path / OAS_LABEL_FILE_TEMPLATE.format(split=_canonical_csv_split(split))
+    return spec.path / f"{split}.csv"
+
+
+def _is_oas_label_row(row: dict[str, Any]) -> bool:
+    return "cleaned_h_sequence" in row and "cleaned_l_sequence" in row
+
+
 def oas_paired_row_to_record(row: dict[str, Any]) -> dict[str, Any] | None:
+    if _is_oas_label_row(row):
+        heavy = normalize_sequence(row.get("cleaned_h_sequence"))
+        light = normalize_sequence(row.get("cleaned_l_sequence"))
+        if not is_valid_protein_sequence(heavy) or not is_valid_protein_sequence(light):
+            return None
+        return {"chains": [heavy, light], "task_type": "antibody", "source": "oas_paired"}
+
     chain1 = normalize_sequence(row.get("cleaned_chain1_seq"))
     chain2 = normalize_sequence(row.get("cleaned_chain2_seq"))
     if not is_valid_protein_sequence(chain1) or not is_valid_protein_sequence(chain2):
@@ -109,7 +136,7 @@ class ImmuneCsvDataset(Dataset):
     """In-memory map-style dataset built from one immune CSV source."""
 
     def __init__(self, spec: ImmuneSourceSpec, split: str = "train", max_rows: int | None = None) -> None:
-        path = spec.path if spec.path.is_file() else spec.path / f"{split}.csv"
+        path = _source_split_path(spec, split)
         if not path.is_file():
             raise FileNotFoundError(f"Immune CSV not found: {path}")
         self.name = spec.name

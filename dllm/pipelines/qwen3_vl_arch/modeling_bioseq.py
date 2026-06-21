@@ -29,11 +29,12 @@ class BioSeqDiffusionTransformerConfig:
     dropout: float = 0.1
     max_position_embeddings: int = 4096
     max_chain_positions: int = 64
-    max_chain_roles: int = 32
-    max_task_types: int = 32
-    use_chain_role_embeddings: bool = True
+    max_chain_roles: int = 32  # unused; kept for checkpoint compatibility
+    max_task_types: int = 32  # unused; kept for checkpoint compatibility
     pad_token_id: int = 1
     mask_token_id: int = 32
+    forbidden_target_token_ids: tuple[int, ...] | None = None
+    qk_norm: bool = False
     time_epsilon: float = 1e-3
     loss_norm: str = "token"
     condition_hidden_size: int | None = None
@@ -95,12 +96,19 @@ class BioSeqSelfAttention(nn.Module):
         self.v_proj = nn.Linear(config.hidden_size, config.hidden_size, bias=False)
         self.o_proj = nn.Linear(config.hidden_size, config.hidden_size, bias=False)
         self.dropout = nn.Dropout(config.dropout)
+        self.qk_norm = bool(getattr(config, "qk_norm", False))
+        if self.qk_norm:
+            self.q_norm = BioSeqRMSNorm(self.head_dim)
+            self.k_norm = BioSeqRMSNorm(self.head_dim)
 
     def forward(self, hidden_states: torch.Tensor, attention_mask: torch.Tensor | None) -> torch.Tensor:
         batch_size, seq_len, hidden_size = hidden_states.shape
         query = self._shape(self.q_proj(hidden_states), batch_size, seq_len)
         key = self._shape(self.k_proj(hidden_states), batch_size, seq_len)
         value = self._shape(self.v_proj(hidden_states), batch_size, seq_len)
+        if self.qk_norm:
+            query = self.q_norm(query)
+            key = self.k_norm(key)
 
         key_mask = attention_mask.bool()[:, None, None, :] if attention_mask is not None else None
         context = F.scaled_dot_product_attention(
@@ -268,11 +276,46 @@ def apply_decoder_corruption_to_encoder(
     return noised_encoder_input_ids
 
 
+def forbidden_diffusion_target_token_ids(config: BioSeqDiffusionTransformerConfig) -> tuple[int, ...]:
+    """Token ids that must not be predicted during residue denoising.
+
+    Masked diffusion feeds ``<mask>`` at corrupted positions. With tied input/output
+    embeddings, the decoder can collapse to always predicting ``<mask>`` unless those
+    logits are excluded from the denoising objective.
+    """
+
+    if config.forbidden_target_token_ids is not None:
+        return config.forbidden_target_token_ids
+    forbidden = {
+        0,  # <cls>
+        int(config.pad_token_id),
+        2,  # <eos>
+        3,  # <unk>
+        int(config.mask_token_id),
+    }
+    return tuple(sorted(token_id for token_id in forbidden if 0 <= token_id < config.vocab_size))
+
+
+def mask_forbidden_target_logits(
+    logits: torch.Tensor,
+    forbidden_token_ids: tuple[int, ...] | None,
+) -> torch.Tensor:
+    if not forbidden_token_ids:
+        return logits
+    masked_logits = logits.clone()
+    for token_id in forbidden_token_ids:
+        if 0 <= token_id < masked_logits.size(-1):
+            masked_logits[..., token_id] = torch.finfo(masked_logits.dtype).min
+    return masked_logits
+
+
 def compute_masked_cross_entropy(
     logits: torch.Tensor,
     labels: torch.Tensor,
     loss_norm: str = "token",
+    forbidden_token_ids: tuple[int, ...] | None = None,
 ) -> torch.Tensor:
+    logits = mask_forbidden_target_logits(logits, forbidden_token_ids)
     token_loss = F.cross_entropy(
         logits.reshape(-1, logits.size(-1)),
         labels.reshape(-1),
@@ -431,12 +474,6 @@ class BioSeqDiffusionDecoder(nn.Module):
         self.token_embeddings = nn.Embedding(config.vocab_size, config.hidden_size, padding_idx=config.pad_token_id)
         self.inner_position_embeddings = nn.Embedding(config.max_position_embeddings, config.hidden_size)
         self.chain_position_embeddings = nn.Embedding(config.max_chain_positions, config.hidden_size)
-        self.chain_role_embeddings = (
-            nn.Embedding(config.max_chain_roles, config.hidden_size)
-            if config.use_chain_role_embeddings
-            else None
-        )
-        self.task_embeddings = nn.Embedding(config.max_task_types, config.hidden_size)
         self.timestep_embeddings = BioSeqTimestepEmbedding(config.hidden_size)
         self.condition_proj = (
             nn.Linear(config.condition_hidden_size, config.hidden_size, bias=False)
@@ -471,10 +508,8 @@ class BioSeqDiffusionDecoder(nn.Module):
         input_ids: torch.Tensor | None = None,
         diffusion_state: torch.Tensor | None = None,
         attention_mask: torch.Tensor | None = None,
-        chain_role_ids: torch.Tensor | None = None,
         position_ids_inner: torch.Tensor | None = None,
         position_ids_chain: torch.Tensor | None = None,
-        task_type_ids: torch.Tensor | None = None,
         timesteps: torch.Tensor | None = None,
         encoder_condition: torch.Tensor | None = None,
     ) -> BioSeqDiffusionOutput:
@@ -503,14 +538,6 @@ class BioSeqDiffusionDecoder(nn.Module):
             safe_chain = position_ids_chain.clamp(min=0, max=self.config.max_chain_positions - 1)
             chain_valid = position_ids_chain.ge(0).to(hidden_states.dtype).unsqueeze(-1)
             hidden_states = hidden_states + self.chain_position_embeddings(safe_chain) * chain_valid
-
-        if chain_role_ids is not None and self.chain_role_embeddings is not None:
-            safe_roles = chain_role_ids.clamp(min=0, max=self.config.max_chain_roles - 1)
-            hidden_states = hidden_states + self.chain_role_embeddings(safe_roles)
-
-        if task_type_ids is not None:
-            safe_task = task_type_ids.clamp(min=0, max=self.config.max_task_types - 1)
-            hidden_states = hidden_states + self.task_embeddings(safe_task).unsqueeze(1)
 
         if timesteps is not None:
             hidden_states = hidden_states + self.timestep_embeddings(timesteps).unsqueeze(1)
@@ -575,10 +602,8 @@ class BioSeqNoEncoderDiffusionModel(nn.Module):
         input_ids: torch.Tensor | None = None,
         diffusion_state: torch.Tensor | None = None,
         attention_mask: torch.Tensor | None = None,
-        chain_role_ids: torch.Tensor | None = None,
         position_ids_inner: torch.Tensor | None = None,
         position_ids_chain: torch.Tensor | None = None,
-        task_type_ids: torch.Tensor | None = None,
         timesteps: torch.Tensor | None = None,
         **_: Any,
     ) -> BioSeqDiffusionOutput:
@@ -586,10 +611,8 @@ class BioSeqNoEncoderDiffusionModel(nn.Module):
             input_ids=input_ids,
             diffusion_state=diffusion_state,
             attention_mask=attention_mask,
-            chain_role_ids=chain_role_ids,
             position_ids_inner=position_ids_inner,
             position_ids_chain=position_ids_chain,
-            task_type_ids=task_type_ids,
             timesteps=timesteps,
         )
 
@@ -602,13 +625,17 @@ class BioSeqNoEncoderDiffusionModel(nn.Module):
         output = self.forward(
             input_ids=noised_input_ids,
             attention_mask=batch.get("attention_mask"),
-            chain_role_ids=batch.get("chain_role_ids"),
             position_ids_inner=batch.get("position_ids_inner"),
             position_ids_chain=batch.get("position_ids_chain"),
-            task_type_ids=batch.get("task_type_ids"),
             timesteps=timesteps,
         )
-        loss = compute_masked_cross_entropy(output.logits, labels, loss_norm=self.config.loss_norm)
+        forbidden = forbidden_diffusion_target_token_ids(self.config)
+        loss = compute_masked_cross_entropy(
+            output.logits,
+            labels,
+            loss_norm=self.config.loss_norm,
+            forbidden_token_ids=forbidden,
+        )
         return BioSeqDiffusionOutput(
             loss=loss,
             logits=output.logits,
@@ -697,11 +724,10 @@ class BioSeqEncoderDiffusionModel(nn.Module):
         diffusion_state: torch.Tensor | None = None,
         attention_mask: torch.Tensor | None = None,
         chain_ids: torch.Tensor | None = None,
-        chain_role_ids: torch.Tensor | None = None,
         position_ids_inner: torch.Tensor | None = None,
         position_ids_chain: torch.Tensor | None = None,
-        task_type_ids: torch.Tensor | None = None,
         timesteps: torch.Tensor | None = None,
+        residue_mask: torch.Tensor | None = None,
         encoder_input_ids: torch.Tensor | None = None,
         encoder_attention_mask: torch.Tensor | None = None,
         encoder_residue_mask: torch.Tensor | None = None,
@@ -719,10 +745,14 @@ class BioSeqEncoderDiffusionModel(nn.Module):
         if encoder_position_ids is None and position_ids_inner is None:
             raise ValueError("position_ids_inner is required for per-chain encoder conditions")
 
+        effective_encoder_residue_mask = encoder_residue_mask
+        if encoder_position_ids is not None and residue_mask is not None:
+            effective_encoder_residue_mask = residue_mask.unsqueeze(1)
+
         chain_token_condition = self.encode_chain_tokens(
             encoder_input_ids=encoder_input_ids,
             encoder_attention_mask=encoder_attention_mask,
-            encoder_residue_mask=encoder_residue_mask,
+            encoder_residue_mask=effective_encoder_residue_mask,
             encoder_chain_mask=encoder_chain_mask,
             encoder_kwargs=encoder_kwargs,
         )
@@ -731,6 +761,7 @@ class BioSeqEncoderDiffusionModel(nn.Module):
                 chain_token_condition,
                 encoder_position_ids=encoder_position_ids,
                 attention_mask=attention_mask,
+                residue_mask=residue_mask,
             )
         else:
             token_condition = self.gather_token_condition(
@@ -744,10 +775,8 @@ class BioSeqEncoderDiffusionModel(nn.Module):
             input_ids=input_ids,
             diffusion_state=diffusion_state,
             attention_mask=attention_mask,
-            chain_role_ids=chain_role_ids,
             position_ids_inner=position_ids_inner,
             position_ids_chain=position_ids_chain,
-            task_type_ids=task_type_ids,
             timesteps=timesteps,
             encoder_condition=token_condition,
         )
@@ -787,6 +816,8 @@ class BioSeqEncoderDiffusionModel(nn.Module):
         chain_hidden = flat_hidden.reshape(batch_size, max_chains, chain_len, hidden_size)
         if encoder_attention_mask is not None:
             chain_hidden = chain_hidden * encoder_attention_mask.to(chain_hidden.dtype).unsqueeze(-1)
+        if encoder_residue_mask is not None:
+            chain_hidden = chain_hidden * encoder_residue_mask.to(chain_hidden.dtype).unsqueeze(-1)
         if encoder_chain_mask is not None:
             chain_hidden = chain_hidden * encoder_chain_mask.to(chain_hidden.dtype).unsqueeze(-1).unsqueeze(-1)
         return chain_hidden
@@ -849,6 +880,7 @@ class BioSeqEncoderDiffusionModel(nn.Module):
         chain_token_condition: torch.Tensor,
         encoder_position_ids: torch.Tensor,
         attention_mask: torch.Tensor | None,
+        residue_mask: torch.Tensor | None = None,
     ) -> torch.Tensor:
         """Gather features from the single ESMC proxy stream without target leakage."""
 
@@ -861,7 +893,10 @@ class BioSeqEncoderDiffusionModel(nn.Module):
             valid = valid & attention_mask.bool()
         safe_positions = encoder_position_ids.clamp(min=0, max=encoder_len - 1)
         gathered = chain_token_condition[batch_indices, 0, safe_positions]
-        return gathered * valid.to(gathered.dtype).unsqueeze(-1)
+        valid_mask = valid.to(gathered.dtype).unsqueeze(-1)
+        if residue_mask is not None:
+            valid_mask = valid_mask * residue_mask.to(gathered.dtype).unsqueeze(-1)
+        return gathered * valid_mask
 
     def compute_loss(self, batch: dict[str, Any]) -> BioSeqDiffusionOutput:
         noised_input_ids, labels, corruption_mask, timesteps = sample_bioseq_diffusion_noise(
@@ -878,18 +913,23 @@ class BioSeqEncoderDiffusionModel(nn.Module):
             input_ids=noised_input_ids,
             attention_mask=batch.get("attention_mask"),
             chain_ids=batch.get("chain_ids"),
-            chain_role_ids=batch.get("chain_role_ids"),
             position_ids_inner=batch.get("position_ids_inner"),
             position_ids_chain=batch.get("position_ids_chain"),
-            task_type_ids=batch.get("task_type_ids"),
             timesteps=timesteps,
+            residue_mask=batch.get("residue_mask"),
             encoder_input_ids=noised_encoder_input_ids,
             encoder_attention_mask=batch.get("encoder_attention_mask"),
             encoder_residue_mask=batch.get("encoder_residue_mask"),
             encoder_chain_mask=batch.get("encoder_chain_mask"),
             encoder_position_ids=batch.get("encoder_position_ids"),
         )
-        loss = compute_masked_cross_entropy(output.logits, labels, loss_norm=self.config.loss_norm)
+        forbidden = forbidden_diffusion_target_token_ids(self.config)
+        loss = compute_masked_cross_entropy(
+            output.logits,
+            labels,
+            loss_norm=self.config.loss_norm,
+            forbidden_token_ids=forbidden,
+        )
         return BioSeqDiffusionOutput(
             loss=loss,
             logits=output.logits,

@@ -92,7 +92,11 @@ class CdrInfillCollator:
     chain_lengths: tuple[int, int] = OPHIUCHUS_AB_CHAIN_LENGTHS
 
     def __call__(self, batches):
-        heavy_chains, light_chains, _, pos_idx = zip(*batches)
+        if len(batches[0]) == 5:
+            heavy_chains, light_chains, _, pos_idx, modes = zip(*batches)
+        else:
+            heavy_chains, light_chains, _, pos_idx = zip(*batches)
+            modes = ("cdrh",) * len(batches)
         heavy = self._convert(list(heavy_chains), 0)
         light = self._convert(list(light_chains), 1)
         label_heavy = heavy.clone()
@@ -100,14 +104,18 @@ class CdrInfillCollator:
         labels_tensor = torch.cat([label_heavy, label_light], dim=-1)
 
         heavy_masked = heavy.clone()
-        for i, (start_idx, end_idx) in enumerate(pos_idx):
-            heavy_masked[i, start_idx + 1 : end_idx + 2] = self.tokenizer.mask_token_id
+        light_masked = light.clone()
+        for i, (region, (start_idx, end_idx)) in enumerate(zip(modes, pos_idx)):
+            if str(region).lower().startswith("cdrl"):
+                light_masked[i, start_idx + 1 : end_idx + 2] = self.tokenizer.mask_token_id
+            else:
+                heavy_masked[i, start_idx + 1 : end_idx + 2] = self.tokenizer.mask_token_id
 
-        input_ids = torch.cat([heavy_masked, light], dim=-1)
+        input_ids = torch.cat([heavy_masked, light_masked], dim=-1)
         chain_ids = torch.cat(
             [
                 torch.zeros_like(heavy_masked, dtype=torch.long),
-                torch.ones_like(light, dtype=torch.long),
+                torch.ones_like(light_masked, dtype=torch.long),
             ],
             dim=-1,
         )

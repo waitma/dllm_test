@@ -1,5 +1,20 @@
 # Project Process
 
+## Active Volc Training Tasks
+
+> Only non-terminal jobs (`Initialized` / `Queue` / `Staging` / `Running` / `Killing`). Remove a row when the job reaches `Success`, `Failed`, or `Killed`. Update after every `volc ml_task submit` or `cancel`. Rule: `/vepfs-mlp2/c20250601/251105016/project/dllm_test/.cursor/rules/volc-train-task-log.mdc`.
+
+Last updated: 2026-06-21 (UTC+8, grammar_v1 resubmit updated yaml)
+
+| Status | Task ID | Job Name | YAML |
+|--------|---------|----------|------|
+| Initialized | t-20260621223241-z55tl | qwen3_vl_bioseq_grammar_v1_esmc300m | `/vepfs-mlp2/c20250601/251105016/project/dllm_test/train_jobs/qwen3_vl_bioseq_grammar_v1_esmc300m.yml` |
+| Initialized | t-20260621223245-ggbzf | qwen3_vl_bioseq_grammar_v1_esmc600m | `/vepfs-mlp2/c20250601/251105016/project/dllm_test/train_jobs/qwen3_vl_bioseq_grammar_v1_esmc600m.yml` |
+| Initialized | t-20260621223248-wwpcb | qwen3_vl_bioseq_grammar_v1_no_encoder_38m | `/vepfs-mlp2/c20250601/251105016/project/dllm_test/train_jobs/qwen3_vl_bioseq_grammar_v1_no_encoder_38m.yml` |
+| Initialized | t-20260621223252-rlj8x | qwen3_vl_bioseq_grammar_v1_no_encoder_300m | `/vepfs-mlp2/c20250601/251105016/project/dllm_test/train_jobs/qwen3_vl_bioseq_grammar_v1_no_encoder_300m.yml` |
+| Initialized | t-20260621223256-w7sgz | qwen3_vl_bioseq_grammar_v1_no_encoder_600m | `/vepfs-mlp2/c20250601/251105016/project/dllm_test/train_jobs/qwen3_vl_bioseq_grammar_v1_no_encoder_600m.yml` |
+| Initialized | t-20260621223259-2cbkd | qwen3_vl_bioseq_grammar_v1_no_encoder_1b | `/vepfs-mlp2/c20250601/251105016/project/dllm_test/train_jobs/qwen3_vl_bioseq_grammar_v1_no_encoder_1b.yml` |
+
 ## 2026-06-07
 
 - Confirmed `/vepfs-mlp2/c20250601/251105016/project/dllm_test` is the active project root.
@@ -58,7 +73,7 @@
 
 - Audited `/vepfs-mlp2/c20250601/251105016/project/dllm_test/data`. Total size is approximately 92G. No active data pipeline process was found.
 - Existing processed paired antibody summary in `/vepfs-mlp2/c20250601/251105016/project/dllm_test/data/data_processing_summary.md`: OAS paired raw 3,087,576, final 2,251,632 with train 2,229,115, valid 11,258, holdout 11,259.
-- Current OAS compatible split under `/vepfs-mlp2/c20250601/251105016/project/dllm_test/data/oas_previous_clean/splits/compat_for_current_loader_oasrule` has 2,486,414 train rows, 12,553 valid rows, and 12,653 holdout rows excluding CSV headers.
+- Current OAS paired antibody split uses `/vepfs-mlp2/c20250601/251105016/project/dllm_test/data/oas_previous_clean/splits/cleaned_merged_data_step_clustered_{train,valid,holdout}_oas_label.csv`; it has 2,486,442 train rows, 12,553 valid rows, and 12,653 holdout rows excluding CSV headers.
 - Existing OTS paired TCR final split under `/vepfs-mlp2/c20250601/251105016/project/dllm_test/data/ots_paired_clean/final` has 2,102,715 train rows, 10,619 valid rows, and 10,621 holdout rows excluding CSV headers.
 - Existing nanobody final split under `/vepfs-mlp2/c20250601/251105016/project/dllm_test/data/nanobody_processed/step6_final` has 11,649,792 train rows, 58,862 valid rows, and 58,981 holdout rows excluding CSV headers. Pipeline log reports final total 11,767,635 sequences.
 - `/vepfs-mlp2/c20250601/251105016/project/dllm_test/data/processed` is current-model safer than `processed_v2`: it has 805,095 train JSONL rows and 14,405 val rows, with max chain length 512. Sources are PPI, VDJdb, MIRA, and McPAS.
@@ -234,7 +249,7 @@
 ## 2026-06-13 BioSeq diffusion-loss design clarification
 
 - User clarified that the foundation-model objective should remain diffusion-only even when an encoder is used.
-- Updated `/vepfs-mlp2/c20250601/251105016/project/dllm_test/BIOSEQ_MODEL_PLAN.md` to make ESMC/ESM2 trainable by default in the encoder-conditioned path.
+- Updated `/vepfs-mlp2/c20250601/251105016/project/dllm_test/BIOSEQ_MODEL_PLAN.md` to make ESMC/ESM2 trainable by default in the feature-conditioned path.
 - Added the training-mask rule that fixed context chains, such as antigen in antibody-antigen generation, stay clean and visible, do not participate in remasking, and do not receive direct diffusion loss.
 - Added the gradient-flow rule that fixed context encoders/connectors still receive gradients through the target-chain denoising loss when their features condition the decoder.
 
@@ -302,12 +317,12 @@
 
 - User asked to reorganize the overall foundation-model pipeline beyond data download and define how to quickly validate model quality on downstream tasks.
 - Audited local integration points: training entry `/vepfs-mlp2/c20250601/251105016/project/dllm_test/examples/bioseq/train_bioseq_ddp.py`, source adapters under `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/bioseq`, and IRBench under `/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark`.
-- Updated `/vepfs-mlp2/c20250601/251105016/project/dllm_test/BIOSEQ_MODEL_PLAN.md` with an `End-to-End Pipeline` section covering raw data, manifests, adapters, canonical JSONL, mixture weights, masking/collation, no-encoder Ophiuchus/MINT training, future encoder-conditioned training, checkpointing, and evaluation.
+- Updated `/vepfs-mlp2/c20250601/251105016/project/dllm_test/BIOSEQ_MODEL_PLAN.md` with an `End-to-End Pipeline` section covering raw data, manifests, adapters, canonical JSONL, mixture weights, masking/collation, no-encoder Ophiuchus/MINT training, future ESMC/ESM feature-conditioned training, checkpointing, and evaluation.
 - Updated the same plan with a `Fast Downstream Validation Plan`: Tier 0 held-out diffusion sanity, Tier 1 frozen-embedding IRBench, Tier 2 generation/infill, and Tier 3 task-specific fine-tuning.
 - Fixed `/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/common/model_api.py` so `BioSeqEmbedder` can load current DDP checkpoints containing `backbone_state_dict`, generic `state_dict`, or a plain state dict. This makes `--embedder bioseq:/abs/path/final.pt` compatible with checkpoints produced by `/vepfs-mlp2/c20250601/251105016/project/dllm_test/examples/bioseq/train_bioseq_ddp.py`.
 - Verified the edited benchmark model API with `python -m py_compile` and a lightweight factory import check.
 
-## 2026-06-14 data format audit for Qwen-style BioSeq
+## 2026-06-14 data format audit for BioSeq foundation
 
 - User asked to first quantify the current `/vepfs-mlp2/c20250601/251105016/project/dllm_test/data` formats before adapting Qwen into an immune receptor diffusion foundation model.
 - Added `/vepfs-mlp2/c20250601/251105016/project/dllm_test/DATA_FORMAT_AUDIT.md` with top-level data sizes, file-format inventory, current JSONL schema, OAS/OTS/nanobody clean CSV schemas and row counts, TCR specificity resources, TCRdb2.0 raw schema, PPI Arrow schema, downstream benchmark formats, and model-input implications.
@@ -324,13 +339,13 @@
 - Verified the migrated files with `python -m py_compile` and package-level imports for `dllm.pipelines.qwen3_vl_arch`, `qwen3_vl`, and `qwen3_vl_moe`.
 - Current runtime `transformers==4.48.1` is older than the Qwen3-VL snapshot and lacks newer internal APIs such as `transformers.masking_utils`, `transformers.modeling_layers`, `transformers.vision_utils`, `transformers.utils.output_capturing`, `transformers.initialization`, `RopeParameters`, and `auto_docstring`, so concrete model/config imports will need a matching newer Transformers version or local compatibility shims before execution.
 
-## 2026-06-14 Qwen3-VL BioSeq data loader
+## 2026-06-14 BioSeq foundation data loader
 
 - User chose to prioritize a training-time loader instead of full offline conversion to JSON/JSONL.
-- Added `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/data` with canonical records, source loaders, mixture datasets, view sampler, ESM-family tokenizers, and Qwen-style diffusion collator.
+- Added `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/data` with canonical records, source loaders, mixture datasets, view sampler, ESM-family tokenizers, and BioSeq foundation diffusion collator.
 - First-version sources cover OAS paired antibody CSV, OTS paired TCR CSV, nanobody CSV, existing processed JSONL for PPI/TCR-epitope, and an optional PPI Arrow source.
 - Loader output is `BioSeqRecord`; masking is deferred to `BioSeqViewSampler` and `BioSeqQwenDataCollator`, which emit `visible_mask`, `fixed_context_mask`, `diffusion_target_mask`, and `diffusion_loss_mask`.
-- Encoding defaults to ESM2/MINT-compatible token ids through `Esm2SequenceTokenizer`; the collator also emits per-chain `encoder_input_ids`, `encoder_attention_mask`, `encoder_residue_mask`, `encoder_chain_mask`, and `encoder_chain_role_ids` for future ESM2/ESMC encoder-conditioned training.
+- Encoding defaults to ESM2/MINT-compatible token ids through `Esm2SequenceTokenizer`; the collator also emits per-chain `encoder_input_ids`, `encoder_attention_mask`, `encoder_residue_mask`, `encoder_chain_mask`, and `encoder_chain_role_ids` for ESM2/ESMC feature-conditioned training.
 - Verified with `python -m pytest /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/tests/bioseq -q`: 27 passed.
 
 ## 2026-06-14 ESM tokenizer and multi-chain paper verification
@@ -341,7 +356,7 @@
 - Re-extracted `/tmp/esm_protein.pdf` to `/tmp/esm_protein.txt` with Ghostscript and checked the ESMC/ESMFold2 preprint. The paper's ESMC section describes a masked language model over protein sequences and single-chain contact evaluation; the explicit multi-chain treatment appears in ESMFold2.
 - Paper-specific conclusion: ESMFold2 uses frozen ESMC 6B representations. For multiple protein chains, each chain is encoded independently by ESMC, then ESMFold2 crops/concatenates chain representations into a complex-level folding trunk with pair representations and atom-level diffusion. Therefore BioSeq should keep multi-chain interaction learning in the decoder/collator/attention or an ESMFold2-style pair module, not assume ESMC alone models cross-chain interactions.
 
-## 2026-06-14 Qwen3-VL BioSeq view-mask correction
+## 2026-06-14 BioSeq foundation view-mask correction
 
 - User clarified that `full_denoise` must not include antigen or pMHC context chains in diffusion loss.
 - Updated `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/data/view_sampler.py`: `full_denoise` now targets only eligible chains. It honors explicit `metadata["targets"]` when present, then filters out antigen, peptide, MHC, HLA-like, and epitope roles as fixed context.
@@ -349,10 +364,10 @@
 - Added coverage in `/vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/tests/bioseq/test_qwen3_vl_data_loader.py` to verify that `full_denoise` keeps peptide, MHC, and antigen fixed even when metadata accidentally lists all chains as targets.
 - Updated `/vepfs-mlp2/c20250601/251105016/project/dllm_test/BIOSEQ_MODEL_PLAN.md`, `/vepfs-mlp2/c20250601/251105016/project/dllm_test/DATA_FORMAT_AUDIT.md`, and `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/data/README.md` with the corrected `full_denoise` semantics.
 
-## 2026-06-14 Qwen3-VL BioSeq data reading diagnostic
+## 2026-06-14 BioSeq foundation data reading diagnostic
 
 - Added temporary diagnostic script `/vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/debug/inspect_qwen3_vl_data_reading.py`.
-- The script samples local sources through the current Qwen3-VL BioSeq loader, then checks source parsing, record roles/tasks, `full_denoise` masks, default random views, empty-loss examples, collator errors, and whether fixed context roles accidentally enter `diffusion_loss_mask`.
+- The script samples local sources through the current BioSeq foundation loader, then checks source parsing, record roles/tasks, `full_denoise` masks, default random views, empty-loss examples, collator errors, and whether fixed context roles accidentally enter `diffusion_loss_mask`.
 - Verified syntax with `python -m py_compile /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/debug/inspect_qwen3_vl_data_reading.py`.
 - Ran `python /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/debug/inspect_qwen3_vl_data_reading.py --limit-per-source 512 --batch-size 16 --max-chain-length 512`. OAS, OTS, nanobody, and `processed_v2` all yielded 512 records with no unknown roles/tasks, no collator errors, no empty-loss examples, and `full_denoise context_loss_tokens=0`.
 - Observed and fixed a data-shape issue: first 512 `processed_v2` records included PPI chains mostly as role `other` rather than `protein_a`/`protein_b`. Updated `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/data/sources.py` so `source=ppi` records normalize the first two chains to `protein_a` and `protein_b`.
@@ -420,12 +435,13 @@
 ## 2026-06-14 Task-homogeneous training batches
 
 - User raised a training-stability requirement: a batch should not mix different task/view objectives.
+- This section is now superseded by the later `2026-06-14 Mixed-task BioSeq foundation batches` decision. `TaskHomogeneousBatchDataset` remains available for ablations/debugging, but it is not the current default foundation-training path.
 - Added `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/data/mixture.py::TaskHomogeneousBatchDataset`. It wraps any BioSeq record stream and groups records by BioSeq task group.
 - Added `bioseq_task_group` and `bioseq_record_fingerprint` helpers. `bioseq_task_group` separates nanobody from paired antibody, and separates antibody-antigen/nanobody-antigen from generic antibody records based on chain roles.
 - Updated `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/data/collator.py`: `BioSeqQwenDataCollator` now samples one shared generation view per batch by default through `BioSeqViewSampler.sample_batch`, and can enforce homogeneous task groups with `require_homogeneous_task=True`.
 - Updated `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/data/view_sampler.py` with `sample_batch`, `compatible_views`, and public `build` helpers.
-- Updated `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/data/README.md` and `/vepfs-mlp2/c20250601/251105016/project/dllm_test/BIOSEQ_MODEL_PLAN.md` with the required training path: source stream -> `TaskHomogeneousBatchDataset` -> `DataLoader(batch_size=None)` -> `BioSeqQwenDataCollator(require_homogeneous_task=True)`.
-- Training-stability note: physical microbatches should be homogeneous, but optimizer steps should accumulate gradients across several task-homogeneous microbatches or use a later weighted task scheduler to avoid high-variance single-task updates.
+- At this point the documented training path was source stream -> `TaskHomogeneousBatchDataset` -> `DataLoader(batch_size=None)` -> `BioSeqQwenDataCollator(require_homogeneous_task=True)`. That path was later replaced by mixed physical batches using `WeightedMixtureDataset` -> `DataLoader(batch_size=N)` -> `BioSeqQwenDataCollator(single_view_per_batch=False, require_homogeneous_task=False)`.
+- The old training-stability note favored homogeneous physical microbatches plus gradient accumulation; the current default instead uses mixed physical microbatches and controls imbalance through source mixture weights.
 - Verified syntax with `python -m py_compile` for `mixture.py`, `collator.py`, and `view_sampler.py`.
 - Verified `python -m pytest /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/tests/bioseq/test_qwen3_vl_data_loader.py -q`: `20 passed`.
 - Re-ran `/vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/debug/inspect_qwen3_vl_data_reading.py --limit-per-source 128 --batch-size 16 --max-chain-length 512`; OAS, OTS, nanobody, and `processed_v2` all reported `issues: none`.
@@ -434,15 +450,15 @@
 
 - User clarified that sample de-duplication is already handled during data processing, so batch-level de-duplication should not be part of the default training path.
 - Updated `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/data/mixture.py::TaskHomogeneousBatchDataset`: `deduplicate_within_batch` now defaults to `False`; setting it to `True` is only a defensive option for debugging untrusted/overlapping streams.
-- Updated `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/data/README.md` and `/vepfs-mlp2/c20250601/251105016/project/dllm_test/BIOSEQ_MODEL_PLAN.md` to clarify the boundary: data processing owns de-duplication, while the training batcher owns task/view homogeneity.
+- Updated `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/data/README.md` and `/vepfs-mlp2/c20250601/251105016/project/dllm_test/BIOSEQ_MODEL_PLAN.md` to clarify the boundary at that time: data processing owns de-duplication, while the training batcher owned task/view homogeneity. The current mixed-task path no longer uses task/view homogeneity as the default batcher responsibility.
 - Verified syntax with `python -m py_compile /vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/data/mixture.py`.
 - Verified `python -m pytest /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/tests/bioseq/test_qwen3_vl_data_loader.py -q`: `21 passed`.
 
 ## 2026-06-14 Simple view sampling probability
 
 - User clarified that view sampling should stay simple: keep `full_denoise` high, and randomly sample other condition views from the remaining probability mass.
-- Updated `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/data/view_sampler.py`: `BioSeqViewSampler` now has `full_denoise_probability=0.5` by default.
-- Sampling rule: if `full_denoise` and at least one condition view are compatible, sample `full_denoise` with probability `0.5`, otherwise sample uniformly from compatible condition views with probability `0.5`. If no condition view is compatible, fall back to `full_denoise`.
+- Historical note from that iteration: `BioSeqViewSampler` used `full_denoise_probability=0.5` by default and split the remaining probability across compatible condition views.
+- This historical 0.5 setting was superseded later on 2026-06-16; the current foundation default is `full_denoise_probability=1.0`.
 - The same rule is used for both single-record sampling and batch-level shared-view sampling.
 - Updated `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/data/README.md` and `/vepfs-mlp2/c20250601/251105016/project/dllm_test/BIOSEQ_MODEL_PLAN.md` with the default probability rule.
 - Verified syntax with `python -m py_compile /vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/data/view_sampler.py`.
@@ -465,9 +481,9 @@
 - PDBbind+ remains blocked by login/subscription through its site API. The SARS-CoV-2 binding bioRxiv supplement remains blocked by HTTP 403 from this environment.
 - Validation: no active download/conversion processes remained; `wc -l` on the unified CSV returned `6271560`, and the summary record sum returned `6271559`.
 
-## 2026-06-14 Qwen3-VL BioSeq training model layer
+## 2026-06-14 BioSeq foundation training model layer
 
-- User request: start building the trainable model architecture under `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch`, with both a no-encoder version and an ESMC/ESM encoder-conditioned version. Encoder-conditioned training should follow the BioSeq diffusion loss/noise rules.
+- User request: start building the trainable model architecture under `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch`, with both a no-encoder version and an ESMC/ESM feature-conditioned version. Feature-conditioned training should follow the BioSeq diffusion loss/noise rules.
 - Added `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/modeling_bioseq.py`.
 - Implemented `BioSeqDiffusionTransformerConfig`, `BioSeqDiffusionDecoder`, `BioSeqNoEncoderDiffusionModel`, and `BioSeqEncoderDiffusionModel`.
 - Implemented BioSeq diffusion utilities in the same module:
@@ -475,11 +491,11 @@
   - `apply_decoder_corruption_to_encoder`: maps corrupted decoder residues back to per-chain encoder residues and masks those encoder tokens before the encoder forward pass.
   - `compute_masked_cross_entropy`: computes denoising cross-entropy only on corrupted target positions.
 - The no-encoder model computes diffusion loss directly over the qwen3_vl_arch collator output.
-- The encoder-conditioned model runs a per-chain encoder, pools residue states into chain features, gathers those features back to decoder token positions by `chain_ids`, and conditions the decoder through a projection. Encoder parameters are trainable by default; `freeze_encoder=True` is available for ablations.
+- The initial feature-conditioned implementation ran a per-chain encoder and projected encoder states into the decoder. This was later corrected so ESMC/ESM features stay token-aligned from the diffusion state `x_t` before the multi-chain denoiser runs.
 - Important leakage rule implemented: when a target residue is corrupted for decoder diffusion, the corresponding residue token in `encoder_input_ids` is also replaced with `<mask>` before encoder forward. Fixed context chains such as antigen remain clean and can condition target denoising.
 - Exported the new model/loss utilities from `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/__init__.py`.
 - Added `/vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/tests/bioseq/test_qwen3_vl_bioseq_model.py`.
-- Test coverage verifies decoder-only loss, encoder-conditioned loss, encoder target masking, fixed antigen preservation, trainable encoder gradients, frozen encoder behavior, extra collator-field tolerance, and diffusion sampler mask boundaries.
+- Test coverage verifies no-encoder masked-diffusion loss, ESMC/ESM feature-conditioned loss, encoder target masking, fixed antigen preservation, trainable encoder gradients, frozen encoder behavior, extra collator-field tolerance, and diffusion sampler mask boundaries.
 - Local ESMC loading check: `/c20250601/mj/model_weights/esmc/ESMC-300M/config.json` declares `model_type="esmc"` and `transformers_version="4.57.6"`. Current environment has `transformers==4.48.1`, so `transformers.AutoModel.from_pretrained("/c20250601/mj/model_weights/esmc/ESMC-300M")` fails because this Transformers version does not recognize ESMC.
 - Resulting constraint at this point was that unit tests used a tiny differentiable encoder to validate the training path. This was later resolved by adding the local Biohub `esm==3.2.3` ESMC loader documented in the 2026-06-14 compatibility fix section below.
 - Verified syntax:
@@ -488,17 +504,17 @@
   - `python -m pytest /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/tests/bioseq/test_qwen3_vl_bioseq_model.py -q`: `5 passed`
   - `python -m pytest /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/tests/bioseq/test_qwen3_vl_data_loader.py /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/tests/bioseq/test_qwen3_vl_bioseq_model.py -q`: `29 passed`
 
-## 2026-06-14 Qwen3-VL BioSeq DDP training path
+## 2026-06-14 BioSeq foundation DDP training path
 
 - User clarified that training needs to support multi-node/multi-GPU execution.
 - Updated `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/data/mixture.py` so iterable record streams are DDP-aware. `SequentialMultiSourceDataset` and `WeightedMixtureDataset` now shard source rows with `global_shard_index = rank * num_workers + worker_id` and `num_shards = world_size * num_workers`.
 - Added `/vepfs-mlp2/c20250601/251105016/project/dllm_test/examples/bioseq/train_qwen3_vl_bioseq_ddp.py`.
 - The new trainer supports:
   - `torchrun` single-node and multi-node launch through environment variables `RANK`, `WORLD_SIZE`, and `LOCAL_RANK`.
-  - decoder-only `--model-type no_encoder` training today.
-  - encoder-conditioned `--model-type encoder` through `BioSeqEncoderDiffusionModel.from_esmc(...)`, now backed by the local Biohub ESMC fallback loader when Hugging Face `AutoModel` cannot recognize `model_type="esmc"`.
-  - task-homogeneous BioSeq batches from `TaskHomogeneousBatchDataset`.
-  - shared-view collation through `BioSeqQwenDataCollator(require_homogeneous_task=True)`.
+  - no-encoder `--model-type no_encoder` training today.
+  - ESMC/ESM feature-conditioned `--model-type encoder` through `BioSeqEncoderDiffusionModel.from_esmc(...)`, now backed by the local Biohub ESMC fallback loader when Hugging Face `AutoModel` cannot recognize `model_type="esmc"`.
+  - initially supported task-homogeneous BioSeq batches from `TaskHomogeneousBatchDataset`; the default was later changed to mixed-task physical batches.
+  - initially supported shared-view collation through `BioSeqQwenDataCollator(require_homogeneous_task=True)`; the default was later changed to per-record views with `require_homogeneous_task=False`.
   - `--device auto|cuda|cpu`, so CPU DDP smoke tests can run even on nodes with fewer visible GPUs than requested local ranks.
   - bf16 autocast, gradient accumulation, grad clipping, warmup, rank-0 logging, optional wandb, checkpoint save/resume, and separate encoder LR when an encoder model is active.
 - Added `/vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/tests/bioseq/test_qwen3_vl_ddp_training.py`, which runs a one-step single-process no-encoder training smoke on real local OAS data and checks that `final.pt` is saved.
@@ -528,3 +544,863 @@
 - Verified real ESMC-300M local loading in both current Python and `/vepfs-mlp2/c20250601/251105016/conda/envs/protenix_abtcr/bin/python`: `LocalESMCEncoder`, hidden size `960`, output shape `(1, 5, 960)`.
 - Added a stricter ESMC-300M state-dict validation: raw local safetensors have `398` keys including wrapper metadata/extra-state entries; converted native ESMC state dict has `308` keys; native Biohub `ESMC(d_model=960, n_heads=15, n_layers=30)` also has `308` keys. Missing keys, unexpected keys, and shape mismatches are all `0`, and parameter numel matches exactly at `332997184`. Forward output with padding mask is finite with shape `(2, 7, 960)`.
 - Verified ESMC-600M with the same strict check. Config is `d_model=1152`, `n_heads=18`, `n_layers=36`, `vocab_size=64`, `mask_token_id=32`, and `pad_token_id=1`. Raw local safetensors have `476` keys; converted native ESMC state dict has `368` keys; native Biohub `ESMC(d_model=1152, n_heads=18, n_layers=36)` also has `368` keys. Missing keys, unexpected keys, and shape mismatches are all `0`, and parameter numel matches exactly at `575036992`. `strict=True` load passed, and wrapper forward output is finite with shape `(2, 7, 1152)`.
+
+## 2026-06-14 Mixed-task BioSeq foundation batches
+
+- User clarified that physical training batches should contain different tasks, rather than only one task group per batch.
+- Updated `/vepfs-mlp2/c20250601/251105016/project/dllm_test/examples/bioseq/train_qwen3_vl_bioseq_ddp.py`: `build_loader` now feeds `WeightedMixtureDataset` directly into `DataLoader(batch_size=args.batch_size, drop_last=True)` and no longer wraps the stream with `TaskHomogeneousBatchDataset`.
+- Updated `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/data/collator.py`: `BioSeqQwenDataCollator.single_view_per_batch` now defaults to `False`, so each record samples its own compatible view inside a mixed batch.
+- The DDP trainer now constructs `BioSeqQwenDataCollator(single_view_per_batch=False, require_homogeneous_task=False)`. The legacy `--deduplicate-within-batch` flag is retained only as a deprecated compatibility flag and is ignored by the mixed-task path.
+- Training logs now report per-batch view counts such as `views=antigen_to_antibody:1,full_denoise:3` instead of assuming one shared view for the whole batch.
+- `TaskHomogeneousBatchDataset` remains available as an ablation/debugging wrapper, but it is no longer the default foundation-training path.
+- Added a data-loader test that collates antibody and antibody-antigen records in the same batch with per-record views: `["full_denoise", "antigen_to_antibody"]`.
+- Verified syntax with `python -m py_compile /vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/data/collator.py /vepfs-mlp2/c20250601/251105016/project/dllm_test/examples/bioseq/train_qwen3_vl_bioseq_ddp.py /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/tests/bioseq/test_qwen3_vl_data_loader.py`.
+- Verified tests:
+  - `python -m pytest /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/tests/bioseq/test_qwen3_vl_bioseq_model.py /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/tests/bioseq/test_qwen3_vl_data_loader.py /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/tests/bioseq/test_qwen3_vl_ddp_training.py -q`: `32 passed`
+
+## 2026-06-14 Formal ESMC offline training verification
+
+- Confirmed the earlier encoder model ran ESMC per chain/sequence. This was later corrected so `BioSeqEncoderDiffusionModel` keeps token-level ESMC features from `x_t` and gathers them back to decoder residue positions instead of using a chain summary.
+- Confirmed ESMC encoder parameters are trainable by default. `/vepfs-mlp2/c20250601/251105016/project/dllm_test/examples/bioseq/train_qwen3_vl_bioseq_ddp.py::optimizer_for_model` creates an AdamW group from `model.encoder.parameters()` when `requires_grad=True`; the formal ESMC-300M and ESMC-600M YAMLs do not pass `--freeze-encoder`.
+- Fixed local ESMC tokenizer loading for the BioSeq foundation data path. `transformers==4.48.1` cannot import the `ESMCTokenizer` class declared by the local ESMC snapshots, so `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/data/esm_encoding.py` now falls back to loading `/vepfs-mlp2/c20250601/251105016/project/dllm_test/model_weights/esmc/ESMC-300M/tokenizer.json` or `/vepfs-mlp2/c20250601/251105016/project/dllm_test/model_weights/esmc/ESMC-600M/tokenizer.json` through the `tokenizers` library.
+- Fixed an edge case in `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/data/collator.py`: if a sampled generation view has no token-level `diffusion_loss_mask` after `max_chain_length` or `max_sequence_length` truncation, the collator falls back to `full_denoise` for that record when `full_denoise` still has eligible target tokens.
+- Added a regression test in `/vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/tests/bioseq/test_qwen3_vl_data_loader.py` for the truncated-CDR case where `single_cdr` would otherwise produce zero loss tokens.
+- Verified syntax:
+  - `python -m py_compile /vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/data/collator.py /vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/data/esm_encoding.py /vepfs-mlp2/c20250601/251105016/project/dllm_test/examples/bioseq/train_qwen3_vl_bioseq_ddp.py /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/tests/bioseq/test_qwen3_vl_data_loader.py`
+- Verified tests:
+  - `python -m pytest /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/tests/bioseq/test_qwen3_vl_data_loader.py /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/tests/bioseq/test_qwen3_vl_bioseq_model.py /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/tests/bioseq/test_qwen3_vl_ddp_training.py -q`: `34 passed`
+- Verified local ESMC-300M encoder training entrypoint with offline wandb and project-disk output:
+  - Command used `/vepfs-mlp2/c20250601/251105016/project/dllm_test/model_weights/esmc/ESMC-300M` for both `--encoder-path` and `--tokenizer-path`, `--model-type encoder`, `--wandb-mode offline`, `--max-steps 1`, and `/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/local_checks/qwen3_vl_encoder_offline_local_check` as output.
+  - Result: `step=0 loss=19.8149 tasks=antibody:1 views=full_denoise:1 corrupted=25`, and `final.pt` was saved under `/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/local_checks/qwen3_vl_encoder_offline_local_check/final.pt`.
+- Verified local ESMC-600M encoder forward/loss without checkpoint saving:
+  - Command used `/vepfs-mlp2/c20250601/251105016/project/dllm_test/model_weights/esmc/ESMC-600M` for both tokenizer and encoder loading, with a tiny decoder and `freeze_encoder=True` for a no-grad compatibility check.
+  - Result: `esmc600m_forward_loss_ok loss 16.4906 logits (1, 22, 64) corrupted 5`.
+- Added the formal no-encoder baseline config `/vepfs-mlp2/c20250601/251105016/project/dllm_test/train_jobs/qwen3_vl_bioseq_no_encoder_stage1.yml`.
+  - `TaskName`: `qwen3_vl_bioseq_no_encoder_stage1`
+  - Model path: `--model-type no_encoder`, with no `--encoder-path`, no `--encoder-lr`, and no `--freeze-encoder`
+  - Tokenizer path: `/vepfs-mlp2/c20250601/251105016/project/dllm_test/model_weights/esmc/ESMC-300M`, using only the ESMC tokenizer/vocab 64 for comparability with ESMC encoder runs
+  - Batch: `--batch-size 8 --grad-accum 1`, 16 GPU effective batch `128`
+  - Wandb: `WANDB_MODE=offline`, `--wandb-mode offline`, project `bioseq-qwen3-vl`, run `qwen3_vl_bioseq_no_encoder_stage1`
+- Verified local no-encoder training entrypoint with ESMC tokenizer and offline wandb:
+  - Result: `step=0 loss=13.9534 tasks=antibody:1 views=full_denoise:1 corrupted=22`, and `final.pt` was saved under `/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/local_checks/qwen3_vl_no_encoder_offline_local_check/final.pt`.
+- The first local attempt used `/tmp/qwen3_vl_encoder_offline_local_check` and failed only at checkpoint write because the root filesystem `/` was full. Formal training outputs must stay on `/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/...`.
+- Verified a CPU training smoke with `--sources oas,ots,nanobody --batch-size 4 --max-steps 1`: loss was finite and logs showed mixed per-record views, e.g. `views=fr_to_cdr:1,light_to_heavy:1,single_cdr:2`.
+- Verified the mixed source stream directly: the first 12 records from `WeightedMixtureDataset` with OAS, OTS, and nanobody included `nanobody`, `tcr`, and `antibody` task groups before batching.
+
+## 2026-06-14 Formal BioSeq foundation ESMC encoder training configs
+
+- User clarified that the next runs should be formal encoder training, not smoke jobs, and should train two versions: ESMC-300M and ESMC-600M. User also clarified wandb should be offline, not online.
+- Staged ESMC weights into the Volc-mounted project tree so training jobs do not depend on `/c20250601/mj/model_weights` being visible inside worker containers:
+  - `/vepfs-mlp2/c20250601/251105016/project/dllm_test/model_weights/esmc/ESMC-300M`
+  - `/vepfs-mlp2/c20250601/251105016/project/dllm_test/model_weights/esmc/ESMC-600M`
+- Added formal job config `/vepfs-mlp2/c20250601/251105016/project/dllm_test/train_jobs/qwen3_vl_bioseq_esmc300m_stage1.yml`.
+  - `TaskName`: `qwen3_vl_bioseq_esmc300m_stage1`
+  - Model path: `--model-type encoder --encoder-path /vepfs-mlp2/c20250601/251105016/project/dllm_test/model_weights/esmc/ESMC-300M`
+  - Tokenizer path: same ESMC-300M snapshot, `--vocab-size 64`
+  - Data: `--sources oas,ots,nanobody,processed_v2`, no per-source limit
+  - Batch: `--batch-size 2 --grad-accum 4`, 16 GPU effective batch `128`
+  - Training: `--max-steps 50000 --lr 1e-4 --encoder-lr 2e-5 --warmup-steps 1000 --bf16`
+  - Output: `/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/qwen3_vl_bioseq_esmc300m_stage1`
+  - Wandb: `WANDB_MODE=offline`, `--wandb-mode offline`, project `bioseq-qwen3-vl`, run `qwen3_vl_bioseq_esmc300m_stage1`
+- Added formal job config `/vepfs-mlp2/c20250601/251105016/project/dllm_test/train_jobs/qwen3_vl_bioseq_esmc600m_stage1.yml`.
+  - `TaskName`: `qwen3_vl_bioseq_esmc600m_stage1`
+  - Model path: `--model-type encoder --encoder-path /vepfs-mlp2/c20250601/251105016/project/dllm_test/model_weights/esmc/ESMC-600M`
+  - Tokenizer path: same ESMC-600M snapshot, `--vocab-size 64`
+  - Data: `--sources oas,ots,nanobody,processed_v2`, no per-source limit
+  - Batch: `--batch-size 1 --grad-accum 8`, 16 GPU effective batch `128`
+  - Training: `--max-steps 50000 --lr 1e-4 --encoder-lr 1e-5 --warmup-steps 1000 --bf16`
+  - Output: `/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/qwen3_vl_bioseq_esmc600m_stage1`
+  - Wandb: `WANDB_MODE=offline`, `--wandb-mode offline`, project `bioseq-qwen3-vl`, run `qwen3_vl_bioseq_esmc600m_stage1`
+- Updated `/vepfs-mlp2/c20250601/251105016/project/dllm_test/examples/bioseq/train_qwen3_vl_bioseq_ddp.py` so wandb receives per-batch view, task-group, and source-count metrics: `batch_views/*`, `batch_tasks/*`, and `batch_sources/*`.
+- Updated `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/data/collator.py` to emit `task_groups` and `task_types` string lists in the batch.
+- Verified staged ESMC files:
+  - ESMC-300M `model.safetensors`: `1332036392` bytes
+  - ESMC-600M `model.safetensors`: `2300205696` bytes
+- Verified YAML parsing for both new configs.
+- Verified syntax:
+  - `python -m py_compile /vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/data/collator.py /vepfs-mlp2/c20250601/251105016/project/dllm_test/examples/bioseq/train_qwen3_vl_bioseq_ddp.py /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/tests/bioseq/test_qwen3_vl_data_loader.py`
+- Verified tests:
+  - `python -m pytest /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/tests/bioseq/test_qwen3_vl_bioseq_model.py /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/tests/bioseq/test_qwen3_vl_data_loader.py /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/tests/bioseq/test_qwen3_vl_ddp_training.py -q`: `32 passed`
+
+## 2026-06-14 Formal BioSeq foundation stage-1 task submissions
+
+- Submitted `/vepfs-mlp2/c20250601/251105016/project/dllm_test/train_jobs/qwen3_vl_bioseq_esmc300m_stage1.yml` with the no-proxy Volc wrapper.
+  - Task id: `t-20260614215611-mkchk`
+  - Initial status from `volc ml_task get`: `Queue`
+- Submitted `/vepfs-mlp2/c20250601/251105016/project/dllm_test/train_jobs/qwen3_vl_bioseq_esmc600m_stage1.yml` with the no-proxy Volc wrapper.
+  - Task id: `t-20260614215620-kbwb8`
+  - Initial status from `volc ml_task get`: `Queue`
+- Submitted `/vepfs-mlp2/c20250601/251105016/project/dllm_test/train_jobs/qwen3_vl_bioseq_no_encoder_stage1.yml` with the no-proxy Volc wrapper.
+  - Task id: `t-20260614215631-tf8ql`
+  - Initial status from `volc ml_task get`: `Queue`
+- All three submissions use offline wandb and output under `/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/...`.
+- These initial 2-node submissions failed:
+  - `t-20260614215611-mkchk`: worker allocation failed because one worker requested 8 GPUs when available GPUs were `0`.
+  - `t-20260614215620-kbwb8` and `t-20260614215631-tf8ql`: preflight pytest failed before training. The worker container did not mount `/c20250601/mj/model_weights/esm2/...`, and importing `transformers.AutoTokenizer` / `AutoModel` triggered a scikit-learn binary import requiring `GLIBC_2.32`.
+- Fixed `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/data/esm_encoding.py` so local ESMC tokenizer snapshots load directly from `tokenizer.json` when `config.json` declares `model_type="esmc"` or `tokenizer_config.json` declares `ESMCTokenizer`.
+- Fixed `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/modeling_bioseq.py::BioSeqEncoderDiffusionModel.from_esmc` so local ESMC snapshots go directly through `load_local_esmc_encoder(...)` without importing `transformers.AutoModel`.
+- Updated the three formal YAMLs to single-node full-8-GPU jobs:
+  - `RoleReplicas: 1`
+  - `Flavor: ml.pni2.28xlarge`
+  - Tags changed from `16gpu` to `8gpu`
+  - Effective batch remains `128` by increasing grad accumulation: ESMC-300M `--batch-size 2 --grad-accum 8`, ESMC-600M `--batch-size 1 --grad-accum 16`, no-encoder `--batch-size 8 --grad-accum 2`.
+  - Removed full pytest preflight from the formal training entrypoints and kept file/import/tokenizer checks.
+- Verified locally after fixes:
+  - `python -m py_compile /vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/modeling_bioseq.py /vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/data/esm_encoding.py`
+  - `BioSeqEncoderDiffusionModel.from_esmc(...)` returned `LocalESMCEncoder 960` for `/vepfs-mlp2/c20250601/251105016/project/dllm_test/model_weights/esmc/ESMC-300M`.
+  - `python -m pytest /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/tests/bioseq/test_qwen3_vl_data_loader.py /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/tests/bioseq/test_qwen3_vl_bioseq_model.py -q`: `33 passed`
+- Submitted corrected 8-GPU stage-1 tasks:
+  - ESMC-300M: `t-20260614223522-m5l87`, initial status `Queue`
+  - ESMC-600M: `t-20260614223523-8shmt`, initial status `Queue`
+  - no-encoder: `t-20260614223319-hzqdr`, status `Running`
+- Confirmed no-encoder training is running on 8 GPUs:
+  - `world_size=8 device=cuda:0 model_type=no_encoder effective_batch=128`
+  - Offline wandb directory: `/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/qwen3_vl_bioseq_no_encoder_stage1/wandb`
+  - Logged loss samples: step `0` loss `191.8261`, step `20` loss `175.5349`, step `40` loss `126.2785`, step `60` loss `56.4232`.
+- Checked formal task status again:
+  - ESMC-300M `t-20260614223522-m5l87`: `Queue`
+  - ESMC-600M `t-20260614223523-8shmt`: `Queue`
+  - no-encoder `t-20260614223319-hzqdr`: `Running`
+- `volc ml_task top --task t-20260614223319-hzqdr --instance worker_0` currently fails with `websocket: bad handshake`, so platform top cannot be relied on for GPU memory.
+- Added CUDA memory metrics to `/vepfs-mlp2/c20250601/251105016/project/dllm_test/examples/bioseq/train_qwen3_vl_bioseq_ddp.py`.
+  - stdout now appends `mem_peak=<peak_allocated_gb>/<total_gb>` at each log interval on CUDA.
+  - offline wandb now receives `perf/gpu_mem_allocated_gb`, `perf/gpu_mem_reserved_gb`, `perf/gpu_mem_peak_allocated_gb`, `perf/gpu_mem_peak_reserved_gb`, and `perf/gpu_mem_total_gb`.
+  - In DDP, metrics are max-reduced across ranks so rank 0 logs the largest observed GPU memory usage.
+- Current no-encoder task was already running before the memory logging patch, so it will not emit the new memory fields. The queued ESMC-300M and ESMC-600M tasks will pick up the updated script when they launch from the shared Vepfs project path.
+- Current batch settings remain conservative until the first memory readings are available:
+  - no-encoder: per-GPU `--batch-size 8 --grad-accum 2`
+  - ESMC-300M: per-GPU `--batch-size 2 --grad-accum 8`
+  - ESMC-600M: per-GPU `--batch-size 1 --grad-accum 16`
+- Batch-size adjustment rule for next resubmission: keep effective batch near `128`; if peak allocated memory is below about 70% of device memory for several log windows, increase per-GPU batch and reduce grad accumulation. If peak is above about 90%, keep or reduce per-GPU batch.
+- Continued polling after the corrected submissions:
+  - ESMC-300M `t-20260614223522-m5l87`: still `Queue`, no container logs yet.
+  - ESMC-600M `t-20260614223523-8shmt`: still `Queue`, no container logs yet.
+  - no-encoder `t-20260614223319-hzqdr`: still `Running`.
+- Latest no-encoder logs showed training continued normally through step `6520`.
+  - Recent loss range was roughly `1.15` to `2.87`, with step `6520` loss `2.3875`.
+  - Throughput stayed around `1590` to `1625` samples/s after checkpoint pauses.
+  - Checkpoints were saved at step `4000`, `5000`, and `6000` to `/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/qwen3_vl_bioseq_no_encoder_stage1/latest.pt`.
+- A later no-encoder log check reached step `7900`; recent losses ranged roughly from `0.63` to `2.54`, and throughput remained around `1590` to `1622` samples/s.
+- No new failure was observed in the running no-encoder task. The two encoder tasks have not started yet, so there is no new encoder-side runtime error to fix or resubmit.
+- Did not submit duplicate same-name jobs while the corrected ESMC jobs are already queued, because duplicate submissions would compete for the same output and offline wandb directories under `/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/...`.
+
+## 2026-06-14 Encoder DDP unused-parameter failure and resubmission
+
+- The corrected encoder tasks later launched and failed quickly:
+  - ESMC-300M `t-20260614223522-m5l87`: `Failed`, worker exit code `1`.
+  - ESMC-600M `t-20260614223523-8shmt`: `Failed`, worker exit code `1`.
+- Both failures had the same root cause from PyTorch DDP:
+  - `RuntimeError: Expected to have finished reduction in the prior iteration before starting a new one.`
+  - DDP reported parameters that did not receive gradients on each rank.
+  - For ESMC-300M the reported unused parameter indices included `302 303 304 305 306 307`; for ESMC-600M they included `362 363 364 365 366 367`.
+- Interpretation: this was not an ESMC weight/tokenizer loading issue. It was a DDP graph issue caused by some encoder-mode parameters not participating in the loss for some mixed-task / mixed-view batches.
+- Fixed `/vepfs-mlp2/c20250601/251105016/project/dllm_test/examples/bioseq/train_qwen3_vl_bioseq_ddp.py`:
+  - Added `should_find_unused_parameters(args)`.
+  - Encoder mode now enables DDP `find_unused_parameters=True` automatically.
+  - The CLI flag `--find-unused-parameters` remains available and explicit.
+- Updated encoder formal YAMLs to pass `--find-unused-parameters` explicitly:
+  - `/vepfs-mlp2/c20250601/251105016/project/dllm_test/train_jobs/qwen3_vl_bioseq_esmc300m_stage1.yml`
+  - `/vepfs-mlp2/c20250601/251105016/project/dllm_test/train_jobs/qwen3_vl_bioseq_esmc600m_stage1.yml`
+- Added tests in `/vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/tests/bioseq/test_qwen3_vl_ddp_training.py`:
+  - encoder mode enables DDP unused-parameter detection by default.
+  - no-encoder mode keeps it disabled by default.
+- Verified:
+  - `python -m py_compile /vepfs-mlp2/c20250601/251105016/project/dllm_test/examples/bioseq/train_qwen3_vl_bioseq_ddp.py /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/tests/bioseq/test_qwen3_vl_ddp_training.py`
+  - `python -m pytest /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/tests/bioseq/test_qwen3_vl_ddp_training.py -q`: `3 passed`
+  - Both encoder YAML files parse and contain `--find-unused-parameters`.
+- Resubmitted the two formal encoder jobs with the no-proxy Volc wrapper:
+  - ESMC-300M: `t-20260615015007-kw5jx`
+  - ESMC-600M: `t-20260615015007-g99bk`
+- Initial status after resubmission:
+  - ESMC-300M `t-20260615015007-kw5jx`: `Queue`
+  - ESMC-600M `t-20260615015007-g99bk`: `Queue`
+  - No worker instances exist yet for these new queued tasks, so there are no new logs yet.
+
+## 2026-06-14 Current formal training status
+
+- Latest Volc status check:
+  - no-encoder `t-20260614223319-hzqdr`: `Success`.
+  - ESMC-300M encoder `t-20260615015007-kw5jx`: `Queue`.
+  - ESMC-600M encoder `t-20260615015007-g99bk`: `Queue`.
+- no-encoder completed the planned `50000` stage-1 steps.
+  - Tail logs reached step `49980` and then saved final checkpoint.
+  - Recent loss examples: step `49820` loss `2.5908`, step `49900` loss `0.5640`, step `49980` loss `2.0503`.
+  - Recent throughput stayed around `1589` to `1622` samples/s.
+  - Final checkpoint: `/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/qwen3_vl_bioseq_no_encoder_stage1/final.pt`
+  - Latest checkpoint: `/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/qwen3_vl_bioseq_no_encoder_stage1/latest.pt`
+  - Both checkpoint files are about `434M`.
+  - Offline wandb run: `/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/qwen3_vl_bioseq_no_encoder_stage1/wandb/wandb/offline-run-20260614_143508-qt02xjok`
+- The resubmitted ESMC encoder jobs still have no worker instances, so there are no new logs after the DDP `find_unused_parameters` fix yet.
+
+## 2026-06-14 Fixed-resource resubmission
+
+- User requested switching training jobs from idle/preemptible resources to fixed resources.
+- Updated the formal job YAMLs from `Preemptible: true` to `Preemptible: false`:
+  - `/vepfs-mlp2/c20250601/251105016/project/dllm_test/train_jobs/qwen3_vl_bioseq_no_encoder_stage1.yml`
+  - `/vepfs-mlp2/c20250601/251105016/project/dllm_test/train_jobs/qwen3_vl_bioseq_esmc300m_stage1.yml`
+  - `/vepfs-mlp2/c20250601/251105016/project/dllm_test/train_jobs/qwen3_vl_bioseq_esmc600m_stage1.yml`
+- Verified all three YAML files parse and have `Preemptible=False`.
+- Canceled the queued idle-resource encoder tasks:
+  - ESMC-300M `t-20260615015007-kw5jx`: `Killed`.
+  - ESMC-600M `t-20260615015007-g99bk`: `Killed`.
+- Submitted fixed-resource encoder tasks with the no-proxy Volc wrapper:
+  - ESMC-300M: `t-20260615015635-rm62r`.
+  - ESMC-600M: `t-20260615015634-crkld`.
+- Initial fixed-resource status:
+  - ESMC-300M `t-20260615015635-rm62r`: `Queue`.
+  - ESMC-600M `t-20260615015634-crkld`: `Queue`.
+
+## 2026-06-14 Reverted encoder submissions to idle/preemptible resources
+
+- User requested changing the two encoder submissions back to idle/preemptible resources.
+- Canceled the queued fixed-resource encoder tasks:
+  - ESMC-300M `t-20260615015635-rm62r`: `Killed`.
+  - ESMC-600M `t-20260615015634-crkld`: `Killed`.
+- Updated only the two encoder formal YAMLs from `Preemptible: false` back to `Preemptible: true`:
+  - `/vepfs-mlp2/c20250601/251105016/project/dllm_test/train_jobs/qwen3_vl_bioseq_esmc300m_stage1.yml`
+  - `/vepfs-mlp2/c20250601/251105016/project/dllm_test/train_jobs/qwen3_vl_bioseq_esmc600m_stage1.yml`
+- Left `/vepfs-mlp2/c20250601/251105016/project/dllm_test/train_jobs/qwen3_vl_bioseq_no_encoder_stage1.yml` as `Preemptible: false`; the no-encoder stage-1 training has already completed successfully and was not resubmitted.
+- Verified both encoder YAMLs parse, have `Preemptible=True`, and still contain `--find-unused-parameters`.
+- Submitted the two idle/preemptible encoder jobs with the no-proxy Volc wrapper:
+  - ESMC-300M: `t-20260615020032-5gg96`.
+  - ESMC-600M: `t-20260615020032-s787s`.
+- Initial status after idle-resource resubmission:
+  - ESMC-300M `t-20260615020032-5gg96`: `Queue`.
+  - ESMC-600M `t-20260615020032-s787s`: `Queue`.
+
+## 2026-06-14 BioSeq foundation naming cleanup
+
+- Standardized public documentation wording from the old Qwen-derived labels to `BioSeq foundation` or `BioSeq foundation-model`.
+- Kept compatibility identifiers unchanged for paths, task names, output directories, wandb project names, and test/script filenames: `qwen3_vl_arch`, `qwen3_vl_bioseq_*`, and `bioseq-qwen3-vl`.
+- Updated visible descriptions in the formal training YAMLs, README files, project guide, model plan, data-format audit, training script docstring, and data-inspection CLI help text.
+- Current no-encoder stage-1 config uses per-GPU microbatch `--batch-size 8`, `--grad-accum 2`, `world_size=8`, so the optimizer effective batch is `8 * 2 * 8 = 128`.
+
+## 2026-06-14 No-encoder architecture wording correction
+
+- Corrected inaccurate autoregressive wording for `BioSeqNoEncoderDiffusionModel`.
+- The `no_encoder` model has no ESM/ESMC encoder, but its internal BioSeq diffusion stack uses bidirectional self-attention over the noised token stream. It should be described as `no-encoder` or `encoder-free bidirectional diffusion transformer`, not as a causal/autoregressive architecture.
+
+## 2026-06-14 Encoder feature-conditioning correction
+
+- Corrected the ESMC/ESM encoder path semantics after review: ESMC is used to extract token-level features from the current diffusion state `x_t`, not to pool clean sequence features into a chain-level condition.
+- The BioSeq denoiser remains responsible for multi-chain denoising over the concatenated token stream, matching the no-encoder path's chain-aware input layout.
+- Removed the old pooled conditioning path from `BioSeqEncoderDiffusionModel`; the encoder output is now gathered back to decoder residue positions as per-token features before the multi-chain denoiser runs.
+- Added denoiser support for direct `diffusion_state` input. Discrete states use embedding lookup; floating states use weighted embedding projection with `state @ embedding_weight`, avoiding internal one-hot expansion.
+- The already-running ESMC encoder jobs were launched before this correction and should be treated as old-implementation runs unless they are explicitly restarted from the updated code.
+
+## 2026-06-14 Restarted encoder training with token-feature implementation
+
+- User requested stopping the old encoder runs and retraining with the corrected feature-conditioning implementation.
+- Canceled the old running encoder tasks:
+  - ESMC-300M old task `t-20260615020032-5gg96`: `Killed`.
+  - ESMC-600M old task `t-20260615020032-s787s`: `Killed`.
+- Updated the two encoder YAMLs to avoid resuming old flawed checkpoints:
+  - `TaskName` changed to `qwen3_vl_bioseq_esmc300m_feat_v2_stage1` and `qwen3_vl_bioseq_esmc600m_feat_v2_stage1`.
+  - `--resume none` is now explicit.
+  - Output and offline wandb directories now use `/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/qwen3_vl_bioseq_esmc300m_feat_v2_stage1` and `/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/qwen3_vl_bioseq_esmc600m_feat_v2_stage1`.
+- Submitted the corrected v2 feature-conditioned training tasks with the no-proxy Volc wrapper:
+  - ESMC-300M v2: `t-20260615042843-kkxcm`, state `Running`, launched `2026-06-14 20:29:04 UTC`.
+  - ESMC-600M v2: `t-20260615042843-cmkpb`, state `Running`, launched `2026-06-14 20:29:01 UTC`.
+- Platform task details confirm both new tasks include `--resume none`, new v2 output directories, and the corrected shared project code path.
+- Both v2 jobs reached step `0` and started logging:
+  - ESMC-300M v2: `loss=230.2500`, `effective_batch=128`, `samples/s=1049.8`, `mem_peak=8.4GB/79.2GB`.
+  - ESMC-600M v2: `loss=200.8462`, `effective_batch=128`, `samples/s=698.5`, `mem_peak=13.9GB/79.2GB`.
+- The preflight tokenizer log prints `tokenizer ok 33 32` because local ESMC `tokenizer.json` exposes 33 emitted tokens with `<mask>` id `32`, while ESMC model configs still declare `vocab_size=64`; the training command keeps `--vocab-size 64` so the denoiser logits stay aligned with the ESMC head size.
+
+## 2026-06-15 Submitted BioSeq OAS+OTS 8GPU comparison run
+
+- User requested direct training of the `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/bioseq` version with OAS + OTS mixed data only, using the native BioSeq dataloader format, on one 8-GPU node, and with wandb project aligned to the `qwen3_vl_arch` comparison runs.
+- Added source selection to `/vepfs-mlp2/c20250601/251105016/project/dllm_test/examples/bioseq/train_bioseq_ddp.py` via `--sources`, preserving the old default `oas,ots,nanobody` while allowing this run to pass `--sources oas,ots`.
+- Added `/vepfs-mlp2/c20250601/251105016/project/dllm_test/train_jobs/bioseq_oas_ots_8gpu_stage1.yml`.
+  - Resources: `RoleReplicas: 1`, `Flavor: ml.pni2.28xlarge`, i.e. 1 node x 8 GPU.
+  - Data: `--sources oas,ots`, `--limit-per-source 300000`, default BioSeq OAS/OTS processed CSV dirs under `/vepfs-mlp2/c20250601/251105016/project/dllm_test/data`.
+  - Model: BioSeq/Ophiuchus-Ab trainer initialized from `/vepfs-mlp2/c20250601/251105016/model_weights/ophiuchus_ab/Ophiuchus-Ab.ckpt`.
+  - Wandb: `--wandb-project bioseq-qwen3-vl`, `--wandb-run-name bioseq_oas_ots_8gpu_stage1`.
+- Verification before submit:
+  - `python -m py_compile examples/bioseq/train_bioseq_ddp.py`
+  - `python -m pytest scripts/tests/bioseq/test_dynamic_training.py -q`: `6 passed`
+  - YAML parsed successfully with `TaskName=bioseq_oas_ots_8gpu_stage1`, `RoleReplicas=1`, `Flavor=ml.pni2.28xlarge`.
+- Submitted with `/root/.codex/skills/volc-no-proxy/scripts/volc-no-proxy.sh ml_task submit --conf train_jobs/bioseq_oas_ots_8gpu_stage1.yml`.
+  - Task id: `t-20260615102316-jhtdq`
+  - Status at `2026-06-15 02:24:52 UTC`: `Queue`
+
+## 2026-06-18 Ophiuchus-Ab generation downstream smoke and CDR metric check
+
+- User requested checking `/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream` Ophiuchus-Ab generation tasks against the Ophiuchus-Ab paper, prioritizing CDR infilling, humanization, and heavy-to-light generation.
+- Paper mapping:
+  - CDR infilling metric: amino-acid recovery (AAR), including SAb23H2 and SAbDab.
+  - Light-chain pairing metric: ImmunoMatch score and generated-vs-reference comparison.
+  - Humanization metric: OASis score and AbNatiV score.
+- Fixed downstream generation compatibility:
+  - `/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/common.py`: `CdrInfillCollator` now masks light-chain CDRs for `cdrl*` modes instead of always masking heavy-chain positions.
+  - `/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/infill/zeroshot_cdr.py`: dataset now passes the CDR mode to the collator; defaults restored to AirGen/paper-style `--sampling-strategy argmax --max-iter 4`.
+  - `/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/infill/zeroshot_sab23h2.py`: maps `cdrh*`/`cdrl*` mode names to local SAb23H2 directories `h_cdr*`/`l_cdr*`; defaults restored to `argmax`, `max_iter=4`.
+  - `/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/humanization/humanize.py`: supports `.pdb` as well as `.cif` inputs and writes `variant_idx`, `generated_heavy`, `generated_light` columns compatible with `oasis_human_score.py`.
+- Verification:
+  - `python -m py_compile downstream/common.py downstream/infill/zeroshot_cdr.py downstream/infill/zeroshot_sab23h2.py downstream/humanization/humanize.py downstream/comp_chain/generate_light_from_csv.py`
+  - `python -m pytest scripts/tests/bioseq/test_downstream_common.py -q`: `5 passed`
+- Ran Ophiuchus-Ab SAb23H2 CDR infilling on A100 using `/c20250601/mj/model_weights/ophiuchus_ab/Ophiuchus-Ab/Ophiuchus-Ab.ckpt`, `argmax`, `max_iter=4`, `temperature=1.0`, `cfg_scale=0.0`.
+  - Output log: `/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/ophiuchus_ab/sab23h2_cdr_infill.log`
+  - Metrics JSON: `/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/ophiuchus_ab/sab23h2_cdr_infill_metrics.json`
+  - AAR (%): `cdrh3=34.50`, `cdrh2=67.88`, `cdrh1=74.52`, `cdrl3=73.08`, `cdrl2=79.41`, `cdrl1=81.09`.
+- Ran heavy-to-light generation smoke on 3 OAS holdout pairs constructed from `/vepfs-mlp2/c20250601/251105016/project/dllm_test/data/oas_previous_clean/splits/compat_for_current_loader_oasrule/holdout.csv`.
+  - Input: `/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/ophiuchus_ab/comp_chain_oas_holdout_smoke_input.csv`
+  - Output: `/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/ophiuchus_ab/comp_chain_oas_holdout_smoke_n1.csv`
+  - Generated light chains are non-empty, lengths `106-111`, simple reference AAR around `87.0%`.
+- Ran humanization generation smoke on two SAb23H2 native PDBs using generated chain-pair CSV.
+  - Output: `/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/ophiuchus_ab/humanization_smoke.csv`
+  - Smoke AAR against original FR/CDR labels: heavy `96.15%`, light `97.06%`.
+- Current blockers for exact paper-score reproduction beyond CDR AAR:
+  - Local `data/downstream/comp_chain` is missing the real `test_data_oas_holdout.csv` and only contains `._test_data_oas_holdout.csv`.
+  - ImmunoMatch local checkpoints expected by `downstream/comp_chain/eval_scripts/immunomatch_score.py` are absent: `/vepfs-mlp2/mlp-public/zhuyiheng/hub/checkpoints/immunomatch-kappa` and `immunomatch-lambda`.
+  - `biophi`, the OASis DB, and `abnativ` are absent, so OASis/AbNatiV humanization scoring cannot run locally.
+  - The paper's 27-murine-antibody humanization benchmark data is not present under `/vepfs-mlp2/c20250601/251105016/project/dllm_test/data/downstream/humanization`.
+
+## 2026-06-15 Resumed v2 ESMC encoder training after resource reclaim
+
+- Checked the corrected token-feature ESMC v2 jobs and confirmed there were no active `qwen3_vl_bioseq_esmc*` tasks in the non-terminal task list.
+- The prior v2 tasks had been stopped by platform resource reclaim:
+  - ESMC-300M v2 `t-20260615042843-kkxcm`: `Killed`, ended `2026-06-15 07:08:02 UTC`.
+  - ESMC-600M v2 `t-20260615042843-cmkpb`: `Killed`, ended `2026-06-15 06:58:43 UTC`.
+- Local logs/checkpoints before resubmission:
+  - ESMC-300M v2 latest log reached `step=32200`, `loss=0.2862`; latest resumable checkpoint is `latest.pt` at saved step `32000`.
+  - ESMC-600M v2 latest log reached `step=15920`, `loss=0.7797`; latest resumable checkpoint is `latest.pt` at saved step `15000`.
+- Added separate resume configs rather than changing the scratch configs:
+  - `/vepfs-mlp2/c20250601/251105016/project/dllm_test/train_jobs/qwen3_vl_bioseq_esmc300m_feat_v2_resume.yml`
+  - `/vepfs-mlp2/c20250601/251105016/project/dllm_test/train_jobs/qwen3_vl_bioseq_esmc600m_feat_v2_resume.yml`
+- Both resume configs keep the same v2 output directories and use `--resume auto`, so the trainer loads `<output-dir>/latest.pt` with model, optimizer, and step state before continuing to `--max-steps 50000`.
+- Submitted the resume jobs with the no-proxy Volc wrapper:
+  - ESMC-300M resume: `t-20260616015357-4m7bs`, initial status `Queue`, start timestamp `2026-06-15 17:53:57 UTC`.
+  - ESMC-600M resume: `t-20260616015357-g96bf`, initial status `Queue`, start timestamp `2026-06-15 17:53:57 UTC`.
+
+## 2026-06-16 Fixed corrupted-token logging normalization
+
+- User noticed that encoder runs reported much smaller `corrupted=` values than the no-encoder run.
+- Audited the diffusion path and confirmed no-encoder and encoder training both call the same `sample_bioseq_diffusion_noise(...)`; the actual corruption sampling probability is not lower in the encoder model.
+- Root cause was the logging denominator: `corrupted=` previously used only `output.corruption_mask.sum()` from rank 0's final local micro-batch at the current optimizer step. Because the memory-tuned configs use different local micro-batch sizes, the raw logged value was not comparable:
+  - no-encoder: `batch-size 8`, `grad-accum 2`, `world_size 8`
+  - ESMC-300M: `batch-size 2`, `grad-accum 8`, `world_size 8`
+  - ESMC-600M: `batch-size 1`, `grad-accum 16`, `world_size 8`
+- On the existing logs, the old per-rank micro-batch averages scale back to similar effective-step counts once multiplied by `grad_accum * world_size`: no-encoder about `12.7k`, ESMC-300M about `12.7k`, and ESMC-600M about `13.9k` corrupted tokens per optimizer step.
+- Updated `/vepfs-mlp2/c20250601/251105016/project/dllm_test/examples/bioseq/train_qwen3_vl_bioseq_ddp.py` so future logs aggregate corrupted and eligible token counts across local gradient accumulation and all DDP ranks before reporting:
+  - `corrupted=` is now the average global corrupted-token count per optimizer step over the logging window.
+  - Logs now also include `eligible=` and `corrupt_rate=`.
+  - Wandb now receives `train/corrupted_tokens`, `train/eligible_tokens`, `train/corruption_rate`, and raw window totals.
+  - `perf/samples_per_sec` now uses the actual number of optimizer steps in the elapsed window instead of always multiplying by `log_interval`, fixing the first-log throughput overestimate.
+- Verification:
+  - `python -m py_compile examples/bioseq/train_qwen3_vl_bioseq_ddp.py`
+  - `python -m pytest scripts/tests/bioseq/test_qwen3_vl_bioseq_model.py scripts/tests/bioseq/test_qwen3_vl_ddp_training.py -q`: `10 passed`
+- Current task/checkpoint status after the earlier resume jobs:
+  - ESMC-300M resume `t-20260616015357-4m7bs`: `Success`; `latest.pt` and `final.pt` both report `step=50000`.
+  - ESMC-600M resume `t-20260616015357-g96bf`: `Killed` by resource reclaim; `latest.pt` reports `step=27000`.
+- Added `/vepfs-mlp2/c20250601/251105016/project/dllm_test/train_jobs/qwen3_vl_bioseq_esmc600m_feat_v2_resume2.yml` and submitted it with the no-proxy Volc wrapper.
+  - ESMC-600M resume2: `t-20260616193220-7sq2k`, initial status `Queue`, start timestamp `2026-06-16 11:32:21 UTC`.
+
+## 2026-06-16 Restarted comparable runs with per-GPU batch size 8
+
+- User clarified that comparability should require each GPU's local micro-batch to be at least `8`, not only the optimizer effective batch being equal.
+- Confirmed the previous completed/resume encoder configs did not satisfy that local-batch rule:
+  - no-encoder: `--batch-size 8 --grad-accum 2`
+  - ESMC-300M v2: `--batch-size 2 --grad-accum 8`
+  - ESMC-600M v2: `--batch-size 1 --grad-accum 16`
+- Canceled the queued old 600M resume2 task because it still used the old `--batch-size 1` local-batch setting:
+  - `t-20260616193220-7sq2k`: `cancel success`; platform state later showed `Killed`.
+- Added clean from-scratch batch8 configs with new output/wandb directories and `--resume none`:
+  - `/vepfs-mlp2/c20250601/251105016/project/dllm_test/train_jobs/qwen3_vl_bioseq_no_encoder_batch8_stage1.yml`
+  - `/vepfs-mlp2/c20250601/251105016/project/dllm_test/train_jobs/qwen3_vl_bioseq_esmc300m_feat_v2_batch8_stage1.yml`
+  - `/vepfs-mlp2/c20250601/251105016/project/dllm_test/train_jobs/qwen3_vl_bioseq_esmc600m_feat_v2_batch8_stage1.yml`
+- All three configs now use `--batch-size 8 --grad-accum 2` on `1 x ml.pni2.28xlarge` (`8` GPUs), so the per-GPU local batch is `8` and the optimizer effective batch is `8 * 2 * 8 = 128`.
+- Submitted the three batch8-per-GPU jobs with the no-proxy Volc wrapper:
+  - no-encoder batch8: `t-20260616222740-mgkmd`, initial status `Queue`, timestamp `2026-06-16 14:27:40 UTC`.
+  - ESMC-300M batch8: `t-20260616222739-crf8b`, initial status `Queue`, timestamp `2026-06-16 14:27:40 UTC`.
+  - ESMC-600M batch8: `t-20260616222740-gpgks`, initial status `Queue`, timestamp `2026-06-16 14:27:40 UTC`.
+- Risk note: ESMC-600M with trainable encoder and local batch `8` may exceed 80GB GPU memory. The first running logs will be used to confirm whether it fits; if it OOMs, this confirms the requested local-batch constraint is above the current 600M memory envelope.
+
+## 2026-06-16 Added validation loss logging
+
+- User requested validation loss in addition to training loss.
+- Updated `/vepfs-mlp2/c20250601/251105016/project/dllm_test/examples/bioseq/train_qwen3_vl_bioseq_ddp.py`:
+  - Added `--val-interval` default `1000`, `--val-batches` default `20`, and `--val-split` default `valid`.
+  - Added a validation loader using the same source mixture and collator on the validation split. CSV sources use `valid.csv`; `processed_v2` maps `valid` to `val.jsonl`.
+  - Validation runs in `eval()` + `torch.no_grad()` and uses bf16 autocast when training uses `--bf16`.
+  - Logs now print `val_loss`, `val_corrupted`, `val_eligible`, and `val_corrupt_rate`.
+  - Wandb receives `val/loss`, `val/corrupted_tokens`, `val/eligible_tokens`, `val/corruption_rate`, and `val/batches`.
+- Updated the three batch8-per-GPU YAMLs to explicitly include `--val-interval 1000 --val-batches 20 --val-split valid`.
+- The three batch8 jobs were still `Queue` after this script update, so they will pick up validation-loss logging when they start:
+  - no-encoder batch8 `t-20260616222740-mgkmd`: `Queue`
+  - ESMC-300M batch8 `t-20260616222739-crf8b`: `Queue`
+  - ESMC-600M batch8 `t-20260616222740-gpgks`: `Queue`
+- Verification:
+  - `python -m py_compile examples/bioseq/train_qwen3_vl_bioseq_ddp.py`
+  - `python -m pytest scripts/tests/bioseq/test_qwen3_vl_bioseq_model.py scripts/tests/bioseq/test_qwen3_vl_ddp_training.py -q`: `10 passed`
+  - CPU smoke with `--val-interval 1 --val-batches 1` printed `step=1 val_loss=13.5535 ...`.
+
+## 2026-06-16 Audited train/validation loss semantics
+
+- User asked to check the training loss from first principles after questioning whether the validation loader really existed.
+- Confirmed validation source files exist:
+  - OAS/OTS/nanobody CSV sources have `valid.csv`.
+  - `processed_v2` has `val.jsonl`, and `default_source_configs(split="valid")` maps that source to `val`.
+- Direct loader diagnostic:
+  - train loader sample: shape `[2, 766]`, sources `ppi, ppi`, loss-mask tokens `1468`.
+  - validation loader sample: shape `[2, 125]`, sources `nanobody, vdjdb`, loss-mask tokens `22`.
+  - OAS-only validation diagnostic produced `sources=['oas_paired', 'oas_paired']` with nonzero `diffusion_loss_mask`.
+- Loss definition after audit:
+  - `sample_bioseq_diffusion_noise(...)` samples timesteps per sequence and masks only `diffusion_loss_mask` residues; fixed context chains stay visible.
+  - labels are original `input_ids` only on corrupted positions and `-100` elsewhere.
+  - `compute_masked_cross_entropy(..., loss_norm="token")` computes cross-entropy only on corrupted target tokens and divides by the number of corrupted tokens.
+  - Encoder and no-encoder both use this same diffusion loss; encoder additionally applies the same corruption state to the per-chain ESMC input so the encoder sees `x_t`, not clean targets.
+- Found and fixed another logging issue: `train/loss` had still been the rank-0 final micro-batch loss, not a global DDP/grad-accum loss. This was analogous to the earlier corrupted-token logging issue.
+- Updated `/vepfs-mlp2/c20250601/251105016/project/dllm_test/examples/bioseq/train_qwen3_vl_bioseq_ddp.py`:
+  - Added `loss_logging_denominator(...)`.
+  - `train/loss` now aggregates loss numerator and denominator across all local gradient-accumulation micro-batches and all DDP ranks before logging.
+  - With the default `loss_norm="token"`, train and validation losses are now both global corrupted-token-weighted cross entropy values.
+  - Added `train/loss_denominator` and `val/loss_denominator` to wandb so the effective denominator is visible.
+- Added a regression test in `/vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/tests/bioseq/test_qwen3_vl_ddp_training.py` proving `build_validation_loader(...)` reads the valid split and produces a nonempty `diffusion_loss_mask`.
+- Verification:
+  - `python -m py_compile examples/bioseq/train_qwen3_vl_bioseq_ddp.py`
+  - `python -m pytest scripts/tests/bioseq/test_qwen3_vl_bioseq_model.py scripts/tests/bioseq/test_qwen3_vl_ddp_training.py -q`: `11 passed`
+  - Direct train/val loss diagnostic on CPU:
+    - train: `loss=13.2893`, denominator `3`, corrupted `3`, eligible `16`
+    - val: `loss=14.4457`, denominator `33`, corrupted `33`, eligible `86`
+- The three batch8 jobs were still queued after this fix, so they should use the corrected train/val loss logging when launched:
+  - no-encoder batch8 `t-20260616222740-mgkmd`: `Queue`
+  - ESMC-300M batch8 `t-20260616222739-crf8b`: `Queue`
+  - ESMC-600M batch8 `t-20260616222740-gpgks`: `Queue`
+
+## 2026-06-16 Simplified foundation objective to full denoise
+
+- User clarified that mixed conditional views are too complex for the foundation model. The default foundation objective should be simple: all eligible generated residues use diffusion loss.
+- Updated `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/data/view_sampler.py`: `BioSeqViewSampler` now defaults to `full_denoise_probability=1.0`.
+- Updated `/vepfs-mlp2/c20250601/251105016/project/dllm_test/examples/bioseq/train_qwen3_vl_bioseq_ddp.py`: the foundation DDP trainer now constructs `BioSeqViewSampler(allowed_views=["full_denoise"])` directly and logs `training_views=full_denoise`.
+- Kept `--full-denoise-probability` accepted as a hidden compatibility argument, but it is ignored by the DDP foundation training loader so the ablation view path is not reachable from training.
+- Removed `--full-denoise-probability 1.0` from the three batch8-per-GPU YAMLs and updated their descriptions to say mixed-task full-denoise batches.
+- Semantics after this change:
+  - Foundation train/validation batches default to `view_names=full_denoise`.
+  - `full_denoise` targets all eligible non-context chains/residues.
+  - Antigen, peptide, MHC, HLA-like, and epitope context chains remain visible and do not receive diffusion loss unless a future explicit target policy changes that.
+  - Conditional views remain available in `BioSeqViewSampler` for separate experiments, but the DDP foundation trainer does not route through them.
+- Verified a local loader diagnostic after the change:
+  - `training_views=full_denoise`
+  - train batch `view_names=['full_denoise', 'full_denoise']`, loss-mask tokens `462`
+  - validation batch `view_names=['full_denoise', 'full_denoise']`, loss-mask tokens `456`
+- Verified the hidden compatibility argument is ignored by the foundation trainer:
+  - command intentionally passed `--full-denoise-probability 0.0`
+  - parsed value was `0.0`, but train and validation loader batches still had `view_names=['full_denoise', 'full_denoise']`
+- Checked the three submitted batch8 tasks with the no-proxy Volc wrapper after the code change. All still have `State=Queue` and empty `LaunchTime`, so they have not started with the old objective:
+  - no-encoder batch8 `t-20260616222740-mgkmd`: `Queue`
+  - ESMC-300M batch8 `t-20260616222739-crf8b`: `Queue`
+  - ESMC-600M batch8 `t-20260616222740-gpgks`: `Queue`
+
+## 2026-06-17 Submitted encoder batch8 retry jobs
+
+- User asked to submit resume/retry jobs after the encoder batch8 jobs were killed.
+- Checked killed task runtimes from platform fields:
+  - ESMC-300M `t-20260616222739-crf8b`: `2026-06-16 20:48:15 UTC` to `2026-06-16 21:01:29 UTC`, 13m14s.
+  - ESMC-600M `t-20260616222740-gpgks`: `2026-06-16 21:05:52 UTC` to `2026-06-16 21:07:32 UTC`, 1m40s.
+- Checkpoint audit:
+  - 300M output had `latest.pt.tmp` but no `latest.pt`.
+  - `torch.load(output/qwen3_vl_bioseq_esmc300m_feat_v2_batch8_stage1/latest.pt.tmp)` failed with `PytorchStreamReader failed reading zip archive: failed finding central directory`, so it is not a valid resume checkpoint.
+  - 600M output had no checkpoint.
+- Added retry YAMLs:
+  - `/vepfs-mlp2/c20250601/251105016/project/dllm_test/train_jobs/qwen3_vl_bioseq_esmc300m_feat_v2_batch8_retry1.yml`
+  - `/vepfs-mlp2/c20250601/251105016/project/dllm_test/train_jobs/qwen3_vl_bioseq_esmc600m_feat_v2_batch8_retry1.yml`
+- Both retry YAMLs keep per-GPU local `--batch-size 8`, `--grad-accum 2`, full-denoise training through the current DDP trainer, validation loss logging, and `--resume auto` against the same batch8 output dirs. Because no valid `latest.pt` exists right now, they will start from step 0 unless a valid checkpoint appears before launch.
+- Submitted with the no-proxy Volc wrapper:
+  - ESMC-300M batch8 retry1: `t-20260617122359-shsjg`, submitted `2026-06-17 04:23:59 UTC`, status after submit `Running`, launch `2026-06-17 04:24:17 UTC`.
+  - ESMC-600M batch8 retry1: `t-20260617122410-2v6ms`, submitted `2026-06-17 04:24:10 UTC`, status after submit `Queue`.
+- The no-encoder batch8 task `t-20260616222740-mgkmd` remained `Queue` with empty `LaunchTime`.
+
+## 2026-06-17 Resubmitted encoder batch8 retry jobs
+
+- User asked to resubmit the two killed encoder retry jobs.
+- Before resubmission, confirmed both output dirs now have valid-looking formal checkpoints:
+  - `output/qwen3_vl_bioseq_esmc300m_feat_v2_batch8_stage1/latest.pt`, mtime `2026-06-17 05:40:05 UTC`, size `4448777981` bytes.
+  - `output/qwen3_vl_bioseq_esmc600m_feat_v2_batch8_stage1/latest.pt`, mtime `2026-06-17 05:00:04 UTC`, size `7351174209` bytes.
+- Reused the existing batch8 retry YAMLs with `--resume auto`, so the new jobs should resume from those `latest.pt` checkpoints:
+  - 300M YAML: `/vepfs-mlp2/c20250601/251105016/project/dllm_test/train_jobs/qwen3_vl_bioseq_esmc300m_feat_v2_batch8_retry1.yml`
+  - 600M YAML: `/vepfs-mlp2/c20250601/251105016/project/dllm_test/train_jobs/qwen3_vl_bioseq_esmc600m_feat_v2_batch8_retry1.yml`
+- Submitted with the no-proxy Volc wrapper:
+  - ESMC-300M resubmission: `t-20260617161809-44ml9`, created `2026-06-17 08:18:10 UTC`, status after submit `Queue`.
+  - ESMC-600M resubmission: `t-20260617161817-4g7cv`, created `2026-06-17 08:18:18 UTC`, status after submit `Queue`.
+- The no-encoder batch8 task `t-20260616222740-mgkmd` remained `Queue` with empty `LaunchTime`.
+
+## 2026-06-18 Resubmitted killed encoder batch8 jobs and synced wandb
+
+- User asked to continue the killed encoder jobs and upload their wandb logs.
+- Latest killed retry1 resubmissions were resource-reclaimed:
+  - ESMC-300M `t-20260617161809-44ml9`: killed after running from `2026-06-17 10:15:48 UTC` to `2026-06-17 13:00:35 UTC`; last observed train loss `1.0501`, last observed val loss `0.9832`.
+  - ESMC-600M `t-20260617161817-4g7cv`: killed after running from `2026-06-17 10:17:06 UTC` to `2026-06-17 12:48:03 UTC`; last observed train loss `1.0564`, last observed val loss `0.9457`.
+- Before resubmission, confirmed formal checkpoints exist:
+  - `output/qwen3_vl_bioseq_esmc300m_feat_v2_batch8_stage1/latest.pt`, mtime `2026-06-17 12:48 UTC`, size `4448782269` bytes.
+  - `output/qwen3_vl_bioseq_esmc600m_feat_v2_batch8_stage1/latest.pt`, mtime `2026-06-17 12:39 UTC`, size `7351179137` bytes.
+- Added retry2 YAMLs with the same output dirs, per-GPU local `--batch-size 8`, `--grad-accum 2`, validation loss logging, and `--resume auto`:
+  - `/vepfs-mlp2/c20250601/251105016/project/dllm_test/train_jobs/qwen3_vl_bioseq_esmc300m_feat_v2_batch8_retry2.yml`
+  - `/vepfs-mlp2/c20250601/251105016/project/dllm_test/train_jobs/qwen3_vl_bioseq_esmc600m_feat_v2_batch8_retry2.yml`
+- Submitted with the no-proxy Volc wrapper:
+  - ESMC-300M retry2: `t-20260618164444-xthm7`, created `2026-06-18 08:44:45 UTC`, current status after submit `Queue`.
+  - ESMC-600M retry2: `t-20260618164444-vvpz7`, created `2026-06-18 08:44:45 UTC`, current status after submit `Queue`.
+- Ran `wandb sync` for the existing offline encoder runs under both batch8 output dirs:
+  - 300M runs: `https://wandb.ai/codema/bioseq-qwen3-vl/runs/xn7pqut2`, `https://wandb.ai/codema/bioseq-qwen3-vl/runs/ihvc9u81`, `https://wandb.ai/codema/bioseq-qwen3-vl/runs/pjcrfxbf`
+  - 600M runs: `https://wandb.ai/codema/bioseq-qwen3-vl/runs/prglmdi5`, `https://wandb.ai/codema/bioseq-qwen3-vl/runs/1ghvcopr`, `https://wandb.ai/codema/bioseq-qwen3-vl/runs/1n5561jl`
+- `wandb sync` exited successfully and uploaded config/summary/output logs; populated runs reported W&B/GCS HTTP 403 only for `wandb-metadata.json`. The earliest 600M offline run `prglmdi5` had a 7-byte run file and effectively contains no training history.
+
+## 2026-06-18 Added flat validation metric aliases for wandb
+
+- User pointed out that encoder runs appeared to have no `val_loss` in wandb.
+- Confirmed the trainer already writes validation to wandb under slash-style keys such as `val/loss`, while stdout prints `val_loss=...`; early killed runs before step 1000 had no validation because `--val-interval 1000`.
+- Updated `/vepfs-mlp2/c20250601/251105016/project/dllm_test/examples/bioseq/train_qwen3_vl_bioseq_ddp.py` so validation metrics now include both styles:
+  - existing keys: `val/loss`, `val/loss_denominator`, `val/corrupted_tokens`, `val/eligible_tokens`, `val/corruption_rate`, `val/batches`
+  - flat aliases: `val_loss`, `val_loss_denominator`, `val_corrupted_tokens`, `val_eligible_tokens`, `val_corruption_rate`, `val_batches`
+- Added a unit test in `/vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/tests/bioseq/test_qwen3_vl_ddp_training.py` to assert the slash-style keys and flat aliases are both present and equal.
+- Verification:
+  - `python -m py_compile examples/bioseq/train_qwen3_vl_bioseq_ddp.py scripts/tests/bioseq/test_qwen3_vl_ddp_training.py`
+  - `PYTHONPATH=$PWD pytest scripts/tests/bioseq/test_qwen3_vl_ddp_training.py -q` -> `7 passed`
+- The retry2 encoder tasks were still `Queue` after the code change, so they should pick up the alias fix when they launch:
+  - ESMC-300M retry2 `t-20260618164444-xthm7`: `Queue`
+  - ESMC-600M retry2 `t-20260618164444-vvpz7`: `Queue`
+
+## 2026-06-18 Submitted no-encoder transformer size sweep from scratch
+
+- User requested deleting previous training logs and restarting three no-encoder transformer trainings from scratch to test whether larger model capacity improves loss descent.
+- Deleted old no-encoder wandb log directories while preserving old checkpoints for traceability:
+  - `output/qwen3_vl_bioseq_no_encoder_stage1/wandb`
+  - `output/qwen3_vl_bioseq_no_encoder_batch8_stage1/wandb`
+- Added three from-scratch no-encoder batch8 YAMLs. All use the same data, objective, batch, optimizer, validation, and checkpoint schedule:
+  - data: `--sources oas,ots,nanobody,processed_v2`
+  - objective: current foundation full-denoise path
+  - per-GPU local batch: `--batch-size 8`
+  - effective batch: `8 GPUs * batch 8 * grad_accum 2 = 128`
+  - training: `--max-steps 50000 --lr 1e-4 --warmup-steps 1000 --bf16`
+  - validation: `--val-interval 1000 --val-batches 20 --val-split valid`
+  - clean start: `--resume none`
+  - offline wandb under each output directory
+- Size sweep:
+  - small: hidden `384`, layers `6`, heads `6`, FFN `1536`, about `16.99M` parameters
+  - base: hidden `512`, layers `8`, heads `8`, FFN `2048`, about `37.86M` parameters
+  - large: hidden `768`, layers `12`, heads `12`, FFN `3072`, about `121.28M` parameters
+- YAMLs:
+  - `/vepfs-mlp2/c20250601/251105016/project/dllm_test/train_jobs/qwen3_vl_bioseq_no_encoder_small_batch8_fromscratch.yml`
+  - `/vepfs-mlp2/c20250601/251105016/project/dllm_test/train_jobs/qwen3_vl_bioseq_no_encoder_base_batch8_fromscratch.yml`
+  - `/vepfs-mlp2/c20250601/251105016/project/dllm_test/train_jobs/qwen3_vl_bioseq_no_encoder_large_batch8_fromscratch.yml`
+- Submitted with the no-proxy Volc wrapper:
+  - small: `t-20260618171357-mzjxx`, created `2026-06-18 09:13:58 UTC`, status after submit `Queue`
+  - base: `t-20260618171357-hvdv2`, created `2026-06-18 09:13:58 UTC`, status after submit `Queue`
+  - large: `t-20260618171358-lcn59`, created `2026-06-18 09:13:58 UTC`, status after submit `Queue`
+- Verification:
+  - YAML parsing succeeded for all three configs.
+  - `python -m py_compile examples/bioseq/train_qwen3_vl_bioseq_ddp.py`
+  - Parameter counts were computed by instantiating `BioSeqNoEncoderDiffusionModel` for each size locally.
+- Note: repository `.gitignore` ignores `*.yml`, so these job YAML files are present locally but do not appear in `git status`.
+
+## 2026-06-18 Prepared no-encoder 300M/600M/1B size sweep
+
+- User clarified that the previous no-encoder size sweep was too small and should instead target a 300M / 600M / 1B style no-encoder transformer comparison.
+- Confirmed previous sweep sizes were only about `16.99M`, `37.86M`, and `121.28M` parameters, so they are not comparable to ESMC-300M/600M/1B scale.
+- Updated `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/modeling_bioseq.py`:
+  - `BioSeqSelfAttention` now uses `torch.nn.functional.scaled_dot_product_attention`.
+  - `BioSeqDiffusionTransformerConfig` now has `gradient_checkpointing`.
+  - `BioSeqDiffusionDecoder` checkpoints transformer blocks during training when `gradient_checkpointing=True`.
+- Updated `/vepfs-mlp2/c20250601/251105016/project/dllm_test/examples/bioseq/train_qwen3_vl_bioseq_ddp.py` to expose `--gradient-checkpointing`.
+- Added a model test covering no-encoder gradient-checkpointed backward in `/vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/tests/bioseq/test_qwen3_vl_bioseq_model.py`.
+- Prepared three from-scratch no-encoder YAMLs. All keep per-GPU local `--batch-size 8`, `--grad-accum 2`, full-denoise objective, validation loss logging, offline wandb, `--resume none`, SDPA, and `--gradient-checkpointing`:
+  - `/vepfs-mlp2/c20250601/251105016/project/dllm_test/train_jobs/qwen3_vl_bioseq_no_encoder_300m_batch8_fromscratch.yml`
+    - hidden `1024`, layers `18`, heads `16`, FFN `4096`, about `314.88M` parameters
+  - `/vepfs-mlp2/c20250601/251105016/project/dllm_test/train_jobs/qwen3_vl_bioseq_no_encoder_600m_batch8_fromscratch.yml`
+    - hidden `1536`, layers `16`, heads `24`, FFN `6144`, about `629.60M` parameters
+  - `/vepfs-mlp2/c20250601/251105016/project/dllm_test/train_jobs/qwen3_vl_bioseq_no_encoder_1b_batch8_fromscratch.yml`
+    - hidden `1792`, layers `20`, heads `28`, FFN `7168`, about `1.06B` parameters
+- Verification:
+  - YAML parsing succeeded for all three configs.
+  - `python -m py_compile dllm/pipelines/qwen3_vl_arch/modeling_bioseq.py examples/bioseq/train_qwen3_vl_bioseq_ddp.py scripts/tests/bioseq/test_qwen3_vl_bioseq_model.py scripts/tests/bioseq/test_qwen3_vl_ddp_training.py`
+  - `PYTHONPATH=$PWD pytest scripts/tests/bioseq/test_qwen3_vl_bioseq_model.py scripts/tests/bioseq/test_qwen3_vl_ddp_training.py -q` -> `15 passed`
+- Did not submit the new 300M/600M/1B YAMLs yet because the previous 17M/38M/121M no-encoder sweep tasks are still queued. Replacing them requires explicit user confirmation to cancel:
+  - `t-20260618171357-mzjxx`
+  - `t-20260618171357-hvdv2`
+  - `t-20260618171358-lcn59`
+
+## 2026-06-18 Cancelled small sweep and submitted no-encoder 300M/600M/1B
+
+- User confirmed cancelling the previous 17M/38M/121M no-encoder size sweep and submitting the new 300M/600M/1B no-encoder runs.
+- Cancelled previous queued tasks with the no-proxy Volc wrapper:
+  - small `t-20260618171357-mzjxx`: final status `Killed`, finish `2026-06-18 11:32:41 UTC`
+  - base `t-20260618171357-hvdv2`: final status `Killed`, finish `2026-06-18 11:32:42 UTC`
+  - large `t-20260618171358-lcn59`: final status `Killed`, finish `2026-06-18 11:32:42 UTC`
+- Submitted the new from-scratch no-encoder size sweep:
+  - 300M `t-20260618193252-cdj8b`: `qwen3_vl_bioseq_no_encoder_300m_batch8_fromscratch`, status `Queue`
+  - 600M `t-20260618193252-fwj49`: `qwen3_vl_bioseq_no_encoder_600m_batch8_fromscratch`, status `Queue`
+  - 1B `t-20260618193252-qc7xw`: `qwen3_vl_bioseq_no_encoder_1b_batch8_fromscratch`, status `Queue`
+- All three new runs use `--resume none`, per-GPU local `--batch-size 8`, `--grad-accum 2`, `--gradient-checkpointing`, SDPA attention, validation loss logging, and clean per-run output/wandb directories.
+
+## 2026-06-18 Ophiuchus-Ab generation downstream metrics
+
+- User asked to validate Ophiuchus-Ab generation-stage downstream metrics for CDR infill, humanization, and generate-light/light-chain pairing.
+- Fixed downstream generation/eval plumbing:
+  - `downstream/common.py`: CDR infill collator now masks light-chain CDRs when dataset rows carry `cdrl*` mode metadata.
+  - `downstream/infill/zeroshot_cdr.py` and `downstream/infill/zeroshot_sab23h2.py`: return/pass mode metadata and use paper-style deterministic CDR defaults (`argmax`, `max_iter=4`).
+  - `downstream/humanization/humanize.py`: supports `.pdb` and `.cif` inputs and writes `variant_idx`, `generated_heavy`, `generated_light`.
+  - `downstream/comp_chain/generate_light_from_csv.py`: preserves input metadata (`raw_light_type`, source row), adds `variant_idx`, and supports `--heavy-batch-size`.
+  - `downstream/comp_chain/eval_scripts/immunomatch_score.py`: correctly normalizes K/L chain-type columns, falls back to abnumber when `gen_light_type` is absent, and maps ImmunoMatch scores by original row id instead of repeated heavy-chain sequence.
+- Installed/downloaded metric dependencies:
+  - `datasets`, `rjieba`, `accelerate` for ImmunoMatch/Transformers evaluation.
+  - `polyleven` for the light-chain property/Wasserstein evaluator.
+  - ImmunoMatch kappa/lambda checkpoints under `/vepfs-mlp2/mlp-public/zhuyiheng/hub/checkpoints/`.
+  - `promb` for OASis Identity without the 22GB BioPhi OASis DB.
+  - AbNatiV VH/VKappa/VLambda checkpoints under `/vepfs-mlp2/c20250601/251105016/model_weights/abnativ/pretrained_models/`, scored through `.venv_abnativ` on CPU because the package CUDA path produced a device mismatch.
+- CDR infill outputs:
+  - SAb23H2: `output/downstream_generation/ophiuchus_ab/sab23h2_cdr_infill_metrics.json`
+    - L1 `81.09`, L2 `79.41`, L3 `73.08`, H1 `74.52`, H2 `67.88`, H3 `34.50` AAR percent.
+  - SAbDab external indices: `output/downstream_generation/ophiuchus_ab/sabdab_cdr_infill_metrics.json`
+    - H1 `74.64`, H2 `68.56`, H3 `39.25`, L1 `73.99`, L2 `82.61`, L3 `73.01` AAR percent.
+- Light-chain pairing outputs:
+  - Exact paper `data/downstream/comp_chain/test_data_oas_holdout.csv` was not present; only `._test_data_oas_holdout.csv` existed.
+  - Built a reconstructed OAS paired input from local raw OAS data: `output/downstream_generation/ophiuchus_ab/comp_chain_oas_holdout_500_input.csv`.
+  - Confirmed against `/vepfs-mlp2/c20250601/251105016/project/airgen/AirGen-Dev/downstream/comp_chain/generate_light_from_csv.py` that the original downstream script uses `argmax`, `max_iter=4`, `cfg_scale=0`, and keeps CLS plus the first three light-chain amino acids fixed (`start_idx = 4`).
+  - Updated migrated `downstream/comp_chain/generate_light_from_csv.py` default `--light-prompt-tokens` from `4` to `3` to match the original downstream script and the paper table's "initial 3-residue prompting" setting.
+  - Generated CSV: `output/downstream_generation/ophiuchus_ab/comp_chain_oas_holdout_500_prompt3_fast_n8.csv`.
+  - Eval CSV: `output/downstream_generation/ophiuchus_ab/comp_chain_oas_holdout_500_prompt3_fast_n8_eval.csv`.
+  - Property eval JSON: `output/downstream_generation/ophiuchus_ab/comp_chain_oas_holdout_500_prompt3_fast_n8_property_eval.json`.
+  - Key metrics on 4000 generated sequences: validity `1.0`, Gen ImmunoMatch `0.3879`, Ref ImmunoMatch `0.5686`, Gen>Ref `0.356`, chain match `1.0`, V gene `0.384`, J gene `0.380`, V family `0.948`, J family `0.380`, diversity near `0.0`, W property average Wasserstein distance `0.0727`.
+  - Added the matching no-prompt run on the same reconstructed 500-row input with `--light-prompt-tokens 0`, `argmax`, `max_iter=4`, `cfg_scale=0.0`, `num_seqs=8`, `heavy_batch_size=16`.
+  - No-prompt generated CSV: `output/downstream_generation/ophiuchus_ab/comp_chain_oas_holdout_500_noprompt_fast_n8.csv`.
+  - No-prompt eval CSV: `output/downstream_generation/ophiuchus_ab/comp_chain_oas_holdout_500_noprompt_fast_n8_eval.csv`.
+  - No-prompt property eval JSON: `output/downstream_generation/ophiuchus_ab/comp_chain_oas_holdout_500_noprompt_fast_n8_property_eval.json`.
+  - No-prompt key metrics on 4000 generated sequences: validity `1.0`, Gen ImmunoMatch `0.4857`, Ref ImmunoMatch `0.5686`, Gen>Ref `0.492`, chain match `0.620`, V gene `0.038`, J gene `0.166`, V family `0.272`, J family `0.166`, diversity near `0.0`, W property average Wasserstein distance `0.1398`.
+  - Earlier prompt4/50-row smoke outputs are kept under `output/downstream_generation/ophiuchus_ab/comp_chain_oas_holdout_500_fast_n8*` and `output/downstream_generation/ophiuchus_ab/comp_chain_oas_holdout_50_fast_n8*`.
+- Humanization outputs:
+  - Exact paper 27 murine SAbDab benchmark could not be fetched from SAbDab during this run; local SAb23H2 native PDBs yielded 26 paired structures parseable by the existing loader.
+  - Generated with `argmax`, `max_iter=4`, `n_sequences=8`, `cfg_scale=0.0`.
+  - Generated CSV: `output/downstream_generation/ophiuchus_ab/humanization_sab23h2_26_fast.csv`.
+  - OASis CSV: `output/downstream_generation/ophiuchus_ab/humanization_sab23h2_26_fast_oasis.csv`.
+  - AbNatiV outputs: `output/downstream_generation/ophiuchus_ab/abnativ_humanization_sab23h2_26_fast/`.
+  - Key metrics: heavy FR AAR `87.63%`, light FR AAR `88.50%`, OASis Identity overall `0.8613` (VH `0.8454`, VL `0.8771`), AbNatiV VH `0.8889`, combined light AbNatiV `0.9373` over 200/208 light sequences scored.
+- Added a reproducible humanization benchmark reconstruction script:
+  - Script: `scripts/downstream/rebuild_igcraft_humanization_split.py`.
+  - It filters local SAbDab summary rows to paired murine antibodies in `2024-02-01` through `2025-03-25`, resolves RCSB FASTA chain IDs with author-chain priority, deduplicates by VH/VL variable sequences, and writes pair-specific PDB copies so multiple H/L pairs from one PDB are not collapsed by the existing loader.
+  - Rebuild output: `output/downstream_generation/ophiuchus_ab/igcraft_rebuild/`.
+  - Parsed `305/305` candidate rows, deduped to `131` unique pairs, and selected `27` known-example-augmented pairs containing `8TFH`, `8TXU`, and `8TVH`.
+  - Selected set has `21` antigen-bound and `6` unbound pairs; IgCraft reports `20/7`, so this is a paper-aligned reconstruction, not a confirmed exact split.
+- Ran humanization fast evaluation on the reconstructed 27-pair set:
+  - Generated CSV: `output/downstream_generation/ophiuchus_ab/humanization_igcraft_rebuild_27_fast.csv`.
+  - OASis CSV: `output/downstream_generation/ophiuchus_ab/humanization_igcraft_rebuild_27_fast_oasis.csv`.
+  - AbNatiV outputs: `output/downstream_generation/ophiuchus_ab/abnativ_humanization_igcraft_rebuild_27_fast/`.
+  - Key metrics on 216 generated paired sequences: heavy FR AAR `88.37%`; light FR AAR `92.89%` from generation stdout and `91.45%` when recomputed from decoded CSV; OASis Identity overall `0.6319` (VH `0.6114`, VL `0.6523`); AbNatiV VH `0.7477`; combined light AbNatiV `0.7169`.
+- Added shard controls for slower paper-style generation:
+  - `downstream/comp_chain/generate_light_from_csv.py` now supports `--start-index` and `--end-index`.
+  - `downstream/humanization/humanize.py` now supports `--start-index` and `--end-index`.
+- Unified machine-readable summary written to `output/downstream_generation/ophiuchus_ab/generation_metrics_summary.json`.
+- Human-readable report written to `output/downstream_generation/ophiuchus_ab/generation_metrics_report.md`.
+- Added paper consistency validation:
+  - Script: `scripts/downstream/validate_ophiuchus_generation_against_paper.py`.
+  - JSON: `output/downstream_generation/ophiuchus_ab/paper_consistency_check.json`.
+  - Markdown: `output/downstream_generation/ophiuchus_ab/paper_consistency_check.md`.
+  - Verdicts: CDR `mostly_consistent` (`8/9` within tolerance; SAbDab H3 is low by `4.30` percentage points), prompt3 light-chain pairing `not_reproduced` (`4/10`), no-prompt light-chain pairing `not_reproduced` (`5/10`), humanization `not_reproduced` (`2/3`, with OASis/Identity `63.19` vs paper `83.4`).
+- Verification:
+  - `LD_LIBRARY_PATH=/vepfs-mlp2/c20250601/251105016/conda/envs/flow/lib:${LD_LIBRARY_PATH:-} python -m py_compile downstream/common.py downstream/infill/zeroshot_cdr.py downstream/infill/zeroshot_sab23h2.py downstream/humanization/humanize.py downstream/comp_chain/generate_light_from_csv.py downstream/comp_chain/eval_scripts/immunomatch_score.py downstream/comp_chain/eval_scripts/generation_eval.py scripts/downstream/rebuild_igcraft_humanization_split.py`
+  - `LD_LIBRARY_PATH=/vepfs-mlp2/c20250601/251105016/conda/envs/flow/lib:${LD_LIBRARY_PATH:-} python -m pytest scripts/tests/bioseq/test_downstream_common.py -q` -> `5 passed`
+
+## 2026-06-19 Exact downstream split correction and humanization metric validation
+
+- User clarified the exact light-chain holdout is local:
+  - `data/oas_previous_clean/splits/holdout_select_500_eval_OAS.csv`
+  - Symlinked as `data/downstream/comp_chain/test_data_oas_holdout.csv`.
+  - Verified 500 holdout rows, K=316 and L=184.
+- User supplied the exact 27-pair humanisation split:
+  - `/vepfs-mlp2/c20250601/251105016/project/.whalent_tmp/2026-06-19/exz26lrcqa6xebsf4s58inavc-humanisation.zip`
+  - Extracted to `data/downstream/humanization/humanisation/`.
+  - `test_chains.csv` has 28 rows because PDB `8onk` has two chain-pair rows; the current loader keys by PDB id, so one `8onk` pair is evaluated and the parsed dataset has 27 structures.
+- Re-ran exact OAS holdout light-chain pairing with the same fast deterministic downstream config (`argmax`, `max_iter=4`, `num_seqs=8`, `cfg_scale=0.0`):
+  - Prompt3 outputs: `output/downstream_generation/ophiuchus_ab/comp_chain_test_oas_holdout_500_prompt3_fast_n8*`.
+  - Prompt3 metrics: ImmunoMatch `0.3235`, Better `23.6%`, chain match `99.8%`, V exact `0.356`, J exact `0.380`, V family `0.898`, J family `0.380`, diversity near `0`, valid `100%`, W property `0.0967`.
+  - No-prompt outputs: `output/downstream_generation/ophiuchus_ab/comp_chain_test_oas_holdout_500_noprompt_fast_n8*`.
+  - No-prompt metrics: ImmunoMatch `0.4536`, Better `30.4%`, chain match `62.0%`, V exact `0.038`, J exact `0.182`, V family `0.236`, J family `0.182`, diversity near `0`, valid `100%`, W property `0.1181`.
+- Re-ran exact uploaded humanisation split:
+  - Generated CSV: `output/downstream_generation/ophiuchus_ab/humanization_exact27_fast.csv`.
+  - Direct FR native recovery: heavy `86.72%`, light `90.50%`.
+  - AbNatiV outputs: `output/downstream_generation/ophiuchus_ab/abnativ_humanization_exact27_fast/`.
+  - AbNatiV means: VH `0.7217`, combined light `0.6967`.
+- Validated the humanization OASis metric issue:
+  - The previous local `*_oasis.csv` artifact was not official BioPhi OASis; it was a local sequence-identity approximation.
+  - Official BioPhi humanness scoring was run through the public BioPhi endpoint with IMGT numbering/CDRs and the default relaxed OASis threshold.
+  - Combined BioPhi summary: `output/downstream_generation/ophiuchus_ab/biophi_public_exact27_relaxed/humanization_exact27_fast_biophi_oasis_relaxed_summary.csv`.
+  - Official exact-split BioPhi metrics: OASis Identity `55.32%`, Heavy OASis Identity `52.82%`, Light OASis Identity `58.00%`, Heavy Germline Content `68.51%`, Light Germline Content `73.26%`.
+- Updated final reports:
+  - `output/downstream_generation/ophiuchus_ab/generation_metrics_summary.json`
+  - `output/downstream_generation/ophiuchus_ab/humanization_exact27_fast_metrics.json`
+  - `output/downstream_generation/ophiuchus_ab/paper_consistency_check.json`
+  - `output/downstream_generation/ophiuchus_ab/paper_consistency_check.md`
+  - `output/downstream_generation/ophiuchus_ab/generation_metrics_report.md`
+- Final exact-split paper consistency verdict:
+  - CDR infill remains mostly consistent: `8/9`.
+  - Light-chain pairing is not reproduced on the exact OAS holdout: prompt3 `4/10`, no-prompt `4/10`.
+  - Humanization is not reproduced on the uploaded exact split: `2/3`; OASis is `55.32` vs paper `83.4`, while BioPhi germline-content values are close to the paper VH/VL sequence-identity values.
+
+## 2026-06-21 BioSeq no-encoder training code reading guide and 300M/600M/1B loss debug
+
+- User asked for a reading guide for `/vepfs-mlp2/c20250601/251105016/project/dllm_test/examples/bioseq/train_qwen3_vl_bioseq_ddp.py` and to debug why the no-encoder 300M/600M/1B runs had loss problems.
+- Recommended code reading order:
+  1. `/vepfs-mlp2/c20250601/251105016/project/dllm_test/examples/bioseq/train_qwen3_vl_bioseq_ddp.py` (`main()`, `build_loader()`, `compute_training_output()`)
+  2. `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/data/README.md`
+  3. `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/data/sources.py` -> `records.py` -> `mixture.py` -> `view_sampler.py` -> `collator.py`
+  4. `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/modeling_bioseq.py` (`sample_bioseq_diffusion_noise`, decoder forward, loss)
+- Foundation training pipeline summary:
+  - `source loader -> BioSeqRecord -> WeightedMixtureDataset -> BioSeqViewSampler(full_denoise) -> BioSeqQwenDataCollator -> sample_bioseq_diffusion_noise -> BioSeqNoEncoderDiffusionModel / BioSeqEncoderDiffusionModel -> masked CE loss`
+  - DDP does not use `DistributedSampler`; iterable sources shard by `rank * num_workers + worker_id`.
+  - Foundation trainer hard-codes `allowed_views=["full_denoise"]`; antigen/MHC/peptide remain fixed context and do not receive diffusion loss.
+- Audited completed no-encoder size-sweep logs under:
+  - `/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/qwen3_vl_bioseq_no_encoder_300m_batch8_fromscratch`
+  - `/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/qwen3_vl_bioseq_no_encoder_600m_batch8_fromscratch`
+  - `/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/qwen3_vl_bioseq_no_encoder_1b_batch8_fromscratch`
+- Observed outcomes:
+  - 300M: trained normally until about step `18000`, then collapsed at step `18760` from train loss `~7.96` to `~95`; val loss jumped from `~3.29` at step `18000` to `~90.84` at step `19000`; final train loss stayed around `~83`.
+  - 600M: stable final train loss `~5.7`, best val loss `~2.74` at step `6000`, final val loss `~3.12`; checkpoint is usable.
+  - 1B: late degradation from train loss `~4` to `~20` by step `49600`, then `NaN` from step `49780`; `latest.pt` contains `191` non-finite tensors and must not be used.
+- Root cause for the broken 300M checkpoint:
+  - Loaded `/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/qwen3_vl_bioseq_no_encoder_300m_batch8_fromscratch/latest.pt` and evaluated on a real OAS-style batch.
+  - The diverged model predicts token id `32` (`<mask>`) on essentially all corrupted positions (`661/661` in the local check), with near-zero entropy and eval loss `~90.48`.
+  - The healthy 600M checkpoint on the same batch predicts amino-acid tokens with eval loss `~2.94`.
+  - Conclusion: this is a masked-diffusion mode-collapse failure, not a data-loader bug. Corrupted decoder inputs already contain `<mask>`, and tied input/output embeddings (`lm_head.weight = token_embeddings.weight`) make `<mask>` an easy attractor unless its logit is excluded from the denoising objective.
+- Additional training-config issue found in the actual submitted runs:
+  - WandB config for the 300M job shows `--lr 1e-4` and no `--lr-scheduler cosine`, even though the current YAMLs on disk specify scaled LRs (`5e-5` / `3e-5` / `2e-5`) plus cosine decay.
+  - Constant `1e-4` likely contributed to the 1B late-stage instability, but it does not explain the sudden 300M `<mask>` collapse by itself because 600M survived with the same submitted LR.
+- Code fix applied in `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/modeling_bioseq.py`:
+  - Added `forbidden_diffusion_target_token_ids()` and `mask_forbidden_target_logits()`.
+  - `compute_masked_cross_entropy()` now masks logits for `<cls>`, `<pad>`, `<eos>`, `<unk>`, and `<mask>` before CE.
+  - Trainer and model `compute_loss()` paths now pass the forbidden-id set from config.
+  - Added regression test `test_compute_masked_cross_entropy_forbids_mask_token_predictions` in `/vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/tests/bioseq/test_qwen3_vl_bioseq_model.py`.
+- Recommended rerun plan:
+  - Do not resume from the broken 300M or 1B checkpoints.
+  - Keep the 600M checkpoint as the only usable no-encoder large run from this sweep.
+  - Resubmit 300M/1B from scratch with the forbidden-logit fix, explicit `--lr-scheduler cosine`, and the size-scaled LRs already written in the YAMLs.
+  - Optionally save `best.pt` by validation loss instead of only `latest.pt`.
+
+## 2026-06-21 Cancelled non-preemptible grammar_v1 tasks and resubmitted on idle (preemptible) resources
+
+- Context: the six `grammar_v1` jobs submitted 2026-06-20 22:15-22:16 (UTC+8) were `Preemptible: false` and had been stuck in `Queue` for ~12.5h without getting fixed resources. User asked to cancel them and resubmit on idle/preemptible resources, and to keep this log updated after every submission.
+- Scope (confirmed with user): only the six queued `grammar_v1` jobs. The running job `qwen3_vl_bioseq_esmc300m_feat_v2_batch8_fromscratch` (`t-20260620015806-wrj9n`, Running ~40.8h) was left untouched.
+- Edited `Preemptible: false` -> `Preemptible: true` in six YAMLs under `/vepfs-mlp2/c20250601/251105016/project/dllm_test/train_jobs/`:
+  - `qwen3_vl_bioseq_grammar_v1_esmc300m.yml`, `qwen3_vl_bioseq_grammar_v1_esmc600m.yml`, `qwen3_vl_bioseq_grammar_v1_no_encoder_38m.yml`, `qwen3_vl_bioseq_grammar_v1_no_encoder_300m.yml`, `qwen3_vl_bioseq_grammar_v1_no_encoder_600m.yml`, `qwen3_vl_bioseq_grammar_v1_no_encoder_1b.yml`
+- Cancelled the six previous non-preemptible queued tasks (`volc ml_task cancel -i <id>` -> `cancel success`):
+  - esmc300m `t-20260621061542-dcgmp`
+  - esmc600m `t-20260621061542-8fkq2`
+  - no_encoder_38m `t-20260621061542-gswsj`
+  - no_encoder_300m `t-20260621061602-scbwj`
+  - no_encoder_600m `t-20260621061542-q4997`
+  - no_encoder_1b `t-20260621061543-2qvml`
+- Resubmitted on idle/preemptible resources (`volc ml_task submit --conf <yaml>` -> `创建任务成功`), initial status `Queue` (verified via `volc ml_task list ... -o json`):
+  - esmc300m `t-20260621185805-78pr8`
+  - esmc600m `t-20260621185808-qsrfm`
+  - no_encoder_38m `t-20260621185811-2b477`
+  - no_encoder_300m `t-20260621185814-gdxf8`
+  - no_encoder_600m `t-20260621185818-dsv9p`
+  - no_encoder_1b `t-20260621185821-kftpd`
+- Volc CLI notes for this environment (no no-proxy/SparkMCP wrapper used this time):
+  - `volc ml_task list` and `volc ml_task get` open an interactive TUI and hang in non-interactive shells even when redirected to a file; always pass `-o json`.
+  - `--limit` must be `<= 300` (`--limit 500` -> `A parameter specified in the request is not valid: Limit`).
+  - This CLI has no `kill` verb; cancel with `volc ml_task cancel -i <id>`.
+  - `-n grammar_v1` returned 0 matches while `-n bioseq` matched the same jobs; use `-n bioseq` plus a local `grammar_v1` JobName filter, and include `--status Initialized,Queue,Staging,Running,Killing` to see freshly submitted jobs.
+
+## 2026-06-21 Cancelled esmc300m_feat_v2_batch8_fromscratch
+
+- User requested cancelling the long-running non-preemptible job `qwen3_vl_bioseq_esmc300m_feat_v2_batch8_fromscratch`.
+- Cancelled `t-20260620015806-wrj9n` via `volc ml_task cancel -i t-20260620015806-wrj9n` -> `cancel success` (was Running ~40.8h).
+- Config: `/vepfs-mlp2/c20250601/251105016/project/dllm_test/train_jobs/qwen3_vl_bioseq_esmc300m_feat_v2_batch8_fromscratch.yml` (`Preemptible: false`).
+- Removed from `## Active Volc Training Tasks` (terminal state); only the six preemptible `grammar_v1` jobs remain active.
+- Added Cursor rule `/vepfs-mlp2/c20250601/251105016/project/dllm_test/.cursor/rules/volc-train-task-log.mdc`: after every submit/cancel, update this file; delete task IDs from the Active table when training reaches a terminal state.
+
+## 2026-06-21 Full no-encoder stability debug + fix + resubmit (38M/300M/600M/1B, no-grammar)
+
+- User asked for a complete debug of the no-encoder loss failure (look at gradients / numerics, not just a guess), then resubmit the three no-encoder no-grammar runs plus a default-parameter ~38M run. Confirmed the 38M default config (`hidden 512 / 8 layers / 8 heads / FFN 2048`) is exactly the downstream Transformer size used inside the ESMC encoder runs (`37.9M` params).
+- Gradient / numerical evidence gathered:
+  - Per-tensor weight stats on `latest.pt`: 300M and 600M have finite weights with `max_abs ~4.85`; 1B `latest.pt` has `191` non-finite tensors (already known NaN at step ~49780).
+  - Per-layer residual-stream RMS via forward hooks on a real OAS batch: broken 300M residual RMS rises smoothly `711 -> 1223` and `final_layernorm` renormalizes it (out RMS `~0.93`); healthy 600M residual RMS is actually far larger (`18k -> 306k`) yet still trains fine. So the failure is NOT exploding activations/weights.
+  - Prediction analysis: broken 300M predicts `<mask>` (id 32) on `661/661` corrupted positions, entropy `~0.06`, eval loss `~90.48`; healthy 600M predicts amino acids, eval loss `~2.94`.
+- Local reproduction with `/vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/debug/diagnose_no_encoder_stability.py` (new):
+  - `mid` (159M) at constant `lr=5e-4` for 1000 steps and even extreme `lr=2e-3` for 500 steps stayed healthy (loss `~2.8-2.9`, grad_norm `~1-2`, `raw_pred_mask_frac=0`). The per-step update is stable; the real-run failure is a mid/late-training stochastic spike that a constant LR cannot recover from, after which the model falls into the `<mask>` attractor.
+  - Root cause (confirmed, not guessed): masked-diffusion mode collapse. Corrupted decoder inputs already contain `<mask>`, input/output embeddings are tied (`lm_head.weight = token_embeddings.weight`), so `<mask>` is a self-reinforcing fixed point unless its logit is removed from the objective. At step 0 the fresh model already predicts `<mask>` on `~33%` of corrupted positions.
+- Fixes implemented:
+  - `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/modeling_bioseq.py`:
+    - `forbidden_diffusion_target_token_ids()` + `mask_forbidden_target_logits()`; `compute_masked_cross_entropy()` masks `<cls>/<pad>/<eos>/<unk>/<mask>` logits before CE (already wired into trainer and both `compute_loss` paths). This removes the `<mask>` attractor at the source.
+    - Added optional per-head query/key RMSNorm (`qk_norm` config flag + `BioSeqSelfAttention.q_norm/k_norm`) for attention-logit stability against the stochastic spike. Default off, so existing tests/behavior are unchanged.
+  - `/vepfs-mlp2/c20250601/251105016/project/dllm_test/examples/bioseq/train_qwen3_vl_bioseq_ddp.py`: added `--qk-norm` and passes `qk_norm` into the config.
+- Fix verification:
+  - `forbidden-mask=1 + qk-norm=1 + cosine` (mid, lr 5e-4, 400 steps): loss `4.3 -> 2.4`, grad_norm stable `~1-2`, `raw_pred_mask_frac=0` throughout, cosine LR decays correctly.
+  - End-to-end trainer smoke (`protenix_abtcr`, single GPU, `--qk-norm`): step 0->2 loss `4.24 -> 3.61`, grad_norm `9.8 -> 5.3`, checkpoint saved.
+  - `python -m pytest scripts/tests/bioseq/test_qwen3_vl_bioseq_model.py` -> `11 passed` (includes the new forbidden-mask regression test).
+- YAML updates (added `--qk-norm`; cosine + size-scaled LRs already present). These are the NO-grammar no-encoder configs the user asked for:
+  - `/vepfs-mlp2/c20250601/251105016/project/dllm_test/train_jobs/qwen3_vl_bioseq_no_encoder_38m_batch8_fromscratch.yml` (hidden 512 / 8 / 8 / 2048, lr 1e-4)
+  - `/vepfs-mlp2/c20250601/251105016/project/dllm_test/train_jobs/qwen3_vl_bioseq_no_encoder_300m_batch8_fromscratch.yml` (hidden 1024 / 18 / 16 / 4096, lr 5e-5)
+  - `/vepfs-mlp2/c20250601/251105016/project/dllm_test/train_jobs/qwen3_vl_bioseq_no_encoder_600m_batch8_fromscratch.yml` (hidden 1536 / 16 / 24 / 6144, lr 3e-5)
+  - `/vepfs-mlp2/c20250601/251105016/project/dllm_test/train_jobs/qwen3_vl_bioseq_no_encoder_1b_batch8_fromscratch.yml` (hidden 1792 / 20 / 28 / 7168, lr 2e-5)
+- Submitted from scratch (`--resume none`) with the no-proxy Volc wrapper (`创建任务成功`, verified via `ml_task get -o json`):
+  - 38M `t-20260621195439-d2fz4`: `Running`
+  - 300M `t-20260621195443-lckq8`: `Queue`
+  - 600M `t-20260621195454-btl6t`: `Initialized`
+  - 1B `t-20260621195457-jhlwx`: `Initialized`
+- Did not resume from the broken 300M/1B checkpoints; all four start fresh with the forbidden-logit fix, qk-norm, cosine schedule, and size-scaled LRs.
+
+## 2026-06-21 Scaling fix: switch no-encoder 300M/600M/1B from wide-shallow to ESMC-style depth-first
+
+- User flagged that the way we were growing the no-encoder models looked wrong and asked how ESM scales. Verified official configs:
+  - ESM-2: 8M(6L,320) -> 35M(12L,480) -> 150M(30L,640) -> 650M(33L,1280) -> 3B(36L,2560) -> 15B(48L,5120). Depth-first; #heads held at 20 with head_dim growing 16->128; FFN strictly 4x (GELU MLP).
+  - ESMC (this project's encoder family; Pre-LN, RoPE, SwiGLU, no biases): 300M(30L,960,15h) -> 600M(36L,1152,18h) -> 6B(80L,2560,40h). head_dim fixed 64. SwiGLU expansion ~8/3 (~2.67x) so FFN param count matches a standard 4x GELU MLP.
+- Audited our real param counts by instantiating `BioSeqNoEncoderDiffusionModel` (`/tmp/param_audit.py`, env `protenix_abtcr`):
+  - 38M current: L8 H512 h8 FFN2048(4.0x) -> 37.9M
+  - 300M current: L18 H1024 h16 FFN4096(4.0x) -> 314.8M
+  - 600M current: L16 H1536 h24 FFN6144(4.0x) -> 629.5M
+  - 1B current: L20 H1792 h28 FFN7168(4.0x) -> 1061.1M
+- Problems identified (with data):
+  - Layer count was non-monotonic / regressed: 300M=18L but 600M=**16L** (fewer layers despite 2x params); 1B only 20L.
+  - Far too wide-and-shallow vs ESM/ESMC: at ~300M ESMC uses 30L (we used 18L); at ~600M ESMC uses 36L (we used 16L). Depth ~half of ESMC.
+  - FFN at full 4x with SwiGLU (3 matrices) makes per-layer FFN = 12 H^2 = 3x the attention (4 H^2), so the param budget was spent on width instead of depth. ESMC's ~2.67x SwiGLU frees budget for more layers.
+  - head_dim=64 was already correct; kept.
+  - Note: our model uses learned absolute position embeddings (`max_position_embeddings=4096`), whereas ESM-2/ESMC use RoPE. User chose to defer the RoPE change to a separate task.
+- Fix applied (same param budget, depth-first, head_dim=64, FFN ~2.67x; verified via `/tmp/param_audit.py`):
+  - 300M: L18 H1024 h16 FFN4096 -> **L28 H960 h15 FFN2560** (321.2M)
+  - 600M: L16 H1536 h24 FFN6144 -> **L38 H1152 h18 FFN3072** (620.8M)
+  - 1B: L20 H1792 h28 FFN7168 -> **L52 H1280 h20 FFN3456** (1049.6M)
+  - 38M control left unchanged (it intentionally mirrors the downstream Transformer inside the ESMC encoder).
+  - Edited `/vepfs-mlp2/c20250601/251105016/project/dllm_test/train_jobs/qwen3_vl_bioseq_no_encoder_{300m,600m,1b}_batch8_fromscratch.yml` (hidden/layers/heads/intermediate); kept qk-norm, cosine, gradient-checkpointing, and the existing LRs (5e-5 / 3e-5 / 2e-5).
+- Cancelled the previous wide-shallow submissions (`volc ml_task cancel` -> `cancel success`): 300M `t-20260621195443-lckq8`, 600M `t-20260621195454-btl6t`, 1B `t-20260621195457-jhlwx`. The 38M job `t-20260621195439-d2fz4` (Running) was left untouched.
+- Resubmitted the depth-first configs (`创建任务成功`, all `Initialized` via `ml_task get -o json`):
+- Follow-up (not done this round, per user): swap learned absolute position embeddings for RoPE to fully match the ESM/ESMC architecture.
+
+## 2026-06-21 Synced no-encoder 38M offline wandb run
+
+- User requested uploading the completed 38M training log to W&B.
+- Volc job: `qwen3_vl_bioseq_no_encoder_38m_batch8_fromscratch`, `task_id=t-20260621195439-d2fz4`, final status `Success`.
+- Offline run dir: `/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/qwen3_vl_bioseq_no_encoder_38m_batch8_fromscratch/wandb/wandb/offline-run-20260621_115539-1nxe3is3` (`run-1nxe3is3.wandb`, ~6.5 MB).
+- Sync command (env `protenix_abtcr`, `WANDB_API_KEY` from `/vepfs-mlp2/c20250601/251105016/.secrets/wandb_api_key`):
+  - `wandb sync .../offline-run-20260621_115539-1nxe3is3` -> `done`
+- W&B URL: `https://wandb.ai/codema/bioseq-qwen3-vl/runs/1nxe3is3`
+- Removed `t-20260621195439-d2fz4` from `## Active Volc Training Tasks` (terminal state).
+
+## 2026-06-21 Cancelled legacy no-encoder batch8 jobs (grammar-v2 migration)
+
+- Cancelled three legacy wide-shallow / no-grammar training jobs (`volc ml_task cancel` -> `cancel success`):
+  - `t-20260621201405-zq8wz` — `qwen3_vl_bioseq_no_encoder_300m_batch8_fromscratch` (was `Running`)
+  - `t-20260621201409-bzvg6` — `qwen3_vl_bioseq_no_encoder_600m_batch8_fromscratch` (was `Queue`)
+  - `t-20260621201412-d6fnq` — `qwen3_vl_bioseq_no_encoder_1b_batch8_fromscratch` (was `Queue`)
+- YAML paths (removed from repo in same cleanup): `/vepfs-mlp2/c20250601/251105016/project/dllm_test/train_jobs/qwen3_vl_bioseq_no_encoder_{300m,600m,1b}_batch8_fromscratch.yml`
+- Removed the three task IDs from `## Active Volc Training Tasks`; six grammar_v1 jobs remain queued.
+## 2026-06-21 Cancelled queued grammar_v1 jobs (pre-resubmit old yaml)
+
+- Context: grammar-v2 code and YAML updates (sqrt weights + cosine for 600m/1b) landed; pytest 26 passed. Cancelled six queued preemptible `grammar_v1` jobs that still pointed at the previous submission.
+- Cancelled (`volc ml_task cancel` -> `cancel success`, prior status `Queue`):
+  - `t-20260621185805-78pr8` — `qwen3_vl_bioseq_grammar_v1_esmc300m`
+  - `t-20260621185808-qsrfm` — `qwen3_vl_bioseq_grammar_v1_esmc600m`
+  - `t-20260621185811-2b477` — `qwen3_vl_bioseq_grammar_v1_no_encoder_38m`
+  - `t-20260621185814-gdxf8` — `qwen3_vl_bioseq_grammar_v1_no_encoder_300m`
+  - `t-20260621185818-dsv9p` — `qwen3_vl_bioseq_grammar_v1_no_encoder_600m`
+  - `t-20260621185821-kftpd` — `qwen3_vl_bioseq_grammar_v1_no_encoder_1b`
+
+## 2026-06-21 Resubmitted grammar_v1 with updated YAML
+
+- Resubmitted all six `grammar_v1` configs via `volc ml_task submit --conf` (wrapper: `volc-no-proxy.sh`). `Preemptible: true` on all YAMLs. All six `创建任务成功`; initial status `Initialized` (`ml_task get -o json`).
+  - `t-20260621223241-z55tl` — `qwen3_vl_bioseq_grammar_v1_esmc300m` — `/vepfs-mlp2/c20250601/251105016/project/dllm_test/train_jobs/qwen3_vl_bioseq_grammar_v1_esmc300m.yml`
+  - `t-20260621223245-ggbzf` — `qwen3_vl_bioseq_grammar_v1_esmc600m` — `/vepfs-mlp2/c20250601/251105016/project/dllm_test/train_jobs/qwen3_vl_bioseq_grammar_v1_esmc600m.yml`
+  - `t-20260621223248-wwpcb` — `qwen3_vl_bioseq_grammar_v1_no_encoder_38m` — `/vepfs-mlp2/c20250601/251105016/project/dllm_test/train_jobs/qwen3_vl_bioseq_grammar_v1_no_encoder_38m.yml`
+  - `t-20260621223252-rlj8x` — `qwen3_vl_bioseq_grammar_v1_no_encoder_300m` — `/vepfs-mlp2/c20250601/251105016/project/dllm_test/train_jobs/qwen3_vl_bioseq_grammar_v1_no_encoder_300m.yml`
+  - `t-20260621223256-w7sgz` — `qwen3_vl_bioseq_grammar_v1_no_encoder_600m` — `/vepfs-mlp2/c20250601/251105016/project/dllm_test/train_jobs/qwen3_vl_bioseq_grammar_v1_no_encoder_600m.yml`
+  - `t-20260621223259-2cbkd` — `qwen3_vl_bioseq_grammar_v1_no_encoder_1b` — `/vepfs-mlp2/c20250601/251105016/project/dllm_test/train_jobs/qwen3_vl_bioseq_grammar_v1_no_encoder_1b.yml`
+- Updated `## Active Volc Training Tasks` with the six new task IDs.

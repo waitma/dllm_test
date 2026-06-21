@@ -12,6 +12,7 @@ Supported first-version sources:
 
 For structured joint generation, `grammar_v1` uses semantic Arrow shards under
 `data/bioseq_grammar_v1`; see `../GRAMMAR_V1.md`.
+PPI / interaction asset inventory and relation taxonomy: `PPI_DATA.md`.
 - Optional PPI Arrow source from `/vepfs-mlp2/c20250601/251105016/project/dllm_test/data/ppi/string_model_org_90_90_split`
 
 The loading path is:

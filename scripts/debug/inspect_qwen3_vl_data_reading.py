@@ -233,7 +233,7 @@ def build_configs(args: argparse.Namespace):
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Inspect Qwen3-VL BioSeq data loading on real local sources.")
+    parser = argparse.ArgumentParser(description="Inspect BioSeq foundation data loading on real local sources.")
     parser.add_argument("--split", default="train", help="Split to inspect for sources that support splits.")
     parser.add_argument("--limit-per-source", type=int, default=64, help="Number of yielded records to inspect per source.")
     parser.add_argument("--batch-size", type=int, default=8, help="Small diagnostic collator batch size.")

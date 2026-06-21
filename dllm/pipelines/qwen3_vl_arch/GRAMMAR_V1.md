@@ -9,19 +9,22 @@ The legacy chain-concatenation path remains available through
 The canonical forms are:
 
 ```text
-OAS: <generate><proas>HEAVY<proae><binding><probs>LIGHT<probd>
-OTS: <generate><proas>ALPHA<proae><binding><probs>BETA<probd>
-TCR: <peptides>PEPTIDE<peptided><generate><proas>ALPHA<proae><binding><probs>BETA<probd>
-pMHC: <fixs>MHC<fixd><binding><peptides>PEPTIDE<peptided><generate><proas>ALPHA<proae><binding><probs>BETA<probd>
-PPI: <protas>PROTEIN_A<protad><binding><protbs>PROTEIN_B<protbd>
-AB-antigen: <fixs>ANTIGEN<fixd><generate><proas>HEAVY<proae><binding><probs>LIGHT<probd>
+OAS: <prots>HEAVY<prote><pairs><prots>LIGHT<prote>
+OTS: <prots>ALPHA<prote><pairs><prots>BETA<prote>
+TCR: <peptides>PEPTIDE<peptided><generate><prots>ALPHA<prote><pairs><prots>BETA<prote>
+pMHC: <fixs>MHC<fixd><binding><peptides>PEPTIDE<peptided><generate><prots>ALPHA<prote><pairs><prots>BETA<prote>
+PPI: <prots>PROTEIN_A<prote><binding><prots>PROTEIN_B<prote>
+AB-antigen: <fixs>ANTIGEN<fixd><binding><generate><prots>HEAVY<prote><pairs><prots>LIGHT<prote>
 ```
 
-`<proae>` is the intentionally retained spelling for the protein-A closing
-token. The relation vocabulary contains `binding`, `activation`, `inhibition`,
+All protein objects use the generic `<prots>` / `<prote>` boundary pair. Object
+identity (chain A vs B, heavy vs light, etc.) is expressed only via
+`chain_position` embedding indices in the collator, not via different token
+names. The relation vocabulary contains `binding`, `activation`, `inhibition`,
 `catalysis`, `reaction`, `expression`, `ptmod`, `neutralization`,
-`nonbinding`, and `unknown_relation`. Sources without a typed relationship use
-`<binding>`.
+`nonbinding`, and `unknown` (`<unknown>`). Sources without a typed relationship
+use `<unknown>`, not `<binding>`. OAS / OTS / TCR / confirmed PPI rows still
+use `<binding>` when the task explicitly defines a binding edge.
 
 ## Denoising
 

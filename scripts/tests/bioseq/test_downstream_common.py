@@ -50,6 +50,20 @@ def test_cdr_infill_collator_builds_airgen_shapes():
     assert tokenizer.mask_token_id in chains[0].tolist()
 
 
+def test_cdr_infill_collator_masks_light_cdr_modes_on_light_chain():
+    tokenizer = Esm2ProteinTokenizer()
+    collator = CdrInfillCollator(tokenizer=tokenizer)
+    chains, _, _ = collator(
+        [
+            ("EVQLVESGGGLVQPGGSLRLSCAASG", "DIQMTQSPSSLSASVGDRVTITC", "QSP", (2, 4), "cdrl1"),
+        ]
+    )
+    heavy_region = chains[0, :150]
+    light_region = chains[0, 150:]
+    assert tokenizer.mask_token_id not in heavy_region.tolist()
+    assert tokenizer.mask_token_id in light_region.tolist()
+
+
 def test_sab23h2_collator_encodes_mask_tokens():
     tokenizer = Esm2ProteinTokenizer()
     collator = Sab23H2Collator(tokenizer=tokenizer)
