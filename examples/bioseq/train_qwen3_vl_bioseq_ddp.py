@@ -283,6 +283,7 @@ def build_config(args: argparse.Namespace, tokenizer: Any) -> BioSeqDiffusionTra
         max_chain_positions=args.max_chain_positions,
         max_chain_roles=args.max_chain_roles,
         max_task_types=args.max_task_types,
+        use_chain_role_embeddings=args.input_format != "grammar_v1",
         pad_token_id=int(tokenizer.pad_token_id),
         mask_token_id=int(tokenizer.mask_token_id),
         time_epsilon=args.time_epsilon,

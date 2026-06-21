@@ -44,6 +44,10 @@ grammar-only token maps to the ESMC separator id (`|`, id 31). Decoder
 corruption is copied position-for-position into this single proxy stream before
 ESMC feature extraction.
 
+Grammar boundary tokens are the sole entity-role representation. Grammar-v1
+models do not instantiate or consume chain-role embeddings. The legacy input
+path keeps its existing chain-role embedding behavior.
+
 ## Data
 
 Build semantic Arrow shards with:

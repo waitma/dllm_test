@@ -281,7 +281,7 @@ def test_encoder_proxy_uses_current_noisy_grammar_stream() -> None:
     assert output.encoder_condition.shape[:2] == batch["input_ids"].shape
 
 
-def test_grammar_batch_uses_generic_embeddings_without_chain_boundary_leakage() -> None:
+def test_grammar_batch_uses_no_chain_role_embedding_or_boundary_leakage() -> None:
     tokenizer = GrammarTokenizer(Esm2SequenceTokenizer())
     record = BioSeqRecord(
         chains=[
@@ -294,7 +294,7 @@ def test_grammar_batch_uses_generic_embeddings_without_chain_boundary_leakage() 
     batch = GrammarBioSeqCollator(tokenizer)([record])
     active = batch["attention_mask"]
 
-    assert batch["chain_role_ids"][active].unique().tolist() == [0]
+    assert "chain_role_ids" not in batch
     assert batch["position_ids_chain"][active].unique().tolist() == [0]
     assert batch["position_ids_chain"][~active].unique().tolist() in ([], [-1])
 
@@ -307,11 +307,12 @@ def test_grammar_batch_uses_generic_embeddings_without_chain_boundary_leakage() 
         dropout=0.0,
         max_position_embeddings=128,
         mask_token_id=tokenizer.mask_token_id,
+        use_chain_role_embeddings=False,
     )
     model = BioSeqNoEncoderDiffusionModel(config)
     output = model.compute_loss(batch)
     assert output.loss is not None
     output.loss.backward()
 
-    assert model.decoder.chain_role_embeddings.weight.grad is not None
+    assert model.decoder.chain_role_embeddings is None
     assert model.decoder.chain_position_embeddings.weight.grad is not None

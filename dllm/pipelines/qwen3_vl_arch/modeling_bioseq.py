@@ -31,6 +31,7 @@ class BioSeqDiffusionTransformerConfig:
     max_chain_positions: int = 64
     max_chain_roles: int = 32
     max_task_types: int = 32
+    use_chain_role_embeddings: bool = True
     pad_token_id: int = 1
     mask_token_id: int = 32
     time_epsilon: float = 1e-3
@@ -430,7 +431,11 @@ class BioSeqDiffusionDecoder(nn.Module):
         self.token_embeddings = nn.Embedding(config.vocab_size, config.hidden_size, padding_idx=config.pad_token_id)
         self.inner_position_embeddings = nn.Embedding(config.max_position_embeddings, config.hidden_size)
         self.chain_position_embeddings = nn.Embedding(config.max_chain_positions, config.hidden_size)
-        self.chain_role_embeddings = nn.Embedding(config.max_chain_roles, config.hidden_size)
+        self.chain_role_embeddings = (
+            nn.Embedding(config.max_chain_roles, config.hidden_size)
+            if config.use_chain_role_embeddings
+            else None
+        )
         self.task_embeddings = nn.Embedding(config.max_task_types, config.hidden_size)
         self.timestep_embeddings = BioSeqTimestepEmbedding(config.hidden_size)
         self.condition_proj = (
@@ -499,7 +504,7 @@ class BioSeqDiffusionDecoder(nn.Module):
             chain_valid = position_ids_chain.ge(0).to(hidden_states.dtype).unsqueeze(-1)
             hidden_states = hidden_states + self.chain_position_embeddings(safe_chain) * chain_valid
 
-        if chain_role_ids is not None:
+        if chain_role_ids is not None and self.chain_role_embeddings is not None:
             safe_roles = chain_role_ids.clamp(min=0, max=self.config.max_chain_roles - 1)
             hidden_states = hidden_states + self.chain_role_embeddings(safe_roles)
 

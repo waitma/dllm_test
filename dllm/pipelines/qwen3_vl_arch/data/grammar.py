@@ -365,7 +365,6 @@ class GrammarBioSeqCollator:
                 "structure_token_mask",
                 "relation_token_mask",
                 "token_class_ids",
-                "chain_role_ids",
                 "position_ids_inner",
                 "position_ids_chain",
                 "encoder_position_ids",
@@ -399,7 +398,6 @@ class GrammarBioSeqCollator:
                 [int(value == TOKEN_CLASS_RELATION) for value in classes] + [0] * pad_len
             )
             batch["token_class_ids"].append(classes + [TOKEN_CLASS_PAD] * pad_len)
-            batch["chain_role_ids"].append([0] * max_len)
             batch["position_ids_inner"].append(list(range(len(input_ids))) + [-1] * pad_len)
             batch["position_ids_chain"].append([0] * len(input_ids) + [-1] * pad_len)
             batch["encoder_position_ids"].append(list(range(len(input_ids))) + [-1] * pad_len)
