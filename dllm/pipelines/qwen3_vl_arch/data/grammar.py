@@ -172,6 +172,12 @@ class GrammarRenderer:
             light = _first_chain(record, {"antibody_light"})
             alpha = _first_chain(record, {"tcr_alpha"})
             beta = _first_chain(record, {"tcr_beta"})
+            if record.task_type == "antibody" and len(record.chains) >= 2:
+                heavy, light = record.chains[:2]
+            if record.task_type == "tcr" and len(record.chains) >= 2 and (
+                alpha is None or beta is None
+            ):
+                beta, alpha = record.chains[:2]
 
             if record.task_type in {"antibody_antigen", "nanobody_antigen"} and antigen is not None:
                 fixed_sequence(antigen)
@@ -359,7 +365,9 @@ class GrammarBioSeqCollator:
                 "structure_token_mask",
                 "relation_token_mask",
                 "token_class_ids",
+                "chain_role_ids",
                 "position_ids_inner",
+                "position_ids_chain",
                 "encoder_position_ids",
             )
         }
@@ -391,7 +399,9 @@ class GrammarBioSeqCollator:
                 [int(value == TOKEN_CLASS_RELATION) for value in classes] + [0] * pad_len
             )
             batch["token_class_ids"].append(classes + [TOKEN_CLASS_PAD] * pad_len)
+            batch["chain_role_ids"].append([0] * max_len)
             batch["position_ids_inner"].append(list(range(len(input_ids))) + [-1] * pad_len)
+            batch["position_ids_chain"].append([0] * len(input_ids) + [-1] * pad_len)
             batch["encoder_position_ids"].append(list(range(len(input_ids))) + [-1] * pad_len)
             encoder_ids.append([proxy + [pad_id] * pad_len])
             encoder_attention.append([attention + [0] * pad_len])

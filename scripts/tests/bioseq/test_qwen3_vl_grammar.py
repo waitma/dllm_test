@@ -23,6 +23,7 @@ from dllm.pipelines.qwen3_vl_arch.data import (
 from dllm.pipelines.qwen3_vl_arch.modeling_bioseq import (
     BioSeqDiffusionTransformerConfig,
     BioSeqEncoderDiffusionModel,
+    BioSeqNoEncoderDiffusionModel,
     apply_decoder_corruption_to_encoder,
     sample_bioseq_diffusion_noise,
 )
@@ -75,6 +76,62 @@ def test_grammar_renders_oas_and_ots_in_canonical_chain_order() -> None:
         "A",
         "A",
         "A",
+        "<proae>",
+        "<binding>",
+        "<probs>",
+        "B",
+        "B",
+        "B",
+        "<probd>",
+    ]
+
+
+def test_antibody_pair_keeps_both_chains_when_oas_labels_both_as_heavy() -> None:
+    record = BioSeqRecord(
+        chains=[
+            BioSeqChain("AAA", "antibody_heavy"),
+            BioSeqChain("CCC", "antibody_heavy"),
+        ],
+        task_type="antibody",
+        source="oas_paired",
+    )
+
+    tokens, _ = rendered_tokens(record)
+
+    assert tokens == [
+        "<generate>",
+        "<proas>",
+        "A",
+        "A",
+        "A",
+        "<proae>",
+        "<binding>",
+        "<probs>",
+        "C",
+        "C",
+        "C",
+        "<probd>",
+    ]
+
+
+def test_tcr_pair_keeps_both_chains_when_ots_labels_both_as_beta() -> None:
+    record = BioSeqRecord(
+        chains=[
+            BioSeqChain("BBB", "tcr_beta"),
+            BioSeqChain("CCC", "tcr_beta"),
+        ],
+        task_type="tcr",
+        source="ots_paired",
+    )
+
+    tokens, _ = rendered_tokens(record)
+
+    assert tokens == [
+        "<generate>",
+        "<proas>",
+        "C",
+        "C",
+        "C",
         "<proae>",
         "<binding>",
         "<probs>",
@@ -222,3 +279,39 @@ def test_encoder_proxy_uses_current_noisy_grammar_stream() -> None:
     assert output.loss is not None and torch.isfinite(output.loss)
     assert output.encoder_condition is not None
     assert output.encoder_condition.shape[:2] == batch["input_ids"].shape
+
+
+def test_grammar_batch_uses_generic_embeddings_without_chain_boundary_leakage() -> None:
+    tokenizer = GrammarTokenizer(Esm2SequenceTokenizer())
+    record = BioSeqRecord(
+        chains=[
+            BioSeqChain("HHH", "antibody_heavy"),
+            BioSeqChain("LLL", "antibody_light"),
+        ],
+        task_type="antibody",
+        source="unit",
+    )
+    batch = GrammarBioSeqCollator(tokenizer)([record])
+    active = batch["attention_mask"]
+
+    assert batch["chain_role_ids"][active].unique().tolist() == [0]
+    assert batch["position_ids_chain"][active].unique().tolist() == [0]
+    assert batch["position_ids_chain"][~active].unique().tolist() in ([], [-1])
+
+    config = BioSeqDiffusionTransformerConfig(
+        vocab_size=tokenizer.vocab_size,
+        hidden_size=16,
+        num_hidden_layers=1,
+        num_attention_heads=4,
+        intermediate_size=32,
+        dropout=0.0,
+        max_position_embeddings=128,
+        mask_token_id=tokenizer.mask_token_id,
+    )
+    model = BioSeqNoEncoderDiffusionModel(config)
+    output = model.compute_loss(batch)
+    assert output.loss is not None
+    output.loss.backward()
+
+    assert model.decoder.chain_role_embeddings.weight.grad is not None
+    assert model.decoder.chain_position_embeddings.weight.grad is not None
