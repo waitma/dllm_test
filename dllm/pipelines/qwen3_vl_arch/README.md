@@ -45,7 +45,7 @@ Training models for this path live in:
 
 Current exported entry points:
 
-- `BioSeqNoEncoderDiffusionModel`: no-encoder masked diffusion over the token stream emitted by `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/data/collator.py`. This path uses bidirectional self-attention and has no ESM/ESMC encoder; it is not a causal/autoregressive LM.
+- `BioSeqNoEncoderDiffusionModel`: no-encoder masked diffusion over the token stream emitted by `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/data/grammar.py`. This path uses bidirectional self-attention and has no ESM/ESMC encoder; it is not a causal/autoregressive LM.
 - `BioSeqEncoderDiffusionModel`: ESMC/ESM feature-conditioned masked diffusion. ESMC runs on the current per-chain diffusion state `x_t` and returns token-level features; the BioSeq denoiser still runs over the concatenated multi-chain token stream and models chain-chain denoising jointly.
 - `BioSeqDiffusionTransformerConfig`: vocabulary/model/loss config. The local
   ESM2 and ESMC sequence tokenizers expose 33 active ids. `grammar_v1` appends
@@ -65,7 +65,7 @@ Verification:
 
 ```bash
 python -m py_compile /vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/modeling_bioseq.py /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/tests/bioseq/test_qwen3_vl_bioseq_model.py
-python -m pytest /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/tests/bioseq/test_qwen3_vl_data_loader.py /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/tests/bioseq/test_qwen3_vl_bioseq_model.py -q
+python -m pytest /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/tests/bioseq/test_qwen3_vl_grammar.py /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/tests/bioseq/test_qwen3_vl_bioseq_model.py /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/tests/bioseq/test_qwen3_vl_ddp_training.py -q
 ```
 
 ## DDP Training
@@ -77,10 +77,12 @@ The BioSeq foundation-model DDP trainer is:
 It should be launched with `torchrun` for multi-node/multi-GPU training. The
 streaming data path is rank-aware: `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/data/mixture.py`
 combines DDP rank and DataLoader worker id when sharding iterable source files.
-The default foundation objective is `full_denoise`: every eligible target
-residue is part of the diffusion target mask, and train/validation loss is
-computed only on corrupted target residues. The DDP trainer hard-codes that
-view and does not route foundation training through conditional-view ablations.
+The objective is the grammar diffusion target: every token outside the
+`<fixs>...<fixd>` fixed-context block (antigen / peptide / MHC conditioning) is a
+diffusion target, and train/validation loss is computed only on corrupted target
+tokens. Run with `--num-workers 0`: each extra DataLoader worker re-shards the
+infinite weighted stream in its own process and can desync the first batch across
+ranks, causing NCCL collective timeouts.
 
 Local CPU DDP smoke:
 
@@ -88,7 +90,7 @@ Local CPU DDP smoke:
 torchrun --standalone --nproc_per_node=2 \
   /vepfs-mlp2/c20250601/251105016/project/dllm_test/examples/bioseq/train_qwen3_vl_bioseq_ddp.py \
   --device cpu --model-type no_encoder --sources oas --limit-per-source 16 \
-  --batch-size 2 --max-steps 2 --max-chain-length 64 --max-sequence-length 256 \
+  --batch-size 2 --max-steps 2 --max-sequence-length 256 \
   --hidden-size 32 --num-hidden-layers 1 --num-attention-heads 4 --intermediate-size 64 \
   --num-workers 0 --save-interval 1 --resume none --wandb-mode disabled \
   --output-dir /tmp/qwen3_vl_bioseq_ddp_smoke

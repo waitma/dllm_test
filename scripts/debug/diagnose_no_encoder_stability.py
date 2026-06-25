@@ -27,13 +27,15 @@ if str(PROJECT_ROOT) not in sys.path:
 from torch.utils.data import DataLoader  # noqa: E402
 
 from dllm.pipelines.qwen3_vl_arch.data import (  # noqa: E402
-    BioSeqQwenDataCollator,
-    BioSeqViewSampler,
+    DEFAULT_GRAMMAR_DATA_DIR,
     Esm2SequenceTokenizer,
+    GrammarArrowSource,
+    GrammarArrowSourceConfig,
+    GrammarBioSeqCollator,
+    GrammarTokenizer,
     SourceWithWeight,
+    TaskHomogeneousBatchDataset,
     WeightedMixtureDataset,
-    default_source_configs,
-    source_from_config,
 )
 from dllm.pipelines.qwen3_vl_arch.modeling_bioseq import (  # noqa: E402
     BioSeqDiffusionTransformerConfig,
@@ -53,18 +55,25 @@ SIZES = {
 
 
 def build_loader(args, tokenizer):
-    configs = [c for c in default_source_configs(split="train", max_records=args.limit_per_source) if c.name in args.sources.split(",")]
-    sources = [SourceWithWeight(source_from_config(c), 1.0) for c in configs]
+    requested = {item.strip() for item in args.sources.split(",") if item.strip()}
+    configs = [
+        GrammarArrowSourceConfig(
+            name=name,
+            path=DEFAULT_GRAMMAR_DATA_DIR,
+            split="train",
+            weight=1.0,
+            max_records=args.limit_per_source,
+        )
+        for name in sorted(requested)
+    ]
+    sources = [SourceWithWeight(GrammarArrowSource(config), 1.0) for config in configs]
     records = WeightedMixtureDataset(sources, epoch_size=None, seed=0)
-    collator = BioSeqQwenDataCollator(
+    batches = TaskHomogeneousBatchDataset(records, batch_size=args.batch_size, drop_last=True)
+    collator = GrammarBioSeqCollator(
         tokenizer=tokenizer,
-        view_sampler=BioSeqViewSampler(allowed_views=("full_denoise",), seed=0),
-        max_chain_length=args.max_chain_length,
         max_sequence_length=args.max_sequence_length,
-        single_view_per_batch=False,
-        require_homogeneous_task=False,
     )
-    return DataLoader(records, batch_size=args.batch_size, collate_fn=collator, num_workers=0, drop_last=True)
+    return DataLoader(batches, batch_size=None, collate_fn=collator, num_workers=0)
 
 
 def main() -> None:
@@ -80,11 +89,9 @@ def main() -> None:
     p.add_argument("--qk-norm", type=int, choices=[0, 1], default=0)
     p.add_argument("--batch-size", type=int, default=8)
     p.add_argument("--grad-accum", type=int, default=2)
-    p.add_argument("--sources", type=str, default="oas,ots,nanobody,processed_v2")
+    p.add_argument("--sources", type=str, default="oas,ots,tcr,ppi")
     p.add_argument("--limit-per-source", type=int, default=4096)
-    p.add_argument("--max-chain-length", type=int, default=320)
-    p.add_argument("--max-sequence-length", type=int, default=1024)
-    p.add_argument("--vocab-size", type=int, default=64)
+    p.add_argument("--max-sequence-length", type=int, default=2112)
     p.add_argument("--bf16", action="store_true", default=True)
     p.add_argument("--log-interval", type=int, default=20)
     p.add_argument("--seed", type=int, default=42)
@@ -92,9 +99,9 @@ def main() -> None:
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     torch.manual_seed(args.seed)
-    tokenizer = Esm2SequenceTokenizer()
+    tokenizer = GrammarTokenizer(Esm2SequenceTokenizer())
     cfg = BioSeqDiffusionTransformerConfig(
-        vocab_size=args.vocab_size,
+        vocab_size=tokenizer.vocab_size,
         **SIZES[args.size],
         dropout=0.1,
         max_position_embeddings=4096,

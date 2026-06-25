@@ -25,9 +25,21 @@ def decode_residue_span(
     start: int,
     end: int,
 ) -> str:
+    residue_ids = [int(token_id) for token_id in token_ids[start:end].tolist()]
+    base = tokenizer.base_tokenizer
+    if hasattr(base, "decode"):
+        return base.decode(residue_ids, skip_special_tokens=True)
+
+    inner = getattr(base, "tokenizer", None)
+    raw = getattr(inner, "tokenizer", inner) if inner is not None else None
+    if raw is not None and hasattr(raw, "decode"):
+        decoded = raw.decode(residue_ids)
+        if isinstance(decoded, str):
+            return decoded.replace(" ", "")
+
     chars: list[str] = []
-    for token_id in token_ids[start:end].tolist():
-        token = tokenizer.token(int(token_id))
+    for token_id in residue_ids:
+        token = tokenizer.token(token_id)
         if len(token) == 1 and token.isalpha():
             chars.append(token)
     return "".join(chars)

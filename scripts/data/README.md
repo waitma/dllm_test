@@ -83,7 +83,7 @@ python /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/data/build_supe
 
 Output: `data/bioseq_grammar_v1/neutralization/train/`
 
-Grammar form: `<generate><prots>HEAVY<prote><neutralization><prots>LIGHT<prote>`
+Runtime grammar form (via `GrammarRenderer`): `<prots> <ab> HEAVY . LIGHT <protd>` with `<neutralization>` relation fixed in context-heavy layouts when neutralization shards are enabled.
 
 ### Step 6 — STRING functional channel sample (optional)
 

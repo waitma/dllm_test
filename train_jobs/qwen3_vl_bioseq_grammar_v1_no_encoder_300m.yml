@@ -14,6 +14,7 @@ Entrypoint: |
   export PYTHONPATH=/vepfs-mlp2/c20250601/251105016/project/dllm_test
   export OMP_NUM_THREADS=8
   export NCCL_TIMEOUT_SECOND=1800
+  export TORCH_NCCL_HEARTBEAT_TIMEOUT_SEC=1800
   export NCCL_DEBUG=WARN
   if [ -f /vepfs-mlp2/c20250601/251105016/.secrets/wandb_api_key ]; then
     export WANDB_API_KEY="$(cat /vepfs-mlp2/c20250601/251105016/.secrets/wandb_api_key)"
@@ -34,7 +35,6 @@ Entrypoint: |
       --master_addr=${MLP_WORKER_0_HOST} \
       --master_port=${MLP_WORKER_0_PORT} \
       examples/bioseq/train_qwen3_vl_bioseq_ddp.py \
-          --input-format grammar_v1 \
           --grammar-data-dir "${DATA_DIR}" \
           --model-type no_encoder \
           --tokenizer-path "${TOKENIZER_DIR}" \
@@ -43,22 +43,25 @@ Entrypoint: |
           --ots-weight 3.6 \
           --ppi-weight 1.4 \
           --tcr-weight 1.0 \
-          --batch-size 1 \
-          --grad-accum 8 \
+          --batch-size 4 \
+          --grad-accum 4 \
           --max-steps 50000 \
           --max-sequence-length 2112 \
           --max-position-embeddings 2304 \
-          --hidden-size 1024 \
-          --num-hidden-layers 18 \
-          --num-attention-heads 16 \
-          --intermediate-size 4096 \
+          --hidden-size 960 \
+          --num-hidden-layers 28 \
+          --num-attention-heads 15 \
+          --intermediate-size 2560 \
           --dropout 0.1 \
           --gradient-checkpointing \
           --lr 1e-4 \
-          --warmup-steps 1000 \
+          --warmup-steps 2000 \
+          --warmup-init-lr 1e-7 \
+          --lr-scheduler polynomial \
+          --min-lr-ratio 0.1 \
           --grad-clip 1.0 \
           --bf16 \
-          --num-workers 2 \
+          --num-workers 0 \
           --log-interval 20 \
           --val-interval 1000 \
           --val-batches 10 \
@@ -69,7 +72,8 @@ Entrypoint: |
           --wandb-mode online \
           --wandb-project bioseq-qwen3-vl \
           --wandb-run-name grammar_v1_no_encoder_300m \
-          --wandb-dir "${WANDB_DIR}"
+          --wandb-dir "${WANDB_DIR}" \
+          --debug-ddp-timing
 
 Tags: [bioseq, grammar_v1, no_encoder, 300m, 8gpu, oas, ots, tcr, ppi]
 ImageUrl: "cr-mlp-cn-beijing.cr.volces.com/public/airgen:v1"

@@ -13,39 +13,75 @@ from dllm.pipelines.qwen3_vl_arch.sampling_bioseq import resolve_partial_mask
 ChainRole = Literal["heavy", "light"]
 
 
+def _target_chain_index(position_ids_chain: torch.Tensor, chain: ChainRole) -> int:
+    """Resolve logical chain index for heavy/light in v2 records."""
+
+    unique = sorted(
+        {
+            int(value)
+            for value in position_ids_chain[position_ids_chain.ge(0)].tolist()
+        }
+    )
+    if not unique:
+        raise ValueError("No residue chain indices found in batch row")
+    if chain == "heavy":
+        return unique[1] if len(unique) >= 3 else unique[0]
+    return unique[-1]
+
+
 def chain_residue_positions(
     input_ids: torch.Tensor,
     attention_mask: torch.Tensor,
     residue_mask: torch.Tensor,
     tokenizer: GrammarTokenizer,
     chain: ChainRole,
+    *,
+    position_ids_chain: torch.Tensor | None = None,
 ) -> list[list[int]]:
-    """Map each batch row to token indices inside one ``<prots>...<prote>`` span.
+    """Map each batch row to residue token indices for one chain (heavy or light)."""
 
-    Grammar-v2 uses repeated ``<prots>/<prote>`` blocks; span 0 is heavy/object A
-    and span 1 is light/object B in antibody pairs.
-    """
-
-    start_id = tokenizer.special_id("<prots>")
-    end_id = tokenizer.special_id("<prote>")
-    target_span = 0 if chain == "heavy" else 1
     batch_positions: list[list[int]] = []
     for row in range(input_ids.size(0)):
         positions: list[int] = []
-        in_chain = False
-        span_index = -1
+        if position_ids_chain is not None:
+            target_index = _target_chain_index(position_ids_chain[row], chain)
+            for col in range(input_ids.size(1)):
+                if not attention_mask[row, col]:
+                    continue
+                if not residue_mask[row, col]:
+                    continue
+                if int(position_ids_chain[row, col].item()) == target_index:
+                    positions.append(col)
+            batch_positions.append(positions)
+            continue
+
+        prots_id = tokenizer.special_id("<prots>")
+        protd_id = tokenizer.special_id("<protd>")
+        dot_id = tokenizer.chain_separator_id()
+        type_marker_ids = {tokenizer.special_id(token) for token in ("<ab>", "<tcr>", "<nb>", "<pep>")}
+        target_span = 0 if chain == "heavy" else 1
+        in_prots_block = False
+        current_span = -1
         for col in range(input_ids.size(1)):
             if not attention_mask[row, col]:
                 continue
             token_id = int(input_ids[row, col].item())
-            if token_id == start_id:
-                span_index += 1
-                in_chain = span_index == target_span
+            if token_id == prots_id:
+                in_prots_block = True
+                current_span = -1
                 continue
-            if in_chain and token_id == end_id:
+            if in_prots_block and token_id == protd_id:
                 break
-            if in_chain and residue_mask[row, col]:
-                positions.append(col)
+            if in_prots_block and token_id in type_marker_ids:
+                continue
+            if in_prots_block and token_id == dot_id:
+                current_span += 1
+                continue
+            if in_prots_block and residue_mask[row, col]:
+                if current_span < 0:
+                    current_span = 0
+                if current_span == target_span:
+                    positions.append(col)
         batch_positions.append(positions)
     return batch_positions
 
@@ -53,6 +89,8 @@ def chain_residue_positions(
 def light_chain_generation_partial_mask(
     batch: dict[str, torch.Tensor],
     tokenizer: GrammarTokenizer,
+    *,
+    prompt_residues: int = 0,
 ) -> torch.Tensor:
     """Keep heavy chain, structure, relation, and fixed context visible."""
 
@@ -60,10 +98,21 @@ def light_chain_generation_partial_mask(
     attention = batch["attention_mask"].bool()
     residue = batch["residue_mask"].bool()
     partial = attention.clone()
-    light_positions = chain_residue_positions(input_ids, attention, residue, tokenizer, chain="light")
+    light_positions = chain_residue_positions(
+        input_ids,
+        attention,
+        residue,
+        tokenizer,
+        chain="light",
+        position_ids_chain=batch.get("position_ids_chain"),
+    )
+    prompt_residues = max(int(prompt_residues), 0)
     for row, positions in enumerate(light_positions):
         for position in positions:
             partial[row, position] = False
+        if prompt_residues > 0:
+            for position in positions[:prompt_residues]:
+                partial[row, position] = True
     return resolve_partial_mask(batch, partial)
 
 
@@ -92,6 +141,7 @@ def cdr_generation_partial_mask(
         residue,
         tokenizer,
         chain=chain_role,
+        position_ids_chain=batch.get("position_ids_chain"),
     )[0]
     if end_char > len(row_positions):
         raise ValueError(

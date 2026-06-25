@@ -1,7 +1,14 @@
-"""Shared helpers for grammar-v1 BioSeq downstream evaluation."""
+"""Shared helpers for grammar-v1 BioSeq downstream evaluation.
+
+Run smoke checks:
+  python -m downstream.grammar.cdr_infill --smoke --device cuda
+  python -m downstream.grammar.light_chain_pairing --smoke --device cuda
+"""
 
 from __future__ import annotations
 
+import sys
+from argparse import Namespace
 from pathlib import Path
 from typing import Any
 
@@ -55,6 +62,32 @@ def antibody_pair_record(
 def collate_records(records: list[BioSeqRecord], collator: GrammarBioSeqCollator | None = None) -> dict[str, Any]:
     collator = collator or build_grammar_collator()
     return collator(records)
+
+
+def _namespace_from_checkpoint_args(raw: dict[str, Any]) -> Namespace:
+    parsed = dict(raw)
+    for key in ("grammar_data_dir", "encoder_path", "tokenizer_path", "output_dir", "wandb_dir"):
+        if key in parsed and parsed[key] is not None:
+            parsed[key] = Path(parsed[key])
+    return Namespace(**parsed)
+
+
+def load_grammar_checkpoint(
+    checkpoint_path: str | Path,
+    device: str | torch.device = "cpu",
+) -> tuple[torch.nn.Module, GrammarTokenizer]:
+    if str(PROJECT_ROOT) not in sys.path:
+        sys.path.insert(0, str(PROJECT_ROOT))
+    from examples.bioseq.train_qwen3_vl_bioseq_ddp import build_config, build_model, build_tokenizer
+
+    payload = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
+    args = _namespace_from_checkpoint_args(payload.get("args", {}))
+    tokenizer = build_tokenizer(args)
+    config = build_config(args, tokenizer)
+    model = build_model(args, config)
+    model.load_state_dict(payload["model_state_dict"])
+    model.eval()
+    return model.to(device), tokenizer
 
 
 def load_untrained_no_encoder(vocab_size: int, **overrides: Any) -> BioSeqNoEncoderDiffusionModel:

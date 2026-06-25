@@ -29,11 +29,8 @@ Multi node, 2 nodes x 8 GPUs::
 from __future__ import annotations
 
 import argparse
-import math
-import os
+import json
 import sys
-import time
-from collections import Counter
 from contextlib import nullcontext
 from dataclasses import replace
 from pathlib import Path
@@ -48,21 +45,9 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from dllm.pipelines.qwen3_vl_arch.data import (  # noqa: E402
-    BioSeqQwenDataCollator,
-    BioSeqViewSampler,
     DEFAULT_GRAMMAR_DATA_DIR,
-    Esm2SequenceTokenizer,
-    GrammarArrowSource,
-    GrammarArrowSourceConfig,
-    GrammarBioSeqCollator,
-    GrammarTokenizer,
-    HuggingFaceEsmTokenizerAdapter,
-    SourceWithWeight,
-    TaskHomogeneousBatchDataset,
+    GrammarDataModule,
     TOKEN_CLASS_NAMES,
-    WeightedMixtureDataset,
-    default_source_configs,
-    source_from_config,
 )
 from dllm.pipelines.qwen3_vl_arch.modeling_bioseq import (  # noqa: E402
     BioSeqDiffusionOutput,
@@ -74,36 +59,32 @@ from dllm.pipelines.qwen3_vl_arch.modeling_bioseq import (  # noqa: E402
     forbidden_diffusion_target_token_ids,
     sample_bioseq_diffusion_noise,
 )
-
-
-FOUNDATION_TRAINING_VIEWS = ("full_denoise",)
+from dllm.pipelines.qwen3_vl_arch.training import (  # noqa: E402
+    BioSeqTrainer,
+    TrainStepFns,
+    lr_at,
+    move_batch,
+    setup_distributed,
+    setup_wandb,
+)
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
 
     data = parser.add_argument_group("data")
-    data.add_argument("--input-format", choices=["legacy", "grammar_v1"], default="grammar_v1")
     data.add_argument("--split", type=str, default="train")
     data.add_argument("--sources", type=str, default="oas,ots,tcr,ppi")
     data.add_argument("--limit-per-source", type=int, default=None)
     data.add_argument("--epoch-size", type=int, default=None, help="Records emitted per rank/worker epoch; None means infinite stream.")
     data.add_argument("--batch-size", type=int, default=8, help="Mixed-task microbatch size per process.")
-    data.add_argument("--max-chain-length", type=int, default=512)
     data.add_argument("--max-sequence-length", type=int, default=None)
-    data.add_argument(
-        "--full-denoise-probability",
-        type=float,
-        default=1.0,
-        help=argparse.SUPPRESS,
-    )
     data.add_argument(
         "--deduplicate-within-batch",
         action="store_true",
-        help="Deprecated compatibility flag; mixed-task training does not deduplicate inside batches.",
+        help="Skip duplicate records within a task-homogeneous batch.",
     )
     data.add_argument("--source-seed", type=int, default=0)
-    data.add_argument("--view-seed", type=int, default=0)
     data.add_argument("--oas-weight", type=float, default=1.0)
     data.add_argument("--ots-weight", type=float, default=1.0)
     data.add_argument("--nanobody-weight", type=float, default=1.0)
@@ -114,12 +95,21 @@ def parse_args() -> argparse.Namespace:
     data.add_argument("--tokenizer-path", type=Path, default=None, help="Optional HF tokenizer path, e.g. an ESMC snapshot.")
 
     model = parser.add_argument_group("model")
-    model.add_argument("--model-type", choices=["no_encoder", "encoder"], default="no_encoder")
-    model.add_argument("--encoder-path", type=Path, default=Path("/c20250601/mj/model_weights/esmc/ESMC-300M"))
+    model.add_argument("--model-type", choices=["no_encoder", "encoder", "esm2"], default="no_encoder")
+    model.add_argument(
+        "--encoder-path",
+        type=Path,
+        default=Path("/vepfs-mlp2/c20250601/251105016/project/dllm_test/model_weights/esmc/ESMC-300M"),
+    )
     model.add_argument("--freeze-encoder", action="store_true")
     model.add_argument("--encoder-use-flash-attn", action="store_true")
     model.add_argument("--vocab-size", type=int, default=None)
     model.add_argument("--hidden-size", type=int, default=512)
+    model.add_argument(
+        "--align-hidden-size-to-encoder",
+        action="store_true",
+        help="For no_encoder ablations, force decoder hidden_size to match --encoder-path latent dim.",
+    )
     model.add_argument("--num-hidden-layers", type=int, default=8)
     model.add_argument("--num-attention-heads", type=int, default=8)
     model.add_argument("--intermediate-size", type=int, default=2048)
@@ -141,7 +131,8 @@ def parse_args() -> argparse.Namespace:
     optim.add_argument("--grad-accum", type=int, default=1)
     optim.add_argument("--max-steps", type=int, default=1000)
     optim.add_argument("--warmup-steps", type=int, default=0)
-    optim.add_argument("--lr-scheduler", choices=["constant", "cosine"], default="constant")
+    optim.add_argument("--warmup-init-lr", type=float, default=1e-7)
+    optim.add_argument("--lr-scheduler", choices=["constant", "cosine", "polynomial"], default="constant")
     optim.add_argument("--min-lr-ratio", type=float, default=0.1)
     optim.add_argument("--grad-clip", type=float, default=1.0)
     optim.add_argument("--bf16", action="store_true")
@@ -149,9 +140,25 @@ def parse_args() -> argparse.Namespace:
 
     runtime = parser.add_argument_group("runtime")
     runtime.add_argument("--device", choices=["auto", "cuda", "cpu"], default="auto")
-    runtime.add_argument("--num-workers", type=int, default=2)
+    runtime.add_argument(
+        "--num-workers",
+        type=int,
+        default=0,
+        help=(
+            "DataLoader workers. Default 0 is the safe path for the memory-mapped Arrow "
+            "sources: each extra worker is a separate process that shards the infinite "
+            "weighted stream independently, so >0 risks per-rank first-batch desync and "
+            "DDP collective hangs under torchrun."
+        ),
+    )
     runtime.add_argument("--log-interval", type=int, default=10)
     runtime.add_argument("--save-interval", type=int, default=200)
+    runtime.add_argument(
+        "--save-top-k",
+        type=int,
+        default=10,
+        help="Keep up to K full checkpoints with the lowest val/loss under output_dir/checkpoints/. 0 disables.",
+    )
     runtime.add_argument("--val-interval", type=int, default=1000, help="Run validation every N optimizer steps; 0 disables.")
     runtime.add_argument("--val-batches", type=int, default=20, help="Validation micro-batches per validation pass.")
     runtime.add_argument("--val-split", type=str, default="valid")
@@ -161,6 +168,11 @@ def parse_args() -> argparse.Namespace:
         "--find-unused-parameters",
         action="store_true",
         help="Enable DDP unused-parameter detection. Encoder mode enables this automatically.",
+    )
+    runtime.add_argument(
+        "--debug-ddp-timing",
+        action="store_true",
+        help="Log per-rank batch/forward/backward/optimizer timing for DDP hang diagnosis.",
     )
 
     wandb_group = parser.add_argument_group("wandb")
@@ -172,93 +184,8 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def setup_distributed(device_mode: str) -> tuple[bool, int, int, int, torch.device]:
-    world_size = int(os.environ.get("WORLD_SIZE", "1"))
-    rank = int(os.environ.get("RANK", "0"))
-    local_rank = int(os.environ.get("LOCAL_RANK", "0"))
-    distributed = world_size > 1
-    if device_mode == "cpu":
-        use_cuda = False
-    elif device_mode == "cuda":
-        use_cuda = True
-    else:
-        use_cuda = torch.cuda.is_available()
-    if use_cuda and local_rank >= torch.cuda.device_count():
-        raise RuntimeError(
-            f"LOCAL_RANK={local_rank} but only {torch.cuda.device_count()} CUDA device(s) are visible. "
-            "Use --device cpu for CPU DDP smoke tests, or launch with nproc_per_node <= visible GPUs."
-        )
-    if distributed:
-        backend = "nccl" if use_cuda else "gloo"
-        torch.distributed.init_process_group(backend=backend, init_method="env://")
-        if use_cuda:
-            torch.cuda.set_device(local_rank)
-    device = torch.device(f"cuda:{local_rank}" if use_cuda else "cpu")
-    return distributed, rank, world_size, local_rank, device
-
-
-def is_main(rank: int) -> bool:
-    return rank == 0
-
-
-def log(rank: int, message: str) -> None:
-    if is_main(rank):
-        print(message, flush=True)
-
-
-def move_batch(value: Any, device: torch.device) -> Any:
-    if isinstance(value, dict):
-        return {key: move_batch(item, device) for key, item in value.items()}
-    if torch.is_tensor(value):
-        return value.to(device, non_blocking=True)
-    return value
-
-
-def setup_wandb(args: argparse.Namespace, rank: int, world_size: int):
-    if not is_main(rank) or args.wandb_mode == "disabled":
-        return None
-    wandb_dir = args.wandb_dir or (args.output_dir / "wandb")
-    wandb_dir.mkdir(parents=True, exist_ok=True)
-    os.environ.setdefault("WANDB_INIT_TIMEOUT", "60")
-    try:
-        import wandb
-    except Exception as exc:  # noqa: BLE001
-        log(rank, f"[wandb] import failed ({exc}); continuing without wandb")
-        return None
-
-    config = vars(args).copy()
-    config["world_size"] = world_size
-    config["effective_batch"] = args.batch_size * args.grad_accum * world_size
-    for key, value in list(config.items()):
-        if isinstance(value, Path):
-            config[key] = str(value)
-
-    for mode in (args.wandb_mode, "offline"):
-        try:
-            run = wandb.init(
-                project=args.wandb_project,
-                entity=args.wandb_entity,
-                name=args.wandb_run_name,
-                dir=str(wandb_dir),
-                mode=mode,
-                config=config,
-            )
-            log(rank, f"[wandb] initialized mode={mode} dir={wandb_dir}")
-            return run
-        except Exception as exc:  # noqa: BLE001
-            log(rank, f"[wandb] init failed mode={mode}: {exc}")
-    return None
-
-
 def build_tokenizer(args: argparse.Namespace):
-    base_tokenizer = (
-        Esm2SequenceTokenizer()
-        if args.tokenizer_path is None
-        else HuggingFaceEsmTokenizerAdapter.from_pretrained(args.tokenizer_path, local_files_only=True)
-    )
-    if args.input_format == "grammar_v1":
-        return GrammarTokenizer(base_tokenizer)
-    return base_tokenizer
+    return GrammarDataModule.from_args(args).build_tokenizer()
 
 
 def infer_vocab_size(tokenizer: Any, requested_vocab_size: int | None) -> int:
@@ -273,10 +200,31 @@ def infer_vocab_size(tokenizer: Any, requested_vocab_size: int | None) -> int:
     return 33
 
 
+def infer_encoder_hidden_size_from_path(encoder_path: Path) -> int:
+    config_path = encoder_path / "config.json"
+    if not config_path.is_file():
+        raise FileNotFoundError(f"Encoder config not found: {config_path}")
+    with config_path.open() as handle:
+        config = json.load(handle)
+    for key in ("hidden_size", "d_model", "embed_dim", "encoder_embed_dim"):
+        if key in config:
+            return int(config[key])
+    raise ValueError(f"Could not infer encoder hidden size from {config_path}")
+
+
+def resolve_hidden_size(args: argparse.Namespace) -> int:
+    if args.model_type in {"encoder", "esm2"}:
+        return infer_encoder_hidden_size_from_path(args.encoder_path)
+    if args.align_hidden_size_to_encoder:
+        return infer_encoder_hidden_size_from_path(args.encoder_path)
+    return int(args.hidden_size)
+
+
 def build_config(args: argparse.Namespace, tokenizer: Any) -> BioSeqDiffusionTransformerConfig:
+    hidden_size = resolve_hidden_size(args)
     return BioSeqDiffusionTransformerConfig(
         vocab_size=infer_vocab_size(tokenizer, args.vocab_size),
-        hidden_size=args.hidden_size,
+        hidden_size=hidden_size,
         num_hidden_layers=args.num_hidden_layers,
         num_attention_heads=args.num_attention_heads,
         intermediate_size=args.intermediate_size,
@@ -298,6 +246,14 @@ def build_config(args: argparse.Namespace, tokenizer: Any) -> BioSeqDiffusionTra
 def build_model(args: argparse.Namespace, config: BioSeqDiffusionTransformerConfig) -> torch.nn.Module:
     if args.model_type == "no_encoder":
         return BioSeqNoEncoderDiffusionModel(config)
+    if args.model_type == "esm2":
+        return BioSeqEncoderDiffusionModel.from_hf_encoder(
+            decoder_config=config,
+            encoder_name_or_path=str(args.encoder_path),
+            local_files_only=True,
+            trust_remote_code=True,
+            freeze_encoder=args.freeze_encoder,
+        )
     return BioSeqEncoderDiffusionModel.from_esmc(
         decoder_config=config,
         encoder_name_or_path=str(args.encoder_path),
@@ -308,131 +264,24 @@ def build_model(args: argparse.Namespace, config: BioSeqDiffusionTransformerConf
     )
 
 
-def source_weight(args: argparse.Namespace, name: str) -> float:
-    return {
-        "oas": args.oas_weight,
-        "ots": args.ots_weight,
-        "nanobody": args.nanobody_weight,
-        "processed_v2": args.processed_v2_weight,
-        "tcr": args.tcr_weight,
-        "ppi": args.ppi_weight,
-    }.get(name, 1.0)
-
-
 def build_loader(
     args: argparse.Namespace,
     tokenizer: Any,
     *,
     split: str | None = None,
     source_seed: int | None = None,
-    view_seed: int | None = None,
     epoch_size: int | None = None,
 ) -> DataLoader:
-    split = args.split if split is None else split
-    source_seed = args.source_seed if source_seed is None else source_seed
-    view_seed = args.view_seed if view_seed is None else view_seed
-    epoch_size = args.epoch_size if epoch_size is None else epoch_size
-    requested_sources = {item.strip() for item in args.sources.split(",") if item.strip()}
-    if args.input_format == "grammar_v1":
-        configs = [
-            GrammarArrowSourceConfig(
-                name=name,
-                path=args.grammar_data_dir,
-                split=split,
-                weight=source_weight(args, name),
-                max_records=args.limit_per_source,
-            )
-            for name in sorted(requested_sources)
-        ]
-        sources = [
-            SourceWithWeight(GrammarArrowSource(config), weight=config.weight)
-            for config in configs
-        ]
-        records = WeightedMixtureDataset(sources, epoch_size=epoch_size, seed=source_seed)
-        batches = TaskHomogeneousBatchDataset(
-            records,
-            batch_size=args.batch_size,
-            drop_last=True,
-            deduplicate_within_batch=args.deduplicate_within_batch,
-        )
-        collator = GrammarBioSeqCollator(
-            tokenizer=tokenizer,
-            max_sequence_length=args.max_sequence_length or 2112,
-        )
-        return DataLoader(
-            batches,
-            batch_size=None,
-            collate_fn=collator,
-            num_workers=args.num_workers,
-            pin_memory=torch.cuda.is_available(),
-        )
-
-    configs = [
-        config
-        for config in default_source_configs(split=split, max_records=args.limit_per_source)
-        if getattr(config, "name", "") in requested_sources
-    ]
-    if not configs:
-        raise ValueError(f"No sources selected from --sources={args.sources!r}")
-    sources = [
-        SourceWithWeight(source_from_config(config), weight=source_weight(args, getattr(config, "name", "")))
-        for config in configs
-    ]
-    records = WeightedMixtureDataset(sources, epoch_size=epoch_size, seed=source_seed)
-    collator = BioSeqQwenDataCollator(
-        tokenizer=tokenizer,
-        view_sampler=BioSeqViewSampler(
-            allowed_views=FOUNDATION_TRAINING_VIEWS,
-            seed=view_seed,
-        ),
-        max_chain_length=args.max_chain_length,
-        max_sequence_length=args.max_sequence_length,
-        single_view_per_batch=False,
-        require_homogeneous_task=False,
-    )
-    return DataLoader(
-        records,
-        batch_size=args.batch_size,
-        collate_fn=collator,
-        num_workers=args.num_workers,
-        pin_memory=torch.cuda.is_available(),
-        drop_last=True,
+    return GrammarDataModule.from_args(args).loader(
+        tokenizer,
+        split=split,
+        source_seed=source_seed,
+        epoch_size=epoch_size,
     )
 
 
 def build_validation_loader(args: argparse.Namespace, tokenizer: Any) -> DataLoader | None:
-    if args.val_interval <= 0 or args.val_batches <= 0:
-        return None
-    return build_loader(
-        args,
-        tokenizer,
-        split=args.val_split,
-        source_seed=args.source_seed + 10_000,
-        view_seed=args.view_seed + 10_000,
-        epoch_size=None,
-    )
-
-
-def lr_at(
-    step: int,
-    base_lr: float,
-    warmup_steps: int,
-    *,
-    max_steps: int | None = None,
-    scheduler: str = "constant",
-    min_lr_ratio: float = 0.1,
-) -> float:
-    if warmup_steps > 0 and step < warmup_steps:
-        return base_lr * float(step + 1) / float(warmup_steps)
-    if scheduler == "cosine":
-        if max_steps is None or max_steps <= warmup_steps:
-            raise ValueError("cosine LR scheduling requires max_steps > warmup_steps")
-        if not 0.0 <= min_lr_ratio <= 1.0:
-            raise ValueError("min_lr_ratio must be between 0 and 1")
-        progress = min(max((step - warmup_steps) / float(max_steps - warmup_steps), 0.0), 1.0)
-        cosine = 0.5 * (1.0 + math.cos(math.pi * progress))
-        return base_lr * (min_lr_ratio + (1.0 - min_lr_ratio) * cosine)
-    return base_lr
+    return GrammarDataModule.from_args(args).val_loader(tokenizer)
 
 
 def optimizer_for_model(model: torch.nn.Module, args: argparse.Namespace) -> torch.optim.Optimizer:
@@ -447,12 +296,8 @@ def optimizer_for_model(model: torch.nn.Module, args: argparse.Namespace) -> tor
     return torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
 
 
-def unwrap_model(model: torch.nn.Module) -> torch.nn.Module:
-    return model.module if isinstance(model, DistributedDataParallel) else model
-
-
 def should_find_unused_parameters(args: argparse.Namespace) -> bool:
-    return bool(args.find_unused_parameters or args.model_type == "encoder")
+    return bool(args.find_unused_parameters or args.model_type in {"encoder", "esm2"})
 
 
 def compute_training_output(
@@ -475,7 +320,6 @@ def compute_training_output(
     }
     if batch.get("chain_ids") is not None:
         kwargs["chain_ids"] = batch.get("chain_ids")
-    if batch.get("encoder_position_ids") is not None:
         kwargs["residue_mask"] = batch.get("residue_mask")
     noised_encoder_input_ids = None
     if isinstance(module, BioSeqEncoderDiffusionModel):
@@ -484,15 +328,15 @@ def compute_training_output(
             corruption_mask=corruption_mask,
             mask_token_id=config.mask_token_id,
         )
-        kwargs.update(
-            {
-                "encoder_input_ids": noised_encoder_input_ids,
-                "encoder_attention_mask": batch.get("encoder_attention_mask"),
-                "encoder_residue_mask": batch.get("encoder_residue_mask"),
-                "encoder_chain_mask": batch.get("encoder_chain_mask"),
-                "encoder_position_ids": batch.get("encoder_position_ids"),
-            }
-        )
+        encoder_kwargs: dict[str, Any] = {
+            "encoder_input_ids": noised_encoder_input_ids,
+            "encoder_attention_mask": batch.get("encoder_attention_mask"),
+            "encoder_residue_mask": batch.get("encoder_residue_mask"),
+            "encoder_chain_mask": batch.get("encoder_chain_mask"),
+        }
+        if batch.get("encoder_position_ids") is not None:
+            encoder_kwargs["encoder_position_ids"] = batch.get("encoder_position_ids")
+        kwargs.update(encoder_kwargs)
     output = train_model(**kwargs)
     forbidden = forbidden_diffusion_target_token_ids(config)
     loss = compute_masked_cross_entropy(
@@ -510,23 +354,6 @@ def compute_training_output(
         timesteps=timesteps,
         noised_encoder_input_ids=noised_encoder_input_ids,
     )
-
-
-def count_names(names: list[str]) -> dict[str, int]:
-    if not names:
-        return {}
-    return dict(Counter(str(name) for name in names))
-
-
-def format_name_counts(names: list[str]) -> str:
-    counts = count_names(names)
-    if not counts:
-        return "unknown"
-    return ",".join(f"{name}:{count}" for name, count in sorted(counts.items()))
-
-
-def wandb_count_metrics(prefix: str, names: list[str]) -> dict[str, int]:
-    return {f"{prefix}/{name}": count for name, count in count_names(names).items()}
 
 
 def diffusion_eligible_token_count(batch: dict[str, Any]) -> torch.Tensor:
@@ -580,40 +407,6 @@ def loss_logging_denominator(output: BioSeqDiffusionOutput, batch: dict[str, Any
         return torch.tensor(float(input_ids.shape[0]), device=input_ids.device, dtype=torch.float32).clamp_min(1.0)
     device = output.loss.device if output.loss is not None else torch.device("cpu")
     return torch.ones((), device=device, dtype=torch.float32)
-
-
-def cuda_memory_metrics(device: torch.device, distributed: bool) -> dict[str, float]:
-    if device.type != "cuda":
-        return {}
-
-    scale = 1024.0**3
-    values = torch.tensor(
-        [
-            torch.cuda.memory_allocated(device) / scale,
-            torch.cuda.memory_reserved(device) / scale,
-            torch.cuda.max_memory_allocated(device) / scale,
-            torch.cuda.max_memory_reserved(device) / scale,
-            torch.cuda.get_device_properties(device).total_memory / scale,
-        ],
-        device=device,
-        dtype=torch.float32,
-    )
-    if distributed:
-        torch.distributed.all_reduce(values, op=torch.distributed.ReduceOp.MAX)
-    return {
-        "perf/gpu_mem_allocated_gb": float(values[0].item()),
-        "perf/gpu_mem_reserved_gb": float(values[1].item()),
-        "perf/gpu_mem_peak_allocated_gb": float(values[2].item()),
-        "perf/gpu_mem_peak_reserved_gb": float(values[3].item()),
-        "perf/gpu_mem_total_gb": float(values[4].item()),
-    }
-
-
-def any_rank_nonfinite(value: torch.Tensor, distributed: bool) -> bool:
-    flag = (~torch.isfinite(value.detach())).to(device=value.device, dtype=torch.int32)
-    if distributed:
-        torch.distributed.all_reduce(flag, op=torch.distributed.ReduceOp.MAX)
-    return bool(flag.item())
 
 
 @torch.no_grad()
@@ -674,240 +467,51 @@ def evaluate_validation(
     }
 
 
-def save_checkpoint(
-    model: torch.nn.Module,
-    optimizer: torch.optim.Optimizer,
-    step: int,
-    args: argparse.Namespace,
-    output_dir: Path,
-    tag: str,
-) -> None:
-    output_dir.mkdir(parents=True, exist_ok=True)
-    payload = {
-        "model_state_dict": unwrap_model(model).state_dict(),
-        "optimizer_state_dict": optimizer.state_dict(),
-        "step": step,
-        "args": {key: str(value) if isinstance(value, Path) else value for key, value in vars(args).items()},
-    }
-    for name in {f"{tag}.pt", "latest.pt"}:
-        target = output_dir / name
-        tmp = target.with_suffix(target.suffix + ".tmp")
-        torch.save(payload, tmp)
-        os.replace(tmp, target)
-
-
-def maybe_resume(
-    args: argparse.Namespace,
-    model: torch.nn.Module,
-    optimizer: torch.optim.Optimizer,
-    device: torch.device,
-    rank: int,
-) -> int:
-    if args.resume in (None, "", "none"):
-        return 0
-    path = args.output_dir / "latest.pt" if args.resume == "auto" else Path(args.resume)
-    if not path.is_file():
-        log(rank, f"[resume] no checkpoint at {path}; starting from step 0")
-        return 0
-    payload = torch.load(path, map_location="cpu")
-    unwrap_model(model).load_state_dict(payload["model_state_dict"])
-    optimizer.load_state_dict(payload["optimizer_state_dict"])
-    for state in optimizer.state.values():
-        for key, value in state.items():
-            if torch.is_tensor(value):
-                state[key] = value.to(device)
-    step = int(payload.get("step", 0))
-    log(rank, f"[resume] loaded {path}; resuming at step {step}")
-    return step
-
-
 def main() -> None:
     args = parse_args()
-    distributed, rank, world_size, local_rank, device = setup_distributed(args.device)
-    torch.manual_seed(args.seed + rank)
+    ctx = setup_distributed(args.device)
+    torch.manual_seed(args.seed + ctx.rank)
     torch.set_float32_matmul_precision("high")
 
-    tokenizer = build_tokenizer(args)
+    datamodule = GrammarDataModule.from_args(args)
+    tokenizer = datamodule.build_tokenizer()
     config = build_config(args, tokenizer)
-    model = build_model(args, config).to(device)
+    model = build_model(args, config).to(ctx.device)
     optimizer = optimizer_for_model(model, args)
     for group in optimizer.param_groups:
         group.setdefault("initial_lr", group["lr"])
 
     train_model: torch.nn.Module = model
-    if distributed:
+    if ctx.distributed:
         ddp_kwargs = {"find_unused_parameters": should_find_unused_parameters(args)}
-        if device.type == "cuda":
-            train_model = DistributedDataParallel(model, device_ids=[local_rank], output_device=local_rank, **ddp_kwargs)
+        if ctx.device.type == "cuda":
+            train_model = DistributedDataParallel(
+                model, device_ids=[ctx.local_rank], output_device=ctx.local_rank, **ddp_kwargs
+            )
         else:
             train_model = DistributedDataParallel(model, **ddp_kwargs)
 
-    start_step = maybe_resume(args, train_model, optimizer, device, rank)
-    loader = build_loader(args, tokenizer)
-    val_loader = build_validation_loader(args, tokenizer)
-    val_iter = iter(val_loader) if val_loader is not None else None
-    autocast = torch.autocast(device_type=device.type, dtype=torch.bfloat16) if args.bf16 else nullcontext()
-    wandb_run = setup_wandb(args, rank, world_size)
-
-    log(
-        rank,
-        f"world_size={world_size} device={device} model_type={args.model_type} "
-        f"input_format={args.input_format} parameters={sum(p.numel() for p in model.parameters())} "
-        f"effective_batch={args.batch_size * args.grad_accum * world_size} "
-        f"training_views={','.join(FOUNDATION_TRAINING_VIEWS)}",
+    step_fns = TrainStepFns(
+        compute_output=compute_training_output,
+        loss_denominator=loss_logging_denominator,
+        eligible_token_count=diffusion_eligible_token_count,
+        token_class_metrics=token_class_loss_metrics,
+        evaluate_validation=evaluate_validation,
     )
-    step = start_step
-    micro_step = 0
-    window_optimizer_steps = 0
-    window_loss_numerator = torch.zeros((), device=device, dtype=torch.float32)
-    window_loss_denominator = torch.zeros((), device=device, dtype=torch.float32)
-    window_corrupted_tokens = torch.zeros((), device=device, dtype=torch.float32)
-    window_eligible_tokens = torch.zeros((), device=device, dtype=torch.float32)
-    window_start = time.time()
-    train_model.train()
-    optimizer.zero_grad(set_to_none=True)
-    while step < args.max_steps:
-        for batch in loader:
-            batch = move_batch(batch, device)
-            for group in optimizer.param_groups:
-                group["lr"] = lr_at(
-                    step,
-                    group["initial_lr"],
-                    args.warmup_steps,
-                    max_steps=args.max_steps,
-                    scheduler=args.lr_scheduler,
-                    min_lr_ratio=args.min_lr_ratio,
-                )
-
-            with autocast:
-                output = compute_training_output(train_model, unwrap_model(train_model), batch)
-                assert output.loss is not None
-                loss = output.loss / args.grad_accum
-            if any_rank_nonfinite(output.loss, distributed):
-                raise FloatingPointError(f"non-finite training loss detected at step={step}")
-            loss.backward()
-            denominator = loss_logging_denominator(output, batch, unwrap_model(train_model).config.loss_norm)
-            window_loss_numerator += output.loss.detach().to(dtype=torch.float32) * denominator
-            window_loss_denominator += denominator
-            if output.corruption_mask is not None:
-                window_corrupted_tokens += output.corruption_mask.detach().sum().to(dtype=torch.float32)
-            window_eligible_tokens += diffusion_eligible_token_count(batch).detach()
-            micro_step += 1
-
-            if micro_step % args.grad_accum == 0:
-                max_grad_norm = args.grad_clip if args.grad_clip > 0 else float("inf")
-                grad_norm = torch.nn.utils.clip_grad_norm_(train_model.parameters(), max_grad_norm)
-                if any_rank_nonfinite(grad_norm, distributed):
-                    optimizer.zero_grad(set_to_none=True)
-                    raise FloatingPointError(f"non-finite gradient norm detected at step={step}")
-                optimizer.step()
-                optimizer.zero_grad(set_to_none=True)
-                window_optimizer_steps += 1
-
-                if step % args.log_interval == 0:
-                    elapsed = max(time.time() - window_start, 1e-6)
-                    samples_per_sec = (
-                        args.batch_size * args.grad_accum * world_size * max(window_optimizer_steps, 1) / elapsed
-                    )
-                    token_counts = torch.stack(
-                        [
-                            window_loss_numerator,
-                            window_loss_denominator,
-                            window_corrupted_tokens,
-                            window_eligible_tokens,
-                        ]
-                    )
-                    if distributed:
-                        torch.distributed.all_reduce(token_counts, op=torch.distributed.ReduceOp.SUM)
-                    optimizer_steps = max(window_optimizer_steps, 1)
-                    train_loss = float(token_counts[0].item()) / max(float(token_counts[1].item()), 1.0)
-                    corrupted = int(round(float(token_counts[2].item()) / optimizer_steps))
-                    eligible = int(round(float(token_counts[3].item()) / optimizer_steps))
-                    corruption_rate = float(token_counts[2].item()) / max(float(token_counts[3].item()), 1.0)
-                    view_summary = format_name_counts(batch.get("view_names", []))
-                    task_summary = format_name_counts(batch.get("task_groups", []))
-                    memory_metrics = cuda_memory_metrics(device, distributed)
-                    memory_summary = ""
-                    if memory_metrics:
-                        memory_summary = (
-                            f" mem_peak={memory_metrics['perf/gpu_mem_peak_allocated_gb']:.1f}GB"
-                            f"/{memory_metrics['perf/gpu_mem_total_gb']:.1f}GB"
-                        )
-                    log(
-                        rank,
-                        f"step={step} loss={train_loss:.4f} tasks={task_summary} views={view_summary} "
-                        f"corrupted={corrupted} eligible={eligible} corrupt_rate={corruption_rate:.3f} "
-                        f"lr={optimizer.param_groups[0]['lr']:.2e} grad_norm={float(grad_norm.item()):.4f} "
-                        f"samples/s={samples_per_sec:.1f}{memory_summary}",
-                    )
-                    if wandb_run is not None:
-                        metrics = {
-                            "train/loss": train_loss,
-                            "train/loss_denominator": float(token_counts[1].item()),
-                            "train/corrupted_tokens": corrupted,
-                            "train/eligible_tokens": eligible,
-                            "train/corruption_rate": corruption_rate,
-                            "train/corrupted_tokens_window": float(token_counts[2].item()),
-                            "train/eligible_tokens_window": float(token_counts[3].item()),
-                            "train/lr": optimizer.param_groups[0]["lr"],
-                            "train/grad_norm": float(grad_norm.item()),
-                            "perf/samples_per_sec": samples_per_sec,
-                        }
-                        metrics.update(memory_metrics)
-                        metrics.update(token_class_loss_metrics(output, batch))
-                        metrics.update(wandb_count_metrics("batch_views", batch.get("view_names", [])))
-                        metrics.update(wandb_count_metrics("batch_tasks", batch.get("task_groups", [])))
-                        metrics.update(wandb_count_metrics("batch_sources", batch.get("sources", [])))
-                        wandb_run.log(metrics, step=step)
-                    if device.type == "cuda":
-                        torch.cuda.reset_peak_memory_stats(device)
-                    window_start = time.time()
-                    window_optimizer_steps = 0
-                    window_loss_numerator.zero_()
-                    window_loss_denominator.zero_()
-                    window_corrupted_tokens.zero_()
-                    window_eligible_tokens.zero_()
-
-                if val_iter is not None and args.val_interval > 0 and step > 0 and step % args.val_interval == 0:
-                    val_metrics = evaluate_validation(
-                        train_model=train_model,
-                        module=unwrap_model(train_model),
-                        val_iter=val_iter,
-                        args=args,
-                        device=device,
-                        distributed=distributed,
-                    )
-                    log(
-                        rank,
-                        f"step={step} val_loss={val_metrics['val/loss']:.4f} "
-                        f"val_corrupted={val_metrics['val/corrupted_tokens']:.1f} "
-                        f"val_eligible={val_metrics['val/eligible_tokens']:.1f} "
-                        f"val_corrupt_rate={val_metrics['val/corruption_rate']:.3f}",
-                    )
-                    if wandb_run is not None:
-                        wandb_run.log(val_metrics, step=step)
-
-                if args.save_interval and step > 0 and step % args.save_interval == 0:
-                    if is_main(rank):
-                        save_checkpoint(train_model, optimizer, step, args, args.output_dir, tag="latest")
-                        log(rank, f"saved checkpoint -> {args.output_dir / 'latest.pt'}")
-                    if distributed:
-                        torch.distributed.barrier()
-
-                step += 1
-                if step >= args.max_steps:
-                    break
-        if args.epoch_size is None:
-            break
-
-    if is_main(rank):
-        save_checkpoint(train_model, optimizer, step, args, args.output_dir, tag="final")
-        log(rank, f"saved final checkpoint -> {args.output_dir / 'final.pt'}")
-    if wandb_run is not None:
-        wandb_run.finish()
-    if distributed:
-        torch.distributed.barrier()
-        torch.distributed.destroy_process_group()
+    wandb_run = setup_wandb(args, ctx.rank, ctx.world_size)
+    trainer = BioSeqTrainer(
+        args=args,
+        ctx=ctx,
+        train_model=train_model,
+        optimizer=optimizer,
+        step_fns=step_fns,
+        wandb_run=wandb_run,
+    )
+    trainer.resume()
+    loader = datamodule.train_loader(tokenizer)
+    val_loader = datamodule.val_loader(tokenizer)
+    val_iter = iter(val_loader) if val_loader is not None else None
+    trainer.fit(loader, val_iter)
 
 
 if __name__ == "__main__":

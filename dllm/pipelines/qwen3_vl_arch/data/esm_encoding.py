@@ -122,6 +122,9 @@ class TokenizersEsmTokenizer:
             raise ValueError(f"tokenizer is missing required token: {token}")
         return int(token_id)
 
+    def token_id(self, token: str) -> int:
+        return self._token_id(token)
+
     def encode(self, sequence: str, add_special_tokens: bool = True, **kwargs) -> list[int]:
         encoding = self.tokenizer.encode(sequence, add_special_tokens=add_special_tokens)
         token_ids = list(encoding.ids)
@@ -187,6 +190,22 @@ class HuggingFaceEsmTokenizerAdapter:
         if value is not None:
             return int(value)
         return int(len(self.tokenizer))
+
+    def token_id(self, token: str) -> int:
+        inner = self.tokenizer
+        if hasattr(inner, "token_id"):
+            return int(inner.token_id(token))
+        if hasattr(inner, "convert_tokens_to_ids"):
+            token_id = inner.convert_tokens_to_ids(token)
+            if isinstance(token_id, list):
+                token_id = token_id[0]
+            return int(token_id)
+        token_to_id = getattr(inner, "token_to_id", None)
+        if isinstance(token_to_id, dict):
+            if token not in token_to_id:
+                raise KeyError(f"tokenizer is missing required token: {token}")
+            return int(token_to_id[token])
+        raise AttributeError(f"Unsupported tokenizer backend for token lookup: {type(inner)!r}")
 
     def encode_chain(self, sequence: str, max_length: int | None = None) -> tuple[list[int], list[int]]:
         kwargs = {"add_special_tokens": True}

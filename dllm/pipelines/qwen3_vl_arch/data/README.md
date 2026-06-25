@@ -15,39 +15,45 @@ For structured joint generation, `grammar_v1` uses semantic Arrow shards under
 PPI / interaction asset inventory and relation taxonomy: `PPI_DATA.md`.
 - Optional PPI Arrow source from `/vepfs-mlp2/c20250601/251105016/project/dllm_test/data/ppi/string_model_org_90_90_split`
 
-The loading path is:
+The raw CSV/JSONL sources above are consumed offline by
+`/vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/data/build_bioseq_grammar_v1.py`,
+which writes the semantic Arrow shards under `data/bioseq_grammar_v1`. Training
+reads only those Arrow shards.
+
+## Training Loading Path (grammar_v1, the only path)
 
 ```text
-source loader -> BioSeqRecord -> weighted mixed stream -> full-denoise target masks -> ESM-compatible collator -> model batch
+GrammarArrowSource -> WeightedMixtureDataset -> TaskHomogeneousBatchDataset -> GrammarBioSeqCollator -> model batch
 ```
 
 `BioSeqRecord` stores the complete biological sample: chains, chain roles,
-regions, source, task type, metadata, labels, and weight. It does not decide
-which positions are generated for a specific training step.
+regions, source, task type, metadata, labels, and weight. The grammar renderer
+turns each record into a flat token stream and decides which positions are
+fixed context versus diffusion targets.
 
-The recommended foundation-training path keeps physical microbatches mixed.
-`WeightedMixtureDataset` emits a source-weighted stream of records, and
-`DataLoader(batch_size=N)` forms batches directly from that stream. This allows
-one batch to contain records such as antibody, antibody-antigen, TCR, and PPI.
-Batch-level de-duplication is not part of the default path because dataset
-processing owns global de-duplication:
+- `GrammarArrowSource` streams `BioSeqRecord`s from one source's Arrow shard
+  (with an in-process `load_from_disk` cache so iterator restarts are free).
+- `WeightedMixtureDataset` interleaves the per-source streams by sampling
+  weight.
+- `TaskHomogeneousBatchDataset` groups the stream so each physical microbatch
+  holds one BioSeq task group (e.g. all antibody, or all PPI). This keeps the
+  rendered grammar layout uniform inside a batch.
+- `GrammarBioSeqCollator` renders/pads each record into the grammar token
+  stream and the ESMC proxy stream.
 
 ```python
-records = WeightedMixtureDataset(sources, epoch_size=epoch_size, seed=seed)
+sources = [SourceWithWeight(GrammarArrowSource(cfg), weight=cfg.weight) for cfg in configs]
+records = WeightedMixtureDataset(sources, epoch_size=epoch_size, seed=source_seed)
+batches = TaskHomogeneousBatchDataset(records, batch_size=N, drop_last=True)
 loader = DataLoader(
-    records,
-    batch_size=micro_batch_size,
-    collate_fn=BioSeqQwenDataCollator(
-        single_view_per_batch=False,
-        require_homogeneous_task=False,
-    ),
-    drop_last=True,
+    batches,
+    batch_size=None,  # the dataset already yields complete batches
+    collate_fn=GrammarBioSeqCollator(tokenizer, max_sequence_length=2112),
+    num_workers=0,
 )
 ```
 
-`TaskHomogeneousBatchDataset` remains available only as an ablation/debugging
-wrapper when a run intentionally wants one BioSeq task group per physical
-microbatch.
+### DDP sharding and the `num_workers` footgun
 
 For multi-node/multi-GPU training, do not use `DistributedSampler` with these
 iterable sources. `SequentialMultiSourceDataset` and `WeightedMixtureDataset`
@@ -58,95 +64,35 @@ global_shard_index = rank * num_workers + worker_id
 num_shards = world_size * num_workers
 ```
 
-The DDP trainer at `/vepfs-mlp2/c20250601/251105016/project/dllm_test/examples/bioseq/train_qwen3_vl_bioseq_ddp.py`
-uses this path directly.
+Because each DataLoader worker is a separate process that independently shards
+the infinite weighted stream (and memory-maps its own Arrow copy), using
+`num_workers > 0` under `torchrun` can desync the first batch across ranks and
+trigger NCCL collective timeouts. The validated default is therefore
+`--num-workers 0`; the trainer warns when a distributed run sets it higher.
 
-Foundation training uses a simple default objective: every record resolves to
-`full_denoise`, so all eligible target residues are diffusion targets and the
-loss is computed only on corrupted target residues. Mixed physical batches can
-still contain antibody, antibody-antigen, TCR, pMHC, PPI, and other task types;
-the mask, not the batch grouping, defines the generated part.
+### Diffusion masks
 
-The DDP trainer hard-codes `allowed_views=["full_denoise"]`; it does not expose
-the ablation view path during foundation pretraining. `BioSeqViewSampler` keeps
-conditional views available only for separate scripts or downstream fine-tuning
-that intentionally pass `allowed_views` such as:
+`GrammarRenderer` marks only the `<fixs>...<fixd>` fixed-context block (antigen,
+peptide, MHC/HLA conditioning) as non-target. Everything else — structure
+tokens, relation tokens, and non-fixed residues — is a diffusion target. The
+collator emits the token-level masks consumed by `sample_bioseq_diffusion_noise`:
 
-- full denoising over eligible target chains
-- heavy-to-light
-- light-to-heavy
-- antigen-to-antibody heavy/light
-- antigen-to-nanobody
-- heavy+antigen-to-light
-- light+antigen-to-heavy
-- antigen+antibody/nanobody FR-to-CDR
-- beta+context-to-alpha
-- alpha+context-to-beta
-- MHC-to-peptide+TCR denoising
-- alpha+beta+MHC-to-peptide
-- pMHC-to-alpha+beta
-- pMHC+TCR FR-to-CDR
-- FR-to-CDR infilling
-- single-CDR infilling
-- CDR-to-FR infilling
-
-The task-specific conditional profiles are not part of the DDP foundation
-training objective. They are supported so that antibody chain completion,
-antigen-conditioned receptor generation, peptide design, pMHC-conditioned TCR
-generation, and FR/CDR infilling can be enabled intentionally outside the main
-foundation trainer.
-
-`BioSeqQwenDataCollator` then emits token-level masks:
-
-- `visible_mask`
 - `fixed_context_mask`
-- `diffusion_target_mask`
 - `diffusion_loss_mask`
+- `diffusion_eligible_mask`
+- `residue_mask`, `structure_token_mask`, `relation_token_mask`, `token_class_ids`
 
-`full_denoise` is not all chains unconditionally. It honors explicit record
-`metadata["targets"]` when present and still keeps antigen, peptide, MHC, and
-HLA-like chains as fixed context by default. Those context residues are visible
-conditioning tokens and do not receive diffusion loss.
-
-`mhc_to_peptide_tcr` is the complementary TCR-pMHC training view for the case
-where MHC/HLA is fixed context while peptide plus available TCR chains are
-diffusion targets. If a TCR epitope dataset stores the peptide as `antigen`,
-that chain is treated as a target only for `tcr_epitope` or `tcr_pmhc` records.
-
-`tcr_mhc_to_peptide` fixes available TCR chains plus MHC/HLA and uses peptide
-or epitope as the diffusion target. `pmhc_to_tcr` fixes peptide/epitope plus
-MHC/HLA and uses available TCR alpha/beta chains as diffusion targets.
-
-Antibody-antigen and nanobody-antigen views follow the same fixed/target
-pattern. `antigen_to_antibody` fixes antigen and targets available heavy/light
-chains. `heavy_antigen_to_light` fixes heavy plus antigen and targets light.
-`light_antigen_to_heavy` fixes light plus antigen and targets heavy.
-`antigen_to_nanobody` fixes antigen and targets the VHH chain. Antibody and
-nanobody training views do not generate the antigen by default; antigen is
-clean conditioning context for receptor-side diffusion loss. `antigen_fr_to_cdr`
-and `antigen_single_cdr` fix antigen plus receptor framework residues and target
-all CDRs or one selected CDR.
-
-The FR/CDR views are not antibody-specific. They operate on any chain with
-`FR*` and `CDR*` region annotations, including TCR full-chain records when the
-source adapter preserves those regions. For TCR-pMHC records, `pmhc_fr_to_cdr`
-and `pmhc_single_cdr` require peptide/epitope plus MHC/HLA context and target
-TCR CDR spans only.
-
-The collator uses ESM-family token ids by default via `Esm2SequenceTokenizer`.
-It also emits per-chain encoder tensors:
+The collator also emits the single-stream ESMC proxy tensors used by the
+encoder-conditioned path to build the per-chain diffusion state `x_t`:
 
 - `encoder_input_ids`
 - `encoder_attention_mask`
 - `encoder_residue_mask`
 - `encoder_chain_mask`
-- `encoder_chain_role_ids`
+- `encoder_position_ids`
 
-These tensors are used by ESM2/ESMC feature-conditioned training to form the
-per-chain diffusion state `x_t` for the biological encoder.
 If the encoder is loaded from a local Hugging Face ESM-family snapshot,
-`HuggingFaceEsmTokenizerAdapter` can be used to make token ids match that
-encoder tokenizer.
+`HuggingFaceEsmTokenizerAdapter` makes token ids match that encoder tokenizer.
 
 ## ESM Tokenizer Compatibility
 

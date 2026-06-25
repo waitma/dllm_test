@@ -4,16 +4,14 @@
 
 > Only non-terminal jobs (`Initialized` / `Queue` / `Staging` / `Running` / `Killing`). Remove a row when the job reaches `Success`, `Failed`, or `Killed`. Update after every `volc ml_task submit` or `cancel`. Rule: `/vepfs-mlp2/c20250601/251105016/project/dllm_test/.cursor/rules/volc-train-task-log.mdc`.
 
-Last updated: 2026-06-21 (UTC+8, grammar_v1 resubmit updated yaml)
+Last updated: 2026-06-25 (UTC+8, resubmitted grammar-v2 test jobs after chain-separator fix)
 
 | Status | Task ID | Job Name | YAML |
 |--------|---------|----------|------|
-| Initialized | t-20260621223241-z55tl | qwen3_vl_bioseq_grammar_v1_esmc300m | `/vepfs-mlp2/c20250601/251105016/project/dllm_test/train_jobs/qwen3_vl_bioseq_grammar_v1_esmc300m.yml` |
-| Initialized | t-20260621223245-ggbzf | qwen3_vl_bioseq_grammar_v1_esmc600m | `/vepfs-mlp2/c20250601/251105016/project/dllm_test/train_jobs/qwen3_vl_bioseq_grammar_v1_esmc600m.yml` |
-| Initialized | t-20260621223248-wwpcb | qwen3_vl_bioseq_grammar_v1_no_encoder_38m | `/vepfs-mlp2/c20250601/251105016/project/dllm_test/train_jobs/qwen3_vl_bioseq_grammar_v1_no_encoder_38m.yml` |
-| Initialized | t-20260621223252-rlj8x | qwen3_vl_bioseq_grammar_v1_no_encoder_300m | `/vepfs-mlp2/c20250601/251105016/project/dllm_test/train_jobs/qwen3_vl_bioseq_grammar_v1_no_encoder_300m.yml` |
-| Initialized | t-20260621223256-w7sgz | qwen3_vl_bioseq_grammar_v1_no_encoder_600m | `/vepfs-mlp2/c20250601/251105016/project/dllm_test/train_jobs/qwen3_vl_bioseq_grammar_v1_no_encoder_600m.yml` |
-| Initialized | t-20260621223259-2cbkd | qwen3_vl_bioseq_grammar_v1_no_encoder_1b | `/vepfs-mlp2/c20250601/251105016/project/dllm_test/train_jobs/qwen3_vl_bioseq_grammar_v1_no_encoder_1b.yml` |
+| Queue | t-20260625140029-66gnq | qwen3_vl_bioseq_grammar_v2_no_encoder_qwen0_6b | `/vepfs-mlp2/c20250601/251105016/project/dllm_test/train_jobs/qwen3_vl_bioseq_grammar_v2_no_encoder_qwen0_6b.yml` |
+| Queue | t-20260625140032-t2vzk | qwen3_vl_bioseq_grammar_v2_esmc300m | `/vepfs-mlp2/c20250601/251105016/project/dllm_test/train_jobs/qwen3_vl_bioseq_grammar_v2_esmc300m.yml` |
+| Queue | t-20260625140036-sz7wd | qwen3_vl_bioseq_grammar_v2_esmc600m | `/vepfs-mlp2/c20250601/251105016/project/dllm_test/train_jobs/qwen3_vl_bioseq_grammar_v2_esmc600m.yml` |
+| Queue | t-20260625140039-dxt5t | qwen3_vl_bioseq_grammar_v2_esm2_650m | `/vepfs-mlp2/c20250601/251105016/project/dllm_test/train_jobs/qwen3_vl_bioseq_grammar_v2_esm2_650m.yml` |
 
 ## 2026-06-07
 
@@ -26,36 +24,16 @@ Last updated: 2026-06-21 (UTC+8, grammar_v1 resubmit updated yaml)
 
 ## Current Status
 
-- BioSeq code scaffold: in progress.
-- Documentation scaffold: in progress.
-- ESMC/ESM2 weights under `/c20250601/mj/model_weights`: pending.
-- Ophiuchus-Ab checkpoint under `/c20250601/mj/model_weights/ophiuchus_ab/Ophiuchus-Ab`: pending.
-- Weight downloads should fetch Hugging Face/PyTorch-compatible model files and skip TensorFlow `.h5` duplicates.
-- ESMC weights downloaded and file-verified:
-  - `/c20250601/mj/model_weights/esmc/ESMC-300M`
-  - `/c20250601/mj/model_weights/esmc/ESMC-600M`
-  - `/c20250601/mj/model_weights/esmc/ESMC-6B`
-- Download tool changed to use known model manifests and size-checked direct curl for large weight files because Hugging Face `snapshot_download` and raw curl retry both produced unreliable large-file writes on `/c20250601/mj/model_weights`.
-- Large weight files now stage partial downloads under `/vepfs-mlp2/c20250601/251105016/project/.download_tmp/bioseq_weights` and copy only complete, size-checked files into `/c20250601/mj/model_weights`.
-- User changed the current weight scope: `/c20250601/mj/model_weights/esm2/esm2_t48_15B_UR50D` is no longer required now.
-- Stopped the active 15B download and removed its partial staging directory and partial target directory.
-- ESM2 weights downloaded and file-verified:
-  - `/c20250601/mj/model_weights/esm2/esm2_t6_8M_UR50D`
-  - `/c20250601/mj/model_weights/esm2/esm2_t12_35M_UR50D`
-  - `/c20250601/mj/model_weights/esm2/esm2_t30_150M_UR50D`
-  - `/c20250601/mj/model_weights/esm2/esm2_t33_650M_UR50D`
-  - `/c20250601/mj/model_weights/esm2/esm2_t36_3B_UR50D`
-- ESM2 smoke-load passed for `/c20250601/mj/model_weights/esm2/esm2_t30_150M_UR50D`, `/c20250601/mj/model_weights/esm2/esm2_t33_650M_UR50D`, and `/c20250601/mj/model_weights/esm2/esm2_t36_3B_UR50D`.
-- Ophiuchus-Ab checkpoint downloaded from `https://zenodo.org/records/18478480` to `/c20250601/mj/model_weights/ophiuchus_ab/Ophiuchus-Ab/Ophiuchus-Ab.ckpt`.
-- Ophiuchus-Ab checkpoint checksum verified: `md5:9baa0d3fbe908930d9a7d4f8d8b6144c`.
-- Investigated ESMC/ESMFold2 multi-chain handling. Current conclusion: ESMC is used as a per-sequence language-model representation source, while ESMFold2 handles complexes through structure-prediction inputs and downstream folding/diffusion modules that build pairwise complex representations.
-- Checked Biohub/EvolutionaryScale ESM documentation and the ESMC/ESMFold2 preprint. The implementation constraint for `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/bioseq` is now: encode protein chains with ESMC as per-chain/per-sequence features, then perform multi-chain interaction modeling in BioSeq chain-aware attention or an ESMFold2-style pair/folding/diffusion module.
-- Cloned `https://github.com/Ophiuchus-Team/Ophiuchus-Ab` to `/tmp/Ophiuchus-Ab-src` for reference only. The official inference path uses `facebook/esm2_t33_650M_UR50D`, `--use_multimer`, `--sep_chains`, heavy length 150, and light length 128.
-- Added Ophiuchus-compatible ESM2 tokenization, Ophiuchus-Ab fixed-length antibody collation, Ophiuchus-Ab model preset helpers, ESM2 token dropout support, and optional no-position embedding support under `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/bioseq`.
-- Added an initial temporary `/vepfs-mlp2/c20250601/251105016/project/dllm_test/examples/bioseq/train_ab.py` helper for early pipeline checks; this was later superseded by the exact Ophiuchus-Ab training entry.
-- Verified `/vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/tests/bioseq` with `python -m pytest /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/tests/bioseq -q`: 5 passed.
-- Verified the temporary helper before the exact migration. Its generated checkpoint was not an Ophiuchus-Ab checkpoint and should not be used for Ophiuchus-Ab work.
-- Inspected `/c20250601/mj/model_weights/ophiuchus_ab/Ophiuchus-Ab/Ophiuchus-Ab.ckpt`: 768 state dict keys, includes `layers.*.self_attn.*`, `layers.*.multimer_attn.*`, `layers.*.self_attn.rot_emb.inv_freq`, `emb_layer_norm_after.*`, and `lm_head.dense/layer_norm.*`; no learned position embedding keys.
+- BioSeq scaffold + docs: in place. Active training path is grammar-v2 under `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch`.
+- Encoder loading validated: ESMC via Biohub `esm==3.2.3` (`load_local_esmc_encoder` / `BioSeqEncoderDiffusionModel.from_esmc`); ESM2 via HF `EsmModel`.
+
+## Model Weights
+
+Full path inventory is the single source of truth in `/vepfs-mlp2/c20250601/251105016/project/dllm_test/PROJ_GUIDE.md`. Shared root `/c20250601/mj/model_weights`; Volc-mounted copies under `/vepfs-mlp2/c20250601/251105016/project/dllm_test/model_weights` for cluster jobs.
+
+- ESMC (native loader, vocab 64, id 31 = `|`): `ESMC-300M` d_model 960 (L30/H15), `ESMC-600M` d_model 1152 (L36/H18), `ESMC-6B`.
+- ESM2 (HF `EsmModel`, vocab 33, id 31 = `<null_1>`): `esm2_t6_8M` hidden 320, `esm2_t12_35M` 480, `esm2_t30_150M` 640, `esm2_t33_650M` 1280 (Ophiuchus-Ab base), `esm2_t36_3B` 2560. 15B not downloaded.
+- Ophiuchus-Ab: `ophiuchus_ab/Ophiuchus-Ab/Ophiuchus-Ab.ckpt`, `md5:9baa0d3fbe908930d9a7d4f8d8b6144c`, from `https://zenodo.org/records/18478480`.
 
 ## 2026-06-11
 
@@ -1404,3 +1382,365 @@ Last updated: 2026-06-21 (UTC+8, grammar_v1 resubmit updated yaml)
   - `t-20260621223256-w7sgz` — `qwen3_vl_bioseq_grammar_v1_no_encoder_600m` — `/vepfs-mlp2/c20250601/251105016/project/dllm_test/train_jobs/qwen3_vl_bioseq_grammar_v1_no_encoder_600m.yml`
   - `t-20260621223259-2cbkd` — `qwen3_vl_bioseq_grammar_v1_no_encoder_1b` — `/vepfs-mlp2/c20250601/251105016/project/dllm_test/train_jobs/qwen3_vl_bioseq_grammar_v1_no_encoder_1b.yml`
 - Updated `## Active Volc Training Tasks` with the six new task IDs.
+
+## 2026-06-21 Resubmitted grammar_v1_esmc300m as non-preemptible
+
+- Cancelled preemptible encoder job: `t-20260621223241-z55tl` (`qwen3_vl_bioseq_grammar_v1_esmc300m`, was `Initialized`) via `volc ml_task cancel` -> `cancel success`.
+- Updated `/vepfs-mlp2/c20250601/251105016/project/dllm_test/train_jobs/qwen3_vl_bioseq_grammar_v1_esmc300m.yml`: `Preemptible: false`.
+- Resubmitted via `volc ml_task submit --conf` (wrapper: `volc-no-proxy.sh`).
+  - `task_id=t-20260621225143-xjbn4`, initial status `Initialized`, `Preemptible: false`.
+- Replaced `t-20260621223241-z55tl` with `t-20260621225143-xjbn4` in `## Active Volc Training Tasks`.
+
+## 2026-06-21 Resubmitted grammar_v1 with polynomial warmup + cosine decay LR
+
+- Added `--lr-scheduler polynomial` to `examples/bioseq/train_qwen3_vl_bioseq_ddp.py`: AirGen-style linear warmup from `--warmup-init-lr` (default `1e-7`) to peak LR, then cosine decay to `min_lr_ratio × base_lr` (default `0.1`). Encoder and decoder param groups share the same schedule shape on their respective `initial_lr` values.
+- Updated all six `train_jobs/qwen3_vl_bioseq_grammar_v1_*.yml` with `--warmup-steps 2000 --warmup-init-lr 1e-7 --lr-scheduler polynomial --min-lr-ratio 0.1`. Decoder peak `1e-4`; encoder jobs also keep `--encoder-lr 2e-5` (decays to `2e-6`).
+- Preemptible policy: `esmc300m` `Preemptible: false`; other five jobs `Preemptible: true`.
+- Cancelled prior six grammar_v1 tasks (`cancel success`):
+  - `t-20260621225143-xjbn4` (esmc300m, was Running)
+  - `t-20260621223245-ggbzf` (esmc600m)
+  - `t-20260621223248-wwpcb` (no_encoder_38m)
+  - `t-20260621223252-rlj8x` (no_encoder_300m)
+  - `t-20260621223256-w7sgz` (no_encoder_600m)
+  - `t-20260621223259-2cbkd` (no_encoder_1b)
+- Resubmitted all six via `volc-no-proxy.sh ml_task submit --conf`; initial status `Initialized`:
+  - esmc300m `t-20260621231245-hs2g6` — `/vepfs-mlp2/c20250601/251105016/project/dllm_test/train_jobs/qwen3_vl_bioseq_grammar_v1_esmc300m.yml` (`Preemptible: false`)
+  - esmc600m `t-20260621231248-vx6wn` — `/vepfs-mlp2/c20250601/251105016/project/dllm_test/train_jobs/qwen3_vl_bioseq_grammar_v1_esmc600m.yml` (`Preemptible: true`)
+  - no_encoder_38m `t-20260621231251-wb4k6` — `/vepfs-mlp2/c20250601/251105016/project/dllm_test/train_jobs/qwen3_vl_bioseq_grammar_v1_no_encoder_38m.yml` (`Preemptible: true`)
+  - no_encoder_300m `t-20260621231254-qn54x` — `/vepfs-mlp2/c20250601/251105016/project/dllm_test/train_jobs/qwen3_vl_bioseq_grammar_v1_no_encoder_300m.yml` (`Preemptible: true`)
+  - no_encoder_600m `t-20260621231258-pgzcl` — `/vepfs-mlp2/c20250601/251105016/project/dllm_test/train_jobs/qwen3_vl_bioseq_grammar_v1_no_encoder_600m.yml` (`Preemptible: true`)
+  - no_encoder_1b `t-20260621231301-j4qxb` — `/vepfs-mlp2/c20250601/251105016/project/dllm_test/train_jobs/qwen3_vl_bioseq_grammar_v1_no_encoder_1b.yml` (`Preemptible: true`)
+
+## 2026-06-21 Single-GPU batch probe + grammar_v1 batch128 tuned resubmit
+
+- Ran `/vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/debug/probe_grammar_v1_batch_size.py` on local A100-80GB with real grammar data, `max_sequence_length=2112`, stress batches `seq_len≈2054`, bf16 + gradient checkpointing.
+- Peak GPU memory (stress batch): no_encoder 38M/300M/600M/1B all OK through `batch_size=16` (max peak 20.1 GB); encoder ESMC-300M `batch_size=8` peak 29.6 GB, `batch_size=16` peak 57.2 GB; encoder ESMC-600M `batch_size=8` peak 42.7 GB, `batch_size=16` OOM.
+- Final YAML batch settings (all `effective_batch=128` on 8 GPU):
+  - esmc300m / esmc600m: `batch_size=8`, `grad_accum=2`
+  - no_encoder 38m / 300m / 600m / 1b: `batch_size=16`, `grad_accum=1`
+- Preemptible: esmc300m `false`; other five `true`.
+- Cancelled prior six tasks (`t-20260621232429-59dd4` through `t-20260621232446-6nltq`) and resubmitted:
+  - esmc300m `t-20260621233326-7tpvg`
+  - esmc600m `t-20260621233329-8ddcg`
+  - no_encoder_38m `t-20260621233332-9djzn`
+  - no_encoder_300m `t-20260621233335-26vnf`
+  - no_encoder_600m `t-20260621233339-8dtmr`
+  - no_encoder_1b `t-20260621233342-4xsr4`
+- Initial status: `Initialized`. Monitor script task id updated to `t-20260621233326-7tpvg`.
+
+## 2026-06-22 esmc300m Failed: NCCL watchdog + resubmit with safer batch
+
+- Failed task `t-20260621233326-7tpvg` (`qwen3_vl_bioseq_grammar_v1_esmc300m`): ran ~25 min, **0 training steps**, exit code 1.
+- Root cause (Volc logs `ml_task logs -t ... -i worker_0`): **NOT OOM**. PyTorch **ProcessGroupNCCL watchdog** killed rank 4 after **480s** with no collective progress during the first optimizer step (`batch_size=8`, `grad_accum=2`). `NCCL_TIMEOUT_SECOND=1800` does not cover PyTorch's separate `TORCH_NCCL_HEARTBEAT_TIMEOUT_SEC` (default 480).
+- Fix in `/vepfs-mlp2/c20250601/251105016/project/dllm_test/train_jobs/qwen3_vl_bioseq_grammar_v1_esmc300m.yml`:
+  - `batch_size=4`, `grad_accum=4` (still effective_batch=128; single-GPU probe peak ~16GB on stress batch)
+  - `export TORCH_NCCL_HEARTBEAT_TIMEOUT_SEC=1800`
+- Resubmitted: `task_id=t-20260622083259-7kzgf`, initial status `Initialized`, `Preemptible: false`.
+- Monitor script updated to pull Volc failure snippets on `Failed`/`Killed`.
+
+## 2026-06-22 2-GPU DDP debug job for multi-card hang diagnosis
+
+- **Not a gradient NaN issue**: failed task `t-20260621233326-7tpvg` died from NCCL watchdog (480s) before any logged step; resubmit `t-20260622083259-7kzgf` still Running ~7+ min with no `step=` yet (first encoder+DDP step may be very slow or still hung).
+- Added `--debug-ddp-timing` to `/vepfs-mlp2/c20250601/251105016/project/dllm_test/examples/bioseq/train_qwen3_vl_bioseq_ddp.py` (per-rank logs: batch wait / forward / backward / clip_grad / optimizer_step).
+- Submitted 2-GPU debug: `task_id=t-20260622084005-wx6fh` via `/vepfs-mlp2/c20250601/251105016/project/dllm_test/train_jobs/debug_qwen3_vl_bioseq_grammar_v1_esmc300m_2gpu.yml`
+  - `Flavor: ml.pni2.7xlarge` (2 GPU), `Preemptible: false`, `Priority: 6`
+  - Phase A: `num_workers=0`, 4 steps; Phase B: `num_workers=2` (production-like), 8 steps
+  - Same encoder config as production, `log_interval=1`, wandb disabled
+- Added `export TORCH_NCCL_HEARTBEAT_TIMEOUT_SEC=1800` to the five queued grammar_v1 YAMLs (600m + four no_encoder) so resubmits inherit the fix.
+
+## 2026-06-22 esmc300m production stopped; 8-GPU debug on 非闲时
+
+- Local dataloader probe (`scripts/debug/probe_grammar_v1_dataloader_ddp.py`): 8-rank CPU gloo + `num_workers=0/2` — **no hang** (max batch wait ~5s). Single-GPU encoder stress batch forward ~3.8s, backward ~0.5s — **not a pure data-loader stall**.
+- Cancelled stuck production esmc300m `t-20260622083259-7kzgf` and 2-GPU debug `t-20260622084005-wx6fh`; esmc300m slot repurposed for debug only (no full training until DDP root cause fixed).
+- Resubmitted 8-GPU debug: `task_id=t-20260622084553-n9qsk` via `/vepfs-mlp2/c20250601/251105016/project/dllm_test/train_jobs/debug_qwen3_vl_bioseq_grammar_v1_esmc300m_8gpu.yml`
+  - `Flavor: ml.pni2.28xlarge` (8 GPU), **`Preemptible: false`（非闲时）**, `Priority: 6`
+  - Phase A: `num_workers=0`, 4 steps; Phase B: `num_workers=2`, 8 steps; `--debug-ddp-timing`, wandb disabled
+- Monitor script retargeted to debug task/output: `scripts/monitor_grammar_v1_esmc300m.py` → `t-20260622084553-n9qsk`, output `output/debug_grammar_v1_esmc300m_8gpu`.
+
+## 2026-06-22 esmc300m 8-GPU debug Success — root cause confirmed
+
+- Debug task `t-20260622084553-n9qsk` finished **`Success`** in ~195s (`Preemptible: false`, `ml.pni2.28xlarge`).
+- **Phase A** (`num_workers=0`, 4 steps) and **Phase B** (`num_workers=2`, 8 steps) both completed; saved `output/debug_grammar_v1_esmc300m_8gpu/phase_nw2/final.pt`.
+- Per-rank timing (typical): `batch_ready` <0.2s, `forward` ~0.05–0.13s, `backward` ~0.1–0.36s, `clip_grad` ~0.01s, `optimizer_step` ~0.01s; **8 ranks stay in sync**; peak GPU mem ~21GB.
+- **Root cause of original failure `t-20260621233326-7tpvg`**: NOT OOM, NOT NaN, NOT dataloader hang. First DDP collective (`clip_grad_norm_` allreduce with `find_unused_parameters=True`) under `batch_size=8 grad_accum=2` + ESMC encoder exceeded PyTorch **`TORCH_NCCL_HEARTBEAT_TIMEOUT_SEC` default 480s** → NCCL watchdog SIGABRT. `NCCL_TIMEOUT_SECOND=1800` alone does not help.
+- **Verified fix**: `batch_size=4 grad_accum=4` + `export TORCH_NCCL_HEARTBEAT_TIMEOUT_SEC=1800` (already in production YAML). Production esmc300m can be resubmitted with this config.
+
+## 2026-06-22 Resubmit five preemptible grammar_v1 jobs with NCCL fix
+
+- **Risk assessment**: All 8-GPU DDP jobs need `TORCH_NCCL_HEARTBEAT_TIMEOUT_SEC=1800`. **Encoder** jobs (`esmc600m`) with old `batch_size=8 grad_accum=2` had the **same high risk** as failed esmc300m; **no_encoder** jobs (`bs=16 ga=1`) are lighter and unlikely to hit 480s, but old queued submits still lacked the heartbeat env var.
+- Cancelled old Queue tasks (old YAML, no heartbeat / esmc600m still bs=8):
+  - `t-20260621233329-8ddcg` esmc600m
+  - `t-20260621233332-9djzn` no_encoder_38m
+  - `t-20260621233335-26vnf` no_encoder_300m
+  - `t-20260621233339-8dtmr` no_encoder_600m
+  - `t-20260621233342-4xsr4` no_encoder_1b
+- YAML updates before resubmit: all five now `export TORCH_NCCL_HEARTBEAT_TIMEOUT_SEC=1800`; esmc600m changed to `batch_size=4 grad_accum=4`.
+- Resubmitted (`Preemptible: true`, initial `Initialized`):
+  - esmc600m `t-20260622085359-qcxhs`
+  - no_encoder_38m `t-20260622085402-cdlwt`
+  - no_encoder_300m `t-20260622085405-gm62n`
+  - no_encoder_600m `t-20260622085409-kcfsq`
+  - no_encoder_1b `t-20260622085413-pqgkk`
+
+## 2026-06-22 Submit esmc300m production (非闲时) + long-run monitor
+
+- Submitted production esmc300m: `task_id=t-20260622085513-t4225` via `/vepfs-mlp2/c20250601/251105016/project/dllm_test/train_jobs/qwen3_vl_bioseq_grammar_v1_esmc300m.yml`
+  - `Preemptible: false`, `batch_size=4 grad_accum=4`, `TORCH_NCCL_HEARTBEAT_TIMEOUT_SEC=1800`, `log_interval=20`
+- Enhanced monitor: `/vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/monitor_grammar_v1_esmc300m.py`
+  - Volc log step grep, WandB step tracking, stale-step alert (default 30 min), state file `output/grammar_v1_esmc300m/monitor_state.json`
+  - Log: `output/grammar_v1_esmc300m/monitor.log`; background stdout: `monitor_stdout.log`
+
+## 2026-06-22 esmc300m cancel/resubmit: num_workers=0 after 20min stall
+
+- Real-time poll (20×30s, ~20min): `t-20260622085513-t4225` stayed `Running` with **no `step=`**, WandB 0 points, no NCCL error yet — likely stuck on first batch with `num_workers=2` + full Arrow load.
+- Cancelled `t-20260622085513-t4225`; YAML changed `--num-workers 2` → `--num-workers 0` (matches successful debug Phase A).
+- Resubmitted: `task_id=t-20260622091611-vkq5v`, `Preemptible: false`. Monitor retargeted to new task id.
+
+## 2026-06-22 esmc300m root cause: uncached load_from_disk + resubmit with cache
+
+- **Why debug passed but production hung**: debug used `--limit-per-source 2000`; production streams full OAS/OTS shards. `GrammarArrowSource.iter_records` called `load_from_disk` on **every iterator restart** (~minutes per call on multi-million-row shards). 8 ranks × 4 sources desync on first batch → DDP allreduce stuck → NCCL watchdog (480s or 1800s).
+- **Fix**: process-local Arrow cache in `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/data/grammar.py` (`_cached_grammar_arrow_dataset`); warm restart 0.0s vs cold ~0.8s locally (was >300s without cache).
+- **Also**: `WeightedMixtureDataset` skips empty shards on restart instead of crashing (`mixture.py`).
+- Cancelled hung `t-20260622091611-vkq5v` (Running ~98min, 0 steps, NCCL 1800s watchdog).
+- Resubmitted: `task_id=t-20260622110228-pj2hb`, `num_workers=0`, `--debug-ddp-timing`, `Preemptible: false`.
+
+## 2026-06-22 Submit MINT MMseqs cluster on ml.c1ie.21xlarge
+
+- Local MMseqs cluster (13 threads, step2 prefilter ~21h) stopped to avoid conflict with Volc job.
+- Submitted `mint_string_mmseqs_cluster_c1ie` via `/vepfs-mlp2/c20250601/251105016/project/dllm_test/train_jobs/mint_string_mmseqs_cluster_c1ie.yml`
+- `task_id=t-20260622090726-lgpsv`, initial status `Initialized`, `Preemptible: false`, flavor `ml.c1ie.21xlarge`
+- Reuses existing `DB100` on vepfs; cleans `mmseqs_tmp` and reruns `mmseqs cluster --min-seq-id 0.50` with `MMSEQS_THREADS=$(nproc)`
+- Output target: `/vepfs-mlp2/c20250601/251105016/project/dllm_test/data/ppi_task_raw/raw/stringdb_mint/clu50.tsv`
+- Volc log: `/vepfs-mlp2/c20250601/251105016/project/dllm_test/data/ppi_task_raw/processed/pipeline_logs/mmseqs_cluster_volc.log`
+- Local `run_mint_pipeline_after_cluster.sh` orchestrator continues polling for `clu50.tsv` on shared vepfs.
+
+## 2026-06-22 Resubmit MINT MMseqs cluster on preemptible resources
+
+- Cancelled non-preemptible task `t-20260622090726-lgpsv` (mint_string_mmseqs_cluster_c1ie), final status `Killed`.
+- Resubmitted via same YAML with `Preemptible: true`: `task_id=t-20260622092811-r9bdb`, initial status `Initialized`, flavor `ml.c1ie.21xlarge`.
+
+## 2026-06-22 Fix MMseqs cluster preemptible (YAML alone did not apply)
+
+- Verified via `volc ml_task get --format Preemptible`: `t-20260622092811-r9bdb` was **`Preemptible: false`** on platform despite YAML `Preemptible: true` — task used native queue quota (组内固定资源), not idle/borrowed quota.
+- Cancelled `t-20260622092811-r9bdb` (`cancel success`, final `Killed`).
+- Resubmitted with explicit CLI flag: `volc ml_task submit --conf .../mint_string_mmseqs_cluster_c1ie.yml --preemptible`
+  - `task_id=t-20260622094943-n9bnv`, **`Preemptible: true`** confirmed, initial status `Initialized`.
+- Note: future submits should pass `--preemptible` (or verify field after submit); YAML-only `Preemptible: true` was not honored for this job.
+
+## 2026-06-22 Resubmit MMseqs cluster after preemptible kill
+
+- Previous preemptible run `t-20260622094943-n9bnv` reached `Killed` (~73 min, cascaded step1 align in progress; no `clu50.tsv`).
+- Resubmitted: `volc ml_task submit --conf .../mint_string_mmseqs_cluster_c1ie.yml --preemptible`
+  - `task_id=t-20260622112332-njxvr`, `Preemptible: true`, initial status `Initialized`.
+
+## 2026-06-22 Repair MINT physical links + resume splits/shards pipeline
+
+- `build_mint_string_splits.py` failed on corrupt `protein.physical.links.full.v12.0.txt.gz` (`zlib.error: invalid stored block lengths`; `gzip -t` failed).
+- Moved corrupt file to `.../stringdb_mint/protein.physical.links.full.v12.0.txt.gz.corrupt_20260622`.
+- Re-downloading via `aria2c` from STRING-DB (log: `data/ppi_task_raw/processed/pipeline_logs/mint_links_redownload.log`).
+- Started `scripts/data/run_mint_pipeline_after_links.sh` (waits for valid gzip → `build_mint_string_splits.py` → `build_mint_grammar_shards.py` train+valid).
+- `clu50.tsv` already present (59309604 lines); MMseqs Volc task `t-20260622112332-njxvr` finished `Success`.
+
+## 2026-06-23 Fix MINT splits OOM + restart pipeline
+
+- Re-download completed: `protein.physical.links.full.v12.0.txt.gz` size **15528028374** bytes, `gzip -t` OK.
+- Second splits attempt (`2026-06-22T18:21:16Z`) was **OOM-killed** while loading all links into RAM (`build_mint_string_splits.py:387246 Killed` in `mint_pipeline_after_links_stdout.log`). Root cause: in-memory `read_links()` list, not corrupt gzip.
+- Refactored `scripts/data/build_mint_string_splits.py` to **disk-backed** link materialization + index shuffle/filter (matches MINT `stringdb.py` semantics, avoids OOM).
+- Hardened `scripts/data/download_stringdb_assets.sh`: verify `gzip -t` + expected byte size before skipping re-download.
+- Restarted `run_mint_pipeline_after_links.sh --skip-wait` (log: `data/ppi_task_raw/processed/pipeline_logs/mint_pipeline_after_links.log`).
+
+## 2026-06-24 Submitted MINT native stringdb splits on ml.g3a.48xlarge (preemptible)
+
+- Cancelled local disk-backed `build_mint_string_splits.py` run (stuck at ~10M/2.36B filter after ~13h; random seek on 144GB flat file).
+- Added `scripts/data/run_mint_stringdb_native.py` — in-memory port of MINT `stringdb.py` (seeds 137/731, 250k valid, cluster dedup + train/valid disjoint filter).
+- Submitted `mint_stringdb_splits_g3a48xlarge` via `/vepfs-mlp2/c20250601/251105016/project/dllm_test/train_jobs/mint_stringdb_splits_g3a48xlarge.yml`
+- `task_id=t-20260624025343-pbrwh`, initial status `Initialized`, `Preemptible: true`, flavor `ml.g3a.48xlarge` (192 vCPU, 768 GiB per Volc ML Platform spec docs).
+- Log: `data/ppi_task_raw/processed/pipeline_logs/mint_stringdb_native_volc.log`
+- Outputs target: `data/ppi_task_raw/processed/mint_string_pretrain_v1/{validation,training_filtered}.{links,seqs}.txt.gz`
+
+## 2026-06-24 Cancelled g3a mint splits; run native MINT on dhlpw WebShell
+
+- Cancelled `t-20260624025343-pbrwh` (`mint_stringdb_splits_g3a48xlarge`, was `Queue`) via `volc ml_task cancel` -> `cancel success`.
+- Plan: run `scripts/data/run_mint_stringdb_on_node.sh` inside **WebShell** of running task `t-20260623161337-dhlpw` (`ml.pni2.28xlarge`, ~2TB RAM, vepfs mounted).
+- Background log: `data/ppi_task_raw/processed/pipeline_logs/mint_stringdb_native_bg.log`
+
+## 2026-06-22 no_encoder_38m grammar_v1 Failed (t-20260622085402-cdlwt)
+
+- Task `qwen3_vl_bioseq_grammar_v1_no_encoder_38m` via `/vepfs-mlp2/c20250601/251105016/project/dllm_test/train_jobs/qwen3_vl_bioseq_grammar_v1_no_encoder_38m.yml`, final status **`Failed`**, `Preemptible: true`.
+- Timeline: queued ~10.8h; actual train ~11min (WandB init 11:31 UTC → NCCL abort 11:42 UTC). **0 optimizer steps**, no checkpoint.
+- **Root trigger**: `[rank1] FloatingPointError: non-finite training loss detected at step=0` on first forward pass.
+- **Terminal failure mode**: other ranks stuck on DDP `ALLREDUCE` (SeqNum=4, 10min PyTorch default op timeout) → NCCL watchdog SIGABRT.
+- **Likely contributors vs healthy esmc300m job**: YAML still uses `--num-workers 2` (esmc300m uses `0`); no `--debug-ddp-timing`; 8-rank first-batch desync amplifies NaN detection collective hang.
+- Recommended resubmit: align with esmc300m fixes (`num_workers=0`, optional `bs=4 ga=4`, `--debug-ddp-timing`); investigate rank1 step-0 NaN locally if reproduces.
+
+## 2026-06-22 no_encoder_300m / no_encoder_600m Failed (same pattern as 38m)
+
+- **no_encoder_300m** `t-20260622085405-gm62n`: **`Failed`**, `Preemptible: true`, queued ~11h, train ~11min, **0 steps**, no checkpoint.
+- **no_encoder_600m** `t-20260622085409-kcfsq`: **`Failed`**, same timeline and symptoms.
+- **Root trigger (both)**: `[rank1] FloatingPointError: non-finite training loss detected at step=0`.
+- **Terminal failure**: DDP `ALLREDUCE` SeqNum=8 timeout **600s** → NCCL SIGABRT (same as 38m).
+- **Not data/OOM**: WandB shows model init only (`parameters=312M/626M`, `effective_batch=128`); no logged training step.
+- **YAML gap vs healthy esmc300m**: `--num-workers 2`, `batch_size=16 grad_accum=1`, no `--debug-ddp-timing`.
+
+## 2026-06-22 Resubmit no_encoder (38m/300m/600m/1b) + esmc600m with DDP fixes
+
+- Updated all four `train_jobs/qwen3_vl_bioseq_grammar_v1_no_encoder_*.yml` and `esmc600m.yml`: `--num-workers 0`, `--batch-size 4 --grad-accum 4`, `--debug-ddp-timing` (effective batch still 128).
+- Cancelled queued old submits: `t-20260622085413-pqgkk` (1b), `t-20260622085359-qcxhs` (esmc600m).
+- Resubmitted (`Preemptible: true`, initial status `Initialized`):
+  - no_encoder_38m `t-20260622202245-zsn5d`
+  - no_encoder_300m `t-20260622202249-prgdr`
+  - no_encoder_600m `t-20260622202252-jcmfd`
+  - no_encoder_1b `t-20260622202256-z4p5c`
+  - esmc600m `t-20260622202259-t2kdc`
+
+## 2026-06-22 Pipeline cleanup: grammar-only data path + DDP footgun guardrails
+
+- **双轨 data 收尾**: legacy collator/view_sampler 在上一轮已删除；本轮清掉残留引用——`scripts/debug/probe_no_encoder_step0_nan.py`（去掉 `view_seed`，按 rank 改用 `source_seed`），`scripts/tests/bioseq/test_qwen3_vl_ddp_training.py`（去掉 `full_denoise_probability` / `--full-denoise-probability` / `--max-chain-length`，`view_names` 断言改为 `grammar_v2`）。全仓 `.py` 已无 `BioSeqQwenDataCollator` / `BioSeqViewSampler` / `view_seed` / `allowed_views` 引用。
+- **DDP 数据层 footgun（代码级修复）**: `examples/bioseq/train_qwen3_vl_bioseq_ddp.py`
+  - `--num-workers` 默认 `2` → `0`（memory-mapped Arrow 源的安全路径；>0 时每个 worker 进程独立分片无限加权流，会让首 batch 在各 rank 间错位、触发 NCCL collective 超时——正是近期 `no_encoder` step-0 挂死的诱因之一）。
+  - 分布式且 `num_workers>0` 时打印告警。
+  - loader 构建后、训练循环前加 `torch.distributed.barrier()` 对齐各 rank 起步。
+- **文档/code 一致性（grammar-only）**:
+  - `dllm/pipelines/qwen3_vl_arch/data/README.md` 重写为 `GrammarArrowSource -> WeightedMixtureDataset -> TaskHomogeneousBatchDataset -> GrammarBioSeqCollator`，新增 `num_workers` footgun 说明，掩码键改为实际 emit 的 `diffusion_loss_mask` / `diffusion_eligible_mask` / `fixed_context_mask` 等。
+  - `PROJ_GUIDE.md`、`BIOSEQ_MODEL_PLAN.md`、`dllm/pipelines/qwen3_vl_arch/README.md` 的训练路径/掩码/`--num-workers 0`/py_compile+pytest 命令同步更新；条件 view 的设计意图保留，但说明改由 grammar 的 `<fixs>...<fixd>` + 推理期 partial-mask prompt 实现，不再有运行时 view sampler。
+- **验证**: `python -m pytest scripts/tests/bioseq/ -q` → 75 passed；相关脚本 `py_compile` 全过。
+- **未处理（明确留作后续）**: "单体 trainer"（`train_qwen3_vl_bioseq_ddp.py` ~900 行）拆分为 data/optim/loop/checkpoint 模块属于较大重构，风险较高，未在本轮动；建议作为独立后续项，避免与本次数据层/文档修复混在一起引入回归。
+
+## 2026-06-23 BioSeq 专用 Trainer + DataModule 抽取（行为等价重构）
+
+- **动机**: 上一节遗留的"单体 trainer"。`examples/bioseq` 下 `train_qwen3_vl_bioseq_ddp.py` 与 `train_bioseq_ddp.py` 各自重复实现 `setup_distributed`/`is_main`/`log`/`move_batch`/`setup_wandb`/`lr_at`/`save_checkpoint`/`maybe_resume`/主循环——这是"配置漂移"的结构性根因。
+- **新增 `dllm/pipelines/qwen3_vl_arch/data/datamodule.py::GrammarDataModule`**（169 行）：封装 tokenizer + `GrammarArrowSource → WeightedMixtureDataset → TaskHomogeneousBatchDataset → GrammarBioSeqCollator`，把 `num_workers=0` 安全默认与 rank×worker 分片固化在数据层。`from_args` 用 `getattr` 容忍 debug/probe 脚本的最小 namespace。已加入 `data/__init__.py` 导出。
+- **新增 `dllm/pipelines/qwen3_vl_arch/training/`**（`trainer.py` 491 行）：`BioSeqTrainer` 持有与模型无关的 infra——distributed context、LR schedule、grad-accum 主循环、非有限值守卫、window 日志 + wandb、validation 编排、checkpoint/resume、启动 barrier。模型/数据语义通过 `TrainStepFns` 适配层注入（`compute_output`/`loss_denominator`/`eligible_token_count`/`token_class_metrics`/`evaluate_validation`），循环不 import 任何入口脚本。
+- **`train_qwen3_vl_bioseq_ddp.py` 收薄**：927 → 474 行。保留模型语义 glue（`compute_training_output`/`evaluate_validation`/`loss_logging_denominator`/`diffusion_eligible_token_count`/`token_class_loss_metrics`）于入口模块，从而 `test_qwen3_vl_ddp_training.py` 对 `train_ddp.*` 的 monkeypatch 表面与 `build_loader`/`build_tokenizer`/`lr_at` 等导入面完全不变。`main()` 变为：parse_args → setup_distributed → GrammarDataModule → model/optimizer → BioSeqTrainer.fit。
+- **边界原则**: 共享的只有 infra；ophiuchus（`train_bioseq_ddp.py`）本轮**未动**，后续可通过提供自己的 `TrainStepFns` + DataModule 复用同一 `BioSeqTrainer`。
+- **验证（行为等价）**:
+  - `pytest scripts/tests/bioseq/ -q` → **75 passed**（含跑通重构后 `main()` 的单进程 subprocess smoke）。
+  - 2-rank CPU DDP smoke（torchrun）：init/barrier/loop/all-reduce 日志/validation/checkpoint(latest+final)/clean shutdown 全部正常，`loss/views=grammar_v2/tasks` 输出与重构前一致。
+  - `--resume auto` smoke：正确加载 `latest.pt` 从 step 3 续跑。
+  - probe/downstream 依赖脚本 `py_compile` 全过；无 lint 错误。
+
+## 2026-06-23 Val-loss top-k checkpoint retention (save_top_k=10)
+
+- Added `dllm/pipelines/qwen3_vl_arch/training/checkpointing.py::ValLossTopKCheckpointManager`.
+- CLI: `--save-top-k` default **10** (`0` disables). On each validation pass, if `val/loss` enters the top-K lowest seen so far, rank0 writes a full checkpoint under `output_dir/checkpoints/step_{step}_val_{loss}.pt`, maintains `checkpoints/topk_manifest.json`, and refreshes `best.pt` as the current best alias.
+- Unchanged: periodic `latest.pt` (`--save-interval`) for resume, plus `final.pt` at normal training end. Resume still defaults to `latest.pt`, not `best.pt`.
+- Tests: `scripts/tests/bioseq/test_bioseq_checkpointing.py` (3 passed) + existing DDP tests green; CPU smoke with `--val-interval 2 --save-top-k 10` wrote `best.pt` + one ranked checkpoint.
+
+## 2026-06-23 Submitted grammar_v1 downstream eval (esmc600m + no_encoder_38m)
+
+- Submitted single-GPU (`ml.pni2.3xlarge`, preemptible) downstream eval for two trained variants (both `step=50000`):
+  - **ESMC-600M encoder**: `eval_grammar_v1_esmc600m_downstream` via `train_jobs/eval_grammar_v1_esmc600m_downstream.yml`, `task_id=t-20260623152944-t757c`, initial status `Queue`, checkpoint `output/grammar_v1_esmc600m/latest.pt`.
+  - **No-encoder 38M**: `eval_grammar_v1_no_encoder_38m_downstream` via `train_jobs/eval_grammar_v1_no_encoder_38m_downstream.yml`, `task_id=t-20260623152946-tfh4t`, initial status `Queue`, checkpoint `output/grammar_v1_no_encoder_38m/latest.pt`.
+- Each job runs (same protocol as esmc300m baseline): SAbDab CDR-H1/H2/H3 10-fold (`argmax`, `max_iter=4`) then OAS holdout500 light pairing (`gumbel_argmax`, `max_iter=32`, `num_seqs=8`, `light_prompt_tokens=3`).
+- Shared runner: `scripts/downstream/run_grammar_variant_downstream_eval.sh`; outputs under `output/downstream_generation/grammar_v1_{esmc600m,no_encoder_38m}_*`.
+
+## 2026-06-23 Failed downstream eval jobs (esmc600m + no_encoder_38m)
+
+- Both eval tasks reached terminal **`Failed`** (exit code 1). Volc logs via `ml_task logs -t <id> -i worker_0`.
+- **esmc600m** `t-20260623152944-t757c`: CDR-H1 completed (**AAR 73.64%**, 10-fold). Failed at CDR-H2 start because **`output/downstream_generation/` was deleted** mid-run → bash redirect error `No such file or directory` (not OOM / not model error).
+- **no_encoder_38m** `t-20260623152946-tfh4t`: CDR-H1/H2/H3 all completed (**67.84% / 59.61% / 35.20%**). Failed ~2.5 min into light pairing 500; stdout has no Python traceback — most likely **preemptible job killed** (`Preemptible: true`) or process SIGKILL before logs flushed.
+- Current vepfs state: entire `output/downstream_generation/` directory is missing (including prior esmc300m / ophiuchus_ab artifacts); need `mkdir -p` + resubmit evals.
+
+## 2026-06-23 Resubmitted all three grammar_v1 downstream eval jobs
+
+- Confirmed `output/downstream_generation/` missing (no esmc300m CDR/pairing artifacts on vepfs); all three variants resubmitted on single-GPU `ml.pni2.3xlarge`, **`Preemptible: false`**.
+- **esmc300m**: `eval_grammar_v1_esmc300m_downstream`, `task_id=t-20260623161354-8ssl2`, yaml `train_jobs/eval_grammar_v1_esmc300m_downstream.yml`, ckpt `output/grammar_v1_esmc300m/latest.pt`.
+- **esmc600m**: `eval_grammar_v1_esmc600m_downstream`, `task_id=t-20260623161357-l9w7f`, yaml `train_jobs/eval_grammar_v1_esmc600m_downstream.yml`, ckpt `output/grammar_v1_esmc600m/latest.pt`.
+- **no_encoder_38m**: `eval_grammar_v1_no_encoder_38m_downstream`, `task_id=t-20260623161400-xckdb`, yaml `train_jobs/eval_grammar_v1_no_encoder_38m_downstream.yml`, ckpt `output/grammar_v1_no_encoder_38m/latest.pt`.
+- Script hardening: `run_grammar_variant_downstream_eval.sh` now supports `esmc300m` and `mkdir -p` before each CDR/pairing log write; yml entrypoints also `mkdir -p output/downstream_generation` before tee.
+
+## 2026-06-23 Submitted grammar_v1 Qwen0.6B ablation (supervised)
+
+- User requested two supervised ablation runs for scaling comparison:
+  1. **No-encoder Qwen3-0.6B trunk** (`L28/H1024/16h/FFN3072`, `--qk-norm`, cosine LR).
+  2. **ESMC-300M encoder + same ~0.6B decoder** (vs existing 38M decoder baseline).
+- Decoder ~394M params in our stack (ESMC vocab=33 vs Qwen vocab=151k); architecture matches official Qwen3-0.6B trunk dims. GQA not implemented — full MHA with head_dim=64.
+- Submitted (`Preemptible: true`, initial status `Initialized`):
+  - `qwen3_vl_bioseq_grammar_v1_no_encoder_qwen0_6b` → `task_id=t-20260623161338-k979t`, yaml `train_jobs/qwen3_vl_bioseq_grammar_v1_no_encoder_qwen0_6b.yml`, output `output/grammar_v1_no_encoder_qwen0_6b`, batch 4 × grad_accum 4.
+  - `qwen3_vl_bioseq_grammar_v1_esmc300m_decoder0_6b` → `task_id=t-20260623161337-dhlpw`, yaml `train_jobs/qwen3_vl_bioseq_grammar_v1_esmc300m_decoder0_6b.yml`, output `output/grammar_v1_esmc300m_decoder0_6b`, batch 2 × grad_accum 8 (memory headroom for encoder+large decoder).
+
+## 2026-06-24 Resumed no_encoder_qwen0_6b from checkpoint (preemptible kill)
+
+- Prior run `t-20260623161338-k979t` reached terminal **`Killed`** (preemptible). Checkpoints on vepfs: `best.pt` @ step 2000 (val=1.476), `latest.pt` @ step 2500.
+- Updated `train_jobs/qwen3_vl_bioseq_grammar_v1_no_encoder_qwen0_6b.yml`: `--resume none` → **`--resume auto`**, same `OUTPUT_DIR=output/grammar_v1_no_encoder_qwen0_6b`.
+- Resubmitted `qwen3_vl_bioseq_grammar_v1_no_encoder_qwen0_6b` → `task_id=t-20260624024912-7mv8m`, initial status `Initialized`, **`Preemptible: true`**. Training will resume from **`latest.pt` step 2500** toward `max_steps=50000`.
+
+## 2026-06-24 Resubmitted no_encoder_qwen0_6b with explicit checkpoint resume
+
+- Cancelled queued auto-resume job `t-20260624174108-4fsjv` (was `--resume auto`).
+- Prior run `t-20260624024912-7mv8m` terminal **`Killed`** (preemptible). On-disk checkpoint: `output/grammar_v1_no_encoder_qwen0_6b/latest.pt` @ **step 14500**.
+- Updated `/vepfs-mlp2/c20250601/251105016/project/dllm_test/train_jobs/qwen3_vl_bioseq_grammar_v1_no_encoder_qwen0_6b.yml`: set `RESUME_CKPT="${OUTPUT_DIR}/latest.pt"`, `test -f`, and **`--resume "${RESUME_CKPT}"`** (explicit path, not auto).
+- Resubmitted → `task_id=t-20260624174241-cbbs2`, initial status **`Queue`**, **`Preemptible: true`**. Continues from step 14500 toward `max_steps=50000`.
+
+## 2026-06-24 no_encoder_qwen0_6b resume Failed (t-20260624174241-cbbs2)
+
+- Task `qwen3_vl_bioseq_grammar_v1_no_encoder_qwen0_6b` via `/vepfs-mlp2/c20250601/251105016/project/dllm_test/train_jobs/qwen3_vl_bioseq_grammar_v1_no_encoder_qwen0_6b.yml`, final status **`Failed`**, exit code 1, ran ~13 min.
+- Volc logs (`ml_task logs -t t-20260624174241-cbbs2 -i worker_0`): **`trainer.resume()` → `load_state_dict` vocab mismatch**.
+  - Checkpoint `latest.pt` @ step **14500**: `decoder.token_embeddings.weight` / `lm_head.weight` shape **`[51, 1024]`**
+  - Current model built from updated grammar tokenizer: shape **`[53, 1024]`** (base ESMC 33 + **20** grammar tokens; checkpoint used 33 + **18**)
+- Root cause: **`grammar.py` grammar-v2 token table grew** (e.g. added `<protbs>`, `<protbd>`) after the checkpoint was saved; explicit `--resume latest.pt` cannot load incompatible embedding rows.
+- Fix options: (1) implement partial resume with embedding resize for new grammar ids; (2) revert tokenizer/grammar token list to the 51-token layout used at step 14500; (3) restart with `--resume none` (lose optimizer state / step counter).
+
+## 2026-06-24 Fixed vocab-expand resume + resubmitted no_encoder_qwen0_6b
+
+- Implemented vocab-row expansion in `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/training/checkpointing.py` (`adapt_model_state_dict_for_resume`, `load_resume_payload`): copies overlapping `token_embeddings` / tied `lm_head` rows when checkpoint vocab (51) < current model (53); skips optimizer state when vocab grows (new token rows get fresh Adam moments).
+- Wired into `BioSeqTrainer.resume()`; added unit tests in `scripts/tests/bioseq/test_bioseq_checkpointing.py` (5 passed). Local smoke: `latest.pt` @ step 14500 loads into 53-token model successfully.
+- Resubmitted `qwen3_vl_bioseq_grammar_v1_no_encoder_qwen0_6b` → `task_id=t-20260624181740-5hhhl`, initial status **`Initialized`**, **`Preemptible: true`**, still `--resume "${OUTPUT_DIR}/latest.pt"`.
+
+## 2026-06-24 Docs cleanup + ESM2 weights confirmed
+
+- Confirmed all 5 ESM2 snapshots present under `/c20250601/mj/model_weights/esm2`: `esm2_t6_8M` (hidden 320), `esm2_t12_35M` (480), `esm2_t30_150M` (640), `esm2_t33_650M` (1280, Ophiuchus-Ab base), `esm2_t36_3B` (2560). ESMC: `ESMC-300M` (960), `ESMC-600M` (1152), `ESMC-6B`.
+- Consolidated the bloated `## Current Status` block into a concise status + `## Model Weights` summary (added ESM2 hidden dims); full path inventory remains the single source of truth in `/vepfs-mlp2/c20250601/251105016/project/dllm_test/PROJ_GUIDE.md`. Removed duplicated pending/downloaded bullets and research prose already preserved in dated sections.
+- Refreshed the Active table from `volc ml_task list` (non-terminal only): removed 9 terminal rows (3 eval jobs, `pj2hb`, and the 06-22 38m/300m/600m/1b/esmc600m); kept `t-20260624174241-cbbs2` (Queue) and `t-20260623161337-dhlpw` (Running).
+
+## 2026-06-24 Synced docs to implemented grammar-v2 (Round 1 baseline)
+
+- Updated the four docs to match grammar-v2 Round 1 (superseded by Round 2 on 2026-06-25; see below).
+- Round-1 snapshot: structure tokens `<ab>`, `<tcr>`, `<nb>`, `<pep>`, `<prots>`, `<protd>` plus 10 relation tokens; leading type markers outside `<prots>`; repeated `<prots>` per chain; PPI dual modes; condition projection. **No longer current.**
+
+## 2026-06-25 Grammar v2 Round 2 docs + ab-ag type markers
+
+- Implemented grammar-v2 Round 2 in code (`grammar.py`, `modeling_bioseq.py`, train entry, tests): type markers inside `<prots>`, `.` chain separator, PPI conditional-only, encoder embedding replacement (no projection), `hidden_size` aligned to encoder latent dim.
+- Antigen-conditioned forms now include receptor type markers: **AB-Ag** `<prots> ANTIGEN <protd> <binding> <prots> <ab> HEAVY . LIGHT <protd>`; **NB-Ag** `<prots> ANTIGEN <protd> <binding> <prots> <nb> VHH <protd>`.
+- Synced docs: `GRAMMAR_V1.md`, `BIOSEQ_MODEL_PLAN.md`, `PROJ_GUIDE.md`, `PPI_DATA.md`, `scripts/data/README.md`. Removed stale Round-1 references (`ppi_joint`, leading type markers outside `<prots>`, repeated `<prots>` per chain, condition projection).
+- Bioseq pytest: **81 passed** after Round 2 + ab-ag/nb-ag marker change.
+
+## 2026-06-25 Submitted grammar-v2 test training (batch 128)
+
+- Created and submitted four preemptible 8×A100 grammar-v2 test jobs (`--batch-size 16`, `--grad-accum 1` → global **128**/step), `--resume none`, `--max-steps 10000`:
+  - **no_encoder ~0.6B** (`L28/H1024`): `t-20260625123349-rzdgz` via `train_jobs/qwen3_vl_bioseq_grammar_v2_no_encoder_qwen0_6b.yml` → `output/grammar_v2_no_encoder_qwen0_6b`
+  - **ESMC-300M** (decoder hidden auto **960**): `t-20260625123353-hln2f` via `train_jobs/qwen3_vl_bioseq_grammar_v2_esmc300m.yml` → `output/grammar_v2_esmc300m`
+  - **ESMC-600M** (decoder hidden auto **1152**): `t-20260625123356-4vfhd` via `train_jobs/qwen3_vl_bioseq_grammar_v2_esmc600m.yml` → `output/grammar_v2_esmc600m`
+  - **ESM2-650M** (decoder hidden auto **1280**): `t-20260625123359-dzst8` via `train_jobs/qwen3_vl_bioseq_grammar_v2_esm2_650m.yml` → `output/grammar_v2_esm2_650m`
+- All four initial status **`Queue`**, **`Preemptible: true`**. Previous grammar-v1 jobs no longer in active table (terminal or finished).
+
+## 2026-06-25 Resubmitted grammar-v2 jobs (chain separator + ESM2 path fix)
+
+- **Root cause (first batch, all Failed ~10 min)**:
+  - no_encoder / ESMC-300M / ESMC-600M: `GrammarRenderer.encode` → `chain_separator_id()` raised `AttributeError: Base tokenizer must expose token_to_id for chain separator '.'` because `HuggingFaceEsmTokenizerAdapter` / `TokenizersEsmTokenizer` did not expose `.` lookup (ESMC `tokenizer.json` has id 29, but adapter lacked API).
+  - ESM2-650M: entrypoint `test -f /c20250601/mj/model_weights/.../config.json` failed on cluster (path not on Vepfs mount); Volc logs nearly empty.
+- **Fixes**:
+  - Added `token_id()` to `TokenizersEsmTokenizer` and `HuggingFaceEsmTokenizerAdapter`; relaxed `GrammarTokenizer.chain_separator_id()` to use it.
+  - Symlinked ESM2 weights to `/vepfs-mlp2/c20250601/251105016/project/dllm_test/model_weights/esm2/`; updated esm2 YAML to Vepfs path.
+  - Added `test_esmc_hf_tokenizer_supports_chain_separator`; grammar tests 11/11 pass.
+- **Resubmitted** (same YAML batch 128 config, `--resume none`):
+  - `t-20260625140029-66gnq` no_encoder_qwen0_6b
+  - `t-20260625140032-t2vzk` esmc300m
+  - `t-20260625140036-sz7wd` esmc600m
+  - `t-20260625140039-dxt5t` esm2_650m
+- Initial status: all **`Queue`**, **`Preemptible: true`**. Failed predecessors: `t-20260625123349-rzdgz`, `t-20260625123353-hln2f`, `t-20260625123356-4vfhd`, `t-20260625123359-dzst8`.
+
+## 2026-06-25 Deleted v12 detailed; started v11 MINT-minimal download
+
+- Confirmed `protein.links.detailed.v*.txt.gz` is **per-channel evidence subscores only** (neighborhood/fusion/cooccurence/coexpression/experimental/database/textmining + combined_score); it has **NO mode/action** (binding/activation/inhibition/catalysis/reaction/ptmod/expression). mode lives in `protein.actions.v11.0.txt.gz` (v12 replaced it with the API-only `regulatory` network). Refs: STRING help/database (`network.actions` table), help/faq (score columns), STRING-2025 NAR (PMC11701646, regulatory directionality).
+- Detailed is **not needed** for MINT-style processing. **Deleted** corrupt `protein.links.detailed.v12.0.txt.gz` (203,534,412,387 bytes, `gzip -t` failed) + `.aria2` control file → freed ~190 GB.
+- MINT minimal input set (per `run_mint_stringdb_native.py`): `protein.physical.links.full.*.txt.gz` + `protein.sequences.*.fa` (+ locally-generated `clu50.tsv` from MMseqs2 50% clustering — NOT a download).
+- Refactored `scripts/data/download_stringdb_assets.sh` to be version-aware: `--version v11.0`, `--with-actions` (v11 only), `--with-detailed` (opt-in). Default = MINT minimal (full physical links + sequences) with `gzip -t` + byte-size verification (v11.0 full=33,237,086,717; sequences.fa.gz=5,526,372,370; actions=12,858,366,570) and `aria2c -c` resume.
+- Started **v11.0 MINT-minimal** background download (`pid=1859694`, log: `data/ppi_task_raw/processed/pipeline_logs/string_v11_minimal_download.log`): `protein.sequences.v11.0.fa.gz` (~5.1 GB) then `protein.physical.links.full.v11.0.txt.gz` (~31 GB).
+- Pending after download: gunzip sequences → MMseqs2 `clu50.v11.0.tsv` → `run_mint_stringdb_native.py --links-gz ... --sequences-fa ... --cluster-tsv ... --output-dir data/ppi_task_raw/processed/mint_string_pretrain_v11.0`.
+
+## 2026-06-25 Prepared v11 MMseqs2 clustering job (not yet submitted)
+
+- Parametrized `scripts/data/run_mint_mmseqs_cluster.sh` with `STRING_VERSION` env (default `v12.0` keeps `DB100`/`clu50.tsv` for backward compat; other versions → `DB100_<ver>` + `clu50.<ver>.tsv` + per-version tmp dir + log, so v11 never clobbers the existing v12 `clu50.tsv`).
+- Created `train_jobs/mint_string_mmseqs_cluster_v11.yml` (clone of `mint_string_mmseqs_cluster_c1ie.yml`, `ml.c1ie.21xlarge`, CPU-only, preemptible, `STRING_VERSION=v11.0`, output `clu50.v11.0.tsv`).
+- **Submit gated on download**: clustering needs the complete `protein.sequences.v11.0.fa`; the v11 minimal download (`pid=1859694`) is still in progress (STRING source ~230 KiB/s; sequences ~10% as of 05:46, then 31 GB physical links). Submit `mint_string_mmseqs_cluster_v11` only after `gzip -t protein.sequences.v11.0.fa.gz` passes.

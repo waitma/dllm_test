@@ -35,9 +35,10 @@ from __future__ import annotations
 import argparse
 import gzip
 import json
-import random
 import sys
 from pathlib import Path
+
+import numpy as np
 
 PROJECT_ROOT = Path("/vepfs-mlp2/c20250601/251105016/project/dllm_test")
 RAW_ROOT = PROJECT_ROOT / "data/ppi_task_raw/raw/stringdb_mint"
@@ -46,6 +47,7 @@ OUT_ROOT = PROJECT_ROOT / "data/ppi_task_raw/processed/mint_string_pretrain_v1"
 NUM_VALID = 250_000
 FILTER_SHUFFLE_SEED = 137
 SPLIT_SHUFFLE_SEED = 731
+WORK_DIR_NAME = "_work_links"
 
 
 def parse_args() -> argparse.Namespace:
@@ -62,6 +64,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--num-valid", type=int, default=NUM_VALID)
     parser.add_argument("--max-links", type=int, default=0, help="Debug cap on links read (0 = all).")
+    parser.add_argument("--keep-work", action="store_true", help="Keep intermediate links flat file under output-dir/_work_links.")
     return parser.parse_args()
 
 
@@ -95,78 +98,154 @@ def read_cluster_map(cluster_tsv: Path) -> dict[str, str]:
     return reps
 
 
-def read_links(links_gz: Path, max_links: int) -> list[str]:
-    links: list[str] = []
-    with gzip.open(links_gz, "rt") as handle:
+def materialize_links(links_gz: Path, work_dir: Path, max_links: int) -> tuple[Path, np.ndarray]:
+    """Stream gzip links to a flat file; return path and byte-offset array."""
+    work_dir.mkdir(parents=True, exist_ok=True)
+    raw_path = work_dir / "links_raw.bin"
+    offsets_path = work_dir / "links_offsets.npy"
+
+    if raw_path.exists() and offsets_path.exists():
+        offsets = np.load(offsets_path, mmap_mode="r")
+        if max_links == 0 or len(offsets) <= max_links:
+            print(f"Reusing materialized links: {raw_path} ({len(offsets):,} rows)", flush=True)
+            return raw_path, offsets
+
+    offsets: list[int] = []
+    pos = 0
+    with gzip.open(links_gz, "rt") as handle, raw_path.open("wb") as out:
         header = next(handle)
         if "protein1" not in header:
             raise ValueError(f"Unexpected links header: {header!r}")
         for index, line in enumerate(handle, start=1):
-            links.append(line.strip())
+            line_bytes = line.rstrip("\n").encode() + b"\n"
+            offsets.append(pos)
+            out.write(line_bytes)
+            pos += len(line_bytes)
+            if index % 1_000_000 == 0:
+                print(f"  materialized {index:,} links ({pos / 1e9:.2f} GB)", flush=True)
             if max_links and index >= max_links:
                 break
-    return links
+
+    offset_arr = np.asarray(offsets, dtype=np.int64)
+    np.save(offsets_path, offset_arr)
+    return raw_path, offset_arr
 
 
-def filter_unique_cluster_pairs(links: list[str], reps: dict[str, str], seed: int) -> list[str]:
-    random.seed(seed)
-    random.shuffle(links)
+def read_link_at(raw_path: Path, offsets: np.ndarray, src_idx: int, handle) -> str:
+    handle.seek(int(offsets[src_idx]))
+    return handle.readline().decode().rstrip("\n")
+
+
+def shuffled_source_indices(n: int, seed: int) -> np.ndarray:
+    perm = np.arange(n, dtype=np.int64)
+    np.random.RandomState(seed).shuffle(perm)
+    return perm
+
+
+def filter_unique_cluster_pairs_disk(
+    raw_path: Path,
+    offsets: np.ndarray,
+    reps: dict[str, str],
+    seed: int,
+) -> np.ndarray:
+    perm = shuffled_source_indices(len(offsets), seed)
     linked_clusters: set[tuple[str, str]] = set()
-    filtered: list[str] = []
-    for link in links:
-        name1, name2 = link.split()[:2]
-        clu1, clu2 = reps[name1], reps[name2]
-        key = tuple(sorted((clu1, clu2)))
-        if key in linked_clusters:
-            continue
-        linked_clusters.add(key)
-        filtered.append(link)
-    return filtered
+    kept: list[int] = []
+    total = len(perm)
+    with raw_path.open("rb") as handle:
+        for scanned, src_idx in enumerate(perm, start=1):
+            line = read_link_at(raw_path, offsets, int(src_idx), handle)
+            name1, name2 = line.split()[:2]
+            clu1, clu2 = reps[name1], reps[name2]
+            key = tuple(sorted((clu1, clu2)))
+            if key in linked_clusters:
+                continue
+            linked_clusters.add(key)
+            kept.append(int(src_idx))
+            if scanned % 1_000_000 == 0:
+                print(
+                    f"  scanned {scanned:,}/{total:,}, kept {len(kept):,}",
+                    flush=True,
+                )
+    del linked_clusters
+    return np.asarray(kept, dtype=np.int64)
 
 
-def write_links_and_seqs(
-    links: list[str],
+def write_links_and_seqs_from_indices(
+    raw_path: Path,
+    offsets: np.ndarray,
+    kept_indices: np.ndarray,
     seqs: dict[str, str],
     links_path: Path,
     seqs_path: Path,
+    start: int = 0,
+    end: int | None = None,
 ) -> tuple[int, int]:
+    end = len(kept_indices) if end is None else end
     written_seqs: set[str] = set()
-    with gzip.open(links_path, "wt") as links_file, gzip.open(seqs_path, "wt") as seqs_file:
-        for link in links:
-            links_file.write(link + "\n")
-            name1, name2 = link.split()[:2]
+    written_links = 0
+    with (
+        gzip.open(links_path, "wt") as links_file,
+        gzip.open(seqs_path, "wt") as seqs_file,
+        raw_path.open("rb") as handle,
+    ):
+        for src_idx in kept_indices[start:end]:
+            line = read_link_at(raw_path, offsets, int(src_idx), handle)
+            links_file.write(line + "\n")
+            written_links += 1
+            name1, name2 = line.split()[:2]
             for name in (name1, name2):
                 if name in written_seqs:
                     continue
                 seqs_file.write(f"{name} {seqs[name]}\n")
                 written_seqs.add(name)
-    return len(links), len(written_seqs)
+            if written_links % 1_000_000 == 0:
+                print(
+                    f"  wrote {written_links:,} links, {len(written_seqs):,} seqs",
+                    flush=True,
+                )
+    return written_links, len(written_seqs)
 
 
-def filter_training_disjoint_clusters(
-    training_links: list[str],
-    validation_links: list[str],
+def filter_training_disjoint_clusters_disk(
+    raw_path: Path,
+    offsets: np.ndarray,
+    train_indices: np.ndarray,
+    val_indices: np.ndarray,
     reps: dict[str, str],
     links_path: Path,
     seqs_path: Path,
     seqs: dict[str, str],
 ) -> tuple[int, int, int]:
-    val_clusters = set()
-    for link in validation_links:
-        name1, name2 = link.split()[:2]
-        val_clusters.add(reps[name1])
-        val_clusters.add(reps[name2])
+    val_clusters: set[str] = set()
+    with raw_path.open("rb") as handle:
+        for src_idx in val_indices:
+            line = read_link_at(raw_path, offsets, int(src_idx), handle)
+            name1, name2 = line.split()[:2]
+            val_clusters.add(reps[name1])
+            val_clusters.add(reps[name2])
+    print(f"Validation covers {len(val_clusters):,} clusters", flush=True)
 
-    kept: list[str] = []
+    kept: list[int] = []
     scanned = 0
-    for link in training_links:
-        scanned += 1
-        name1, name2 = link.split()[:2]
-        if reps[name1] in val_clusters or reps[name2] in val_clusters:
-            continue
-        kept.append(link)
+    with raw_path.open("rb") as handle:
+        for src_idx in train_indices:
+            scanned += 1
+            line = read_link_at(raw_path, offsets, int(src_idx), handle)
+            name1, name2 = line.split()[:2]
+            if reps[name1] in val_clusters or reps[name2] in val_clusters:
+                continue
+            kept.append(int(src_idx))
+            if scanned % 1_000_000 == 0:
+                print(
+                    f"  scanned {scanned:,} train_pool links, kept {len(kept):,}",
+                    flush=True,
+                )
 
-    written_links, written_seqs = write_links_and_seqs(kept, seqs, links_path, seqs_path)
+    kept_arr = np.asarray(kept, dtype=np.int64)
+    written_links, written_seqs = write_links_and_seqs_from_indices(
+        raw_path, offsets, kept_arr, seqs, links_path, seqs_path
+    )
     return scanned, written_links, written_seqs
 
 
@@ -176,6 +255,7 @@ def main() -> None:
     sequences_fa = args.sequences_fa or (raw_root / "protein.sequences.v12.0.fa")
     cluster_tsv = args.cluster_tsv or (raw_root / "clu50.tsv")
     links_gz = args.links_gz or (raw_root / "protein.physical.links.full.v12.0.txt.gz")
+    work_dir = args.output_dir / WORK_DIR_NAME
 
     for path in (sequences_fa, cluster_tsv, links_gz):
         if not path.exists():
@@ -192,34 +272,49 @@ def main() -> None:
     reps = read_cluster_map(cluster_tsv)
     print(f"Loaded {len(reps):,} sequence->cluster mappings ({len(set(reps.values())):,} clusters)", flush=True)
 
-    print(f"Reading links from {links_gz}", flush=True)
-    links = read_links(links_gz, args.max_links)
-    print(f"Read {len(links):,} raw links", flush=True)
+    print(f"Materializing links from {links_gz} (disk-backed, avoids OOM)", flush=True)
+    raw_path, offsets = materialize_links(links_gz, work_dir, args.max_links)
+    print(f"Ready: {len(offsets):,} raw links in {raw_path}", flush=True)
 
     print("Filtering to one link per cluster pair (MINT step 1)", flush=True)
-    filtered = filter_unique_cluster_pairs(links, reps, FILTER_SHUFFLE_SEED)
-    print(f"Kept {len(filtered):,} cluster-unique links", flush=True)
+    kept = filter_unique_cluster_pairs_disk(raw_path, offsets, reps, FILTER_SHUFFLE_SEED)
+    print(f"Kept {len(kept):,} cluster-unique links", flush=True)
 
-    random.seed(SPLIT_SHUFFLE_SEED)
-    random.shuffle(filtered)
-    validation = filtered[: args.num_valid]
-    training = filtered[args.num_valid :]
-    print(f"Split: valid={len(validation):,}, train_pool={len(training):,}", flush=True)
+    print(f"Shuffling filtered links (seed={SPLIT_SHUFFLE_SEED})", flush=True)
+    np.random.RandomState(SPLIT_SHUFFLE_SEED).shuffle(kept)
+    val_indices = kept[: args.num_valid]
+    train_indices = kept[args.num_valid :]
+    print(f"Split: valid={len(val_indices):,}, train_pool={len(train_indices):,}", flush=True)
 
     val_links = args.output_dir / "validation.links.txt.gz"
     val_seqs = args.output_dir / "validation.seqs.txt.gz"
-    val_nlinks, val_nseqs = write_links_and_seqs(validation, seqs, val_links, val_seqs)
+    val_nlinks, val_nseqs = write_links_and_seqs_from_indices(
+        raw_path, offsets, val_indices, seqs, val_links, val_seqs
+    )
     print(f"Wrote validation: {val_nlinks:,} links, {val_nseqs:,} seqs", flush=True)
 
     train_links = args.output_dir / "training_filtered.links.txt.gz"
     train_seqs = args.output_dir / "training_filtered.seqs.txt.gz"
-    scanned, train_nlinks, train_nseqs = filter_training_disjoint_clusters(
-        training, validation, reps, train_links, train_seqs, seqs
+    scanned, train_nlinks, train_nseqs = filter_training_disjoint_clusters_disk(
+        raw_path,
+        offsets,
+        train_indices,
+        val_indices,
+        reps,
+        train_links,
+        train_seqs,
+        seqs,
     )
     print(
         f"Wrote training_filtered: scanned={scanned:,}, kept={train_nlinks:,} links, {train_nseqs:,} seqs",
         flush=True,
     )
+
+    if not args.keep_work:
+        raw_path.unlink(missing_ok=True)
+        (work_dir / "links_offsets.npy").unlink(missing_ok=True)
+        if work_dir.exists() and not any(work_dir.iterdir()):
+            work_dir.rmdir()
 
     manifest = {
         "policy_id": "mint_string_pretrain_v1",

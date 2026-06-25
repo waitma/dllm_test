@@ -1,4 +1,4 @@
-from .collator import BioSeqQwenDataCollator
+from .datamodule import GrammarDataModule
 from .esm_encoding import Esm2SequenceTokenizer, HuggingFaceEsmTokenizerAdapter
 from .grammar import (
     DEFAULT_GRAMMAR_DATA_DIR,
@@ -55,17 +55,14 @@ from .sources import (
     processed_json_to_record,
     source_from_config,
 )
-from .view_sampler import BioSeqViewSampler, GenerationView, ResidueSpan
 
 __all__ = [
     "BioSeqChain",
     "BioSeqRecord",
-    "BioSeqQwenDataCollator",
-    "BioSeqViewSampler",
     "CsvBioSeqSource",
     "CsvSourceConfig",
     "Esm2SequenceTokenizer",
-    "GenerationView",
+    "GrammarDataModule",
     "GRAMMAR_RELATIONS",
     "GRAMMAR_TOKENS",
     "GrammarArrowSource",
@@ -78,7 +75,6 @@ __all__ = [
     "PpiArrowSource",
     "PpiArrowSourceConfig",
     "ProcessedJsonlSource",
-    "ResidueSpan",
     "DATA_TIER",
     "STRING_LINK_CHANNELS",
     "TASK_FAMILY_TO_RELATION",

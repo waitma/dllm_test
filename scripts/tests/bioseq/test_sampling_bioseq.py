@@ -111,11 +111,14 @@ def test_no_encoder_generate_runs_and_unmasks() -> None:
     assert output_tokens[generation].ne(tokenizer.mask_token_id).all()
 
 
-def test_encoder_generate_runs_with_proxy_stream() -> None:
+def test_encoder_generate_runs_with_per_chain_inputs() -> None:
     tokenizer = GrammarTokenizer(Esm2SequenceTokenizer())
     batch = _antibody_batch(tokenizer)
     config = _tiny_config(tokenizer)
-    model = BioSeqEncoderDiffusionModel(config, encoder=TinyEncoder(tokenizer.vocab_size)).eval()
+    model = BioSeqEncoderDiffusionModel(
+        config,
+        encoder=TinyEncoder(tokenizer.vocab_size, hidden_size=config.hidden_size),
+    ).eval()
     partial = light_chain_generation_partial_mask(batch, tokenizer)
     output_tokens, _ = generate_bioseq(
         model,

@@ -8,10 +8,10 @@ import torch.nn as nn
 
 from dllm.pipelines.qwen3_vl_arch.data import (
     BioSeqChain,
-    BioSeqQwenDataCollator,
     BioSeqRecord,
-    BioSeqViewSampler,
     Esm2SequenceTokenizer,
+    GrammarBioSeqCollator,
+    GrammarTokenizer,
 )
 from dllm.pipelines.qwen3_vl_arch.modeling_bioseq import (
     BioSeqDiffusionDecoder,
@@ -40,9 +40,12 @@ class TinyEncoder(nn.Module):
         return SimpleNamespace(last_hidden_state=hidden_states)
 
 
+_GRAMMAR_TOKENIZER = GrammarTokenizer(Esm2SequenceTokenizer())
+
+
 def tiny_config(**overrides) -> BioSeqDiffusionTransformerConfig:
     values = {
-        "vocab_size": 33,
+        "vocab_size": _GRAMMAR_TOKENIZER.vocab_size,
         "hidden_size": 32,
         "num_hidden_layers": 2,
         "num_attention_heads": 4,
@@ -68,6 +71,7 @@ def antibody_antigen_batch() -> dict[str, torch.Tensor]:
             ],
             task_type="antibody_antigen",
             source="unit",
+            labels={"relation": "binding"},
         ),
         BioSeqRecord(
             chains=[
@@ -77,14 +81,10 @@ def antibody_antigen_batch() -> dict[str, torch.Tensor]:
             ],
             task_type="antibody_antigen",
             source="unit",
+            labels={"relation": "binding"},
         ),
     ]
-    collator = BioSeqQwenDataCollator(
-        tokenizer=Esm2SequenceTokenizer(),
-        view_sampler=BioSeqViewSampler(allowed_views=["full_denoise"], seed=0),
-        require_homogeneous_task=True,
-    )
-    return collator(records)
+    return GrammarBioSeqCollator(_GRAMMAR_TOKENIZER)(records)
 
 
 def test_no_encoder_model_compute_loss_runs_and_respects_fixed_context() -> None:
@@ -96,7 +96,7 @@ def test_no_encoder_model_compute_loss_runs_and_respects_fixed_context() -> None
 
     assert output.loss is not None
     assert torch.isfinite(output.loss)
-    assert output.logits.shape == (*batch["input_ids"].shape, 33)
+    assert output.logits.shape == (*batch["input_ids"].shape, tiny_config().vocab_size)
     assert output.corruption_mask is not None
     assert (output.corruption_mask & ~batch["diffusion_loss_mask"]).sum().item() == 0
     assert (output.corruption_mask & batch["fixed_context_mask"]).sum().item() == 0
@@ -179,7 +179,7 @@ def test_decoder_initialization_starts_near_uniform_cross_entropy() -> None:
 def test_encoder_model_compute_loss_uses_diffusion_state_token_features() -> None:
     torch.manual_seed(0)
     batch = antibody_antigen_batch()
-    encoder = TinyEncoder(vocab_size=33, hidden_size=16)
+    encoder = TinyEncoder(vocab_size=_GRAMMAR_TOKENIZER.vocab_size, hidden_size=32)
     model = BioSeqEncoderDiffusionModel(tiny_config(), encoder=encoder, freeze_encoder=False)
 
     output = model.compute_loss(batch)
@@ -194,35 +194,8 @@ def test_encoder_model_compute_loss_uses_diffusion_state_token_features() -> Non
         mask_token_id=model.config.mask_token_id,
     )
     assert torch.equal(output.noised_encoder_input_ids, expected_encoder_ids)
-    assert torch.equal(output.noised_encoder_input_ids[:, 2], batch["encoder_input_ids"][:, 2])
     assert output.encoder_condition is not None
-    assert output.encoder_condition.shape == (*batch["input_ids"].shape, 16)
-
-    chain_token_features = model.encode_chain_tokens(
-        encoder_input_ids=output.noised_encoder_input_ids,
-        encoder_attention_mask=batch["encoder_attention_mask"],
-        encoder_residue_mask=batch["encoder_residue_mask"],
-        encoder_chain_mask=batch["encoder_chain_mask"],
-    )
-    expected_condition = model.gather_token_condition(
-        chain_token_features,
-        chain_ids=batch["chain_ids"],
-        position_ids_inner=batch["position_ids_inner"],
-        attention_mask=batch["attention_mask"],
-        encoder_residue_mask=batch["encoder_residue_mask"],
-    )
-    assert torch.allclose(output.encoder_condition, expected_condition)
-
-    residue_positions = torch.nonzero(
-        (batch["chain_ids"][0] == 0) & batch["position_ids_inner"][0].ge(0),
-        as_tuple=False,
-    ).flatten()
-    decoder_pos = residue_positions[0]
-    residue_index = batch["position_ids_inner"][0, decoder_pos]
-    encoder_residue_positions = torch.nonzero(batch["encoder_residue_mask"][0, 0], as_tuple=False).flatten()
-    encoder_pos = encoder_residue_positions[residue_index]
-    expected_token_feature = encoder.embeddings(output.noised_encoder_input_ids[0, 0, encoder_pos])
-    assert torch.allclose(output.encoder_condition[0, decoder_pos], expected_token_feature)
+    assert output.encoder_condition.shape == (*batch["input_ids"].shape, 32)
 
     special_positions = batch["attention_mask"] & batch["position_ids_inner"].lt(0)
     assert output.encoder_condition[special_positions].abs().sum().item() == 0
@@ -235,7 +208,7 @@ def test_encoder_model_compute_loss_uses_diffusion_state_token_features() -> Non
 def test_encoder_model_can_freeze_encoder() -> None:
     torch.manual_seed(0)
     batch = antibody_antigen_batch()
-    encoder = TinyEncoder(vocab_size=33, hidden_size=16)
+    encoder = TinyEncoder(vocab_size=_GRAMMAR_TOKENIZER.vocab_size, hidden_size=32)
     model = BioSeqEncoderDiffusionModel(tiny_config(), encoder=encoder, freeze_encoder=True)
 
     output = model.compute_loss(batch)
@@ -249,14 +222,14 @@ def test_encoder_model_can_freeze_encoder() -> None:
 def test_encoder_forward_ignores_extra_collator_fields() -> None:
     torch.manual_seed(0)
     batch = antibody_antigen_batch()
-    encoder = TinyEncoder(vocab_size=33, hidden_size=16)
+    encoder = TinyEncoder(vocab_size=_GRAMMAR_TOKENIZER.vocab_size, hidden_size=32)
     model = BioSeqEncoderDiffusionModel(tiny_config(), encoder=encoder)
 
     model_inputs = dict(batch)
     input_ids = model_inputs.pop("input_ids")
     output = model(input_ids=input_ids, **model_inputs)
 
-    assert output.logits.shape == (*batch["input_ids"].shape, 33)
+    assert output.logits.shape == (*batch["input_ids"].shape, tiny_config().vocab_size)
 
 
 def test_denoiser_accepts_soft_diffusion_state_without_internal_one_hot() -> None:

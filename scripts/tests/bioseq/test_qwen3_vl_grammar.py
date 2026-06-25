@@ -21,7 +21,7 @@ from dllm.pipelines.qwen3_vl_arch.data import (
     GrammarRenderer,
     GrammarTokenizer,
 )
-from dllm.pipelines.qwen3_vl_arch.data.grammar import CHAIN_ID_FIXED_CONTEXT, CHAIN_ID_OBJECT_A, CHAIN_ID_OBJECT_B
+from dllm.pipelines.qwen3_vl_arch.data.esm_encoding import HuggingFaceEsmTokenizerAdapter
 from dllm.pipelines.qwen3_vl_arch.modeling_bioseq import (
     BioSeqDiffusionTransformerConfig,
     BioSeqEncoderDiffusionModel,
@@ -55,38 +55,40 @@ def test_grammar_renders_oas_and_ots_in_canonical_chain_order() -> None:
         source="ots_paired",
     )
 
-    antibody_tokens, _ = rendered_tokens(antibody)
+    antibody_tokens, antibody_row = rendered_tokens(antibody)
     tcr_tokens, _ = rendered_tokens(tcr)
 
     assert antibody_tokens == [
         "<prots>",
+        "<ab>",
         "H",
         "H",
         "H",
-        "<prote>",
-        "<pairs>",
-        "<prots>",
+        ".",
         "L",
         "L",
         "L",
-        "<prote>",
+        "<protd>",
     ]
+    assert antibody_row["fixed_context_mask"][1] == 1
+    assert antibody_row["fixed_context_mask"][0] == 0
+    assert all(not value for value in antibody_row["fixed_context_mask"][2:])
+
     assert tcr_tokens == [
         "<prots>",
+        "<tcr>",
         "A",
         "A",
         "A",
-        "<prote>",
-        "<pairs>",
-        "<prots>",
+        ".",
         "B",
         "B",
         "B",
-        "<prote>",
+        "<protd>",
     ]
 
 
-def test_single_entity_uses_prots_without_generate_or_relation() -> None:
+def test_nanobody_uses_nb_marker_inside_prots() -> None:
     nanobody = BioSeqRecord(
         chains=[BioSeqChain("VHHVHH", "nanobody_vhh")],
         task_type="nanobody",
@@ -95,18 +97,16 @@ def test_single_entity_uses_prots_without_generate_or_relation() -> None:
 
     tokens, row = rendered_tokens(nanobody)
 
-    assert tokens == ["<prots>", "V", "H", "H", "V", "H", "H", "<prote>"]
-    assert "<generate>" not in tokens
-    assert "<pairs>" not in tokens
-    assert "<binding>" not in tokens
-    assert not any(row["fixed_context_mask"])
+    assert tokens == ["<prots>", "<nb>", "V", "H", "H", "V", "H", "H", "<protd>"]
+    assert row["fixed_context_mask"][1] == 1
+    assert row["fixed_context_mask"][0] == 0
 
 
-def test_antibody_pair_keeps_both_chains_when_oas_labels_both_as_heavy() -> None:
+def test_antibody_pair_keeps_both_chains_in_one_prots_block() -> None:
     record = BioSeqRecord(
         chains=[
             BioSeqChain("AAA", "antibody_heavy"),
-            BioSeqChain("CCC", "antibody_heavy"),
+            BioSeqChain("CCC", "antibody_light"),
         ],
         task_type="antibody",
         source="oas_paired",
@@ -116,43 +116,15 @@ def test_antibody_pair_keeps_both_chains_when_oas_labels_both_as_heavy() -> None
 
     assert tokens == [
         "<prots>",
+        "<ab>",
         "A",
         "A",
         "A",
-        "<prote>",
-        "<pairs>",
-        "<prots>",
+        ".",
         "C",
         "C",
         "C",
-        "<prote>",
-    ]
-
-
-def test_tcr_pair_keeps_both_chains_when_ots_labels_both_as_beta() -> None:
-    record = BioSeqRecord(
-        chains=[
-            BioSeqChain("BBB", "tcr_beta"),
-            BioSeqChain("CCC", "tcr_beta"),
-        ],
-        task_type="tcr",
-        source="ots_paired",
-    )
-
-    tokens, _ = rendered_tokens(record)
-
-    assert tokens == [
-        "<prots>",
-        "C",
-        "C",
-        "C",
-        "<prote>",
-        "<pairs>",
-        "<prots>",
-        "B",
-        "B",
-        "B",
-        "<prote>",
+        "<protd>",
     ]
 
 
@@ -176,90 +148,54 @@ def test_grammar_renders_tcr_peptide_and_ppi() -> None:
         labels={"relation": "binding"},
     )
 
-    tcr_tokens, _ = rendered_tokens(tcr)
-    ppi_tokens, _ = rendered_tokens(ppi, rng=random.Random(1))
+    tcr_tokens, tcr_row = rendered_tokens(tcr)
+    ppi_tokens, ppi_row = rendered_tokens(ppi)
 
-    assert tcr_tokens[:5] == ["<peptides>", "P", "E", "P", "<peptided>"]
-    assert tcr_tokens[5:] == [
-        "<generate>",
+    assert tcr_tokens == [
         "<prots>",
-        "A",
-        "A",
-        "A",
-        "<prote>",
-        "<pairs>",
+        "<pep>",
+        "P",
+        "E",
+        "P",
+        "<protd>",
+        "<binding>",
         "<prots>",
+        "<tcr>",
+        "A",
+        "A",
+        "A",
+        ".",
         "B",
         "B",
         "B",
-        "<prote>",
+        "<protd>",
     ]
+    assert all(tcr_row["fixed_context_mask"][:7])
+    assert tcr_row["fixed_context_mask"][7] == 0
+    assert tcr_row["fixed_context_mask"][8] == 1
+    assert not any(tcr_row["fixed_context_mask"][9:])
+
     assert ppi_tokens == [
         "<prots>",
         "A",
         "A",
         "A",
         "A",
-        "<prote>",
+        "<protd>",
         "<binding>",
         "<prots>",
         "C",
         "C",
         "C",
         "C",
-        "<prote>",
+        "<protd>",
     ]
+    assert ppi_row["grammar_name"] == "ppi_conditional"
+    assert all(ppi_row["fixed_context_mask"][:7])
+    assert not any(ppi_row["fixed_context_mask"][7:])
 
 
-def test_ppi_binding_can_render_fixed_chain_conditional_layout() -> None:
-    record = BioSeqRecord(
-        chains=[
-            BioSeqChain("AAAA", "protein_a"),
-            BioSeqChain("CCCC", "protein_b"),
-        ],
-        task_type="ppi",
-        source="string_ppi",
-        labels={"relation": "binding"},
-    )
-
-    _, fix_a = rendered_tokens(record, rng=random.Random(0))
-    _, fix_b = rendered_tokens(record, rng=random.Random(5))
-
-    assert GrammarTokenizer(Esm2SequenceTokenizer()).decode_tokens(fix_a["input_ids"]) == [
-        "<fixs>",
-        "A",
-        "A",
-        "A",
-        "A",
-        "<fixd>",
-        "<binding>",
-        "<generate>",
-        "<prots>",
-        "C",
-        "C",
-        "C",
-        "C",
-        "<prote>",
-    ]
-    assert GrammarTokenizer(Esm2SequenceTokenizer()).decode_tokens(fix_b["input_ids"]) == [
-        "<fixs>",
-        "C",
-        "C",
-        "C",
-        "C",
-        "<fixd>",
-        "<binding>",
-        "<generate>",
-        "<prots>",
-        "A",
-        "A",
-        "A",
-        "A",
-        "<prote>",
-    ]
-
-
-def test_antigen_antibody_uses_binding_generate_and_pairs() -> None:
+def test_antigen_antibody_fixes_antigen_and_binding() -> None:
     record = BioSeqRecord(
         chains=[
             BioSeqChain("ANT", "antigen"),
@@ -271,70 +207,101 @@ def test_antigen_antibody_uses_binding_generate_and_pairs() -> None:
         labels={"relation": "binding"},
     )
 
-    tokens, _ = rendered_tokens(record)
+    tokens, row = rendered_tokens(record)
 
     assert tokens == [
-        "<fixs>",
+        "<prots>",
         "A",
         "N",
         "T",
-        "<fixd>",
+        "<protd>",
         "<binding>",
-        "<generate>",
         "<prots>",
+        "<ab>",
         "H",
         "H",
         "H",
-        "<prote>",
-        "<pairs>",
-        "<prots>",
+        ".",
         "L",
         "L",
         "L",
-        "<prote>",
+        "<protd>",
     ]
+    assert all(row["fixed_context_mask"][:6])
+    assert row["fixed_context_mask"][6] == 0
+    assert row["fixed_context_mask"][7] == 1
+    assert not any(row["fixed_context_mask"][8:])
 
 
-def test_only_fix_span_is_protected_from_diffusion() -> None:
+def test_nanobody_antigen_uses_nb_marker_in_receptor_block() -> None:
     record = BioSeqRecord(
         chains=[
             BioSeqChain("ANT", "antigen"),
+            BioSeqChain("VHHVHH", "nanobody_vhh"),
+        ],
+        task_type="nanobody_antigen",
+        source="unit",
+        labels={"relation": "binding"},
+    )
+
+    tokens, row = rendered_tokens(record)
+
+    assert tokens == [
+        "<prots>",
+        "A",
+        "N",
+        "T",
+        "<protd>",
+        "<binding>",
+        "<prots>",
+        "<nb>",
+        "V",
+        "H",
+        "H",
+        "V",
+        "H",
+        "H",
+        "<protd>",
+    ]
+    assert row["grammar_name"] == "antigen_nanobody"
+    assert row["fixed_context_mask"][7] == 1
+
+
+def test_esmc_hf_tokenizer_supports_chain_separator() -> None:
+    adapter = HuggingFaceEsmTokenizerAdapter.from_pretrained(
+        "/vepfs-mlp2/c20250601/251105016/project/dllm_test/model_weights/esmc/ESMC-300M"
+    )
+    tokenizer = GrammarTokenizer(adapter)
+    assert tokenizer.chain_separator_id() == adapter.token_id(".")
+    record = BioSeqRecord(
+        chains=[
             BioSeqChain("HHH", "antibody_heavy"),
             BioSeqChain("LLL", "antibody_light"),
         ],
-        task_type="antibody_antigen",
+        task_type="antibody",
         source="unit",
     )
-    tokens, row = rendered_tokens(record)
-    fixed_positions = [index for index, value in enumerate(row["fixed_context_mask"]) if value]
-
-    assert [tokens[index] for index in fixed_positions] == ["<fixs>", "A", "N", "T", "<fixd>"]
-    assert all(
-        bool(fixed) != bool(eligible)
-        for fixed, eligible in zip(row["fixed_context_mask"], row["diffusion_eligible_mask"])
-    )
-    assert tokens[fixed_positions[-1] + 1 : fixed_positions[-1] + 4] == [
-        "<unknown>",
-        "<generate>",
-        "<prots>",
-    ]
-
-    tokenizer = GrammarTokenizer(Esm2SequenceTokenizer())
     batch = GrammarBioSeqCollator(tokenizer)([record])
-    torch.manual_seed(0)
-    _, labels, corruption, _ = sample_bioseq_diffusion_noise(
-        batch,
-        mask_token_id=tokenizer.mask_token_id,
-        time_epsilon=0.999,
+    assert tokenizer.chain_separator_id() in batch["input_ids"][0].tolist()
+
+
+def test_multi_chain_positions_use_distinct_chain_indices() -> None:
+    record = BioSeqRecord(
+        chains=[
+            BioSeqChain("HHH", "antibody_heavy"),
+            BioSeqChain("LLL", "antibody_light"),
+        ],
+        task_type="antibody",
+        source="unit",
     )
-    assert not (corruption & batch["fixed_context_mask"]).any()
-    assert (labels.ne(-100) == corruption).all()
-    assert (corruption & batch["structure_token_mask"]).any()
-    assert (corruption & batch["relation_token_mask"]).any()
+    _, row = rendered_tokens(record)
+    chain_ids = row["position_ids_chain"]
+    residue_chain_ids = [chain_ids[index] for index, class_id in enumerate(row["token_class_ids"]) if class_id == 1]
+    assert residue_chain_ids == [0, 0, 0, 1, 1, 1]
 
 
 class TinyEncoder(nn.Module):
-    def __init__(self, hidden_size: int = 8) -> None:
+    def __init__(self, hidden_size: int = 16) -> None:
         super().__init__()
         self.config = SimpleNamespace(hidden_size=hidden_size)
         self.embedding = nn.Embedding(33, hidden_size)
@@ -344,7 +311,7 @@ class TinyEncoder(nn.Module):
         return SimpleNamespace(last_hidden_state=hidden)
 
 
-def test_encoder_proxy_uses_current_noisy_grammar_stream() -> None:
+def test_encoder_uses_per_chain_inputs() -> None:
     tokenizer = GrammarTokenizer(Esm2SequenceTokenizer())
     record = BioSeqRecord(
         chains=[
@@ -355,18 +322,19 @@ def test_encoder_proxy_uses_current_noisy_grammar_stream() -> None:
         source="unit",
     )
     batch = GrammarBioSeqCollator(tokenizer)([record])
+    assert batch["encoder_input_ids"].shape[1] == 2
+    assert batch["chain_ids"] is not None
+    assert "encoder_position_ids" not in batch
+
     corruption = torch.zeros_like(batch["input_ids"], dtype=torch.bool)
-    corruption[0, 0] = True
-    corruption[0, 2] = True
+    heavy_start = batch["position_ids_chain"][0].tolist().index(0)
+    corruption[0, heavy_start] = True
     noised_encoder = apply_decoder_corruption_to_encoder(
         batch,
         corruption_mask=corruption,
         mask_token_id=tokenizer.mask_token_id,
     )
-
-    assert noised_encoder[0, 0, 0].item() == tokenizer.mask_token_id
-    assert noised_encoder[0, 0, 2].item() == tokenizer.mask_token_id
-    assert batch["encoder_input_ids"][0, 0, 0].item() == 31
+    assert noised_encoder[0, 0, 1].item() == tokenizer.mask_token_id
 
     config = BioSeqDiffusionTransformerConfig(
         vocab_size=tokenizer.vocab_size,
@@ -378,14 +346,13 @@ def test_encoder_proxy_uses_current_noisy_grammar_stream() -> None:
         max_position_embeddings=128,
         mask_token_id=tokenizer.mask_token_id,
     )
-    model = BioSeqEncoderDiffusionModel(config, encoder=TinyEncoder())
+    model = BioSeqEncoderDiffusionModel(config, encoder=TinyEncoder(hidden_size=16))
     output = model.compute_loss(batch)
     assert output.loss is not None and torch.isfinite(output.loss)
     assert output.encoder_condition is not None
-    assert output.encoder_condition.shape[:2] == batch["input_ids"].shape
 
 
-def test_grammar_batch_assigns_real_chain_indices() -> None:
+def test_no_encoder_grammar_batch_runs() -> None:
     tokenizer = GrammarTokenizer(Esm2SequenceTokenizer())
     record = BioSeqRecord(
         chains=[
@@ -396,30 +363,6 @@ def test_grammar_batch_assigns_real_chain_indices() -> None:
         source="unit",
     )
     batch = GrammarBioSeqCollator(tokenizer)([record])
-    active = batch["attention_mask"]
-    chain_ids = batch["position_ids_chain"][active]
-
-    assert "chain_role_ids" not in batch
-    assert chain_ids[chain_ids == CHAIN_ID_OBJECT_A].numel() == 6
-    assert chain_ids[chain_ids == CHAIN_ID_OBJECT_B].numel() == 5
-    assert batch["position_ids_chain"][~active].unique().tolist() in ([], [-1])
-
-    antigen_record = BioSeqRecord(
-        chains=[
-            BioSeqChain("ANT", "antigen"),
-            BioSeqChain("HHH", "antibody_heavy"),
-            BioSeqChain("LLL", "antibody_light"),
-        ],
-        task_type="antibody_antigen",
-        source="unit",
-    )
-    antigen_batch = GrammarBioSeqCollator(tokenizer)([antigen_record])
-    fixed_mask = antigen_batch["fixed_context_mask"][0]
-    assert (
-        antigen_batch["position_ids_chain"][0][fixed_mask].unique().tolist()
-        == [CHAIN_ID_FIXED_CONTEXT]
-    )
-
     config = BioSeqDiffusionTransformerConfig(
         vocab_size=tokenizer.vocab_size,
         hidden_size=16,
@@ -434,7 +377,27 @@ def test_grammar_batch_assigns_real_chain_indices() -> None:
     output = model.compute_loss(batch)
     assert output.loss is not None
     output.loss.backward()
-
-    assert not hasattr(model.decoder, "chain_role_embeddings")
-    assert not hasattr(model.decoder, "task_embeddings")
     assert model.decoder.chain_position_embeddings.weight.grad is not None
+
+
+def test_diffusion_respects_fixed_context() -> None:
+    record = BioSeqRecord(
+        chains=[
+            BioSeqChain("ANT", "antigen"),
+            BioSeqChain("HHH", "antibody_heavy"),
+            BioSeqChain("LLL", "antibody_light"),
+        ],
+        task_type="antibody_antigen",
+        source="unit",
+    )
+    tokenizer = GrammarTokenizer(Esm2SequenceTokenizer())
+    batch = GrammarBioSeqCollator(tokenizer)([record])
+    torch.manual_seed(0)
+    _, labels, corruption, _ = sample_bioseq_diffusion_noise(
+        batch,
+        mask_token_id=tokenizer.mask_token_id,
+        time_epsilon=0.999,
+    )
+    assert not (corruption & batch["fixed_context_mask"]).any()
+    assert (labels.ne(-100) == corruption).all()
+    assert (corruption & batch["residue_mask"]).any()

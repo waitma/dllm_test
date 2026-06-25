@@ -309,7 +309,7 @@ def compute_diversity_by_heavy_chain(
             groups[h_seq].append(l_seq)
     
     if not groups:
-        return 0.0, 0.0, {}, {}
+        return 0.0, 0.0, {}
     
     # Parallel computation of diversity for each group
     # Use sequential processing if n_jobs=1 or only a few groups

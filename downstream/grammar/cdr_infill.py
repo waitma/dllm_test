@@ -21,6 +21,7 @@ from downstream.grammar.common import (
     antibody_pair_record,
     build_grammar_collator,
     build_grammar_tokenizer,
+    load_grammar_checkpoint,
     load_untrained_no_encoder,
     run_grammar_generate,
 )
@@ -28,10 +29,22 @@ from downstream.grammar.masks import cdr_generation_partial_mask, cdr_generation
 from downstream.grammar.metrics import masked_token_accuracy
 
 
+def resolve_sabdab_test_json(file_path: str, mode: str, fold: int) -> str:
+    direct = os.path.join(file_path, f"fold_{fold}", "test.json")
+    if os.path.isfile(direct):
+        return direct
+    nested = os.path.join(file_path, mode, f"fold_{fold}", "test.json")
+    if os.path.isfile(nested):
+        return nested
+    raise FileNotFoundError(
+        f"SAbDab test.json not found for fold {fold}; tried {direct!r} and {nested!r}"
+    )
+
+
 class SAbDabDataset(Dataset):
     def __init__(self, file_path: str, mode: str, fold: int = 0):
         self.mode = mode
-        data = pd.read_json(os.path.join(file_path, mode, f"fold_{fold}", "test.json"), lines=True)
+        data = pd.read_json(resolve_sabdab_test_json(file_path, mode, fold), lines=True)
         self.heavy = data["heavy_chain_seq"].astype(str).str.replace("J", "L").tolist()
         self.light = data["light_chain_seq"].astype(str).str.replace("J", "L").tolist()
         self.target = data[f"{mode}_seq"].tolist()
@@ -134,10 +147,18 @@ def smoke_eval(device: str = "cpu") -> float:
     return float(aar.item())
 
 
-def evaluate(args) -> None:
-    device = torch.device(args.device)
+def _load_eval_model(args, device: torch.device):
+    if args.checkpoint_path:
+        model, tokenizer = load_grammar_checkpoint(args.checkpoint_path, device=device)
+        return model, tokenizer
     tokenizer = build_grammar_tokenizer()
     model = load_untrained_no_encoder(tokenizer.vocab_size, mask_token_id=tokenizer.mask_token_id).to(device)
+    return model, tokenizer
+
+
+def evaluate(args) -> None:
+    device = torch.device(args.device)
+    model, tokenizer = _load_eval_model(args, device)
     collator = build_grammar_collator(tokenizer)
 
     outer_aars = []
@@ -145,7 +166,9 @@ def evaluate(args) -> None:
     for fold in range(args.num_folds):
         dataset = SAbDabDataset(args.test_set, args.mode, fold=fold)
         inner_aars = []
-        for heavy, light, target, _pos, mode in DataLoader(dataset, batch_size=1):
+        for sample_idx, (heavy, light, target, _pos, mode) in enumerate(DataLoader(dataset, batch_size=1)):
+            if args.max_samples is not None and sample_idx >= args.max_samples:
+                break
             heavy_str = heavy[0]
             light_str = light[0]
             target_str = target[0]
@@ -184,8 +207,10 @@ def evaluate(args) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--test-set", type=str, default="")
+    parser.add_argument("--checkpoint-path", type=str, default="")
     parser.add_argument("--mode", type=str, default="cdrh3")
     parser.add_argument("--num-folds", type=int, default=10)
+    parser.add_argument("--max-samples", type=int, default=None)
     parser.add_argument("--device", type=str, default="cpu")
     parser.add_argument("--temperature", type=float, default=1.0)
     parser.add_argument("--sampling-strategy", type=str, default="argmax")

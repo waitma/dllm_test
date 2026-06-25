@@ -100,7 +100,10 @@ class WeightedMixtureDataset(IterableDataset):
                     shard_index=shard_index,
                     num_shards=num_shards,
                 )
-                record = next(iterators[index])
+                try:
+                    record = next(iterators[index])
+                except StopIteration:
+                    continue
             yield record
             emitted += 1
 

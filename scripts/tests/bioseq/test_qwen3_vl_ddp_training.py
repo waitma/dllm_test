@@ -24,6 +24,28 @@ from examples.bioseq.train_qwen3_vl_bioseq_ddp import (
 PROJECT_ROOT = Path("/vepfs-mlp2/c20250601/251105016/project/dllm_test")
 
 
+def test_polynomial_lr_warms_up_from_init_lr_then_cosine_decays() -> None:
+    assert math.isclose(
+        lr_at(0, 1e-4, 2000, max_steps=50_000, scheduler="polynomial", warmup_init_lr=1e-7),
+        1e-7,
+    )
+    assert math.isclose(
+        lr_at(1999, 1e-4, 2000, max_steps=50_000, scheduler="polynomial", warmup_init_lr=1e-7),
+        1e-4,
+        rel_tol=1e-3,
+    )
+    assert math.isclose(
+        lr_at(2000, 1e-4, 2000, max_steps=50_000, scheduler="polynomial", warmup_init_lr=1e-7),
+        1e-4,
+    )
+    assert 1e-5 < lr_at(25_000, 1e-4, 2000, max_steps=50_000, scheduler="polynomial", warmup_init_lr=1e-7) < 1e-4
+    assert math.isclose(
+        lr_at(49_999, 1e-4, 2000, max_steps=50_000, scheduler="polynomial", warmup_init_lr=1e-7),
+        1e-5,
+        rel_tol=1e-3,
+    )
+
+
 def test_cosine_lr_warms_up_then_decays() -> None:
     assert math.isclose(lr_at(0, 1e-4, 1000, max_steps=10_000, scheduler="cosine"), 1e-7)
     assert math.isclose(lr_at(999, 1e-4, 1000, max_steps=10_000, scheduler="cosine"), 1e-4)
@@ -38,13 +60,31 @@ def test_encoder_mode_enables_ddp_find_unused_by_default(monkeypatch) -> None:
     assert should_find_unused_parameters(args)
 
 
+def test_esm2_mode_enables_ddp_find_unused_by_default(monkeypatch) -> None:
+    monkeypatch.setattr(sys, "argv", ["train_qwen3_vl_bioseq_ddp.py", "--model-type", "esm2"])
+    args = parse_args()
+    assert should_find_unused_parameters(args)
+
+
 def test_no_encoder_mode_keeps_ddp_find_unused_disabled_by_default(monkeypatch) -> None:
     monkeypatch.setattr(sys, "argv", ["train_qwen3_vl_bioseq_ddp.py", "--model-type", "no_encoder"])
     args = parse_args()
     assert not should_find_unused_parameters(args)
 
 
-def test_training_loader_defaults_to_full_denoise_foundation_objective(monkeypatch) -> None:
+def test_num_workers_defaults_to_zero_safe_ddp_path(monkeypatch) -> None:
+    monkeypatch.setattr(sys, "argv", ["train_qwen3_vl_bioseq_ddp.py", "--sources", "oas"])
+    args = parse_args()
+    assert args.num_workers == 0
+
+
+def test_save_top_k_defaults_to_ten(monkeypatch) -> None:
+    monkeypatch.setattr(sys, "argv", ["train_qwen3_vl_bioseq_ddp.py", "--sources", "oas"])
+    args = parse_args()
+    assert args.save_top_k == 10
+
+
+def test_training_loader_emits_grammar_batches_with_diffusion_targets(monkeypatch) -> None:
     monkeypatch.setattr(
         sys,
         "argv",
@@ -61,35 +101,9 @@ def test_training_loader_defaults_to_full_denoise_foundation_objective(monkeypat
         ],
     )
     args = parse_args()
-    assert args.full_denoise_probability == 1.0
     tokenizer = build_tokenizer(args)
     batch = next(iter(build_loader(args, tokenizer)))
-    assert set(batch["view_names"]) == {"full_denoise"}
-    assert int(batch["diffusion_loss_mask"].sum().item()) > 0
-
-
-def test_training_loader_ignores_ablation_view_probability(monkeypatch) -> None:
-    monkeypatch.setattr(
-        sys,
-        "argv",
-        [
-            "train_qwen3_vl_bioseq_ddp.py",
-            "--sources",
-            "oas",
-            "--limit-per-source",
-            "8",
-            "--batch-size",
-            "2",
-            "--num-workers",
-            "0",
-            "--full-denoise-probability",
-            "0.0",
-        ],
-    )
-    args = parse_args()
-    tokenizer = build_tokenizer(args)
-    batch = next(iter(build_loader(args, tokenizer)))
-    assert set(batch["view_names"]) == {"full_denoise"}
+    assert set(batch["view_names"]) == {"grammar_v2"}
     assert int(batch["diffusion_loss_mask"].sum().item()) > 0
 
 
@@ -120,7 +134,7 @@ def test_validation_loader_reads_valid_split(monkeypatch) -> None:
     batch = next(iter(loader))
     assert batch["input_ids"].shape[0] == 2
     assert set(batch["sources"]) == {"oas_paired"}
-    assert set(batch["view_names"]) == {"full_denoise"}
+    assert set(batch["view_names"]) == {"grammar_v2"}
     assert int(batch["diffusion_loss_mask"].sum().item()) > 0
 
 
@@ -178,8 +192,6 @@ def test_qwen3_vl_bioseq_ddp_script_single_process_smoke(tmp_path: Path) -> None
             "2",
             "--max-steps",
             "1",
-            "--max-chain-length",
-            "64",
             "--max-sequence-length",
             "256",
             "--hidden-size",

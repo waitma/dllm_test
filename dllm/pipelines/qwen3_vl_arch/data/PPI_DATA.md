@@ -37,10 +37,10 @@ case_study              oncoPPI Y2H validation sets
 ```
 
 Current formal `grammar_v1` training uses only the **grammar_v1_current** tier for PPI.
-All those rows serialize as:
+All those rows serialize at **encode time** as (PPI conditional):
 
 ```text
-<prots>PROTEIN_A<prote><binding><prots>PROTEIN_B<prote>
+<prots>PROTEIN_A<protd><binding><prots>PROTEIN_B<protd>
 ```
 
 ## Local inventory (2026-06-21)
