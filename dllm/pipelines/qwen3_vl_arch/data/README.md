@@ -39,7 +39,8 @@ fixed context versus diffusion targets.
   holds one BioSeq task group (e.g. all antibody, or all PPI). This keeps the
   rendered grammar layout uniform inside a batch.
 - `GrammarBioSeqCollator` renders/pads each record into the grammar token
-  stream and the ESMC proxy stream.
+  stream and per-chain encoder tensors (`encoder_input_ids [B, max_chains, L]`).
+  See `../GRAMMAR_V1.md` for the full v2 layout and mask rules.
 
 ```python
 sources = [SourceWithWeight(GrammarArrowSource(cfg), weight=cfg.weight) for cfg in configs]
@@ -72,9 +73,9 @@ trigger NCCL collective timeouts. The validated default is therefore
 
 ### Diffusion masks
 
-`GrammarRenderer` marks only the `<fixs>...<fixd>` fixed-context block (antigen,
-peptide, MHC/HLA conditioning) as non-target. Everything else — structure
-tokens, relation tokens, and non-fixed residues — is a diffusion target. The
+`GrammarRenderer` sets `fixed_context_mask` per task (see `../GRAMMAR_V1.md`):
+conditional tasks fix context blocks and relation tokens; unconditional tasks
+(OAS, OTS, nanobody) diffuse the entire record including type markers. The
 collator emits the token-level masks consumed by `sample_bioseq_diffusion_noise`:
 
 - `fixed_context_mask`
@@ -82,14 +83,14 @@ collator emits the token-level masks consumed by `sample_bioseq_diffusion_noise`
 - `diffusion_eligible_mask`
 - `residue_mask`, `structure_token_mask`, `relation_token_mask`, `token_class_ids`
 
-The collator also emits the single-stream ESMC proxy tensors used by the
-encoder-conditioned path to build the per-chain diffusion state `x_t`:
+The collator also emits per-chain encoder tensors for the feature-conditioned
+path (ESMC / ESM2):
 
-- `encoder_input_ids`
+- `encoder_input_ids` — `[batch, max_chains, chain_len]`, one `<cls> seq <eos>` per chain
 - `encoder_attention_mask`
 - `encoder_residue_mask`
 - `encoder_chain_mask`
-- `encoder_position_ids`
+- `chain_ids`, `position_ids_inner` — gather encoder features back to decoder residues
 
 If the encoder is loaded from a local Hugging Face ESM-family snapshot,
 `HuggingFaceEsmTokenizerAdapter` makes token ids match that encoder tokenizer.

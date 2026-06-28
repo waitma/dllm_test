@@ -37,6 +37,7 @@ from .grammar import (
     GrammarTokenizer,
 )
 from .mixture import SourceWithWeight, TaskHomogeneousBatchDataset, WeightedMixtureDataset
+from .records import DEFAULT_MAX_PROTEIN_LENGTH
 
 DEFAULT_MAX_SEQUENCE_LENGTH = 2112
 VAL_SOURCE_SEED_OFFSET = 10_000
@@ -59,6 +60,7 @@ class GrammarDataModule:
     epoch_size: int | None = None
     limit_per_source: int | None = None
     max_sequence_length: int | None = None
+    max_protein_length: int = DEFAULT_MAX_PROTEIN_LENGTH
     deduplicate_within_batch: bool = False
     num_workers: int = 0
     tokenizer_path: Path | None = None
@@ -87,6 +89,7 @@ class GrammarDataModule:
             epoch_size=getattr(args, "epoch_size", None),
             limit_per_source=getattr(args, "limit_per_source", None),
             max_sequence_length=getattr(args, "max_sequence_length", None),
+            max_protein_length=getattr(args, "max_protein_length", DEFAULT_MAX_PROTEIN_LENGTH),
             deduplicate_within_batch=getattr(args, "deduplicate_within_batch", False),
             num_workers=getattr(args, "num_workers", 0),
             tokenizer_path=getattr(args, "tokenizer_path", None),
@@ -132,15 +135,18 @@ class GrammarDataModule:
             for config in configs
         ]
         records = WeightedMixtureDataset(sources, epoch_size=epoch_size, seed=source_seed)
+        loader_max_protein = None if self.max_protein_length <= 0 else self.max_protein_length
         batches = TaskHomogeneousBatchDataset(
             records,
             batch_size=self.batch_size,
             drop_last=True,
             deduplicate_within_batch=self.deduplicate_within_batch,
+            max_protein_length=loader_max_protein,
         )
         collator = GrammarBioSeqCollator(
             tokenizer=tokenizer,
             max_sequence_length=self.max_sequence_length or DEFAULT_MAX_SEQUENCE_LENGTH,
+            max_protein_length=self.max_protein_length,
         )
         return DataLoader(
             batches,

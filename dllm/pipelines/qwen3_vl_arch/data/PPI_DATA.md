@@ -111,21 +111,66 @@ python /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/data/build_bios
 
 ## MINT comparison (Nat Commun 2026)
 
-| | MINT STRING pretraining | This project (today) |
+| | MINT STRING pretraining | This project (grammar training mix) |
 |---|--:|--:|
-| Curated PPI pairs | ~95.8M | ~319k (grammar cache) |
-| Link type | physical (binding) | physical only |
-| Functional edges | separate STRING channels | not ingested yet |
+| Curated PPI pairs (binding) | ~95.8M physical | **`mint_ppi` from v12** `mint_string_pretrain_v1` (~96M train_filtered) |
+| Functional / regulatory modes | not in MINT physical pipeline | **`mint_actions` from v11** `mint_string_actions_v11.0` (~9.2M train_filtered) |
+| Relation tokens | binding only (`mint_ppi`) | per-row `mode` in `mint_actions` -> `<catalysis>`/... |
+| Length policy | MINT paper uses full sequences | **Either chain >1024 aa dropped** at shard build (not cropped) |
 
-STRING functional link files do not exist as separate per-channel downloads.
-Channel subscores are in ``protein.links.detailed.v12.0.txt.gz`` (~190GB):
+### Training data scale (`bioseq_grammar_v1/manifest.json`)
 
-```bash
-bash /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/data/download_stringdb_assets.sh --with-detailed
-```
+| source | train rows (approx.) | notes |
+|--------|---------------------:|-------|
+| oas / ots / tcr / ppi | 2.5M / 2.1M / 164k / 319k | immune + Bernett eval-tier PPI |
+| **mint_ppi** | **~96M** | v12 physical binding |
+| **mint_actions** | **~9.2M** | v11 actions (7 modes; binding downsampled 5%) |
 
-Parse the dominant channel subscore to grammar tokens (`activation`, `inhibition`, etc.)
-once the detailed file is wired into the CSV builder.
+Rebuild shards (v12 binding + v11 actions, filter >1024)::
+
+    bash scripts/data/rebuild_mint_training_shards.sh
+
+Volc job: `train_jobs/qwen3_vl_bioseq_grammar_v2_no_encoder_1b_v12v11.yml`
+
+### STRING v11 actions pipeline (modes only; binding uses v12)
+
+1. **Download (MINT minimal + actions)**::
+
+    bash scripts/data/download_stringdb_assets.sh --version v11.0
+    bash scripts/data/download_stringdb_assets.sh --version v11.0 --with-actions
+
+2. **MMseqs2 50% cluster** on `protein.sequences.v11.0.fa` -> `clu50.v11.0.tsv`
+   (Volc job: `train_jobs/mint_string_mmseqs_cluster_v11.yml`).
+
+3. **Physical binding splits (MINT, v12 for training)**::
+
+    python scripts/data/run_mint_stringdb_native.py \\
+      --links-gz .../protein.physical.links.full.v12.0.txt.gz \\
+      --sequences-fa .../protein.sequences.v12.0.fa \\
+      --cluster-tsv .../clu50.tsv \\
+      --output-dir data/ppi_task_raw/processed/mint_string_pretrain_v1
+
+4. **Actions mode splits (v11 only)**::
+
+    python scripts/data/build_string_actions_splits.py \\
+      --actions-gz .../protein.actions.v11.0.txt.gz \\
+      --sequences-fa .../protein.sequences.v11.0.fa \\
+      --cluster-tsv .../clu50.v11.0.tsv \\
+      --output-dir data/ppi_task_raw/processed/mint_string_actions_v11.0
+
+   Link format: ``target_id actor_id mode``. Direction from ``a_is_acting=t`` rows
+   (actor=item_id_a, target=item_id_b). Binding is downsampled (default 5%).
+
+5. **Grammar Arrow shards** (drop pairs with either protein >1024 aa)::
+
+    bash scripts/data/rebuild_mint_training_shards.sh
+
+6. **Mix into training**::
+
+    python scripts/data/build_bioseq_grammar_v1.py \\
+      --sources oas,ots,tcr,ppi,mint_ppi,mint_actions --splits train,valid
+
+``protein.links.detailed`` is **not** used (evidence channels only, no mode/action).
 
 ## Rebuild commands
 

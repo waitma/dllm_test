@@ -54,8 +54,8 @@ def parse_args() -> argparse.Namespace:
         "--sources",
         default="oas,ots,tcr,ppi",
         help=(
-            "Comma-separated sources: oas, ots, tcr, ppi, mint_ppi, neutralization. "
-            "mint_ppi requires prebuilt shards (build_mint_grammar_shards.py). "
+            "Comma-separated sources: oas, ots, tcr, ppi, mint_ppi, mint_actions, neutralization. "
+            "mint_ppi / mint_actions require prebuilt shards (build_mint_grammar_shards.py). "
             "neutralization uses unified CSV or prebuilt shards."
         ),
     )
@@ -169,8 +169,8 @@ def iter_ppi(split: str, limit: int | None, max_protein_length: int) -> Iterator
         if pair_key in seen:
             continue
         seen.add(pair_key)
-        seq_a = stable_crop(seq_a, max_protein_length, pair_key[0])
-        seq_b = stable_crop(seq_b, max_protein_length, pair_key[1])
+        if len(seq_a) > max_protein_length or len(seq_b) > max_protein_length:
+            continue
         record = BioSeqRecord(
             chains=[
                 BioSeqChain(seq_a, "protein_a"),
@@ -283,8 +283,8 @@ def build_source(
     except ImportError as exc:
         raise ImportError("Building grammar Arrow data requires the `datasets` package") from exc
 
-    if name == "mint_ppi":
-        return verify_prebuilt_shard("mint_ppi", split, output_dir, force)
+    if name in {"mint_ppi", "mint_actions"}:
+        return verify_prebuilt_shard(name, split, output_dir, force)
     if name == "neutralization":
         return build_neutralization_shard(split, output_dir, limit, force)
 

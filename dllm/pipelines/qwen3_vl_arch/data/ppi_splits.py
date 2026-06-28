@@ -48,6 +48,24 @@ MINT_STRING_PRETRAIN = SplitPolicy(
     ),
 )
 
+# STRING v11 protein.actions — functional/regulatory edges with grammar relation modes.
+# Link lines: ``target_id actor_id mode`` (target=fixed context, actor=generated).
+MINT_STRING_ACTIONS_V11 = SplitPolicy(
+    policy_id="mint_string_actions_v11",
+    reference="STRING v11 protein.actions + MINT-style cluster dedup/split",
+    source_id="stringdb_actions",
+    allowed_split_names=("train", "valid"),
+    role_by_split={
+        "train": "pretrain_train",
+        "valid": "pretrain_valid",
+    },
+    notes=(
+        "Built from STRING v11 protein.actions (a_is_acting=t rows). "
+        "Each mode kept as a separate edge; binding downsampled. "
+        "Training clusters disjoint from actions valid and optional physical MINT valid."
+    ),
+)
+
 # Bernett et al. 2024 gold-standard (Figshare) — used by MINT / SaProt / IRBench P1.
 # Intra0/1/2 are increasing sequence-identity regimes within species.
 BERNETT_GOLD_STANDARD = SplitPolicy(
@@ -161,6 +179,7 @@ SPLIT_POLICIES: dict[str, SplitPolicy] = {
     policy.policy_id: policy
     for policy in (
         MINT_STRING_PRETRAIN,
+        MINT_STRING_ACTIONS_V11,
         BERNETT_GOLD_STANDARD,
         BERNETT_STRING_90_90,
         HUMAN_PPI_SAPROT,
@@ -173,6 +192,7 @@ SPLIT_POLICIES: dict[str, SplitPolicy] = {
 
 SOURCE_TO_DEFAULT_POLICY: dict[str, str] = {
     "stringdb_mint": MINT_STRING_PRETRAIN.policy_id,
+    "stringdb_actions": MINT_STRING_ACTIONS_V11.policy_id,
     "figshare_gold_standard": BERNETT_GOLD_STANDARD.policy_id,
     "string_model_org_90_90_split": BERNETT_STRING_90_90.policy_id,
     "saprot_humanppi": HUMAN_PPI_SAPROT.policy_id,

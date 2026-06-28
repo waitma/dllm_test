@@ -54,13 +54,44 @@ NB-antigen:           <prots> ANTIGEN <protd> <binding> <prots> <nb> VHH <protd>
 ## Denoising (fixed vs generated)
 
 The renderer marks `fixed_context_mask`; `diffusion_loss_mask = NOT fixed`.
+`diffusion_eligible_mask` equals `diffusion_loss_mask` (structure tokens and
+residues in generated regions are both eligible).
 
-- **Fixed** (not diffused): type markers (`<ab>`/`<tcr>`/`<nb>`/`<pep>`) when
-  present, all relation tokens, and any **context** object (antigen, MHC, peptide)
-  including its `<prots>`, residues, `.`, and `<protd>`.
-- **Generated** (diffused): target object structure tokens (`<prots>`, `.`,
-  `<protd>`) and target residues. Type markers inside a **generated** block are
-  still fixed (e.g. `<ab>` in OAS, `<ab>`/`<nb>` in ab-ag/nb-ag).
+### Masking rules by task
+
+| Task | Fixed (not diffused) | Generated (diffused, including type markers) |
+|------|----------------------|-----------------------------------------------|
+| OAS / OTS / nanobody | — | Entire `<prots> <type> … <protd>` block |
+| AB-antigen / NB-antigen | `<prots> ANTIGEN <protd> <binding>` | `<prots> <ab>/<nb> H . L <protd>` |
+| TCR+peptide | `<prots> <pep> PEPTIDE <protd> <binding>` | `<prots> <tcr> α . β <protd>` |
+| TCR-pMHC | MHC block + `<binding>` + peptide block + `<binding>` | `<prots> <tcr> α . β <protd>` |
+| PPI conditional | A block + `<REL>` | B block (no type marker) |
+
+Details:
+
+- **Relation tokens** (`<binding>`, `<activation>`, …) in conditional tasks are
+  always fixed.
+- **Type markers** (`<ab>`, `<tcr>`, `<nb>`, `<pep>`) are fixed **only inside
+  fixed context blocks** (e.g. `<pep>` in a fixed peptide block). Inside a
+  **generated** block they participate in diffusion like any other structure
+  token (OAS `<ab>`, receptor `<ab>`/`<nb>`/`<tcr>`, etc.).
+- **Unconditional** tasks (OAS, OTS, nanobody) have no fixed context; the
+  whole record is generated.
+
+### TCR-pMHC example
+
+```text
+<prots> MHC . B2M <protd> <binding>   ← fixed (3 encoder chains: MHC, B2M, —)
+<prots> <pep> PEPTIDE <protd> <binding> ← fixed (1 encoder chain; <pep> fixed)
+<prots> <tcr> ALPHA . BETA <protd>      ← generated (2 encoder chains; <tcr> diffused)
+```
+
+### Noise sampling
+
+Per sequence, sample `t ~ Uniform(ε, 1)`; each **eligible** token is masked
+independently with probability `t` (`sample_bioseq_diffusion_noise`). Fixed
+context is never masked. This is token-level masking, not chain-level
+all-or-nothing.
 
 PPI training is **conditional only**: protein A block and `<REL>` are fixed;
 protein B block is generated. There is no `ppi_joint` mode.
@@ -70,8 +101,44 @@ expose separate residue, structure-token, and relation-token losses
 (`TOKEN_CLASS_NAMES`).
 
 Padding is applied after the complete record; records are never truncated after
-serialization. STRING proteins are deterministically cropped to 1024 residues
-during Arrow preprocessing; full-record capacity is 2112 tokens.
+serialization. STRING PPI / MINT pairs with either protein longer than **1024**
+residues are **dropped** at Arrow shard build time (not cropped); see
+``grammar_builders.ppi_record`` and ``build_mint_grammar_shards.py``.
+
+## Decoder ↔ Encoder data flow
+
+Training step (encoder models):
+
+```text
+BioSeqRecord (Arrow)
+  → GrammarRenderer.encode     flat decoder stream + fixed/diffusion masks
+  → GrammarBioSeqCollator      per-chain encoder_input_ids [B,C,L], chain_ids, position_ids_inner
+  → sample_bioseq_diffusion_noise   decoder x_t (per-token mask on eligible positions)
+  → apply_decoder_corruption_to_encoder   mirror mask onto encoder residue positions
+  → encoder forward            [B,C,L] → [B,C,L,E] (ESMC/ESM2 per chain)
+  → gather_token_condition     scatter residue features to decoder positions [B,S,E]
+  → decoder forward            embedding replacement at residue sites only
+```
+
+- **Decoder**: one flat grammar token stream per record.
+- **Encoder**: each biological chain → `<cls> + residues + <eos>` (split on `.`
+  inside a block and on `<protd>` between blocks). Padding chain rows use a
+  minimal valid `<cls><eos>` stream; `encoder_chain_mask` zeroes their condition.
+- **Corruption mirror**: if decoder residue at chain `c`, inner index `i` is
+  masked, the matching encoder residue slot is set to `<mask>`. Fixed context
+  chains stay clean on both sides.
+- **No encoder signal** on structure/relation tokens (`<prots>`, `<ab>`,
+  `<binding>`, `.`, etc.): `gather_token_condition` only fills residue
+  positions; others keep learned decoder embeddings.
+
+### Encoder align fix (2026-06-28)
+
+v2 per-chain collator originally rebuilt encoder chains via amino-acid string
+round-trip (`_residue_ids_to_sequence`). Local ESMC/ESM2 adapters loaded through
+`HuggingFaceEsmTokenizerAdapter` did not expose `id_to_token`, so every chain
+silently became all-`X`. Fixed by `_encode_chain_from_residue_ids`: copy decoder
+residue ids directly into `<cls> residues <eos>`. Grammar-v1 proxy stream did
+not have this bug (it mapped decoder ids directly).
 
 ## Encoder Mode (per-chain, embedding replacement)
 
@@ -101,13 +168,54 @@ Build semantic Arrow shards with:
 python /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/data/build_bioseq_grammar_v1.py \
   --output-dir /vepfs-mlp2/c20250601/251105016/project/dllm_test/data/bioseq_grammar_v1 \
   --splits train,valid \
-  --sources oas,ots,tcr,ppi
+  --sources oas,ots,tcr,ppi,mint_ppi,mint_actions
 ```
 
 The cache includes paired OAS, paired OTS, non-PPI TCR/epitope records from
-`processed_v2`, and canonicalized STRING PPI pairs. Antibody-antigen /
-nanobody-antigen records are supported by the renderer but are not in the default
-training mix yet.
+`processed_v2`, canonicalized STRING PPI pairs (Bernett 90/90), **v12 MINT
+binding** (`mint_ppi`, ~96M train), and **v11 actions modes** (`mint_actions`,
+~9.2M train). Rebuild mint shards::
+
+```bash
+bash /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/data/rebuild_mint_training_shards.sh
+```
+
+- **`mint_ppi`**: v12 physical binding from `mint_string_pretrain_v1` — relation
+  token is always `<binding>`.
+- **`mint_actions`**: v11 functional/regulatory edges from `mint_string_actions_v11.0`
+  — relation token equals the STRING **mode** (`<catalysis>`, `<activation>`, etc.).
+
+Antibody-antigen / nanobody-antigen records are supported by the renderer but are
+not in the default training mix yet.
+
+### STRING actions mode and direction (v11)
+
+Actions edges come from `protein.actions.v11.0` (separate from physical binding
+links). Split files use three columns:
+
+```text
+target_id  actor_id  mode
+```
+
+Direction follows STRING `a_is_acting=t` rows: **actor** is the acting protein,
+**target** is the acted-upon protein. In grammar records this maps to:
+
+```text
+<prots> TARGET_SEQ <protd> <MODE> <prots> ACTOR_SEQ <protd>
+```
+
+- **target** → `protein_a` (fixed context, not diffused)
+- **actor** → `protein_b` (generated partner)
+- **`<MODE>`** → one of `<binding>`, `<activation>`, `<inhibition>`, `<catalysis>`,
+  `<reaction>`, `<expression>`, `<ptmod>` (fixed, not diffused)
+
+For **binding** mode in actions (undirected), partner order is canonicalized by
+sorted protein id; both orientations may appear during augmentation. Directed modes
+(catalysis, expression, reaction, activation, inhibition, ptmod) preserve actor→target
+semantics via the column order above.
+
+Physical MINT splits (`mint_ppi`) remain binding-only and use the same PPI template
+with `<binding>` as the relation token.
 
 ## Inference Contract
 

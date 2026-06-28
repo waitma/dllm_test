@@ -80,6 +80,13 @@ def parse_args() -> argparse.Namespace:
     data.add_argument("--batch-size", type=int, default=8, help="Mixed-task microbatch size per process.")
     data.add_argument("--max-sequence-length", type=int, default=None)
     data.add_argument(
+        "--max-protein-length",
+        type=int,
+        default=1024,
+        help="Drop any record with a chain longer than this at loader batching (default 1024). "
+        "Set 0 to disable.",
+    )
+    data.add_argument(
         "--deduplicate-within-batch",
         action="store_true",
         help="Skip duplicate records within a task-homogeneous batch.",
@@ -115,6 +122,12 @@ def parse_args() -> argparse.Namespace:
     model.add_argument("--intermediate-size", type=int, default=2048)
     model.add_argument("--dropout", type=float, default=0.1)
     model.add_argument("--qk-norm", action="store_true", help="Apply RMSNorm to query/key per head for attention stability.")
+    model.add_argument(
+        "--condition-norm",
+        action="store_true",
+        help="LayerNorm the encoder condition before injection (fixes ESMC tiny-gamma squashing; "
+        "encoder models only). Recommended for ESMC; harmless for ESM2.",
+    )
     model.add_argument("--gradient-checkpointing", action="store_true")
     model.add_argument("--initializer-range", type=float, default=0.02)
     model.add_argument("--max-position-embeddings", type=int, default=4096)
@@ -238,6 +251,7 @@ def build_config(args: argparse.Namespace, tokenizer: Any) -> BioSeqDiffusionTra
         time_epsilon=args.time_epsilon,
         loss_norm=args.loss_norm,
         qk_norm=args.qk_norm,
+        condition_norm=args.condition_norm,
         gradient_checkpointing=args.gradient_checkpointing,
         initializer_range=args.initializer_range,
     )

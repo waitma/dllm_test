@@ -72,6 +72,7 @@ TASK_FAMILY_UNKNOWN_RELATION: frozenset[str] = frozenset(
 # Optional per-source overrides when task_family alone is too coarse.
 SOURCE_ID_TO_RELATION: dict[str, str] = {
     "stringdb_mint": "binding",
+    "stringdb_actions": "unknown",
     "string_model_org_90_90_split": "binding",
     "figshare_gold_standard": "binding",
     "saprot_humanppi": "binding",

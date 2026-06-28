@@ -69,6 +69,12 @@ def _namespace_from_checkpoint_args(raw: dict[str, Any]) -> Namespace:
     for key in ("grammar_data_dir", "encoder_path", "tokenizer_path", "output_dir", "wandb_dir"):
         if key in parsed and parsed[key] is not None:
             parsed[key] = Path(parsed[key])
+    # Fields added after early grammar-v2 checkpoints were saved (eval-only defaults).
+    for key, value in (
+        ("condition_norm", False),
+        ("gradient_checkpointing", False),
+    ):
+        parsed.setdefault(key, value)
     return Namespace(**parsed)
 
 

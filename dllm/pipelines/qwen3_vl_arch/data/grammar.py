@@ -24,7 +24,7 @@ from torch.utils.data import IterableDataset
 
 from .esm_encoding import Esm2SequenceTokenizer, EsmTokenizerProtocol
 from .mixture import distributed_worker_shard
-from .records import BioSeqChain, BioSeqRecord, TASK_TYPE_TO_ID
+from .records import BioSeqChain, BioSeqRecord, DEFAULT_MAX_PROTEIN_LENGTH, TASK_TYPE_TO_ID, record_within_max_protein_length
 
 # v2 structure tokens (no <fixs>/<fixd>/<generate>/<prote>/<pairs>).
 # Multi-chain objects use repeated <prots>...<protd> blocks; peptide uses <pep>.
@@ -228,9 +228,7 @@ def _build_per_chain_encoder_inputs(
 
     for encoder_index, logical_id in enumerate(sorted_chain_ids):
         residue_tokens = [token_id for _, token_id in sorted(residue_groups[logical_id], key=lambda item: item[0])]
-        encoded_ids, encoded_mask = tokenizer.base_tokenizer.encode_chain(
-            _residue_ids_to_sequence(residue_tokens, tokenizer)
-        )
+        encoded_ids, encoded_mask = _encode_chain_from_residue_ids(residue_tokens, tokenizer)
         encoder_chains.append([int(token_id) for token_id in encoded_ids])
         encoder_residue_masks.append([int(value) for value in encoded_mask])
         logical_to_encoder[logical_id] = encoder_index
@@ -251,17 +249,61 @@ def _build_per_chain_encoder_inputs(
     return encoder_chains, encoder_residue_masks, decoder_chain_ids, decoder_inner_ids
 
 
+def _base_residue_token(token_id: int, tokenizer: GrammarTokenizer) -> str | None:
+    """Map a decoder residue id back to a single amino-acid character."""
+
+    if int(token_id) in tokenizer.id_to_token:
+        return None
+    base = tokenizer.base_tokenizer
+    id_to_token = getattr(base, "id_to_token", None)
+    if isinstance(id_to_token, dict):
+        token = id_to_token.get(int(token_id))
+    elif hasattr(base, "token_from_id"):
+        token = base.token_from_id(int(token_id))
+    elif hasattr(base, "tokenizer") and hasattr(base.tokenizer, "id_to_token"):
+        token = getattr(base.tokenizer, "id_to_token", {}).get(int(token_id))
+    else:
+        token = None
+    if token is None and hasattr(base, "tokenizer") and hasattr(base.tokenizer, "id_to_token"):
+        vocab = base.tokenizer.get_vocab() if hasattr(base.tokenizer, "get_vocab") else {}
+        if vocab:
+            reverse = {value: key for key, value in vocab.items()}
+            token = reverse.get(int(token_id))
+    if token is None:
+        return "X"
+    token = str(token)
+    if token.startswith("<"):
+        return None
+    return token
+
+
 def _residue_ids_to_sequence(residue_ids: list[int], tokenizer: GrammarTokenizer) -> str:
     pieces: list[str] = []
-    base_id_to_token = getattr(tokenizer.base_tokenizer, "id_to_token", {})
     for token_id in residue_ids:
-        if token_id in tokenizer.id_to_token:
-            continue
-        token = base_id_to_token.get(int(token_id), "X")
-        if token.startswith("<"):
-            continue
-        pieces.append(str(token))
+        token = _base_residue_token(token_id, tokenizer)
+        if token is not None:
+            pieces.append(token)
     return "".join(pieces)
+
+
+def _encode_chain_from_residue_ids(
+    residue_ids: list[int],
+    tokenizer: GrammarTokenizer,
+) -> tuple[list[int], list[int]]:
+    """Wrap decoder residue ids as ``<cls> residues <eos>`` for the encoder.
+
+    Decoder residue positions already carry base-vocabulary ids from
+    ``GrammarTokenizer.encode_residues``. Re-encoding through an amino-acid
+    string requires ``id_to_token`` on the base tokenizer; local ESMC snapshots
+    loaded via ``TokenizersEsmTokenizer`` do not expose that map, which silently
+    turned every chain into ``X`` before this helper existed.
+    """
+
+    base = tokenizer.base_tokenizer
+    residue_token_ids = [int(token_id) for token_id in residue_ids]
+    encoded_ids = [int(base.cls_token_id)] + residue_token_ids + [int(base.eos_token_id)]
+    encoded_mask = [0] + [1] * len(residue_token_ids) + [0]
+    return encoded_ids, encoded_mask
 
 
 @dataclass
@@ -273,6 +315,13 @@ class GrammarRenderer:
     rng: random.Random | None = None
 
     def encode(self, record: BioSeqRecord) -> dict[str, Any]:
+        if self.ppi_max_protein_length > 0 and not record_within_max_protein_length(
+            record, self.ppi_max_protein_length
+        ):
+            raise ValueError(
+                f"Record from {record.source} has a chain longer than "
+                f"{self.ppi_max_protein_length} aa; filter at loader stage instead of cropping"
+            )
         ids: list[int] = []
         fixed: list[int] = []
         classes: list[int] = []
@@ -332,9 +381,9 @@ class GrammarRenderer:
         if record.task_type == "ppi" or {"protein_a", "protein_b"} <= roles:
             protein_a = _first_chain(record, {"protein_a", "other"}) or record.chains[0]
             protein_b = _first_chain(record, {"protein_b"}) or record.chains[1]
-            append_protein_block([protein_a], is_fixed=True, cap=self.ppi_max_protein_length)
+            append_protein_block([protein_a], is_fixed=True)
             special(relation, is_fixed=True)
-            append_protein_block([protein_b], is_fixed=False, cap=self.ppi_max_protein_length)
+            append_protein_block([protein_b], is_fixed=False)
             grammar_name = "ppi_conditional"
         else:
             mhc_chains = [chain for chain in record.chains if chain.role.lower() in {"mhc", "pmhc", "hla"}]
@@ -370,7 +419,6 @@ class GrammarRenderer:
                     ab_chains if ab_chains else record.chains,
                     type_marker=receptor_type,
                     is_fixed=False,
-                    type_marker_fixed=True,
                 )
             elif record.task_type in {"nanobody"} or (
                 heavy is not None and light is None and "nanobody_vhh" in roles and antigen is None
@@ -379,7 +427,6 @@ class GrammarRenderer:
                     [heavy or record.chains[0]],
                     type_marker="<nb>",
                     is_fixed=False,
-                    type_marker_fixed=True,
                 )
                 grammar_name = "nanobody"
             elif alpha is not None or beta is not None or record.task_type.startswith("tcr"):
@@ -396,7 +443,6 @@ class GrammarRenderer:
                         receptor,
                         type_marker="<tcr>",
                         is_fixed=False,
-                        type_marker_fixed=True,
                     )
                     grammar_name = "tcr_single"
                 else:
@@ -404,7 +450,6 @@ class GrammarRenderer:
                         receptor,
                         type_marker="<tcr>",
                         is_fixed=False,
-                        type_marker_fixed=True,
                     )
                     grammar_name = "tcr_pmhc" if mhc_chains else (
                         "tcr_peptide" if tcr_peptide is not None else "tcr_pair"
@@ -415,7 +460,6 @@ class GrammarRenderer:
                     ab_chains if ab_chains else record.chains,
                     type_marker="<ab>",
                     is_fixed=False,
-                    type_marker_fixed=True,
                 )
                 grammar_name = "antibody_pair"
             elif record.task_type == "tcr":
@@ -423,7 +467,6 @@ class GrammarRenderer:
                     record.chains,
                     type_marker="<tcr>",
                     is_fixed=False,
-                    type_marker_fixed=True,
                 )
                 grammar_name = "tcr_pair"
             else:
@@ -519,10 +562,11 @@ class GrammarBioSeqCollator:
 
     tokenizer: GrammarTokenizer
     max_sequence_length: int = 2112
+    max_protein_length: int = DEFAULT_MAX_PROTEIN_LENGTH
     task_type_to_id: dict[str, int] = field(default_factory=lambda: dict(TASK_TYPE_TO_ID))
 
     def __post_init__(self) -> None:
-        self.renderer = GrammarRenderer(self.tokenizer)
+        self.renderer = GrammarRenderer(self.tokenizer, ppi_max_protein_length=self.max_protein_length)
 
     def __call__(self, records: list[BioSeqRecord | dict[str, Any]]) -> dict[str, Any]:
         rows = [
@@ -612,12 +656,20 @@ class GrammarBioSeqCollator:
         padded_encoder_attention: list[list[list[int]]] = []
         padded_encoder_residue: list[list[list[int]]] = []
         padded_encoder_chain_mask: list[list[int]] = []
+        # Padding chain rows (added so every record has ``max_chains`` rows) must NOT
+        # be all-pad: an all-zero attention row makes the encoder softmax over -inf
+        # (NaN) and breaks ESM2 token-dropout (division by attention_mask.sum()==0).
+        # Use a minimal valid ``<cls><eos>`` stream instead; ``encoder_chain_mask`` /
+        # ``encoder_residue_mask`` stay 0 so the row contributes no decoder condition.
+        empty_chain = [self.tokenizer.cls_token_id, self.tokenizer.eos_token_id] + [pad_id] * (max_chain_len - 2)
+        empty_attn = [1, 1] + [0] * (max_chain_len - 2)
         for chains, masks, residue_masks, chain_mask in zip(
             encoder_ids, encoder_attention, encoder_residue, encoder_chain_mask
         ):
-            padded_chains = chains + [[pad_id] * max_chain_len] * (max_chains - len(chains))
-            padded_attn = masks + [[0] * max_chain_len] * (max_chains - len(masks))
-            padded_res = residue_masks + [[0] * max_chain_len] * (max_chains - len(residue_masks))
+            num_pad_chains = max_chains - len(chains)
+            padded_chains = chains + [list(empty_chain) for _ in range(num_pad_chains)]
+            padded_attn = masks + [list(empty_attn) for _ in range(num_pad_chains)]
+            padded_res = residue_masks + [[0] * max_chain_len for _ in range(num_pad_chains)]
             for chain_index, chain in enumerate(padded_chains):
                 if len(chain) < max_chain_len:
                     padded_chains[chain_index] = chain + [pad_id] * (max_chain_len - len(chain))

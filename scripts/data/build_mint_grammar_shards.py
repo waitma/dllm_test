@@ -9,10 +9,10 @@ Prerequisites::
 
 Then build shards (streaming, supports ~96M train pairs)::
 
-    python scripts/data/build_mint_grammar_shards.py --split train
-    python scripts/data/build_mint_grammar_shards.py --split valid
+    python scripts/data/build_mint_grammar_shards.py --source mint_ppi --split train
+    python scripts/data/build_mint_grammar_shards.py --source mint_actions --split train
 
-Outputs under ``data/bioseq_grammar_v1/mint_ppi/{train,valid}/``.
+Outputs under ``data/bioseq_grammar_v1/{mint_ppi,mint_actions}/{train,valid}/``.
 """
 
 from __future__ import annotations
@@ -45,19 +45,47 @@ def _load_module(name: str, path: Path):
 
 _grammar_builders = _load_module("grammar_builders", _data / "grammar_builders.py")
 _ppi_splits = _load_module("ppi_splits", _data / "ppi_splits.py")
-iter_semantic_rows = _grammar_builders.iter_semantic_rows
+_ppi_relations = _load_module("ppi_relations", _data / "ppi_relations.py")
 ppi_record = _grammar_builders.ppi_record
 semantic_row = _grammar_builders.semantic_row
 MINT_STRING_PRETRAIN = _ppi_splits.MINT_STRING_PRETRAIN
+MINT_STRING_ACTIONS_V11 = _ppi_splits.MINT_STRING_ACTIONS_V11
 validate_split = _ppi_splits.validate_split
+normalize_relation = _ppi_relations.normalize_relation
 
-DEFAULT_MINT_DIR = PROJECT_ROOT / "data/ppi_task_raw/processed/mint_string_pretrain_v1"
+DEFAULT_MINT_PPI_DIR = PROJECT_ROOT / "data/ppi_task_raw/processed/mint_string_pretrain_v1"
+DEFAULT_MINT_ACTIONS_DIR = PROJECT_ROOT / "data/ppi_task_raw/processed/mint_string_actions_v11.0"
 DEFAULT_OUTPUT = PROJECT_ROOT / "data/bioseq_grammar_v1"
+
+SOURCE_CONFIG = {
+    "mint_ppi": {
+        "source_id": "stringdb_mint",
+        "policy": MINT_STRING_PRETRAIN,
+        "default_mint_dir": DEFAULT_MINT_PPI_DIR,
+        "shard_name": "mint_ppi",
+        "record_source": "mint_string_ppi",
+        "default_relation": "binding",
+    },
+    "mint_actions": {
+        "source_id": "stringdb_actions",
+        "policy": MINT_STRING_ACTIONS_V11,
+        "default_mint_dir": DEFAULT_MINT_ACTIONS_DIR,
+        "shard_name": "mint_actions",
+        "record_source": "mint_string_actions",
+        "default_relation": None,
+    },
+}
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--mint-dir", type=Path, default=DEFAULT_MINT_DIR)
+    parser.add_argument(
+        "--source",
+        choices=tuple(SOURCE_CONFIG),
+        default="mint_ppi",
+        help="mint_ppi=physical binding splits; mint_actions=protein.actions mode splits.",
+    )
+    parser.add_argument("--mint-dir", type=Path, default=None)
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT)
     parser.add_argument("--split", choices=("train", "valid"), default="train")
     parser.add_argument("--max-protein-length", type=int, default=1024)
@@ -84,10 +112,14 @@ def load_sequence_map(seqs_gz: Path) -> dict[str, str]:
     return seqs
 
 
-def iter_mint_ppi_rows(
+def iter_mint_rows(
     links_gz: Path,
     seqs: dict[str, str],
     split: str,
+    *,
+    source_name: str,
+    record_source: str,
+    default_relation: str | None,
     max_protein_length: int,
     max_records: int | None,
 ) -> Iterator[dict[str, Any]]:
@@ -97,16 +129,22 @@ def iter_mint_ppi_rows(
             parts = line.strip().split()
             if len(parts) < 2:
                 continue
-            name1, name2 = parts[0], parts[1]
-            seq_a = seqs.get(name1, "")
-            seq_b = seqs.get(name2, "")
+            target_name, actor_name = parts[0], parts[1]
+            relation = default_relation
+            if len(parts) >= 3:
+                relation = normalize_relation(parts[2])
+            elif default_relation is None:
+                raise ValueError(f"{source_name} links must include relation column: {line[:120]}")
+
+            seq_target = seqs.get(target_name, "")
+            seq_actor = seqs.get(actor_name, "")
             record = ppi_record(
-                seq_a,
-                seq_b,
+                seq_target,
+                seq_actor,
                 split=split,
-                relation="binding",
-                source="mint_string_ppi",
-                pair_key=tuple(sorted((name1, name2))),
+                relation=relation,
+                source=record_source,
+                pair_key=(target_name, actor_name),
                 max_protein_length=max_protein_length,
             )
             if record is None:
@@ -119,22 +157,32 @@ def iter_mint_ppi_rows(
 
 def main() -> None:
     args = parse_args()
-    validate_split("stringdb_mint", args.split, policy_id=MINT_STRING_PRETRAIN.policy_id)
-    links_gz, seqs_gz = split_paths(args.mint_dir, args.split)
+    cfg = SOURCE_CONFIG[args.source]
+    mint_dir = args.mint_dir or cfg["default_mint_dir"]
+    validate_split(cfg["source_id"], args.split, policy_id=cfg["policy"].policy_id)
+    links_gz, seqs_gz = split_paths(mint_dir, args.split)
     for path in (links_gz, seqs_gz):
         if not path.exists():
             raise FileNotFoundError(
-                f"Missing {path}. Run build_mint_string_splits.py first "
-                f"(requires MMseqs2 clu50.tsv)."
+                f"Missing {path}. Build MINT/actions splits first for source={args.source!r}."
             )
 
-    target = args.output_dir / "mint_ppi" / args.split
+    target = args.output_dir / cfg["shard_name"] / args.split
     if target.exists():
         if not args.force:
             from datasets import Dataset
 
             existing = Dataset.load_from_disk(str(target))
-            print(json.dumps({"source": "mint_ppi", "split": args.split, "rows": len(existing), "path": str(target)}))
+            print(
+                json.dumps(
+                    {
+                        "source": cfg["shard_name"],
+                        "split": args.split,
+                        "rows": len(existing),
+                        "path": str(target),
+                    }
+                )
+            )
             return
         shutil.rmtree(target)
 
@@ -146,20 +194,23 @@ def main() -> None:
 
     target.parent.mkdir(parents=True, exist_ok=True)
     dataset = Dataset.from_generator(
-        lambda: iter_mint_ppi_rows(
+        lambda: iter_mint_rows(
             links_gz,
             seqs,
             args.split,
-            args.max_protein_length,
-            args.max_records,
+            source_name=cfg["shard_name"],
+            record_source=cfg["record_source"],
+            default_relation=cfg["default_relation"],
+            max_protein_length=args.max_protein_length,
+            max_records=args.max_records,
         ),
         cache_dir=str(args.output_dir / ".cache"),
     )
     dataset.save_to_disk(str(target), max_shard_size="512MB")
     manifest = {
-        "source": "mint_ppi",
+        "source": cfg["shard_name"],
         "split": args.split,
-        "split_policy": MINT_STRING_PRETRAIN.policy_id,
+        "split_policy": cfg["policy"].policy_id,
         "rows": len(dataset),
         "path": str(target),
         "links_gz": str(links_gz),

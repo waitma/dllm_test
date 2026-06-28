@@ -59,9 +59,8 @@ def ppi_record(
     seq_b = normalize_sequence(seq_b)
     if not is_valid_protein_sequence(seq_a) or not is_valid_protein_sequence(seq_b):
         return None
-    key = pair_key or tuple(sorted((seq_a[:32], seq_b[:32])))
-    seq_a = stable_crop(seq_a, max_protein_length, key[0])
-    seq_b = stable_crop(seq_b, max_protein_length, key[1])
+    if len(seq_a) > max_protein_length or len(seq_b) > max_protein_length:
+        return None
     return BioSeqRecord(
         chains=[
             BioSeqChain(seq_a, "protein_a"),

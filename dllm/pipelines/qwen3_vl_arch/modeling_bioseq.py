@@ -68,6 +68,7 @@ class BioSeqDiffusionTransformerConfig:
     loss_norm: str = "token"
     condition_hidden_size: int | None = None
     use_condition_projection: bool = False
+    condition_norm: bool = False
     gradient_checkpointing: bool = False
     initializer_range: float = 0.02
 
@@ -571,6 +572,104 @@ def load_local_esmc_encoder(
     return LocalESMCEncoder(esmc=esmc, hidden_size=hidden_size)
 
 
+def _convert_esm2_masked_lm_state_dict(state_dict: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
+    """Strip ``EsmForMaskedLM`` prefixes and drop auxiliary heads for ``EsmModel``."""
+
+    converted: dict[str, torch.Tensor] = {}
+    for key, value in state_dict.items():
+        if not key.startswith("esm."):
+            continue
+        new_key = key[len("esm.") :]
+        if new_key.startswith(("contact_head.", "pooler.")):
+            continue
+        converted[new_key] = value
+    return converted
+
+
+def _install_sklearn_import_stub() -> None:
+    """Stub sklearn before transformers import on nodes with older glibc.
+
+    Recent ``transformers`` versions import ``sklearn.metrics.roc_curve`` from
+    ``generation.candidate_generator`` when loading ``EsmModel`` (via
+    ``modeling_utils``). Some Volc cluster nodes only provide glibc < 2.32 while
+    the shared conda sklearn wheel requires 2.32, so a real import fails before
+    training starts. The stub satisfies the import-only dependency; ESM2 encoding
+    never calls ``roc_curve``.
+    """
+
+    import importlib.util
+    import sys
+    import types
+
+    existing = sys.modules.get("sklearn")
+    if existing is not None and getattr(existing, "__file__", None):
+        return
+
+    for name in list(sys.modules):
+        if name == "sklearn" or name.startswith("sklearn."):
+            del sys.modules[name]
+
+    sklearn = types.ModuleType("sklearn")
+    sklearn.__spec__ = importlib.util.spec_from_loader("sklearn", loader=None)
+    sklearn.__path__ = []  # type: ignore[attr-defined]
+    metrics = types.ModuleType("sklearn.metrics")
+    metrics.__spec__ = importlib.util.spec_from_loader("sklearn.metrics", loader=None)
+    metrics.roc_curve = lambda *args, **kwargs: ([], [], [])
+    sklearn.metrics = metrics
+    sys.modules["sklearn"] = sklearn
+    sys.modules["sklearn.metrics"] = metrics
+
+
+def load_local_esm2_encoder(model_path: str | Path) -> nn.Module:
+    """Load local ESM2 weights as ``EsmModel`` without importing ``AutoModel``.
+
+    Volc cluster nodes ship an older glibc than some conda-built sklearn wheels.
+    Even ``transformers.models.esm.modeling_esm`` pulls in ``modeling_utils`` →
+    ``generation`` → sklearn. ``_install_sklearn_import_stub`` avoids that import
+    failure; weights are read from local ``config.json`` + ``model.safetensors``.
+    """
+
+    _install_sklearn_import_stub()
+    model_path = Path(model_path)
+    config_path = model_path / "config.json"
+    safetensors_path = model_path / "model.safetensors"
+    bin_path = model_path / "pytorch_model.bin"
+    if not config_path.is_file():
+        raise FileNotFoundError(f"ESM2 config not found: {config_path}")
+    if not safetensors_path.is_file() and not bin_path.is_file():
+        raise FileNotFoundError(
+            f"ESM2 weights not found under {model_path} (expected model.safetensors or pytorch_model.bin)"
+        )
+
+    try:
+        from transformers.models.esm.configuration_esm import EsmConfig
+        from transformers.models.esm.modeling_esm import EsmModel
+    except ImportError as exc:
+        raise ImportError("Loading local ESM2 requires transformers with ESM support.") from exc
+
+    with config_path.open() as handle:
+        config_dict = json.load(handle)
+    skip_keys = {"architectures", "transformers_version", "torch_dtype", "vocab_list", "_name_or_path"}
+    config = EsmConfig(**{key: value for key, value in config_dict.items() if key not in skip_keys})
+    # ESM2's ``token_dropout`` rescales embeddings by ``1 / (1 - mask_ratio)``.
+    # The diffusion encoder stream shares ``mask_token_id`` (32) with ESM2, and at
+    # high noise levels a chain can be (almost) entirely masked, driving the ratio
+    # to 1 -> division by zero -> NaN/inf at training step 1. The rescale assumes a
+    # fixed MLM mask ratio (~0.12) that does not hold here, so disable it; masked
+    # positions then use their normal mask-token embedding (numerically stable).
+    config.token_dropout = False
+    model = EsmModel(config)
+
+    if safetensors_path.is_file():
+        from safetensors.torch import load_file
+
+        state_dict = load_file(str(safetensors_path), device="cpu")
+    else:
+        state_dict = torch.load(bin_path, map_location="cpu", weights_only=True)
+    model.load_state_dict(_convert_esm2_masked_lm_state_dict(state_dict), strict=False)
+    return model
+
+
 class BioSeqDiffusionDecoder(nn.Module):
     """Bidirectional transformer denoiser for grammar token streams.
 
@@ -598,6 +697,25 @@ class BioSeqDiffusionDecoder(nn.Module):
         self.condition_proj = (
             nn.Linear(config.condition_hidden_size, config.hidden_size, bias=False)
             if config.condition_hidden_size is not None and config.use_condition_projection
+            else None
+        )
+        # Re-scale the encoder condition before injection. With replacement
+        # injection the condition enters the *residual stream* un-normalized
+        # (h = cond at residue positions) and is carried by skip connections to
+        # the final read-out: out = lm_head(RMSNorm(cond + Σ sublayer_outputs)).
+        # The per-position RMSNorm only normalizes sublayer *inputs*, not the
+        # condition's weight in that residual sum, so the condition's influence
+        # on the output is set by its magnitude relative to the rest of the
+        # stream. ESMC's final-LayerNorm output is tiny (per-pos L2 ~1.3, gamma
+        # ~0.04) -> negligible in the residual -> the decoder ignores it
+        # (ablation: raw ESMC condition ties zeroing it out; a fixed ×24 scale,
+        # RMSNorm, or LayerNorm all fix it equally). ESM2 (L2 ~9.5) is already
+        # large enough. A LayerNorm with gamma=1 brings any encoder's condition
+        # to a usable, encoder-agnostic scale. Off by default for checkpoint
+        # backward-compat.
+        self.condition_norm = (
+            nn.LayerNorm(config.condition_hidden_size)
+            if config.condition_hidden_size is not None and config.condition_norm
             else None
         )
         self.layers = nn.ModuleList([BioSeqTransformerBlock(config) for _ in range(config.num_hidden_layers)])
@@ -683,6 +801,8 @@ class BioSeqDiffusionDecoder(nn.Module):
 
         # + ESMC/ESM2 condition (encoder models): replace residue embeddings or add projection.
         if encoder_condition is not None:
+            if self.condition_norm is not None:
+                encoder_condition = self.condition_norm(encoder_condition.to(hidden_states.dtype))
             if encoder_condition_mask is not None and not self.config.use_condition_projection:
                 replace_mask = encoder_condition_mask.to(hidden_states.dtype).unsqueeze(-1)
                 hidden_states = hidden_states * (1.0 - replace_mask) + encoder_condition.to(
@@ -908,13 +1028,8 @@ class BioSeqEncoderDiffusionModel(nn.Module):
     ) -> "BioSeqEncoderDiffusionModel":
         """Load a Hugging Face ESM2 (or compatible) encoder for per-chain conditioning."""
 
-        from transformers import AutoModel
-
-        encoder = AutoModel.from_pretrained(
-            encoder_name_or_path,
-            local_files_only=local_files_only,
-            trust_remote_code=trust_remote_code,
-        )
+        _ = local_files_only, trust_remote_code
+        encoder = load_local_esm2_encoder(encoder_name_or_path)
         return cls(decoder_config=decoder_config, encoder=encoder, freeze_encoder=freeze_encoder)
 
     def forward(
@@ -1025,6 +1140,16 @@ class BioSeqEncoderDiffusionModel(nn.Module):
             if encoder_attention_mask is not None
             else None
         )
+        # Empty/padded chain rows (used to pad ragged chain counts) have an all-zero
+        # attention mask. A transformer encoder attends over an all-masked row with a
+        # softmax over -inf, producing NaN; the subsequent ``hidden * mask`` cannot
+        # recover it (``NaN * 0 = NaN``). Give such rows a single valid attended
+        # position so the encoder forward stays finite; their output is zeroed below.
+        if flat_attention_mask is not None:
+            empty_rows = flat_attention_mask.sum(dim=-1).eq(0)
+            if empty_rows.any():
+                flat_attention_mask = flat_attention_mask.clone()
+                flat_attention_mask[empty_rows, 0] = 1
         call_kwargs: dict[str, Any] = {"input_ids": flat_input_ids}
         if flat_attention_mask is not None:
             call_kwargs["attention_mask"] = flat_attention_mask

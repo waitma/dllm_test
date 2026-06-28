@@ -5,6 +5,7 @@ from typing import Any
 
 
 VALID_PROTEIN_CHARS = set("ACDEFGHIKLMNPQRSTVWYXBZUO.-")
+DEFAULT_MAX_PROTEIN_LENGTH = 1024
 REGION_ORDER = ("FR1", "CDR1", "FR2", "CDR2", "FR3", "CDR3", "FR4")
 
 CHAIN_ROLE_TO_ID = {
@@ -137,6 +138,17 @@ class BioSeqRecord:
         if self.labels:
             data["labels"] = self.labels
         return data
+
+
+def record_within_max_protein_length(
+    record: BioSeqRecord,
+    max_protein_length: int = DEFAULT_MAX_PROTEIN_LENGTH,
+) -> bool:
+    """Return True when every chain in the record is at most ``max_protein_length`` aa."""
+
+    if max_protein_length <= 0:
+        return True
+    return all(len(chain.sequence) <= max_protein_length for chain in record.chains)
 
 
 def chain_role_from_processed_type(value: Any) -> str:

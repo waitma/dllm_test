@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import replace
+from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
 import torch
 import torch.nn as nn
 
@@ -22,8 +24,13 @@ from dllm.pipelines.qwen3_vl_arch.modeling_bioseq import (
     apply_decoder_corruption_to_encoder,
     compute_masked_cross_entropy,
     forbidden_diffusion_target_token_ids,
+    load_local_esm2_encoder,
     mask_forbidden_target_logits,
     sample_bioseq_diffusion_noise,
+)
+
+ESM2_650M_DIR = Path(
+    "/vepfs-mlp2/c20250601/251105016/project/dllm_test/model_weights/esm2/esm2_t33_650M_UR50D"
 )
 
 
@@ -205,6 +212,54 @@ def test_encoder_model_compute_loss_uses_diffusion_state_token_features() -> Non
     assert torch.isfinite(encoder.embeddings.weight.grad).all()
 
 
+def test_condition_norm_disabled_by_default() -> None:
+    """Backward-compat: no condition LayerNorm unless explicitly enabled."""
+    model = BioSeqEncoderDiffusionModel(
+        tiny_config(), encoder=TinyEncoder(vocab_size=_GRAMMAR_TOKENIZER.vocab_size, hidden_size=32)
+    )
+    assert model.config.condition_norm is False
+    assert model.decoder.condition_norm is None
+
+
+def test_condition_norm_rescales_squashed_encoder_condition() -> None:
+    """A tiny-scale encoder output (mimicking ESMC's gamma~0.04 final norm) must
+    be renormalized to a usable scale before injection when condition_norm=True."""
+    torch.manual_seed(0)
+    batch = antibody_antigen_batch()
+
+    class TinySquashedEncoder(nn.Module):
+        def __init__(self, vocab_size: int, hidden_size: int) -> None:
+            super().__init__()
+            self.config = SimpleNamespace(hidden_size=hidden_size)
+            self.embeddings = nn.Embedding(vocab_size, hidden_size)
+
+        def forward(self, input_ids, attention_mask=None):
+            hidden = self.embeddings(input_ids) * 0.04  # squash like ESMC post-norm
+            if attention_mask is not None:
+                hidden = hidden * attention_mask.to(hidden.dtype).unsqueeze(-1)
+            return SimpleNamespace(last_hidden_state=hidden)
+
+    encoder = TinySquashedEncoder(_GRAMMAR_TOKENIZER.vocab_size, 32)
+    model = BioSeqEncoderDiffusionModel(
+        tiny_config(condition_norm=True), encoder=encoder, freeze_encoder=False
+    )
+    assert isinstance(model.decoder.condition_norm, nn.LayerNorm)
+
+    output = model.compute_loss(batch)
+    assert output.loss is not None and torch.isfinite(output.loss)
+
+    residue = batch["attention_mask"] & batch["position_ids_inner"].ge(0)
+    raw = output.encoder_condition[residue]
+    normed = model.decoder.condition_norm(raw.to(model.decoder.condition_norm.weight.dtype))
+    # Raw squashed condition has tiny std; LayerNorm restores ~unit scale.
+    assert raw.std().item() < 0.1
+    assert normed.std().item() > 0.5
+
+    output.loss.backward()
+    assert encoder.embeddings.weight.grad is not None
+    assert torch.isfinite(encoder.embeddings.weight.grad).all()
+
+
 def test_encoder_model_can_freeze_encoder() -> None:
     torch.manual_seed(0)
     batch = antibody_antigen_batch()
@@ -315,3 +370,23 @@ def test_biohub_esmc_state_dict_key_conversion() -> None:
     assert "transformer.blocks.0.ffn.3.weight" in converted
     assert "sequence_head.3.weight" in converted
     assert not any(key.endswith("._extra_state") for key in converted)
+
+
+@pytest.mark.skipif(
+    not (ESM2_650M_DIR / "config.json").is_file(),
+    reason="Local ESM2-650M weights not available",
+)
+def test_local_esm2_encoder_disables_token_dropout_and_stays_finite() -> None:
+    """ESM2 token_dropout rescales by 1/(1-mask_ratio); a fully-masked diffusion
+    chain drives mask_ratio->1 -> NaN. The loader must disable token_dropout so a
+    chain whose attended positions are all ``mask_token_id`` stays finite."""
+
+    encoder = load_local_esm2_encoder(ESM2_650M_DIR).eval()
+    assert encoder.config.token_dropout is False
+
+    mask_id = encoder.config.mask_token_id
+    fully_masked = torch.full((1, 16), mask_id, dtype=torch.long)
+    attention_mask = torch.ones_like(fully_masked)
+    with torch.no_grad():
+        output = encoder(fully_masked, attention_mask=attention_mask)
+    assert torch.isfinite(output.last_hidden_state).all()

@@ -7,7 +7,7 @@ from typing import Callable, Iterable, Iterator, Sequence
 import torch
 from torch.utils.data import IterableDataset, get_worker_info
 
-from .records import BioSeqRecord
+from .records import BioSeqRecord, DEFAULT_MAX_PROTEIN_LENGTH, record_within_max_protein_length
 
 
 class RecordSource(IterableDataset):
@@ -118,6 +118,7 @@ class TaskHomogeneousBatchDataset(IterableDataset):
         task_key_fn: Callable[[BioSeqRecord], str] = bioseq_task_group,
         drop_last: bool = True,
         deduplicate_within_batch: bool = False,
+        max_protein_length: int | None = DEFAULT_MAX_PROTEIN_LENGTH,
     ) -> None:
         super().__init__()
         if batch_size <= 0:
@@ -127,11 +128,16 @@ class TaskHomogeneousBatchDataset(IterableDataset):
         self.task_key_fn = task_key_fn
         self.drop_last = drop_last
         self.deduplicate_within_batch = deduplicate_within_batch
+        self.max_protein_length = max_protein_length
 
     def __iter__(self) -> Iterator[list[BioSeqRecord]]:
         buffers: dict[str, list[BioSeqRecord]] = {}
         fingerprints: dict[str, set[tuple[str, tuple[str, ...], tuple[str, ...]]]] = {}
         for record in self.records:
+            if self.max_protein_length is not None and not record_within_max_protein_length(
+                record, self.max_protein_length
+            ):
+                continue
             task_key = self.task_key_fn(record)
             record_key = bioseq_record_fingerprint(record)
             task_buffer = buffers.setdefault(task_key, [])

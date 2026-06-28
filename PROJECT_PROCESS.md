@@ -4,14 +4,35 @@
 
 > Only non-terminal jobs (`Initialized` / `Queue` / `Staging` / `Running` / `Killing`). Remove a row when the job reaches `Success`, `Failed`, or `Killed`. Update after every `volc ml_task submit` or `cancel`. Rule: `/vepfs-mlp2/c20250601/251105016/project/dllm_test/.cursor/rules/volc-train-task-log.mdc`.
 
-Last updated: 2026-06-25 (UTC+8, resubmitted grammar-v2 test jobs after chain-separator fix)
+Last updated: 2026-06-28T12:00Z (UTC)
 
 | Status | Task ID | Job Name | YAML |
 |--------|---------|----------|------|
-| Queue | t-20260625140029-66gnq | qwen3_vl_bioseq_grammar_v2_no_encoder_qwen0_6b | `/vepfs-mlp2/c20250601/251105016/project/dllm_test/train_jobs/qwen3_vl_bioseq_grammar_v2_no_encoder_qwen0_6b.yml` |
-| Queue | t-20260625140032-t2vzk | qwen3_vl_bioseq_grammar_v2_esmc300m | `/vepfs-mlp2/c20250601/251105016/project/dllm_test/train_jobs/qwen3_vl_bioseq_grammar_v2_esmc300m.yml` |
-| Queue | t-20260625140036-sz7wd | qwen3_vl_bioseq_grammar_v2_esmc600m | `/vepfs-mlp2/c20250601/251105016/project/dllm_test/train_jobs/qwen3_vl_bioseq_grammar_v2_esmc600m.yml` |
-| Queue | t-20260625140039-dxt5t | qwen3_vl_bioseq_grammar_v2_esm2_650m | `/vepfs-mlp2/c20250601/251105016/project/dllm_test/train_jobs/qwen3_vl_bioseq_grammar_v2_esm2_650m.yml` |
+| Running | t-20260628155330-g8nch | qwen3_vl_bioseq_grammar_v2_esmc300m (condition_norm, 50k) | `/vepfs-mlp2/c20250601/251105016/project/dllm_test/train_jobs/qwen3_vl_bioseq_grammar_v2_esmc300m.yml` |
+| Queue | t-20260628155332-27ztf | qwen3_vl_bioseq_grammar_v2_esmc600m (condition_norm, 50k) | `/vepfs-mlp2/c20250601/251105016/project/dllm_test/train_jobs/qwen3_vl_bioseq_grammar_v2_esmc600m.yml` |
+
+## Live Progress — grammar_v2 v12 binding + v11 actions
+
+> Refresh this block whenever rebuild/train status changes. Terminal Volc jobs: remove from Active table above; details stay in dated sections below.
+
+| Item | Status | Notes |
+|------|--------|-------|
+| v12 MINT splits (`mint_string_pretrain_v1`) | **Done** | ~96.4M train links; no re-run needed (needs ~768 GiB RAM if rebuilt) |
+| v11 actions splits (`mint_string_actions_v11.0`) | **Done** | ~9.24M train links, 7 modes |
+| `mint_actions` grammar shards | **Done, preserved** | manifest `mint_actions:train` = 9,237,455 — rebuild script does **not** `--force` this |
+| `mint_ppi` grammar shards | **Done** | v12 rebuild complete: `mint_ppi:train` = **82,441,955** (was 173M v11 bleed; >1024 aa filter drops ~14% vs 96.4M raw links) |
+| Marker `.mint_shards_filter1024_v12v11` | **Done** | `2026-06-28T11:27:55Z` |
+| Local rebuild log | **Done** | `rebuild_mint_training_shards.log` — post-check passed; `mint_actions` unchanged |
+| 1B no-encoder resume | **Ready to submit** | Data ready; YAML train-only, **`--max-steps 350000`**, resume `output/grammar_v2_no_encoder_1b/latest.pt` (~step 34k) |
+| Train/data split policy | **Locked** | Data prep offline: `bash scripts/data/rebuild_mint_training_shards.sh`; Volc YAML only checks `manifest.json` + shard dirs |
+
+**Quick checks**
+
+```bash
+tail -1 /vepfs-mlp2/c20250601/251105016/project/dllm_test/data/ppi_task_raw/processed/pipeline_logs/rebuild_mint_training_shards.log
+test -f /vepfs-mlp2/c20250601/251105016/project/dllm_test/data/bioseq_grammar_v1/.mint_shards_filter1024_v12v11 && echo marker_ok
+env -u http_proxy -u https_proxy -u HTTP_PROXY -u HTTPS_PROXY -u ALL_PROXY volc ml_task list -n bioseq --status Initialized,Queue,Staging,Running,Killing -o json --limit 100
+```
 
 ## 2026-06-07
 
@@ -1730,6 +1751,36 @@ Full path inventory is the single source of truth in `/vepfs-mlp2/c20250601/2511
   - `t-20260625140039-dxt5t` esm2_650m
 - Initial status: all **`Queue`**, **`Preemptible: true`**. Failed predecessors: `t-20260625123349-rzdgz`, `t-20260625123353-hln2f`, `t-20260625123356-4vfhd`, `t-20260625123359-dzst8`.
 
+## 2026-06-25 Not all wasted: 2 preempted (resumable), esm2 path bug fixed
+
+- Status review of the batch-4 resubmissions:
+  - **esmc600m `t-20260625143218-tq59x` (non-preemptible): RUNNING healthy** — step 1600, loss 1.88, mem 43.2GB/79GB. NaN + OOM fixes confirmed working in production.
+  - **no_encoder `t-20260625140029-66gnq` (preemptible): preempted** — `SignalException ... got signal: 15` (SIGTERM) at step ~4720 (loss 1.08). Not a bug; idle resource reclaimed. `latest.pt`/`best.pt` saved.
+  - **esmc300m `t-20260625143215-5dnr8` (preemptible): preempted** — same SIGTERM after passing step 2 / OOM (batch-4 fix verified) and saving checkpoints.
+  - **esm2_650m `t-20260625143221-9kxbk`: Failed** — empty log; root cause: `model_weights/esm2` was a symlink to `/c20250601/mj/model_weights/esm2`, a different filesystem (device differs) that is NOT mounted on cluster nodes (only Vepfs SubPath `c20250601/251105016` is). `test -f config.json` failed → early exit.
+- **Fixes**:
+  - Copied real ESM2-650M weights (4.9G) into `/vepfs-mlp2/c20250601/251105016/project/dllm_test/model_weights/esm2/esm2_t33_650M_UR50D` (removed the dangling symlink). config.json/model.safetensors present.
+  - Set `--resume none` → `--resume auto` for no_encoder and esmc300m so they continue from saved checkpoints and auto-recover on future preemption.
+- **Resubmitted**: no_encoder `t-20260625160505-htgr2`, esmc300m `t-20260625160508-7g742` (both resume auto, preemptible), esm2_650m `t-20260625160526-fwzhj` (preemptible). esmc600m still Running.
+
+## 2026-06-25 Encoder jobs: fixed step-2 NaN (ragged chains) + batch-16 OOM
+
+- **Symptom**: esmc600m (`t-20260625141038-lt65w`) `Failed` — NCCL ALLREDUCE watchdog timeout (600s). True root cause from logs: `FloatingPointError: non-finite training loss detected at step=2` on several ranks; the ranks that raised exited, the rest hung on the `any_rank_nonfinite` scalar all-reduce → watchdog abort. lr was 1e-7 with grad clip 1.0, so the NaN came from the **forward**, encoder-only (no_encoder ran fine).
+- **NaN root cause**: in a task-homogeneous batch with **ragged chain counts** (e.g. TCR with vs without peptide), the collator pads to `max_chains` with all-`pad` chain rows whose `encoder_attention_mask` is all-zero. A transformer encoder attends over an all-masked row via softmax-over-`-inf` → `NaN`; the subsequent `chain_hidden * mask` cannot recover it (`NaN * 0 = NaN`), so NaN reached the decoder embedding replacement → loss NaN. Step 0 (`tcr:16`, uniform chains) was fine; step 2 drew a ragged batch.
+- **NaN fix** (`modeling_bioseq.py::encode_chain_tokens`): give all-zero attention rows a single valid attended position (`mask[empty,0]=1`) before the encoder, and add `torch.nan_to_num` after masking. New regression test `test_encoder_ragged_chain_counts_stay_finite` (NaN-on-empty encoder) added; bioseq grammar/model/sampling tests 28 passed.
+- **Second issue (after NaN fix)**: esmc300m (`t-20260625140032-t2vzk`) then hit **CUDA OOM** at a later step — a PPI batch (proteins capped 1024 residues × batch 16) blows the ESMC self-attention (quadratic in chain_len). step 0 (short tcr) was only 15.5GB; PPI batch spiked >79GB.
+- **OOM fix**: encoder YAMLs `--batch-size 16 --grad-accum 1` → `--batch-size 4 --grad-accum 4` (global batch stays **128** = 8 GPU × 4 × 4); added `PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True`. no_encoder (batch 16) stays — it has no encoder, mem ~12.5GB, healthy at step 1240 loss 1.37.
+- **Resubmitted** (cancelled t2vzk / lt65w-resubmit 5pgjf / dxt5t):
+  - esmc300m `t-20260625143215-5dnr8` (preemptible)
+  - esmc600m `t-20260625143218-tq59x` (**non-preemptible**)
+  - esm2_650m `t-20260625143221-9kxbk` (preemptible)
+- Queued jobs read code at container start, so they pick up the NaN fix automatically.
+
+## 2026-06-25 esmc600m switched to non-preemptible
+
+- Cancelled preemptible esmc600m `t-20260625140036-sz7wd`; set `Preemptible: false` in `train_jobs/qwen3_vl_bioseq_grammar_v2_esmc600m.yml` and resubmitted → `t-20260625141038-lt65w` (status `Queue`, **non-preemptible**, `Priority: 6`).
+- Other three remain preemptible. `no_encoder_qwen0_6b` (`t-20260625140029-66gnq`) is now **`Running`**.
+
 ## 2026-06-25 Deleted v12 detailed; started v11 MINT-minimal download
 
 - Confirmed `protein.links.detailed.v*.txt.gz` is **per-channel evidence subscores only** (neighborhood/fusion/cooccurence/coexpression/experimental/database/textmining + combined_score); it has **NO mode/action** (binding/activation/inhibition/catalysis/reaction/ptmod/expression). mode lives in `protein.actions.v11.0.txt.gz` (v12 replaced it with the API-only `regulatory` network). Refs: STRING help/database (`network.actions` table), help/faq (score columns), STRING-2025 NAR (PMC11701646, regulatory directionality).
@@ -1744,3 +1795,207 @@ Full path inventory is the single source of truth in `/vepfs-mlp2/c20250601/2511
 - Parametrized `scripts/data/run_mint_mmseqs_cluster.sh` with `STRING_VERSION` env (default `v12.0` keeps `DB100`/`clu50.tsv` for backward compat; other versions → `DB100_<ver>` + `clu50.<ver>.tsv` + per-version tmp dir + log, so v11 never clobbers the existing v12 `clu50.tsv`).
 - Created `train_jobs/mint_string_mmseqs_cluster_v11.yml` (clone of `mint_string_mmseqs_cluster_c1ie.yml`, `ml.c1ie.21xlarge`, CPU-only, preemptible, `STRING_VERSION=v11.0`, output `clu50.v11.0.tsv`).
 - **Submit gated on download**: clustering needs the complete `protein.sequences.v11.0.fa`; the v11 minimal download (`pid=1859694`) is still in progress (STRING source ~230 KiB/s; sequences ~10% as of 05:46, then 31 GB physical links). Submit `mint_string_mmseqs_cluster_v11` only after `gzip -t protein.sequences.v11.0.fa.gz` passes.
+
+## 2026-06-25 Implemented v11 actions mode pipeline (code + human smoke)
+
+- Added `scripts/data/build_string_actions_splits.py`: reads `protein.actions` (`a_is_acting=t`), emits `target actor mode` links, binding downsample (default 5%), MINT-style cluster dedup + 250k valid + train/valid cluster disjoint filter; skips proteins missing from cluster/sequence maps.
+- Registered `mint_string_actions_v11` split policy in `ppi_splits.py` (`source_id=stringdb_actions`).
+- Extended `build_mint_grammar_shards.py` with `--source {mint_ppi,mint_actions}`; actions shards read mode column into grammar relation tokens (target→`protein_a` fixed, actor→`protein_b` generated).
+- `build_bioseq_grammar_v1.py` accepts `mint_actions` prebuilt source alongside `mint_ppi`.
+- Human smoke on `9606.protein.actions.v11.0.txt.gz`: 921k edges after filter → 754k deduped → valid 5k / train_filtered 29k (dev smoke dir `data/ppi_task_raw/processed/string_actions_smoke`).
+- Tests: `scripts/tests/bioseq/test_string_actions_grammar.py` + existing grammar tests **15 passed**.
+- After minimal download completes: run `download_stringdb_assets.sh --version v11.0 --with-actions`, submit `mint_string_mmseqs_cluster_v11.yml`, then full v11 physical + actions splits + grammar shards.
+
+## 2026-06-25 v11 pipeline orchestration + docs (actions download parallel)
+
+- Added `--actions-only` to `download_stringdb_assets.sh` so full-species `protein.actions.v11.0.txt.gz` (~12 GB) can download in parallel with the MINT minimal set (sequences + physical links).
+- Started parallel actions download (`bash download_stringdb_assets.sh --version v11.0 --actions-only`, log: `data/ppi_task_raw/processed/pipeline_logs/protein_actions_v11_download.log`).
+- Created `train_jobs/mint_stringdb_splits_v11_g3a48xlarge.yml` for in-memory MINT physical splits → `mint_string_pretrain_v11.0/`.
+- Added `scripts/data/run_v11_actions_pipeline.sh` orchestrator: waits for gzip integrity, auto-submits `mint_string_mmseqs_cluster_v11.yml` + physical splits Volc jobs, then runs `build_string_actions_splits.py` once physical validation exists.
+- Updated `GRAMMAR_V1.md` with STRING actions mode/direction semantics (`target`→fixed context, `actor`→generated, relation=mode token).
+- MINT minimal download still in progress (~87% sequences as of 10:27 UTC); cluster/splits jobs gated on orchestrator.
+
+## 2026-06-25 Submitted v11 MMseqs cluster; restarted physical links download
+
+- `protein.sequences.v11.0.fa.gz` verified (`gzip -t` OK, 5,526,372,370 bytes).
+- Submitted `mint_string_mmseqs_cluster_v11.yml` via volc-no-proxy: `task_id=t-20260625190533-h99qw`, initial status `Queue`, `Preemptible: true`.
+- Minimal download script crashed after sequences (transient syntax error during live edit); restarted physical-only pass → log `string_v11_physical_download.log` (~31 GB `protein.physical.links.full.v11.0.txt.gz`).
+- Orchestrator `run_v11_actions_pipeline.sh` running: will submit `mint_stringdb_splits_v11_g3a48xlarge.yml` after physical links + `clu50.v11.0.tsv`, then build `mint_string_actions_v11.0` splits.
+
+## 2026-06-25 esm2_650m Failed (AutoModel/sklearn GLIBC) + resubmit
+
+- **Failed**: `t-20260625160526-fwzhj` via `train_jobs/qwen3_vl_bioseq_grammar_v2_esm2_650m.yml`, final status **`Failed`**, `Preemptible: true`.
+- **Root cause** (Volc logs `ml_task logs -t t-20260625160526-fwzhj -i worker_0`): `BioSeqEncoderDiffusionModel.from_hf_encoder` imported `transformers.AutoModel`, which pulls in `transformers.generation` → `sklearn.metrics`. The conda `flow` sklearn wheel requires **`GLIBC_2.32`**, but cluster nodes only provide an older glibc → import crash at model build (pytest passed because it never loads ESM2 AutoModel).
+- **Fix**: added `load_local_esm2_encoder` in `modeling_bioseq.py` — loads `EsmModel` via the ESM submodule + local `config.json`/`model.safetensors`, avoiding `AutoModel`. ESMC already used an analogous local loader.
+- **Resubmitted**: `t-20260625193530-bwjt6` via same YAML, initial status **`Queue`**, `Preemptible: true`.
+
+## 2026-06-25 esm2_650m Failed again (EsmModel still imports sklearn) + resubmit
+
+- **Failed**: `t-20260625193530-bwjt6`, final status **`Failed`**, `Preemptible: true`.
+- **Root cause**: prior fix avoided `AutoModel`, but `transformers.models.esm.modeling_esm.EsmModel` still imports `modeling_utils` → `generation` → `sklearn.metrics.roc_curve` → same **GLIBC_2.32** crash on cluster nodes.
+- **Fix**: `_install_sklearn_import_stub()` in `load_local_esm2_encoder` — registers a minimal `sklearn.metrics` stub (with valid `__spec__`) before any transformers ESM import. ESM2 encoding never calls `roc_curve`.
+- **Resubmitted**: `t-20260625213903-5bvz5` via `train_jobs/qwen3_vl_bioseq_grammar_v2_esm2_650m.yml`, initial status **`Queue`**, `Preemptible: true`.
+
+## 2026-06-25 v11 MMseqs cluster Killed (preemptible) + non-preemptible resume
+
+- **Killed**: `t-20260625190533-h99qw` via `train_jobs/mint_string_mmseqs_cluster_v11.yml`, final status **`Killed`** after ~2h (`Preemptible: true`). MMseqs was mid cluster step-2 prefilter; `clu50.v11.0.tsv` not produced. `DB100_v11.0` (createdb) already on vepfs (~8.4 GB).
+- **Resubmitted**: `t-20260625220601-xlntx` via `train_jobs/mint_string_mmseqs_cluster_v11_resume.yml`, initial status **`Queue`**, **`Preemptible: false`**. Skips createdb, reruns cluster + createtsv.
+
+## 2026-06-26 esm2_650m Failed at training step 1 (ESM2 token_dropout NaN) + resubmit
+
+- **Failed**: `t-20260625213903-5bvz5`, final status **`Failed`**. This time import succeeded and **training started** (sklearn stub worked); the run died via NCCL ALLREDUCE watchdog timeout (600s, scalar `any_rank_nonfinite` reduce). True root cause (Volc logs `-c "non-finite"`): **`FloatingPointError: non-finite training loss detected at step=1` on all 8 ranks** (deterministic, unlike the earlier random ragged-chain ESMC NaN).
+- **Root cause**: `BioSeqDiffusionTransformerConfig.mask_token_id = 32` equals ESM2's `mask_token_id = 32`. The diffusion encoder stream (`apply_decoder_corruption_to_encoder`) masks residues to id 32. ESM2's `token_dropout` then rescales embeddings by `(1 - 0.12) / (1 - mask_ratio_observed)`, where `mask_ratio_observed = (input_ids==32).sum() / attention_mask.sum()`. At high noise a chain's attended positions are (nearly) all mask → ratio→1 → divide-by-zero → inf/NaN. ESMC has no such rescale, so only ESM2 crashed. Reproduced locally: fully-masked chain → `last_hidden_state` non-finite with `token_dropout=True`, finite with it off.
+- **Fix**: `load_local_esm2_encoder` now sets `config.token_dropout = False` before building `EsmModel`. The MLM rescale assumes a fixed ~0.12 mask ratio that does not hold for diffusion inputs; masked positions just use their normal mask-token embedding. Added guarded regression `test_local_esm2_encoder_disables_token_dropout_and_stays_finite` (skips if weights absent); 24 bioseq model+grammar tests pass.
+- **Resubmitted**: `t-20260626002534-zv8x6` via `train_jobs/qwen3_vl_bioseq_grammar_v2_esm2_650m.yml`, initial status **`Queue`**, `Preemptible: true`.
+
+## 2026-06-26 Submitted grammar_v2 downstream eval (CDR + light pairing)
+
+- **Submitted** three single-GPU downstream eval jobs (`Preemptible: false`, `ml.pni2.3xlarge`):
+  - `t-20260626164042-cp7zp` via `train_jobs/eval_grammar_v2_esmc300m_downstream.yml` → ckpt `output/grammar_v2_esmc300m/latest.pt` (step 10000)
+  - `t-20260626164043-n6dg8` via `train_jobs/eval_grammar_v2_esmc600m_downstream.yml` → ckpt `output/grammar_v2_esmc600m/latest.pt` (step 10000)
+  - `t-20260626164042-gvfm2` via `train_jobs/eval_grammar_v2_no_encoder_qwen0_6b_downstream.yml` → ckpt `output/grammar_v2_no_encoder_qwen0_6b/latest.pt` (step 10000; user "no encoder 600m" maps to this ~0.6B variant)
+- **Protocol** (same as grammar_v1): CDR H1/H2/H3 SAbDab 10-fold (`argmax`, `max_iter=4`); OAS holdout 500 light pairing (`prompt3`, `n=8`, `gumbel_argmax`, `max_iter=32`).
+- **Scripts**: `scripts/downstream/run_grammar_v2_variant_downstream_eval.sh`; pairing metrics locally via `scripts/downstream/run_grammar_v2_pairing_metrics_local.py` (Volc sklearn/GLIBC issue on v1).
+- **Outputs** → `output/downstream_generation/grammar_v2_*`
+
+## 2026-06-26 v11 data prep merged into grammar_v2_no_encoder_1b (cancel g3a splits queue)
+
+- **Cancelled** `t-20260626024049-9z49h` (`mint_stringdb_splits_v11_g3a48xlarge`, was `Queue`) — g3a CPU queue unlikely to schedule; physical MINT splits need ~768 GiB RAM but `ml.pni2.28xlarge` has ~2 TB (same approach as prior dhlpw WebShell run).
+- Added idempotent `scripts/data/prepare_v11_mint_grammar_data.sh`: physical MINT splits → actions splits → mint grammar shards → manifest update.
+- **Submitted** `t-20260626164209-96sqz` via `train_jobs/qwen3_vl_bioseq_grammar_v2_no_encoder_1b.yml`: runs data prep on rank-0 then grammar-v2 no-encoder ~1B training with `--sources oas,ots,tcr,ppi,mint_ppi,mint_actions`. Initial status `Queue`, `Preemptible: true`, flavor `ml.pni2.28xlarge`.
+- Stopped background `run_v11_actions_pipeline.sh` orchestrator to avoid duplicate splits submission.
+
+## 2026-06-26 Corrected grammar_v2_no_encoder_1b: train first, v11 prep on CPU in background
+
+- **Cancelled** `t-20260626164209-96sqz` (blocked on v11 prep before training).
+- **Resubmitted** `t-20260626170110-fhhc7` via updated `train_jobs/qwen3_vl_bioseq_grammar_v2_no_encoder_1b.yml`:
+  - GPU: immediate training on existing `oas,ots,tcr,ppi` (same mix as 0.6B), 1B decoder (L52/H1280).
+  - CPU: `prepare_v11_mint_grammar_data.sh` in background (`nohup`, log `prepare_v11_bg.log`); does not block torchrun.
+
+## 2026-06-28 ESMC encoder condition bug found + fix (condition_norm) + 50k resubmit
+
+- **TL;DR (honest current state)**: Strongly NARROWED, not 100% proven. Using ESM2 as the reference on the *trained* checkpoints (`condition_reliance_trained.py`): ESMC **does** use its condition but extracts only ~half of ESM2's benefit, its condition stays small-magnitude (cond_absmax 1.2 vs ESM2 8.6) even after training, and ESMC ends up **worse than no_encoder** (1.71 vs 0.77) ⇒ the ESMC encoder→decoder **injection/representation** is the bottleneck (not data, tokenizer, batch, or ESMC model size — 600M≈300M). `condition_norm` targets this; the 50k retrains (`g8nch`/`27ztf`) are the real validation. Short single-GPU ablations (<= a few hundred steps) and the ESM2-shrink control were **inconclusive** (too early to show the encoder benefit) — do not treat them as proof.
+- **Symptom** (user-reported): grammar_v2 encoder runs have much higher loss than no_encoder, but only ESMC — ESM2 is fine. Confirmed from finished runs:
+  - no_encoder ~0.6B: val ~0.77 (best), train residue loss ~0.32
+  - **ESM2-650M**: val **0.72**, residue **0.11** (encoder helps)
+  - **ESMC-300M**: val **1.67**, residue **1.40** (worse than no_encoder)
+  - **ESMC-600M**: val **1.77**, residue **0.92** (worse than no_encoder)
+  - ESMC val plateaus from step 1000 (~1.9) and barely moves; ESM2 steadily descends.
+- **Ruled out**: tokenizer mismatch (local `ESMC-*/tokenizer.json` id→residue map is identical to native `get_esmc_model_tokenizers()`); ESMC `sequence_id` semantics (native default is `tokens!=pad`, == `attention_mask.bool()`); data sharding / per-chain encoder inputs / corruption alignment (all shared with ESM2, which works); effective batch (ESM2 2×8×8=128, ESMC 4×4×8=128, both correct).
+- **Root cause** (corrected after a sharper ablation — it is NOT "tiny gamma squashes/collapses features"; ESMC features are actually well-centered with good per-position spread, cosine 0.28 vs ESM2 0.37): the failure is purely **residual-stream magnitude**. With **embedding replacement** (`hidden = hidden*(1-mask) + cond*mask`), the condition enters the residual stream un-normalized and reaches the read-out via skip connections: `out = lm_head(RMSNorm(cond + Σ sublayer_outputs))`. The decoder's per-position RMSNorm normalizes sublayer *inputs* but NOT the condition's weight in that residual sum. ESMC's post-final-norm `last_hidden_state` is tiny (per-pos L2 ≈ 1.3, final LayerNorm gamma ≈ 0.038) → negligible in the residual → the decoder's output barely depends on it → it learns to ignore it. ESM2's condition (L2 ≈ 9.5, gamma ≈ 0.25, ~7× larger) is naturally above this threshold, which is why ESM2 trains fine without any change.
+- **Ablation proof** (`scripts/debug/ab_test_esmc_condition_norm.py`, ESMC-300M, same init/data/seed):
+  - First pass (A/B/C, 240 steps): A=raw 2.83→**2.83** (flat); B=+LayerNorm 2.87→**2.42**; C=condition zeroed 2.84→**2.84**. **A ≈ C** ⇒ raw ESMC condition contributes nothing; B fixes it.
+  - Sharper pass (A/S/R/B, 200 steps) isolating the mechanism: A=raw **2.82**; S=condition×24 fixed scalar **2.63**; R=RMSNorm(condition) **2.58**; B=LayerNorm(condition) **2.60**. **S ≈ R ≈ B, all beat A** ⇒ the early-training fix is purely re-scaling magnitude; centering (B only) and learnable affine (B/R) are irrelevant (S has neither and ties).
+- **CAVEAT / correction (trained-checkpoint analysis, `scripts/debug/condition_reliance_trained.py`)**: the short single-GPU ablations cover only ~hundreds of samples (bs 2-4, 1 GPU) vs the real effective batch 128 — far too early to reach where the encoder's benefit fully manifests, so "A≈C ⇒ condition is dead weight" is an **untrained-transient artifact, not the steady state**. Measuring the *finished* checkpoints (val loss with condition vs condition zeroed):
+  - ESM2-650M: 0.747 → 2.862 (zeroed), reliance **+2.11**, cond_absmax 8.6
+  - ESMC-300M: 1.712 → 2.877 (zeroed), reliance **+1.17**, cond_absmax 1.16
+  - ESMC-600M: 1.766 → 2.967 (zeroed), reliance **+1.20**, cond_absmax 1.38
+  - ⇒ **trained ESMC DOES use its condition** (not ignored), but extracts only ~half the benefit ESM2 does. **ESMC-600M ≈ ESMC-300M** ⇒ more ESMC capacity does not help, so the bottleneck is the **feature injection/representation** (the tiny-magnitude post-final-norm output), not ESMC model size or raw feature quality. The ESM2-shrink control (`confirm_esm2_shrink_breaks.py`, 180 steps) was inconclusive (all arms ~2.84 — too short to show ESM2's benefit even un-shrunk).
+- **Cleanest framing (vs no_encoder)**: injection is **replacement**, so residue-position token info comes entirely from the condition; the "+2.11 reliance" only means the architecture depends on it, NOT that the encoder beats no_encoder. The right baseline is no_encoder val ≈ 0.77 (residue positions use the decoder's own token embedding). Then: **ESM2 0.75 ≈ no_encoder 0.77** (its condition ≈ as good as a plain token embedding), but **ESMC 1.71 < no_encoder 0.77** (its condition is *worse* than a plain learned token embedding). A condition carries strictly more info (noisy token identity + context) than a bare token embedding, so even a mediocre encoder should be ≥ no_encoder. ESMC being worse ⇒ the ESMC injection is *losing residue-identity information* the decoder needs — consistent with the tiny-magnitude post-final-norm output and the capacity-insensitivity (600M≈300M).
+- **Status of the fix**: `condition_norm` targets exactly this injection bottleneck and is a reasonable, low-risk change, but whether it closes the 1.71→0.77 gap is **not yet proven** — the 50k ESMC retrains (`g8nch`/`27ztf`, condition_norm on) are the real test. It may fully close, partially close, or reveal a residual feature-quality gap.
+- **Fix**: added `condition_norm` config flag → `BioSeqDiffusionDecoder.condition_norm = nn.LayerNorm(condition_hidden_size)` applied to the encoder condition before injection (replacement or projection). Off by default (checkpoint backward-compat); enabled via `--condition-norm`. Wired through `examples/bioseq/train_qwen3_vl_bioseq_ddp.py::build_config`. New regression tests `test_condition_norm_disabled_by_default` + `test_condition_norm_rescales_squashed_encoder_condition`; 26 bioseq model+grammar tests pass.
+- **Also noted**: grammar v1 trained 50k steps; v2 only 10k (5× fewer). Resubmitting ESMC at **50k** to both fix the bug and match v1's budget.
+- **Resubmitted** (new output dirs `output/grammar_v2_esmc{300,600}m_condnorm`, `--resume auto` on empty dir, `--condition-norm`, `--max-steps 50000`, `Preemptible: true`):
+  - esmc300m `t-20260628155330-g8nch`
+  - esmc600m `t-20260628155332-27ztf`
+- **Open**: for a fully fair 4-way comparison at 50k, no_encoder/ESM2 may also need 50k reruns (not yet launched — ESM2 already converged to 0.72 at 10k).
+
+## 2026-06-26 esm2_650m Failed at step 1 (rank-5 PPI OOM, not NaN) + resubmit bs=2
+
+- **Failed**: `t-20260626002534-zv8x6` via `train_jobs/qwen3_vl_bioseq_grammar_v2_esm2_650m.yml`, final status **`Failed`**, `Preemptible: true`. Step 0 completed on all ranks (loss ~3.92, grad_norm ~40); step 1 micro 5 killed the job.
+- **Misleading symptom**: other ranks logged finite losses then raised `FloatingPointError: non-finite training loss at step=1` and NCCL ALLREDUCE SeqNum=1127 timeout (600s). This was **`any_rank_nonfinite` waiting for rank 5**, not a true cross-rank NaN.
+- **True root cause** (Volc logs rank5 traceback): **`torch.OutOfMemoryError` on GPU 5** during decoder forward (gradient-checkpoint MLP) on a **PPI batch** with `encoder_input_ids [4,2,1026]`, `input_ids [4,2053]` (~79 GiB peak on that rank). Exact batch reproduced locally via rank-5 shard replay (`scripts/debug/replay_rank5_micro5.py`).
+- **Local NaN hunt**: per-rank shard scans (train mode, 40 noise seeds, step0+1 replay) found **0 non-finite forwards**; earlier token_dropout fix is working. Failure is memory-only on long PPI samples with ESM2-650M + 1280-d decoder at `batch_size=4`.
+- **Fix**: YAML `batch_size=2`, `grad_accum=8` (global batch still 128 = 8×2×8). Description updated in yml.
+- **Resubmitted**: `t-20260626214410-rpg5h` via same YAML, initial status **`Queue`**, `Preemptible: true`.
+
+## 2026-06-28 grammar_v2 no_encoder 1b: v12 binding + v11 actions, filter >1024
+
+- **Policy**: `mint_ppi` shards from **v12** `mint_string_pretrain_v1` (~96M binding); `mint_actions` from **v11** (~9.2M modes). PPI pairs with either chain **>1024 aa are dropped** at shard build (`ppi_record` filter, not crop).
+- **Code**: `scripts/data/rebuild_mint_training_shards.sh`; marker `data/bioseq_grammar_v1/.mint_shards_filter1024_v12v11`.
+- **Docs**: updated `PPI_DATA.md`, `GRAMMAR_V1.md`.
+- **Submitted**: `t-20260628164312-dnkdc` via `train_jobs/qwen3_vl_bioseq_grammar_v2_no_encoder_1b_v12v11.yml` — six sources, `--max-steps 50000`, `--resume auto`, `Preemptible: true`. Entrypoint rebuilds mint shards on rank-0 if marker missing.
+- **Background rebuild** started locally: `pipeline_logs/rebuild_mint_training_shards.log` (mint_ppi/train from v12 first).
+
+## 2026-06-28 Resubmitted 1B resume: v12 mint_ppi rebuild only, preserve mint_actions
+
+- **Cancel**: `t-20260628164312-dnkdc` (queued job used old rebuild that also `--force` rebuilt `mint_actions`).
+- **Script fix**: `rebuild_mint_training_shards.sh` now rebuilds **only** `mint_ppi` from v12 `mint_string_pretrain_v1`; **skips** existing `mint_actions` shards (~9.2M). Post-check rejects `mint_ppi:train` >120M (v11 bleed). `prepare_v11_mint_grammar_data.sh` is actions-only (no v11 `mint_ppi` grammar shards).
+- **Resubmitted**: `t-20260628172139-4dss8` via `train_jobs/qwen3_vl_bioseq_grammar_v2_no_encoder_1b_v12v11.yml` — `--resume auto` from `output/grammar_v2_no_encoder_1b/latest.pt`, rank-0 runs v12-only rebuild if marker missing, initial status `Queue`, `Preemptible: true`.
+
+## 2026-06-28 Local v12 mint_ppi rebuild in progress (mint_actions untouched)
+
+- **Snapshot** (2026-06-28T09:35Z): local `rebuild_mint_training_shards.sh` running (pid via `nohup`, conda `protenix_abtcr` python). Stage: **`mint_ppi/train`** from v12 `mint_string_pretrain_v1`, ~4.0M rows generated, ~12.4k rows/s. Marker **not** written yet; manifest still shows wrong `mint_ppi:train` = 173,109,679 until rebuild finishes and `build_bioseq_grammar_v1.py` refreshes manifest.
+- **Earlier local failures**: bare `python` lacked `datasets`; fixed by `${CONDA}/bin/python` in rebuild script. First successful run passed sequence load (16,390,441 seqs) and `Dataset.from_generator` streaming.
+- **Memory note**: large-RAM node (~768 GiB+) is only required for **MINT splits** (`run_mint_stringdb_native.py`); grammar shard rebuild streams links and only holds the sequence map (~tens of GiB), so it can run on the dev box (slow but OK).
+- **Blocked on**: rebuild completion → marker → **then** `volc ml_task submit` for 1B (data prep is **not** in train YAML).
+- **Cancelled (terminal)**: `t-20260628164312-dnkdc` → `Killed` (superseded by `4dss8`). Prior 1B job `t-20260626170110-fhhc7` → `Killed` ~step 34k; checkpoint retained at `output/grammar_v2_no_encoder_1b/latest.pt` (12G, 2026-06-27).
+
+## 2026-06-28 Cancel 1B queue job; decouple data prep from train YAML
+
+- **Policy**: grammar shard rebuild runs **offline** (`scripts/data/rebuild_mint_training_shards.sh` on dev box or CPU node). Train jobs assume vepfs data is ready; **do not** embed `rebuild_mint_*` or marker gates in Volc entrypoints.
+- **YAML change**: removed rank-0 `rebuild_mint_training_shards.sh`, multi-node sleep, and marker `test` from `train_jobs/qwen3_vl_bioseq_grammar_v2_no_encoder_1b_v12v11.yml`. Entrypoint keeps manifest/shard preflight + pytest + `torchrun` only.
+- **Cancelled**: `t-20260628172139-4dss8` (`qwen3_vl_bioseq_grammar_v2_no_encoder_1b_v12v11`, was `Queue`) — was submitted before data ready and used old entrypoint with rebuild logic. Resubmit after marker `.mint_shards_filter1024_v12v11` exists and manifest `mint_ppi:train` ≈ 96M.
+
+## 2026-06-28 Scale 1B training steps for six-source MINT mix
+
+- **Rationale**: train rows ~5.1M (4 immune sources) → ~111M (+ v12 `mint_ppi` ~96M + v11 `mint_actions` ~9.2M). With mixture weights (oas 3.9, ots 3.6, ppi 1.4, tcr 1.0, mint_* 1.0), weighted mass ratio ≈ **6.9×** vs old 4-source mix.
+- **YAML** `train_jobs/qwen3_vl_bioseq_grammar_v2_no_encoder_1b_v12v11.yml`: `--max-steps 50000` → **`350000`**; `--warmup-steps 2000` → **`10000`**; `--val-interval 500` → **`1000`**; `--save-interval 1000` → **`2000`**; `ActiveDeadlineSeconds` **604800 → 1209600** (14d).
+- **Expected coverage @ 350k** (global batch 128): `mint_actions` ~41% of shard; `mint_ppi` ~4% (dominant corpus, weight 1.0 — full pass would need ~9M steps). Immune sources oversampled vs MINT by design unless mint weights are raised later.
+- **Resume**: existing `latest.pt` (~step 34k) continues toward 350k under `--resume auto`.
+
+## 2026-06-28 Grammar v2 数据流与 mask 规则澄清
+
+- **Doc**: canonical spec in `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/GRAMMAR_V1.md`; data loader notes in `dllm/pipelines/qwen3_vl_arch/data/README.md`.
+
+### Grammar v2 模板（active）
+
+| Task | Token layout |
+|------|--------------|
+| OAS | `<prots> <ab> H . L <protd>` |
+| OTS | `<prots> <tcr> α . β <protd>` |
+| Nanobody | `<prots> <nb> VHH <protd>` |
+| TCR+peptide | `<prots> <pep> PEP <protd> <binding> <prots> <tcr> α . β <protd>` |
+| TCR-pMHC | `<prots> MHC . B2M <protd> <binding> <prots> <pep> PEP <protd> <binding> <prots> <tcr> α . β <protd>` |
+| PPI | `<prots> A <protd> <REL> <prots> B <protd>` (conditional only) |
+| AB-antigen | `<prots> ANTIGEN <protd> <binding> <prots> <ab> H . L <protd>` |
+
+### Fixed vs generated（已修正代码 2026-06-28）
+
+- **Unconditional** (OAS/OTS/nanobody): entire record diffused, **including** `<ab>`/`<tcr>`/`<nb>`.
+- **Conditional**: context blocks + relation tokens fixed; generated receptor/partner block diffused **including** type marker inside that block.
+- **TCR-pMHC fixed**: MHC block, both `<binding>`, peptide block (`<pep>` fixed). **Generated**: TCR receptor block only.
+- **Noise**: per-sequence `t ~ U(ε,1)`; each eligible token masked independently with prob `t` (token-level, not chain all-or-nothing).
+
+### 训练一步数据流
+
+```text
+Arrow BioSeqRecord → GrammarRenderer → GrammarBioSeqCollator
+  → sample_bioseq_diffusion_noise (decoder x_t)
+  → apply_decoder_corruption_to_encoder (mirror to per-chain encoder)
+  → ESMC/ESM2 encode [B,C,L] → gather_token_condition → decoder (embedding replacement at residues)
+```
+
+- Decoder: flat grammar stream. Encoder: each biological chain as `<cls>seq<eos>`; structure/relation tokens get no encoder condition.
+
+### 已修 bug
+
+1. **Type marker wrongly fixed** (`grammar.py`): generated blocks passed `type_marker_fixed=True`, so OAS `<ab>` etc. never diffused. Removed; tests updated (`test_tcr_pmhc_layout_and_fixed_masks` added).
+2. **Encoder align all-X** (`grammar.py::_encode_chain_from_residue_ids`): per-chain rebuild via string round-trip failed without `id_to_token` on ESMC/ESM2 adapters → every encoder chain was `X`. Fixed by copying decoder residue ids directly into `<cls> residues <eos>`.
+
+### 训练任务建议
+
+- Active ESMC condition_norm 50k jobs (`t-20260628155330-g8nch`, `t-20260628155332-27ztf`) were submitted **before** type-marker fix and encoder align fix → **recommend cancel + resubmit** after validating local pytest on fixed code.
+- Prior grammar_v2 Round-2 val reference (10k, pre-fix): no_encoder ~0.77, ESM2 ~0.72, ESMC ~1.67; grammar_v1 ESMC proxy+proj ~0.82 @50k.
+
+### Code / tests touched
+
+- `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/data/grammar.py`
+- `/vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/tests/bioseq/test_qwen3_vl_grammar.py` (17 passed)
+
+## 2026-06-28 Local v12 mint_ppi rebuild completed
+
+- **Finished** (2026-06-28T11:27:55Z): `rebuild_mint_training_shards.sh` — v12-only `mint_ppi` train+valid; `mint_actions` preserved.
+- **Manifest (train)**: `mint_ppi` **82,441,955** | `mint_actions` **9,237,455** | immune sources unchanged (oas 2.49M, ots 2.10M, ppi 319k, tcr 164k).
+- **Filter note**: v12 split has ~96.4M train links; grammar shard count ~82.4M after **>1024 aa pair drop** (~14% removed).
+- **Marker**: `data/bioseq_grammar_v1/.mint_shards_filter1024_v12v11` written; **1B job can be submitted** via `train_jobs/qwen3_vl_bioseq_grammar_v2_no_encoder_1b_v12v11.yml`.

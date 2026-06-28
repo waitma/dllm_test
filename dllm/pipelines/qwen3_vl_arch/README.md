@@ -56,6 +56,27 @@ Current exported entry points:
 
 The encoder model keeps the biological encoder trainable by default. Use `freeze_encoder=True` only for ablations or debugging.
 
+Encoder-condition magnitude (important): the encoder condition is injected by
+**replacing** the decoder residue embeddings (`hidden = hidden*(1-mask) + cond*mask`),
+so the condition enters the residual stream un-normalized and reaches the read-out
+via skip connections (`out = lm_head(RMSNorm(cond + Σ sublayer_outputs))`). The
+per-position RMSNorm normalizes sublayer *inputs* but NOT the condition's relative
+weight in that residual sum — so the condition only influences the output if its
+magnitude is comparable to the rest of the stream. ESM2's `last_hidden_state`
+(per-pos L2 ≈ 9.5) is naturally large enough; **ESMC's post-final-norm output is
+tiny (per-pos L2 ≈ 1.3, final-LayerNorm gamma ≈ 0.04)**, ~7× smaller than ESM2's
+(L2 ≈ 9.5). Measured on the trained grammar-v2 checkpoints (val loss with condition
+vs condition zeroed): ESM2 reliance +2.11 (0.75→2.86), ESMC-300M +1.17 (1.71→2.88),
+ESMC-600M +1.20 (1.77→2.97). So trained ESMC *does* use its condition, but extracts
+only ~half the benefit ESM2 does, and **ESMC-600M ≈ ESMC-300M** ⇒ the bottleneck is
+the feature injection (the squashed post-final-norm output), not ESMC size or raw
+feature quality. Mitigation: enable `condition_norm` (config flag / `--condition-norm`)
+to LayerNorm the condition to a usable, encoder-agnostic scale before injection
+(short-training ablation: a fixed scalar scale, RMSNorm, or LayerNorm all help
+equally → it is a magnitude effect, not centering). Whether this closes the full
+gap is being validated by the 50k ESMC retrains; see `PROJECT_PROCESS.md`
+(2026-06-28) and `scripts/debug/{ab_test_esmc_condition_norm,confirm_esm2_shrink_breaks,condition_reliance_trained}.py`.
+
 The structured multi-entity representation and Arrow preprocessing contract
 are documented in [GRAMMAR_V1.md](GRAMMAR_V1.md).
 

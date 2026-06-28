@@ -11,6 +11,8 @@
 #   bash .../download_stringdb_assets.sh --version v11.0       # v11.0 MINT minimal
 #   bash .../download_stringdb_assets.sh --version v11.0 --with-actions
 #                                                              # + all-species protein.actions (mode/action edges)
+#   bash .../download_stringdb_assets.sh --version v11.0 --actions-only
+#                                                              # actions file only (parallel with minimal download)
 #   bash .../download_stringdb_assets.sh --with-detailed       # + ~190GB per-channel detailed file
 #                                                              #   (NOT needed for MINT; has NO mode/action)
 #
@@ -23,12 +25,14 @@ BASE="https://stringdb-downloads.org/download"
 VERSION="v12.0"
 WITH_DETAILED=0
 WITH_ACTIONS=0
+ACTIONS_ONLY=0
 
 while [[ $# -gt 0 ]]; do
   case "${1}" in
     --version) VERSION="${2}"; shift 2 ;;
     --with-detailed) WITH_DETAILED=1; shift ;;
     --with-actions) WITH_ACTIONS=1; shift ;;
+    --actions-only) ACTIONS_ONLY=1; shift ;;
     *) echo "Unknown arg: ${1}" >&2; exit 2 ;;
   esac
 done
@@ -103,6 +107,16 @@ download() {
 }
 
 echo "=== STRING ${VERSION} MINT minimal download ==="
+
+if [[ "${ACTIONS_ONLY}" -eq 1 ]]; then
+  if [[ "${VERSION}" != "v11.0" ]]; then
+    echo "ERROR: --actions-only supports v11.0 only" >&2
+    exit 2
+  fi
+  download "protein.actions.${VERSION}.txt.gz" "$(actions_size "${VERSION}")"
+  echo "Done (actions only)."
+  exit 0
+fi
 
 # --- MINT pretraining minimal set (physical interaction) ---
 download "protein.sequences.${VERSION}.fa.gz" "$(sequences_size "${VERSION}")"
