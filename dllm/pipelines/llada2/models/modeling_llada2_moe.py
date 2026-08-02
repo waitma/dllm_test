@@ -36,20 +36,42 @@ from transformers.modeling_outputs import (
     MoeModelOutputWithPast,
     MoeCausalLMOutputWithPast,
 )
-from transformers.modeling_rope_utils import ROPE_INIT_FUNCTIONS, dynamic_rope_update
+from transformers.modeling_rope_utils import ROPE_INIT_FUNCTIONS
+
+try:
+    # transformers >=4.5x: recomputes inv_freq for dynamic/NTK rope types.
+    from transformers.modeling_rope_utils import dynamic_rope_update
+except ImportError:
+    # Older transformers (e.g. 4.48): the decorator does not exist. For the
+    # "default" rope type used here (rope_scaling=None) it is a no-op, so fall
+    # back to a passthrough that preserves the wrapped forward unchanged.
+    def dynamic_rope_update(fn):  # type: ignore[misc]
+        return fn
 from transformers.modeling_utils import ALL_ATTENTION_FUNCTIONS, PreTrainedModel
 from transformers.processing_utils import Unpack
-from transformers.pytorch_utils import (
-    ALL_LAYERNORM_LAYERS,
-    is_torch_greater_or_equal_than_1_13,
-)
+from transformers.pytorch_utils import ALL_LAYERNORM_LAYERS
+
+try:
+    # Removed in newer transformers; only used to gate an FX-wrap on torch<1.13.
+    from transformers.pytorch_utils import is_torch_greater_or_equal_than_1_13
+except ImportError:
+    is_torch_greater_or_equal_than_1_13 = True
+
 from transformers.utils import (
-    TransformersKwargs,
     add_start_docstrings,
     add_start_docstrings_to_model_forward,
     logging,
     replace_return_docstrings,
 )
+
+try:
+    # Added in newer transformers; only used as an ``Unpack[...]`` type hint.
+    from transformers.utils import TransformersKwargs
+except ImportError:
+    from typing import TypedDict
+
+    class TransformersKwargs(TypedDict, total=False):  # type: ignore[misc]
+        pass
 from transformers.utils.import_utils import is_torch_fx_available
 from .configuration_llada2_moe import LLaDA2MoeConfig
 from transformers.generation.utils import GenerationMixin

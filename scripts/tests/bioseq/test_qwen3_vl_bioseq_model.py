@@ -19,6 +19,8 @@ from dllm.pipelines.qwen3_vl_arch.modeling_bioseq import (
     BioSeqDiffusionDecoder,
     BioSeqDiffusionTransformerConfig,
     BioSeqEncoderDiffusionModel,
+    BioSeqLLaDAEncoderDiffusionModel,
+    BioSeqLLaDA2EncoderDiffusionModel,
     BioSeqNoEncoderDiffusionModel,
     _convert_biohub_esmc_state_dict,
     apply_decoder_corruption_to_encoder,
@@ -285,6 +287,345 @@ def test_encoder_forward_ignores_extra_collator_fields() -> None:
     output = model(input_ids=input_ids, **model_inputs)
 
     assert output.logits.shape == (*batch["input_ids"].shape, tiny_config().vocab_size)
+
+
+def _naive_gather_token_condition(
+    chain_token_condition, chain_ids, position_ids_inner, attention_mask, encoder_residue_mask
+):
+    """Reference O(B*C) loop implementation (pre-vectorization) for equivalence checks."""
+    batch_size, seq_len = chain_ids.shape
+    _, max_chains, _, hidden_size = chain_token_condition.shape
+    token_condition = chain_token_condition.new_zeros(batch_size, seq_len, hidden_size)
+    valid_decoder = chain_ids.ge(0) & chain_ids.lt(max_chains) & position_ids_inner.ge(0)
+    if attention_mask is not None:
+        valid_decoder = valid_decoder & attention_mask.bool()
+    for b in range(batch_size):
+        for c in range(max_chains):
+            decoder_positions = torch.nonzero(
+                valid_decoder[b] & chain_ids[b].eq(c), as_tuple=False
+            ).flatten()
+            if decoder_positions.numel() == 0:
+                continue
+            if encoder_residue_mask is None:
+                residue_token_positions = torch.arange(chain_token_condition.shape[2])
+            else:
+                residue_token_positions = torch.nonzero(
+                    encoder_residue_mask[b, c], as_tuple=False
+                ).flatten()
+            residue_indices = position_ids_inner[b, decoder_positions]
+            in_bounds = residue_indices.lt(residue_token_positions.numel())
+            if not in_bounds.any():
+                continue
+            dp = decoder_positions[in_bounds]
+            ep = residue_token_positions[residue_indices[in_bounds]]
+            token_condition[b, dp] = chain_token_condition[b, c, ep]
+    return token_condition
+
+
+def _naive_apply_decoder_corruption_to_encoder(batch, corruption_mask, mask_token_id):
+    """Reference per-token loop implementation (pre-vectorization)."""
+    encoder_input_ids = batch["encoder_input_ids"]
+    encoder_residue_mask = batch["encoder_residue_mask"]
+    chain_ids = batch["chain_ids"]
+    position_ids_inner = batch["position_ids_inner"]
+    noised = encoder_input_ids.clone()
+    batch_size, max_chains, _ = encoder_input_ids.shape
+    for b in range(batch_size):
+        for decoder_pos in torch.nonzero(corruption_mask[b], as_tuple=False).flatten().tolist():
+            chain_index = int(chain_ids[b, decoder_pos].item())
+            residue_index = int(position_ids_inner[b, decoder_pos].item())
+            if chain_index < 0 or chain_index >= max_chains or residue_index < 0:
+                continue
+            residue_token_positions = torch.nonzero(
+                encoder_residue_mask[b, chain_index], as_tuple=False
+            ).flatten()
+            if residue_index >= residue_token_positions.numel():
+                continue
+            noised[b, chain_index, residue_token_positions[residue_index]] = int(mask_token_id)
+    return noised
+
+
+def test_encoder_condition_replaces_only_token_emb_and_keeps_position_timestep() -> None:
+    """Residue-site injection must replace the token embedding but ADD position /
+    chain / timestep on top (not overwrite them)."""
+    torch.manual_seed(0)
+    batch = antibody_antigen_batch()
+    encoder = TinyEncoder(vocab_size=_GRAMMAR_TOKENIZER.vocab_size, hidden_size=32)
+    model = BioSeqEncoderDiffusionModel(tiny_config(), encoder=encoder)
+    decoder = model.decoder
+
+    captured: dict[str, torch.Tensor] = {}
+
+    def pre_hook(_module, args):
+        captured["x"] = args[0].detach().clone()
+
+    handle = decoder.layers[0].register_forward_pre_hook(pre_hook)
+
+    torch.manual_seed(1)
+    noised_input_ids, _, corruption_mask, timesteps = sample_bioseq_diffusion_noise(
+        batch=batch, mask_token_id=model.config.mask_token_id, time_epsilon=model.config.time_epsilon
+    )
+    noised_encoder_input_ids = apply_decoder_corruption_to_encoder(
+        batch, corruption_mask=corruption_mask, mask_token_id=model.config.mask_token_id
+    )
+    output = model.forward(
+        input_ids=noised_input_ids,
+        attention_mask=batch["attention_mask"],
+        chain_ids=batch["chain_ids"],
+        position_ids_inner=batch["position_ids_inner"],
+        position_ids_chain=batch["position_ids_chain"],
+        timesteps=timesteps,
+        residue_mask=batch["residue_mask"],
+        encoder_input_ids=noised_encoder_input_ids,
+        encoder_attention_mask=batch["encoder_attention_mask"],
+        encoder_residue_mask=batch["encoder_residue_mask"],
+        encoder_chain_mask=batch["encoder_chain_mask"],
+    )
+    handle.remove()
+
+    token_condition = output.encoder_condition  # [B,S,H]: encoder feat at residue, 0 elsewhere
+    condition_mask = model.build_encoder_condition_mask(
+        chain_ids=batch["chain_ids"],
+        position_ids_inner=batch["position_ids_inner"],
+        attention_mask=batch["attention_mask"],
+        encoder_position_ids=None,
+        residue_mask=batch["residue_mask"],
+    )
+
+    # Recompute the expected injected hidden with the intended order.
+    hidden = decoder.token_embeddings(noised_input_ids)
+    replace_mask = condition_mask.to(hidden.dtype).unsqueeze(-1)
+    hidden = hidden * (1.0 - replace_mask) + token_condition.to(hidden.dtype) * replace_mask
+    safe_inner = batch["position_ids_inner"].clamp(min=0, max=model.config.max_position_embeddings - 1)
+    inner_valid = batch["position_ids_inner"].ge(0).to(hidden.dtype).unsqueeze(-1)
+    hidden = hidden + decoder.inner_position_embeddings(safe_inner) * inner_valid
+    safe_chain = batch["position_ids_chain"].clamp(min=0, max=model.config.max_chain_positions - 1)
+    chain_valid = batch["position_ids_chain"].ge(0).to(hidden.dtype).unsqueeze(-1)
+    hidden = hidden + decoder.chain_position_embeddings(safe_chain) * chain_valid
+    hidden = hidden + decoder.timestep_embeddings(timesteps).unsqueeze(1)
+    hidden = hidden * batch["attention_mask"].to(hidden.dtype).unsqueeze(-1)
+
+    assert torch.allclose(captured["x"], hidden, atol=1e-5)
+
+    # Discriminator: at residue sites the injected hidden must NOT equal the pure
+    # encoder feature (position + timestep survived on top of it).
+    residue = batch["attention_mask"] & batch["position_ids_inner"].ge(0)
+    assert not torch.allclose(captured["x"][residue], token_condition[residue], atol=1e-4)
+
+
+def test_llada_backbone_inputs_embeds_path_and_backward() -> None:
+    """ESMC-style encoder + LLaDA backbone: residue features replace wte at residue
+    sites, grammar special tokens keep wte, masked-CE reaches encoder + LLaDA."""
+    pytest.importorskip("transformers")
+    torch.manual_seed(0)
+    batch = antibody_antigen_batch()
+    # d_model must equal encoder hidden (pure replacement); n_heads divides d_model.
+    encoder = TinyEncoder(vocab_size=_GRAMMAR_TOKENIZER.vocab_size, hidden_size=32)
+    model = BioSeqLLaDAEncoderDiffusionModel(
+        tiny_config(hidden_size=32, num_attention_heads=4, num_hidden_layers=2, intermediate_size=64),
+        encoder=encoder,
+        freeze_encoder=False,
+    )
+
+    # Backbone is a LLaDA LM stored under .decoder (so optimizer/DDP plumbing works).
+    assert model.decoder.__class__.__name__ == "LLaDAModelLM"
+
+    captured: dict[str, torch.Tensor] = {}
+
+    def pre_hook(_module, args, kwargs):
+        captured["inputs_embeds"] = kwargs["inputs_embeds"].detach().clone()
+
+    handle = model.decoder.register_forward_pre_hook(pre_hook, with_kwargs=True)
+    output = model.compute_loss(batch)
+    handle.remove()
+
+    assert output.loss is not None and torch.isfinite(output.loss)
+    assert output.logits.shape == (*batch["input_ids"].shape, _GRAMMAR_TOKENIZER.vocab_size)
+
+    # Residue sites replaced by encoder feature; special/structure tokens keep wte.
+    condition_mask = model.build_encoder_condition_mask(
+        chain_ids=batch["chain_ids"],
+        position_ids_inner=batch["position_ids_inner"],
+        attention_mask=batch["attention_mask"],
+        encoder_position_ids=None,
+        residue_mask=batch["residue_mask"],
+    )
+    injected = captured["inputs_embeds"]
+    residue = condition_mask
+    special = batch["attention_mask"] & batch["position_ids_inner"].lt(0)
+    assert torch.allclose(injected[residue], output.encoder_condition[residue], atol=1e-5)
+    wte = model.decoder.get_input_embeddings()(output.noised_input_ids)
+    assert torch.allclose(injected[special], wte[special], atol=1e-5)
+
+    output.loss.backward()
+    assert encoder.embeddings.weight.grad is not None
+    assert torch.isfinite(encoder.embeddings.weight.grad).all()
+    # LLaDA backbone received gradient too.
+    wte_grad = model.decoder.get_input_embeddings().weight.grad
+    assert wte_grad is not None and torch.isfinite(wte_grad).all()
+
+
+def _tiny_llada2_config(**overrides) -> BioSeqDiffusionTransformerConfig:
+    """Tiny but architecture-faithful LLaDA2-MoE config for unit tests.
+
+    Keeps the MoE structure (routed + shared experts, group-limited routing, GQA,
+    partial RoPE) but shrinks every dimension so a full forward/backward is cheap.
+    head_dim=8 with partial_rotary_factor=0.5 => rope_dim=4 (even, required).
+    n_group=2 divides num_experts=4; topk_group=2; experts_per_tok=2.
+    """
+    values = dict(
+        hidden_size=32,
+        num_attention_heads=4,
+        num_hidden_layers=2,
+        intermediate_size=64,
+        moe_num_experts=4,
+        moe_num_experts_per_tok=2,
+        moe_num_shared_experts=1,
+        moe_intermediate_size=16,
+        moe_n_group=2,
+        moe_topk_group=2,
+        moe_first_k_dense_replace=1,
+        moe_num_key_value_heads=2,
+        moe_head_dim=8,
+        moe_partial_rotary_factor=0.5,
+    )
+    values.update(overrides)
+    return tiny_config(**values)
+
+
+def test_llada2_backbone_inputs_embeds_path_and_backward() -> None:
+    """ESMC-style encoder + LLaDA2-MoE backbone (from scratch): residue features
+    replace word_embeddings at residue sites, grammar special tokens keep the
+    embedding, and masked-CE reaches both the encoder and the LLaDA2 backbone."""
+    pytest.importorskip("transformers")
+    torch.manual_seed(0)
+    batch = antibody_antigen_batch()
+    # hidden_size must equal encoder hidden (pure replacement).
+    encoder = TinyEncoder(vocab_size=_GRAMMAR_TOKENIZER.vocab_size, hidden_size=32)
+    model = BioSeqLLaDA2EncoderDiffusionModel(
+        _tiny_llada2_config(),
+        encoder=encoder,
+        freeze_encoder=False,
+    )
+
+    # Backbone is a LLaDA2-MoE LM stored under .decoder (optimizer/DDP plumbing).
+    assert model.decoder.__class__.__name__ == "LLaDA2MoeModelLM"
+    # It really is an MoE: sparse blocks after first_k_dense_replace dense layers.
+    moe_blocks = [
+        m for m in model.decoder.modules() if m.__class__.__name__ == "LLaDA2MoeSparseMoeBlock"
+    ]
+    assert len(moe_blocks) >= 1
+
+    captured: dict[str, torch.Tensor] = {}
+
+    def pre_hook(_module, args, kwargs):
+        captured["inputs_embeds"] = kwargs["inputs_embeds"].detach().clone()
+        # A 4D bidirectional padding mask must be passed (bypasses causal mask).
+        mask = kwargs.get("attention_mask")
+        captured["mask_ndim"] = torch.tensor(mask.dim() if mask is not None else 0)
+
+    handle = model.decoder.register_forward_pre_hook(pre_hook, with_kwargs=True)
+    output = model.compute_loss(batch)
+    handle.remove()
+
+    assert output.loss is not None and torch.isfinite(output.loss)
+    assert output.logits.shape == (*batch["input_ids"].shape, _GRAMMAR_TOKENIZER.vocab_size)
+    assert int(captured["mask_ndim"].item()) == 4  # bidirectional 4D mask
+
+    # Residue sites replaced by encoder feature; special/structure tokens keep wte.
+    condition_mask = model.build_encoder_condition_mask(
+        chain_ids=batch["chain_ids"],
+        position_ids_inner=batch["position_ids_inner"],
+        attention_mask=batch["attention_mask"],
+        encoder_position_ids=None,
+        residue_mask=batch["residue_mask"],
+    )
+    injected = captured["inputs_embeds"]
+    residue = condition_mask
+    special = batch["attention_mask"] & batch["position_ids_inner"].lt(0)
+    assert torch.allclose(injected[residue], output.encoder_condition[residue], atol=1e-5)
+    wte = model.decoder.get_input_embeddings()(output.noised_input_ids)
+    assert torch.allclose(injected[special], wte[special], atol=1e-5)
+
+    output.loss.backward()
+    assert encoder.embeddings.weight.grad is not None
+    assert torch.isfinite(encoder.embeddings.weight.grad).all()
+    # LLaDA2 backbone received gradient too (embedding + at least one expert).
+    wte_grad = model.decoder.get_input_embeddings().weight.grad
+    assert wte_grad is not None and torch.isfinite(wte_grad).all()
+    expert_grads = [
+        p.grad
+        for block in moe_blocks
+        for p in block.experts.parameters()
+        if p.grad is not None
+    ]
+    assert expert_grads, "at least one routed expert must receive gradient"
+    assert all(torch.isfinite(g).all() for g in expert_grads)
+
+
+def test_vectorized_gather_and_corruption_match_naive_reference() -> None:
+    """Vectorized gather/corruption-mirror must be bit-identical to the loop versions."""
+    torch.manual_seed(0)
+    batch = antibody_antigen_batch()
+    encoder = TinyEncoder(vocab_size=_GRAMMAR_TOKENIZER.vocab_size, hidden_size=32)
+    model = BioSeqEncoderDiffusionModel(tiny_config(), encoder=encoder)
+
+    chain_condition = model.encode_chain_tokens(
+        encoder_input_ids=batch["encoder_input_ids"],
+        encoder_attention_mask=batch["encoder_attention_mask"],
+        encoder_residue_mask=batch["encoder_residue_mask"],
+        encoder_chain_mask=batch["encoder_chain_mask"],
+    )
+
+    # gather with residue mask (per-chain <cls>seq<eos> offset path)
+    got = model.gather_token_condition(
+        chain_condition,
+        chain_ids=batch["chain_ids"],
+        position_ids_inner=batch["position_ids_inner"],
+        attention_mask=batch["attention_mask"],
+        encoder_residue_mask=batch["encoder_residue_mask"],
+    )
+    expected = _naive_gather_token_condition(
+        chain_condition,
+        batch["chain_ids"],
+        batch["position_ids_inner"],
+        batch["attention_mask"],
+        batch["encoder_residue_mask"],
+    )
+    assert torch.equal(got, expected)
+
+    # gather without residue mask (identity offset path)
+    got_no_mask = model.gather_token_condition(
+        chain_condition,
+        chain_ids=batch["chain_ids"],
+        position_ids_inner=batch["position_ids_inner"],
+        attention_mask=batch["attention_mask"],
+        encoder_residue_mask=None,
+    )
+    expected_no_mask = _naive_gather_token_condition(
+        chain_condition,
+        batch["chain_ids"],
+        batch["position_ids_inner"],
+        batch["attention_mask"],
+        None,
+    )
+    assert torch.equal(got_no_mask, expected_no_mask)
+
+    # corruption mirror over several random noise draws
+    for seed in range(5):
+        torch.manual_seed(seed)
+        _, _, corruption_mask, _ = sample_bioseq_diffusion_noise(
+            batch=batch,
+            mask_token_id=model.config.mask_token_id,
+            time_epsilon=model.config.time_epsilon,
+        )
+        got_enc = apply_decoder_corruption_to_encoder(
+            batch, corruption_mask=corruption_mask, mask_token_id=model.config.mask_token_id
+        )
+        expected_enc = _naive_apply_decoder_corruption_to_encoder(
+            batch, corruption_mask, model.config.mask_token_id
+        )
+        assert torch.equal(got_enc, expected_enc)
 
 
 def test_denoiser_accepts_soft_diffusion_state_without_internal_one_hot() -> None:

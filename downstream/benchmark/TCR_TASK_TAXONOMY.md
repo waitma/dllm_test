@@ -88,16 +88,18 @@
 
 | 状态 | 任务 | 数据 | 主指标 | 文献依据 |
 |------|------|------|--------|----------|
-| **保留·主榜** | CDR3β **无条件**生成（库分布） | OTS holdout（已落地） | k-mer JSD↓ + novelty + NN distance | OLGA/soNNia 式 repertoire 生成 |
-| **保留·次榜** | CDR3 **条件 infill**（masked 恢复） | `data/downstream/cdr_infilling/tcr` 10-fold | AAR（氨基酸恢复率） | 抗体 CDR infill 范式迁移到 TCR |
+| **保留·setting A（无条件）** | CDR3β **无条件**生成（库分布） | OTS holdout（已落地） | k-mer JSD↓ + novelty + NN distance | OLGA/soNNia 式 repertoire 生成 |
+| **保留·setting B（表位条件）** | **表位条件 TCR 设计**（给 epitope 生成 binder） | IMMREP23 分层 common/rare/novel（已落地 `data/tcr_design/`） | recovery + exact-match（辅 NN2ref/JSD） | TcrDesign/TCRT5 口径；**已实现并跑通** baseline + oracle |
+| **保留·次任务** | CDR3 **条件 infill**（masked 恢复） | `data/downstream/cdr_infilling/tcr` 10-fold | AAR（氨基酸恢复率） | 抗体 CDR infill 范式迁移到 TCR |
 | **砍掉** | 全链 αβ 配对生成 | 数据/评测不成熟 | — | 延后 |
 | **砍掉** | 实验验证型 design（DecoderTCR wet-lab） | 超出计算基准 | — | 不纳入 IRBench |
-| **延后** | 表位条件 TCR 设计 | 需 epitope-conditioned 采样接口 | 结合子集 enrichment | DecoderTCR 生成分支 |
 
 **T4 最终形态（精）**
 ```
-主任务 = 无条件 CDR3β 分布匹配（JSD）
-次任务 = CDR infill AAR（一条脚本，不拆第三个大类）
+Generation 是一个方向，含两种 conditioning setting（都是"生成 CDR3β 序列"，共享生成器+序列级指标，不拆成第五个大类）：
+  setting A 无条件 CDR3β 分布匹配（JSD）      -> tcr_generation/run.py
+  setting B 表位条件 TCR 设计（recovery/exact） -> tcr_design/run.py   ← 用户强调的 "TCR design"
+辅：CDR infill AAR（一条脚本）
 ```
 
 ---
@@ -122,6 +124,6 @@
 | **T1 Binding** | IMMREP23 paired-chain | **unseen macro-AUC0.1** | 克隆型去重 + unseen 表位 |
 | **T2 Clustering** | VDJdb 表位 repertoire | **Purity** (+ Retention) | 标签不参与聚类 |
 | **T3 Representation** | 24-way epitope probe | **probe-AUROC** | 克隆型隔离 split |
-| **T4 Generation** | OTS CDR3β + infill | **JSD** / **AAR** | holdout 新颖度 |
+| **T4 Generation** | 无条件 OTS CDR3β + 表位条件设计（+ infill 辅），两种 setting | 无条件 **JSD** / 表位条件 **recovery·exact** / **AAR** | holdout 新颖度 + 表位分层 zero-shot |
 
 > PPI（P1）与抗体（A1 NbBench）保持独立维度，不并入 TCR 四类。

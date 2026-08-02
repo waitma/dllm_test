@@ -1,7 +1,4 @@
-# 生成的数据集与评测产物（仅保留 split_manifest.json 等小元数据需手动 -f 添加）
-data/**
-!data/.gitkeep
-!data/**/split_manifest.json
+# 生成的评测产物（split_manifest 等小元数据可手动 git add -f）
 outputs/**
 !outputs/.gitkeep
 

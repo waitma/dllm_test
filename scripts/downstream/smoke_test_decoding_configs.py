@@ -88,8 +88,9 @@ def test_humanization(model, tokenizer, device, pdb_dir: str, chain_csv: str, co
         light_aars = []
         examples = []
         for sample in dataset:
-            heavy_masked, light_masked, heavy_seq, light_seq, pdb_id = sample
+            heavy_masked, light_masked, heavy_seq, light_seq, pdb_id, sample_id, chain_pair = sample
             batch_data = [sample[:4] for _ in range(cfg["n_sequences"])]
+            del sample_id, chain_pair  # kept for dataset API compatibility
             torch.manual_seed(cfg.get("seed", 42))
             chains, chain_ids, labels, heavy_len = collator(batch_data)
             chains = chains.to(device)

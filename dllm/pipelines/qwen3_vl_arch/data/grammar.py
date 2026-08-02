@@ -396,7 +396,20 @@ class GrammarRenderer:
 
             if record.task_type == "antibody" and len(record.chains) >= 2:
                 heavy, light = record.chains[0], record.chains[1]
-            if record.task_type == "tcr" and len(record.chains) >= 2 and (alpha is None or beta is None):
+            # Legacy context-free TCR pairs may lack explicit chain roles and use
+            # positional [beta, alpha] order.  Never apply that fallback when a
+            # receptor role or a peptide/antigen/MHC context is already explicit:
+            # doing so would turn [peptide, tcr_beta] into [alpha=tcr_beta,
+            # beta=peptide] and duplicate the peptide inside the TCR block.
+            if (
+                record.task_type == "tcr"
+                and len(record.chains) >= 2
+                and alpha is None
+                and beta is None
+                and peptide is None
+                and antigen is None
+                and not mhc_chains
+            ):
                 alpha, beta = record.chains[1], record.chains[0]
 
             if record.task_type in {
@@ -431,12 +444,25 @@ class GrammarRenderer:
                 grammar_name = "nanobody"
             elif alpha is not None or beta is not None or record.task_type.startswith("tcr"):
                 tcr_peptide = peptide or antigen
+                # The pMHC<->TCR recognition token carries the binding/nonbinding
+                # label (e.g. PISTE negatives). Honor record.labels["relation"];
+                # unlabeled pretraining pMHC-TCR pairs default to <binding> so this
+                # is byte-identical to the old hardcoded behaviour when unset.
+                recognition_relation = (
+                    relation if relation in {"<binding>", "<nonbinding>"} else "<binding>"
+                )
+                has_tcr_peptide = tcr_peptide is not None
                 if mhc_chains:
                     append_protein_block(mhc_chains, is_fixed=True)
-                    special("<binding>", is_fixed=True)
-                if tcr_peptide is not None:
+                    # MHC->peptide is presentation (always <binding>); MHC->TCR with
+                    # no peptide carries the recognition label instead.
+                    special(
+                        "<binding>" if has_tcr_peptide else recognition_relation,
+                        is_fixed=True,
+                    )
+                if has_tcr_peptide:
                     append_peptide_block(tcr_peptide, is_fixed=True)
-                    special("<binding>", is_fixed=True)
+                    special(recognition_relation, is_fixed=True)
                 receptor = [chain for chain in (alpha, beta) if chain is not None]
                 if len(receptor) == 1:
                     append_protein_block(
@@ -444,7 +470,9 @@ class GrammarRenderer:
                         type_marker="<tcr>",
                         is_fixed=False,
                     )
-                    grammar_name = "tcr_single"
+                    grammar_name = "tcr_pmhc" if mhc_chains else (
+                        "tcr_peptide" if tcr_peptide is not None else "tcr_single"
+                    )
                 else:
                     append_protein_block(
                         receptor,
@@ -514,6 +542,43 @@ class GrammarArrowSourceConfig:
     split: str = "train"
     weight: float = 1.0
     max_records: int | None = None
+    # Streaming shuffle window over each shard. 0/1 disables it and keeps the
+    # exact stored-order stream. The Arrow shards are written unshuffled (see
+    # scripts/data/build_bioseq_grammar_v1.py), and WeightedMixtureDataset only
+    # randomizes *which source* emits next, so without this the samples inside a
+    # single task-homogeneous batch stay adjacent in stored (often clustered)
+    # order. The buffer reorders within a window while keeping reads sequential.
+    shuffle_buffer_size: int = 0
+    shuffle_seed: int = 0
+
+
+def _streaming_shuffle(
+    records: Iterator[BioSeqRecord],
+    buffer_size: int,
+    rng: random.Random,
+) -> Iterator[BioSeqRecord]:
+    """Reservoir-style streaming shuffle (TF ``dataset.shuffle`` semantics).
+
+    Reads ``records`` sequentially into a fixed-size window and, once full,
+    yields a random buffered element in place of each incoming one. This is
+    *count preserving*: every input record is emitted exactly once, so per-shard
+    counts (and therefore DDP batch counts) are identical to the un-shuffled
+    stream. Reads stay sequential, so Arrow mmap locality is preserved.
+    """
+
+    if buffer_size <= 1:
+        yield from records
+        return
+    buffer: list[BioSeqRecord] = []
+    for record in records:
+        if len(buffer) < buffer_size:
+            buffer.append(record)
+            continue
+        swap = rng.randrange(buffer_size)
+        yield buffer[swap]
+        buffer[swap] = record
+    rng.shuffle(buffer)
+    yield from buffer
 
 
 class GrammarArrowSource(IterableDataset):
@@ -528,8 +593,12 @@ class GrammarArrowSource(IterableDataset):
                 f"Grammar Arrow source not found: {self.path}. "
                 "Run scripts/data/build_bioseq_grammar_v1.py first."
             )
+        # Each fresh iterator is a new pass over the shard. WeightedMixtureDataset
+        # re-opens exhausted sources (small corpora loop many times per run), so
+        # bumping this per call reshuffles every pass instead of repeating one order.
+        self._shuffle_pass = 0
 
-    def iter_records(self, shard_index: int = 0, num_shards: int = 1) -> Iterator[BioSeqRecord]:
+    def _raw_records(self, shard_index: int, num_shards: int) -> Iterator[BioSeqRecord]:
         dataset = _cached_grammar_arrow_dataset(self.path)
         dataset = dataset.shard(num_shards=num_shards, index=shard_index, contiguous=True)
         kept = 0
@@ -550,6 +619,23 @@ class GrammarArrowSource(IterableDataset):
             kept += 1
             if self.config.max_records is not None and kept >= self.config.max_records:
                 break
+
+    def iter_records(self, shard_index: int = 0, num_shards: int = 1) -> Iterator[BioSeqRecord]:
+        raw = self._raw_records(shard_index, num_shards)
+        buffer_size = int(self.config.shuffle_buffer_size)
+        if buffer_size <= 1:
+            yield from raw
+            return
+        pass_index = self._shuffle_pass
+        self._shuffle_pass += 1
+        # Compose an int seed (never a tuple: random.seed rejects tuples). Int
+        # seeds are deterministic across processes, unlike str hashing under
+        # PYTHONHASHSEED, so every rank reproduces its own order on resume.
+        seed_int = (
+            (int(self.config.shuffle_seed) * 1_000_003 + int(shard_index)) * 1_000_003
+            + int(pass_index)
+        ) & 0x7FFFFFFF
+        yield from _streaming_shuffle(raw, buffer_size, random.Random(seed_int))
 
     def __iter__(self) -> Iterator[BioSeqRecord]:
         shard_index, num_shards = distributed_worker_shard()

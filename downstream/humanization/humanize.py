@@ -189,8 +189,10 @@ def generate(args):
 
     print(f"Overall heavy AAR: {np.mean(all_heavy_aars) * 100:.2f}%")
     print(f"Overall light AAR: {np.mean(all_light_aars) * 100:.2f}%")
-    pd.DataFrame(rows).to_csv(args.output_csv, index=False)
-    print(f"Saved {args.output_csv}")
+    output_path = Path(args.output_csv)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame(rows).to_csv(output_path, index=False)
+    print(f"Saved {output_path}")
 
 
 def main():

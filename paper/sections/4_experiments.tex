@@ -1,0 +1,446 @@
+\section{Downstream Benchmark}
+\label{sec:experiments}
+
+We evaluate our model, \Ours{} (a grammar-conditioned ESMC$\rightarrow$LLaDA
+diffusion language model), on a unified panel of immune-receptor and
+protein--protein interaction downstream tasks. The row labelled \OursCkpt{} is
+the retrained integrated 7-layer checkpoint; its features are extracted
+\emph{post-LLaDA} following the mandatory protocol in \Cref{sec:interface}: the
+full record is rendered, passed through a clean (noise-free)
+ESMC$\rightarrow$LLaDA forward pass, and mean-pooled once over all residue
+positions into a single vector. Baseline evidence is labelled throughout as
+paper-reported [P], official-artifact re-scored [A], or locally evaluated [L].
+When the downloaded data or local head differs from the anchor protocol, [P]
+is the primary reference and [L] is not ranked against it. The provenance
+registry is stored under \texttt{outputs/external/}. Numbers for \OursCkpt{}
+come from the retrained integrated
+7-layer checkpoint
+(\texttt{grammar\_v2\_esmc300m\_integrated\_llada\_7l}, step 16{,}000),
+reported honestly, including cases where \Ours{} trails specialised baselines.
+
+%--------------------------------------------------------------------
+\subsection{Model plug-in interface}
+\label{sec:interface}
+
+Every task exposes a single string-spec entry point so that any embedder ---
+ours or a baseline --- can be swapped in without touching task code. The factory
+\texttt{build\_embedder(spec)} routes on the prefix:
+
+\begin{center}
+\small
+\begin{adjustbox}{max width=\textwidth}
+\begin{tabular}{@{}ll@{}}
+\toprule
+Spec prefix & Meaning \\
+\midrule
+\texttt{bioseq-llada:/abs/best.pt} & our model, post-LLaDA features (headline) \\
+\texttt{grammar:decoder:global:/abs/best.pt} & post-LLaDA whole-record global mean-pool \\
+\texttt{grammar:encoder:/abs/best.pt} & ESMC-encoder-only ablation (control) \\
+\texttt{esm2\_150m}, \texttt{protbert}, \texttt{sceptr}, \dots & reference / baseline embedders \\
+\bottomrule
+\end{tabular}
+\end{adjustbox}
+\end{center}
+
+The same interface is reused by the TCR harness (\texttt{--embedder}), the MINT
+PPI harness (\texttt{--model grammar:.../best.pt}), and the antibody/nanobody
+generative scripts. Plugging a newly trained checkpoint into the full benchmark
+therefore requires only pointing the spec at the new \texttt{best.pt}.
+
+%--------------------------------------------------------------------
+\subsection{TCR tasks}
+\label{sec:tcr}
+
+\paragraph{T1: TCR--epitope binding (Nature Methods 2025 split).}
+Overall (pooled) AUPRC on the official seen/unseen epitope splits
+\citep{nathan2025tcrbench}, CDR3$\beta$
+track, AS negatives (\Cref{tab:t1}). Baseline rows are transcribed from
+Supplementary Table~4 of the anchor paper [P]. They show strong degradation on
+\emph{unseen} epitopes. Training-free controls and \OursCkpt{} are local
+evaluations [L], separated from the paper rows and not substituted for them.
+Additional paper rows are in \Cref{sec:t1-extra}.
+
+\begin{table}[t]
+\centering
+\caption{T1 TCR--epitope binding on the Nature Methods 2025 benchmark
+(CDR3$\beta$, AS negatives, overall AUPRC / AUROC). [P] denotes paper values
+and [L] a local diagnostic. Best [P] value per column in \best{bold}. Further
+paper variants are in
+\Cref{tab:t1-tier1}.}
+\label{tab:t1}
+\small
+\begin{tabular}{@{}lcccc@{}}
+\toprule
+Method & Seen AUPRC & Unseen AUPRC & Seen AUROC & Unseen AUROC \\
+\midrule
+ATM-TCR [P]               & \best{0.6957} & \best{0.5208} & \best{0.6480} & \best{0.5218} \\
+TEIM [P]                  & 0.6756 & 0.5159 & 0.6025 & 0.5161 \\
+NetTCR-2.2 [P]            & 0.6457 & 0.5062 & 0.5880 & 0.5005 \\
+ERGO-LSTM (VDJdb) [P]     & 0.6279 & 0.5171 & 0.5771 & 0.5116 \\
+epiTCR [P]                & 0.6023 & 0.4879 & 0.5566 & 0.4887 \\
+PanPep [P]                & 0.4979 & 0.4771 & 0.5065 & 0.4825 \\
+\midrule
+CDR3-kNN [L]              & 0.553 & 0.544 & 0.507 & 0.504 \\
+Random [L]                & 0.512 & 0.503 & 0.517 & 0.520 \\
+\midrule
+\OursCkpt{} [L]           & 0.528 & 0.525 & 0.500 & 0.522 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{T2: TCR clustering.}
+We use two complementary bases. \emph{Basis A} is the NAR Genomics \&
+Bioinformatics 2025 paired-chain benchmark \citep{nargab2025tcrcluster}.
+\Cref{tab:t2-nargab} reports the paper's own Purity/Retention values [P]. A
+separate local audit re-scored the released assignments and matched 6/9 methods
+within $\pm0.03$; it also exposed and fixed a reversed length-difference lookup
+for LD. Because the remaining discrepancies are unresolved, local re-scores are
+not the primary baseline. Basis A is baseline-only (its tools do not expose an
+embedding, so \Ours{} is not directly comparable).
+\emph{Basis B} is the embedding$\rightarrow$clustering protocol of TCREmbedding
+\citep{feng2025tcrembedding}: $K$-means ARI/NMI/Purity averaged over
+$K\in\{10,\dots,100\}$ on the 9{,}033 CDR3$\beta$ / 25-epitope dataset
+(\Cref{tab:t2}). This is a local embedding audit [L], not a transcription of
+the TCREmbedding leaderboard. We evaluate four training-free handcrafted encodings:
+$k$-mer and one-hot amino-acid composition, the BLOSUM62 mean substitution
+profile, and the Atchley five-factor descriptor. The result partially supports
+TCREmbedding's finding that simple features rival data-driven PLM embeddings on
+CDR3$\beta$: composition encodings ($k$-mer, one-hot) match or beat the general
+PLMs (ESM2-150M, ProtBERT) while the descriptor encodings (BLOSUM62, Atchley)
+trail; only the specialised TCR models (SCEPTR, TCR-BERT) lead clearly, so the
+decisive factor here is TCR-specific modelling rather than handcrafted vs.\
+learned features. These comparisons are restricted to this local harness.
+
+\begin{table}[t]
+\centering
+\caption{T2 Basis A: NAR-GAB 2025 paired-chain clustering. Values are
+paper-reported [P] and replace discrepant local re-scores as the primary
+baseline.}
+\label{tab:t2-nargab}
+\small
+\begin{tabular}{@{}lcc@{}}
+\toprule
+Method [P] & Retention & Purity \\
+\midrule
+HD        & 0.25 & 0.66 \\
+LD        & 0.25 & 0.66 \\
+iSMART    & 0.25 & 0.66 \\
+GIANA     & 0.25 & 0.66 \\
+TCRMatch  & 0.09 & 0.82 \\
+clusTCR   & 0.09 & 0.99 \\
+GLIPH2    & 0.22 & 0.80 \\
+DeepTCR   & 0.92 & 0.63 \\
+TCRdist3  & 0.44 & 0.42 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[t]
+\centering
+\caption{T2 Basis B [L]: local TCR clustering audit ($K$-means mean over $K$).
+SCEPTR uses CDR3$\beta$+TRBV (native partial input); all other rows use
+CDR3$\beta$ only. It is not used as a paper-aligned baseline table.}
+\label{tab:t2}
+\small
+\begin{tabular}{@{}lccc@{}}
+\toprule
+Embedding & ARI & NMI & Purity \\
+\midrule
+SCEPTR (contrastive TCR) & \best{0.033} & \best{0.159} & \best{0.339} \\
+TCR-BERT                 & 0.016 & 0.095 & 0.287 \\
+$k$-mer(2)               & 0.010 & 0.079 & 0.268 \\
+ESM2-150M                & 0.007 & 0.068 & 0.258 \\
+one-hot (composition)    & 0.007 & 0.064 & 0.254 \\
+ProtBERT                 & 0.006 & 0.061 & 0.248 \\
+BLOSUM62 (mean profile)  & 0.004 & 0.056 & 0.240 \\
+Atchley (5-factor)       & 0.002 & 0.047 & 0.233 \\
+\midrule
+\OursCkpt{}              & 0.019 & 0.119 & 0.294 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{T3: TCR representation (SCEPTR few-shot, deep 6-pMHC).}
+Per-pMHC nearest-neighbour AUROC \citep{nagano2024sceptr} (macro over 6 pMHC,
+100 seeds) at increasing reference-set sizes $k$ (\Cref{tab:t3}). All rows in
+this table are local protocol-compatible evaluations [L]. At $k{=}200$, an
+independent audit compares the six reference methods with the paper's
+Supplementary Information; it does not turn the local rows into paper values.
+The complementary broad 24-epitope track and 24-way linear-probe view are in
+\Cref{sec:t3-extra}.
+
+\begin{table}[t]
+\centering
+\caption{T3 local evaluation [L]: deep 6-pMHC few-shot NN AUROC (100 seeds,
+random${=}0.5$). Best value per column in \best{bold}; no cell is a
+paper-transcribed value.}
+\label{tab:t3}
+\small
+\begin{tabular}{@{}lccccc@{}}
+\toprule
+Method & $k{=}1$ & $k{=}5$ & $k{=}20$ & $k{=}100$ & $k{=}200$ \\
+\midrule
+SCEPTR (contrastive)        & 0.640 & \best{0.702} & \best{0.738} & \best{0.775} & \best{0.790} \\
+TCRdist (official)          & \best{0.647} & 0.701 & 0.733 & 0.764 & 0.777 \\
+CDR3-Levenshtein-NN         & 0.626 & 0.671 & 0.696 & 0.722 & 0.733 \\
+$k$-mer(3)                  & 0.607 & 0.665 & 0.690 & 0.717 & 0.728 \\
+ESM2-150M                   & 0.591 & 0.631 & 0.656 & 0.685 & 0.696 \\
+ProtBERT                    & 0.585 & 0.624 & 0.648 & 0.681 & 0.694 \\
+TCR-BERT                    & 0.579 & 0.631 & 0.656 & 0.681 & 0.692 \\
+\midrule
+\OursCkpt{}                 & 0.581 & 0.622 & 0.648 & 0.671 & 0.681 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{T4: TCR generation (TCRT5 protocol \citep{tcrt5_2025}).}
+Setting~A is a local unconditional repertoire audit [L]. For Setting~B, the
+paper evaluator contains 13 scored pMHC blocks plus one reserved simulation
+item. We therefore re-score the released prediction artifacts on the exact
+sparse-13 set [A] in \Cref{tab:t4}; the older 14-pMHC local table is only a
+control and is no longer mixed with these baselines. Target-rich held20 and
+full-length $\alpha/\beta$ results remain separate local controls in
+\Cref{tab:t4-held20,tab:t4-setc}.
+
+\begin{table}[t]
+\centering
+\caption{T4 TCR generation with evidence sources kept separate. Setting~A is
+local [L] ($n{=}5000$). Setting~B uses released predictions re-scored on the
+paper's sparse-13 target list [A] ($K{=}100$). $\downarrow$ lower is better.}
+\label{tab:t4}
+\small
+\setlength{\tabcolsep}{4pt}
+\begin{adjustbox}{max width=\textwidth}
+\begin{tabular}{@{}lc@{\hskip 1.2em}lccccc@{}}
+\toprule
+\multicolumn{2}{c}{Setting A [L]} & \multicolumn{6}{c}{Setting B sparse-13 [A]} \\
+\cmidrule(r){1-2}\cmidrule(l){3-8}
+Method & JSD$\downarrow$ & Method & $n$ & F1@100 & $d_{\text{edit}}\downarrow$ & seq-rec & Char-BLEU \\
+\midrule
+soNNia & \best{0.043} & TCRT5          & 13 & 0.0003 & 4.467 & \best{0.602} & \best{0.701} \\
+OLGA   & 0.061 & GRATCR              & 13 & 0.0000 & \best{4.397} & 0.595 & 0.677 \\
+\OursCkpt{} & 0.295 & ER-Transformer & 13 & 0.0000 & 6.068 & 0.337 & 0.594 \\
+\bottomrule
+\end{tabular}
+\end{adjustbox}
+\end{table}
+
+\begin{table}[t]
+\centering
+\caption{T4 local control [L] on the target-rich held20 split ($K{=}100$).
+$^{\dagger}$For \Ours{} this split has ${\sim}48\%$ training-pair leakage, so
+its row is a \emph{seen}, optimistic control only. This table is not mixed with
+the sparse-13 paper baseline.}
+\label{tab:t4-held20}
+\small
+\begin{tabular}{@{}lcccc@{}}
+\toprule
+Method & F1@100 & $d_{\text{edit}}\downarrow$ & seq-rec & Char-BLEU \\
+\midrule
+TcrDesign-G (official) & \best{0.153} & \best{1.47} & \best{0.870} & \best{0.986} \\
+TCRT5 (HF beam)        & 0.086 & 1.82 & 0.834 & 0.947 \\
+\OursCkpt{}$^{\dagger}$ & 0.000 & 6.36 & 0.454 & 0.411 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[t]
+\centering
+\caption{T4 Setting C local control [L], full-length $\alpha/\beta$ assembly. \Ours{}
+(unconditional, $n{=}500$) attains high per-residue AA validity but only a small
+fraction of $\beta$ chains yield an ANARCI-extractable canonical CDR3$\beta$ ---
+its honest capability boundary is CDR3-level, not full-length de novo. TcrDesign
+(epitope-conditioned, 34 pMHC $K{=}100$) is the full-length SOTA. ``--'' = not
+applicable to that mode.}
+\label{tab:t4-setc}
+\small
+\setlength{\tabcolsep}{4pt}
+\begin{adjustbox}{max width=\textwidth}
+\begin{tabular}{@{}llcccc@{}}
+\toprule
+Method & cond. & valid-AA ($\beta/\alpha$) & CDR3 extract & F1@100 & seq-rec \\
+\midrule
+\OursCkpt{} (full-length) & uncond. & 0.998 / 0.996 & 0.038 & -- & -- \\
+TcrDesign (full-length)   & epitope & -- & -- & 0.061 & 0.772 \\
+\bottomrule
+\end{tabular}
+\end{adjustbox}
+\end{table}
+
+%--------------------------------------------------------------------
+\subsection{Protein--protein interaction (MINT GeneralPPI)}
+\label{sec:mint}
+
+The primary baseline is transcribed from MINT Source Data, Figure~2c--h and
+Table~S1 [P] \citep{ullanat2026mint}. It uses the paper's task-specific metrics
+and full protocol (\Cref{tab:mint-cls}). Our local port caps training at 3,000,
+uses an IRBench subset in place of Gold-standard PPI, and builds PDB-Bind from
+a different mirror. Those runs are therefore local diagnostics [L], not a MINT
+reproduction, and are omitted from the paper-aligned comparison. In addition,
+the former local regression implementation reported Pearson/RMSE in a
+fold-specific transformed target space; those conclusions are withdrawn. The
+code now inverse-transforms predictions before raw-unit metrics, but the
+corrected baseline rerun is pending (\Cref{sec:mint-caveat}).
+
+\begin{table}[t]
+\centering
+\caption{MINT paper-reported baselines [P], transcribed from Source Data
+Figure~2c--h / Table~S1 (mean $\pm$ standard deviation). Metrics follow the
+paper exactly. No local or \Ours{} value is mixed into this table.}
+\label{tab:mint-cls}
+\small
+\begin{tabular}{@{}llcc@{}}
+\toprule
+Task & Paper metric & MINT [P] & ESM2-650M [P] \\
+\midrule
+Human PPI       & Accuracy & $0.8796\pm0.0069$ & $0.8704\pm0.0146$ \\
+Yeast PPI       & Accuracy & $0.6870\pm0.0106$ & $0.6074\pm0.0084$ \\
+Gold-standard PPI & AUPRC & $0.6872\pm0.0033$ & $0.6639\pm0.0065$ \\
+Mutational PPI  & AUPRC   & $0.6449\pm0.0408$ & $0.6351\pm0.0596$ \\
+SKEMPI          & Pearson & $0.2974\pm0.1312$ & $0.2562\pm0.1618$ \\
+PDB-Bind        & Pearson & $0.5930\pm0.0424$ & $0.5759\pm0.0283$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+%--------------------------------------------------------------------
+\subsection{Antibody tasks}
+\label{sec:ab}
+
+\paragraph{CDR infilling (SabDab 10-fold).}
+The primary baseline is Ophiuchus-Ab Table~2 [P], average amino-acid recovery
+(AAR, \%) over ten folds (\Cref{tab:ab-cdr}). AntiBERTy and AbLang2 are marked
+by that paper as having possible train/test overlap; Ophiuchus-Ab is its
+no-overlap zero-shot row. Our earlier masked-infilling run used a different
+input layout and is not ranked here; the fold-path loader has been fixed and an
+exact local rerun remains pending.
+
+\begin{table}[t]
+\centering
+\caption{Antibody CDR infilling, paper-reported average AAR (\%) from
+Ophiuchus-Ab Table~2 [P]. $^{\dagger}$Possible training-data overlap as flagged
+by the paper.}
+\label{tab:ab-cdr}
+\small
+\begin{tabular}{@{}lccc@{}}
+\toprule
+Model & CDR-H1 & CDR-H2 & CDR-H3 \\
+\midrule
+AntiBERTy [P]$^{\dagger}$ & \best{76.70} & \best{71.10} & 42.70 \\
+AbLang2 [P]$^{\dagger}$   & 76.30 & 70.60 & 42.70 \\
+Ophiuchus-Ab [P]           & 75.50 & 70.18 & \best{43.55} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{Heavy$\rightarrow$light pairing (OAS holdout500).}
+Generated light chains scored by ImmunoMatch against the reference
+(\Cref{tab:ab-pair}). These are local evaluations [L]; the anchor paper does
+not publish p-IgGen/LICHEN values for this table. All rows use the \emph{same}
+3-residue light prompt (prompt3); the prompt-free (de-novo) variants of
+p-IgGen/LICHEN and \Ours{} are in \Cref{sec:ab-extra}. The p-IgGen/LICHEN
+baselines are therefore not paper-transcribed. Note that \Ours{}'s mask-fill decoding reveals
+the reference length, so its chain/V-gene match and diversity are not a
+like-for-like comparison with the variable-length de-novo generators
+(discussed in \Cref{sec:ab-extra}).
+
+\begin{table}[t]
+\centering
+\caption{Antibody heavy$\rightarrow$light pairing [L] (OAS holdout500, $n{=}8$/heavy,
+prompt3 for all rows). Reference ImmunoMatch ${=}0.699$; the Ophiuchus-Ab paper
+reports ${\approx}0.701$ under this protocol. Best per column in \best{bold}.
+$^{\ddagger}$Chain match for \Ours{} is inflated by mask-fill length revelation
+(see text); not ranked against de-novo generators.}
+\label{tab:ab-pair}
+\small
+\begin{tabular}{@{}lcccc@{}}
+\toprule
+Model & ImmunoMatch & gen${>}$ref & chain match & diversity \\
+\midrule
+p-IgGen (prompt3) & \best{0.683} & \best{0.473} & 0.990 & \best{0.368} \\
+LICHEN (prompt3)  & 0.632 & 0.421 & \best{0.998} & 0.255 \\
+\OursCkpt{}       & 0.600 & 0.364 & 1.000$^{\ddagger}$ & 0.118 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{FLAb property regression.}
+The primary baseline is MINT Figure~3b [P], which uses nested 10-outer / 5-inner
+cross-validation and reports $R^2$ (\Cref{tab:ab-flab}). The former local
+5-fold pooled-Spearman sweep is a different protocol and is not a substitute.
+The nested-$R^2$ runner has been repaired, but the local rerun is pending.
+
+\begin{table}[t]
+\centering
+\caption{FLAb antibody property regression, paper-reported $R^2$ mean
+$\pm$ standard deviation from MINT Figure~3b [P] (nested 10$\times$5-fold CV).}
+\label{tab:ab-flab}
+\small
+\setlength{\tabcolsep}{4pt}
+\begin{adjustbox}{max width=\textwidth}
+\begin{tabular}{@{}lcccc@{}}
+\toprule
+Model [P] & trastuzumab & d44 & g6 Kd & g6 ER \\
+\midrule
+AbLang          & $0.293\pm0.117$ & $0.246\pm0.038$ & $0.244\pm0.034$ & $0.439\pm0.027$ \\
+AntiBERTy       & $0.239\pm0.102$ & $0.217\pm0.056$ & $0.199\pm0.025$ & $0.401\pm0.032$ \\
+IgBert-unpaired & $0.278\pm0.094$ & $0.181\pm0.040$ & $0.177\pm0.018$ & $0.347\pm0.023$ \\
+IgBert          & $0.306\pm0.114$ & $0.131\pm0.047$ & $0.174\pm0.032$ & $0.400\pm0.023$ \\
+IgT5-unpaired   & $0.299\pm0.119$ & $0.245\pm0.040$ & $0.206\pm0.029$ & $0.567\pm0.025$ \\
+IgT5            & $0.274\pm0.070$ & $0.297\pm0.057$ & $0.179\pm0.014$ & $0.548\pm0.067$ \\
+MINT            & $0.398\pm0.078$ & $0.379\pm0.058$ & $0.253\pm0.041$ & $0.657\pm0.023$ \\
+\bottomrule
+\end{tabular}
+\end{adjustbox}
+\end{table}
+
+%--------------------------------------------------------------------
+\subsection{Nanobody multi-task (NbBench)}
+\label{sec:nbbench}
+
+\Cref{tab:nbbench} transcribes NbBench Table~5 [P]: the paper's ESM2-150M row
+and best of its eleven evaluated models for each of eleven tasks. The local
+ESM2/k-mer/\Ours{} runs use a single-seed sklearn probe, whereas the paper uses
+a learned MLP head and three seeds; they are retained only as [L] diagnostics
+and are not mixed into this table. Paratope is especially important: the paper
+reports AUROC, while the former local main column reported AUPRC. The local
+hTNFa task is an additional twelfth task absent from Table~5.
+
+\begin{table}[t]
+\centering
+\caption{NbBench paper-reported Table~5 baselines [P] (MLP head, three-seed
+mean). Paratope uses AUROC. Local sklearn probes and the extra hTNFa task are
+excluded because their protocols do not match.}
+\label{tab:nbbench}
+\small
+\setlength{\tabcolsep}{3.5pt}
+\begin{adjustbox}{max width=\textwidth}
+\begin{tabular}{@{}llcc@{}}
+\toprule
+Task & Paper metric & ESM2-150M [P] & Best of 11 [P] \\
+\midrule
+VRClassification    & Accuracy & 0.9989 & 0.9989 (ESM2-150M / AntiBERTa2) \\
+CDRInfilling        & BLOSUM62 recovery & 1.499 & 1.551 (ESM2-650M) \\
+SARS-CoV-2          & AUROC    & 0.834 & 0.884 (AbLang-H) \\
+hIL6                & AUROC    & 0.850 & 0.925 (AbLang-H) \\
+Paratope            & AUROC    & 0.922 & 0.939 (AntiBERTa2-CSSP) \\
+thermo-seq          & Spearman & 0.389 & 0.587 (AntiBERTa2) \\
+thermo-tm           & Spearman & 0.301 & 0.593 (AntiBERTa2-CSSP) \\
+polyreaction        & AUROC    & 0.833 & 0.842 (ESM2-650M) \\
+nanobody\_type      & Accuracy & 0.994 & 0.999 (AntiBERTy) \\
+vhh\_affinity-seq   & Spearman & 0.170 & 0.184 (IgBert) \\
+vhh\_affinity-score & Spearman & 0.063 & 0.128 (AbLang-L) \\
+\bottomrule
+\end{tabular}
+\end{adjustbox}
+\end{table}
+
+%--------------------------------------------------------------------
+\subsection{Summary}
+The audit establishes source-labelled baselines and a single local plug-in
+interface. T1, T2, MINT, CDR infilling, FLAb, and NbBench now use paper values
+as their primary references whenever the local protocol differs. T4 uses an
+official-artifact sparse-13 re-score, and T3 remains explicitly local with a
+separate paper audit. Consequently, this revision makes no cross-protocol claim
+that \Ours{} exceeds the MINT, FLAb, CDR-infilling, or NbBench paper baselines;
+those comparisons require paper-aligned reruns.

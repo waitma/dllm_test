@@ -54,7 +54,8 @@ def parse_args() -> argparse.Namespace:
         "--sources",
         default="oas,ots,tcr,ppi",
         help=(
-            "Comma-separated sources: oas, ots, tcr, ppi, mint_ppi, mint_actions, neutralization. "
+            "Comma-separated sources: oas, ots, nanobody, tcr, ppi, mint_ppi, mint_actions, "
+            "neutralization. nanobody reads the leakage-cleaned step7_clean CSV. "
             "mint_ppi / mint_actions require prebuilt shards (build_mint_grammar_shards.py). "
             "neutralization uses unified CSV or prebuilt shards."
         ),
@@ -108,6 +109,62 @@ def iter_oas_or_ots(name: str, split: str, limit: int | None) -> Iterator[dict[s
     for record in source.iter_records():
         record.labels.setdefault("relation", "binding")
         yield semantic_row(record, split, default_relation="binding")
+
+
+def iter_nanobody(split: str, limit: int | None) -> Iterator[dict[str, Any]]:
+    # Reads DEFAULT_NANOBODY_DIR (step7_clean, i.e. nbbench-dropped +
+    # length-windowed) via the shared nanobody adapter. Single nanobody_vhh
+    # chain, task_type "antibody" -> renderer emits the unconditional "nanobody"
+    # (<nb>) generation grammar. relation is left "unknown" (no binding partner).
+    config = next(
+        config
+        for config in default_source_configs(split=split, max_records=limit)
+        if config.name == "nanobody"
+    )
+    source = CsvBioSeqSource(config)
+    for record in source.iter_records():
+        yield semantic_row(record, split, default_relation="unknown")
+
+
+def iter_tcr_pmhc_fulllength(split: str, limit: int | None) -> Iterator[dict[str, Any]]:
+    """Full-length five-entity TCR-pMHC records from build_fulllength_tcr_pmhc.py.
+
+    Reads the bioseq.v1 JSONL (``[mhc, b2m, peptide, tcr_alpha, tcr_beta]`` with
+    roles preserved) and preserves ``labels['relation']`` so the B1 renderer fix
+    can emit the correct binding token. VDJdb/McPAS are curated binders, so the
+    relation defaults to ``binding``.
+    """
+    raw_split = "valid" if split in {"val", "validation"} else split
+    path = PROJECT_ROOT / "data/tcr_pmhc_fulllength" / f"records_{raw_split}.jsonl"
+    if not path.is_file():
+        raise FileNotFoundError(
+            f"Missing {path}. Run scripts/data/build_fulllength_tcr_pmhc.py first."
+        )
+    kept = 0
+    with path.open() as handle:
+        for line in handle:
+            line = line.strip()
+            if not line:
+                continue
+            row = json.loads(line)
+            sequences = [normalize_sequence(s) for s in row.get("chains", [])]
+            roles = list(row.get("chain_roles", []))
+            if len(sequences) != len(roles) or not all(
+                is_valid_protein_sequence(s) for s in sequences
+            ):
+                continue
+            record = BioSeqRecord(
+                chains=[BioSeqChain(seq, role) for seq, role in zip(sequences, roles)],
+                task_type=str(row.get("task_type", "tcr_pmhc")),
+                source="tcr_pmhc_fulllength",
+                split=split,
+                labels={"relation": str((row.get("labels") or {}).get("relation", "binding"))},
+                metadata=dict(row.get("metadata") or {}),
+            )
+            yield semantic_row(record, split, default_relation="binding")
+            kept += 1
+            if limit is not None and kept >= limit:
+                break
 
 
 def iter_tcr(split: str, limit: int | None) -> Iterator[dict[str, Any]]:
@@ -298,8 +355,12 @@ def build_source(
 
     if name in {"oas", "ots"}:
         generator = lambda: iter_oas_or_ots(name, split, limit)
+    elif name == "nanobody":
+        generator = lambda: iter_nanobody(split, limit)
     elif name == "tcr":
         generator = lambda: iter_tcr(split, limit)
+    elif name == "tcr_pmhc_fulllength":
+        generator = lambda: iter_tcr_pmhc_fulllength(split, limit)
     elif name == "ppi":
         generator = lambda: iter_ppi(split, limit, ppi_max_protein_length)
     else:

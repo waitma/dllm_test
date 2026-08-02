@@ -25,7 +25,7 @@ csv.field_size_limit(min(sys.maxsize, 2**31 - 1))
 DEFAULT_DATA_ROOT = Path("/vepfs-mlp2/c20250601/251105016/project/dllm_test/data")
 DEFAULT_OAS_DIR = DEFAULT_DATA_ROOT / "oas_previous_clean/splits"
 DEFAULT_OTS_DIR = DEFAULT_DATA_ROOT / "ots_paired_clean/final"
-DEFAULT_NANOBODY_DIR = DEFAULT_DATA_ROOT / "nanobody_processed/step6_final"
+DEFAULT_NANOBODY_DIR = DEFAULT_DATA_ROOT / "nanobody_processed/step7_clean"
 DEFAULT_PROCESSED_V2_DIR = DEFAULT_DATA_ROOT / "processed_v2"
 DEFAULT_PPI_DIR = DEFAULT_DATA_ROOT / "ppi/string_model_org_90_90_split"
 OAS_LABEL_FILE_TEMPLATE = "cleaned_merged_data_step_clustered_{split}_oas_label.csv"

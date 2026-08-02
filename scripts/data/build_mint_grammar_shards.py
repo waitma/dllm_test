@@ -130,11 +130,20 @@ def iter_mint_rows(
             if len(parts) < 2:
                 continue
             target_name, actor_name = parts[0], parts[1]
-            relation = default_relation
-            if len(parts) >= 3:
+            if default_relation is None:
+                # Actions-style split: 3-column `target actor mode`; the mode
+                # column is required and lives at parts[2].
+                if len(parts) < 3:
+                    raise ValueError(
+                        f"{source_name} links must include relation column: {line[:120]}"
+                    )
                 relation = normalize_relation(parts[2])
-            elif default_relation is None:
-                raise ValueError(f"{source_name} links must include relation column: {line[:120]}")
+            else:
+                # Physical-binding split (STRING protein.physical.links.full):
+                # columns after the two protein ids are per-channel scores, not a
+                # relation mode. Keep default_relation instead of misreading a
+                # score (e.g. neighborhood="0") as the relation token.
+                relation = default_relation
 
             seq_target = seqs.get(target_name, "")
             seq_actor = seqs.get(actor_name, "")

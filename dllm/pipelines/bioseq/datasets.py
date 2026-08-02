@@ -32,7 +32,7 @@ DEFAULT_DATA_ROOT = Path("/vepfs-mlp2/c20250601/251105016/project/dllm_test/data
 
 OAS_DEFAULT_DIR = DEFAULT_DATA_ROOT / "oas_previous_clean/splits"
 OTS_DEFAULT_DIR = DEFAULT_DATA_ROOT / "ots_paired_clean/final"
-NANOBODY_DEFAULT_DIR = DEFAULT_DATA_ROOT / "nanobody_processed/step6_final"
+NANOBODY_DEFAULT_DIR = DEFAULT_DATA_ROOT / "nanobody_processed/step7_clean"
 OAS_LABEL_FILE_TEMPLATE = "cleaned_merged_data_step_clustered_{split}_oas_label.csv"
 
 

@@ -1,0 +1,30 @@
+---
+description: 改动后必须同步更新对应的项目 md 文件（process / plan / guide / data）
+alwaysApply: true
+---
+
+# 文档同步规则（md 维护）
+
+所有路径用**绝对路径**。改动发生的**同一回合内**就更新对应 md，不要留到之后再补。
+
+## 何时更新哪个文件
+
+| 你改了什么 | 必须实时更新 |
+|---|---|
+| 训练/评测/采样任务的 submit·cancel·状态变化、实验进展与结果 | `/vepfs-mlp2/c20250601/251105016/project/dllm_test/PROJECT_PROCESS.md` |
+| 训练 YAML 的 batch / 显存 profile | 同上 + `/vepfs-mlp2/c20250601/251105016/project/dllm_test/PROJ_GUIDE.md`；规则见 `volc-batch-sizing.mdc` |
+| 模型架构 / 方法设计 / 方案决策 / 调研结论 | `/vepfs-mlp2/c20250601/251105016/project/dllm_test/BIOSEQ_MODEL_PLAN.md` |
+| 长期项目规则 / 路径约定 / 管线边界 | `/vepfs-mlp2/c20250601/251105016/project/dllm_test/PROJ_GUIDE.md` |
+| 数据格式 / 数据布局变化 | `/vepfs-mlp2/c20250601/251105016/project/dllm_test/DATA_FORMAT_AUDIT.md` |
+
+## PROJECT_PROCESS.md 细则
+
+- Volc 任务的 Active 表 + dated 章节维护遵循 `/vepfs-mlp2/c20250601/251105016/project/dllm_test/.cursor/rules/volc-train-task-log.mdc`。
+- 训练 YAML 的 batch / 显存：遵循 `/vepfs-mlp2/c20250601/251105016/project/dllm_test/.cursor/rules/volc-batch-sizing.mdc`。
+- 每次更新刷新顶部 `Last updated`（UTC）时间戳。
+- 进展变化同步更新对应进度表（如 `Live Progress — LLaDA backbone`）。
+
+## 禁止
+
+- 改了 plan/process/规则却不更新对应 md。
+- 把本该写进 md 的长内容只留在对话里。

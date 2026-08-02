@@ -13,7 +13,14 @@ from pathlib import Path
 
 PROJECT_ROOT = Path("/vepfs-mlp2/c20250601/251105016/project/dllm_test")
 OUT_DIR = PROJECT_ROOT / "output" / "downstream_generation"
-VARIANTS = ("esmc300m", "esmc600m", "no_encoder_qwen0_6b", "esm2_650m")
+VARIANTS = (
+    "esmc300m",
+    "esmc600m",
+    "no_encoder_qwen0_6b",
+    "esm2_650m",
+    "esmc300m_fixalign",
+    "esmc600m_fixalign",
+)
 NUM_SEQS = 8
 
 if str(PROJECT_ROOT) not in sys.path:

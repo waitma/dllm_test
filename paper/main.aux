@@ -1,0 +1,181 @@
+\relax 
+\providecommand\hyper@newdestlabel[2]{}
+\providecommand\HyperFirstAtBeginDocument{\AtBeginDocument}
+\HyperFirstAtBeginDocument{\ifx\hyper@anchor\@undefined
+\global\let\oldcontentsline\contentsline
+\gdef\contentsline#1#2#3#4{\oldcontentsline{#1}{#2}{#3}}
+\global\let\oldnewlabel\newlabel
+\gdef\newlabel#1#2{\newlabelxx{#1}#2}
+\gdef\newlabelxx#1#2#3#4#5#6{\oldnewlabel{#1}{{#2}{#3}}}
+\AtEndDocument{\ifx\hyper@anchor\@undefined
+\let\contentsline\oldcontentsline
+\let\newlabel\oldnewlabel
+\fi}
+\fi}
+\global\let\hyper@last\relax 
+\gdef\HyperFirstAtBeginDocument#1{#1}
+\providecommand\HyField@AuxAddToFields[1]{}
+\providecommand\HyField@AuxAddToCoFields[2]{}
+\providecommand \oddpage@label [2]{}
+\@writefile{toc}{\contentsline {section}{\numberline {1}Introduction}{1}{section.1}\protected@file@percent }
+\newlabel{sec:intro}{{1}{1}{Introduction}{section.1}{}}
+\newlabel{sec:intro@cref}{{[section][1][]1}{[1][1][]1}}
+\providecommand*\caption@xref[2]{\@setref\relax\@undefined{#1}}
+\newlabel{fig:overview-a}{{1a}{2}{One frozen checkpoint for immune--protein complexes: TCR--pMHC, antibody--antigen, nanobody--antigen and protein--protein inputs map to a shared grammar-conditioned ESMC$\rightarrow $LLaDA diffusion model that feeds ten downstream tasks.\relax }{figure.caption.1}{}}
+\newlabel{fig:overview-a@cref}{{[subfigure][1][1]1a}{[1][1][]2}}
+\newlabel{sub@fig:overview-a}{{a}{2}{One frozen checkpoint for immune--protein complexes: TCR--pMHC, antibody--antigen, nanobody--antigen and protein--protein inputs map to a shared grammar-conditioned ESMC$\rightarrow $LLaDA diffusion model that feeds ten downstream tasks.\relax }{figure.caption.1}{}}
+\newlabel{sub@fig:overview-a@cref}{{[subfigure][1][1]1a}{[1][1][]2}}
+\newlabel{fig:overview-b}{{1b}{2}{Designed grammar-v2 token format. Entity blocks (\texttt {<prots>}{\ldots }\texttt {<protd>}) carry an optional type tab and residue span; relation tokens join blocks. Grey residues are fixed context; orange residues are diffusion targets.\relax }{figure.caption.1}{}}
+\newlabel{fig:overview-b@cref}{{[subfigure][2][1]1b}{[1][1][]2}}
+\newlabel{sub@fig:overview-b}{{b}{2}{Designed grammar-v2 token format. Entity blocks (\texttt {<prots>}{\ldots }\texttt {<protd>}) carry an optional type tab and residue span; relation tokens join blocks. Grey residues are fixed context; orange residues are diffusion targets.\relax }{figure.caption.1}{}}
+\newlabel{sub@fig:overview-b@cref}{{[subfigure][2][1]1b}{[1][1][]2}}
+\newlabel{fig:overview-c}{{1c}{2}{Training forward pass. Noisy tokens are read two ways: ESMC encodes each chain (corruption-mirrored) into boxed residue features that replace embeddings at residue sites, while structure/relation tokens keep token embeddings; the fused stream enters a bidirectional LLaDA trained with masked cross-entropy on target residues.\relax }{figure.caption.1}{}}
+\newlabel{fig:overview-c@cref}{{[subfigure][3][1]1c}{[1][1][]2}}
+\newlabel{sub@fig:overview-c}{{c}{2}{Training forward pass. Noisy tokens are read two ways: ESMC encodes each chain (corruption-mirrored) into boxed residue features that replace embeddings at residue sites, while structure/relation tokens keep token embeddings; the fused stream enters a bidirectional LLaDA trained with masked cross-entropy on target residues.\relax }{figure.caption.1}{}}
+\newlabel{sub@fig:overview-c@cref}{{[subfigure][3][1]1c}{[1][1][]2}}
+\newlabel{fig:overview-d}{{1d}{2}{Inference: confidence-ordered iterative unmasking. Fixed context (\texttt {<prots>}/\texttt {<tcr>}/\texttt {<protd>} and conditioning residues) stays visible while masked target sites are revealed from high- to low-confidence.\relax }{figure.caption.1}{}}
+\newlabel{fig:overview-d@cref}{{[subfigure][4][1]1d}{[1][1][]2}}
+\newlabel{sub@fig:overview-d}{{d}{2}{Inference: confidence-ordered iterative unmasking. Fixed context (\texttt {<prots>}/\texttt {<tcr>}/\texttt {<protd>} and conditioning residues) stays visible while masked target sites are revealed from high- to low-confidence.\relax }{figure.caption.1}{}}
+\newlabel{sub@fig:overview-d@cref}{{[subfigure][4][1]1d}{[1][1][]2}}
+\@writefile{lof}{\contentsline {figure}{\numberline {1}{\ignorespaces Overview of \textsc  {Ophiuchus-X}{}, a grammar-conditioned ESMC$\rightarrow $LLaDA diffusion language model.\relax }}{2}{figure.caption.1}\protected@file@percent }
+\newlabel{fig:overview}{{1}{2}{Overview of \Ours {}, a grammar-conditioned ESMC$\rightarrow $LLaDA diffusion language model.\relax }{figure.caption.1}{}}
+\newlabel{fig:overview@cref}{{[figure][1][]1}{[1][1][]2}}
+\@writefile{toc}{\contentsline {section}{\numberline {2}Downstream Benchmark}{2}{section.2}\protected@file@percent }
+\newlabel{sec:experiments}{{2}{2}{Downstream Benchmark}{section.2}{}}
+\newlabel{sec:experiments@cref}{{[section][2][]2}{[1][2][]2}}
+\citation{nathan2025tcrbench}
+\citation{nargab2025tcrcluster}
+\citation{feng2025tcrembedding}
+\citation{nagano2024sceptr}
+\@writefile{lot}{\contentsline {table}{\numberline {1}{\ignorespaces T1 TCR--epitope binding on the Nature Methods 2025 benchmark (CDR3$\beta $, AS negatives, overall AUPRC / AUROC). Best released-model value per column in \textbf  {bold}. Eight further official variants are in \Cref  {tab:t1-tier1}.\relax }}{3}{table.caption.3}\protected@file@percent }
+\newlabel{tab:t1}{{1}{3}{T1 TCR--epitope binding on the Nature Methods 2025 benchmark (CDR3$\beta $, AS negatives, overall AUPRC / AUROC). Best released-model value per column in \best {bold}. Eight further official variants are in \Cref {tab:t1-tier1}.\relax }{table.caption.3}{}}
+\newlabel{tab:t1@cref}{{[table][1][]1}{[1][3][]3}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.1}Model plug-in interface}{3}{subsection.2.1}\protected@file@percent }
+\newlabel{sec:interface}{{2.1}{3}{Model plug-in interface}{subsection.2.1}{}}
+\newlabel{sec:interface@cref}{{[subsection][1][2]2.1}{[1][3][]3}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.2}TCR tasks}{3}{subsection.2.2}\protected@file@percent }
+\newlabel{sec:tcr}{{2.2}{3}{TCR tasks}{subsection.2.2}{}}
+\newlabel{sec:tcr@cref}{{[subsection][2][2]2.2}{[1][3][]3}}
+\@writefile{toc}{\contentsline {paragraph}{T1: TCR--epitope binding (Nature Methods 2025 split).}{3}{section*.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{T2: TCR clustering.}{3}{section*.4}\protected@file@percent }
+\citation{nagano2024sceptr}
+\citation{tcrt5_2025}
+\citation{ullanat2026mint}
+\@writefile{lot}{\contentsline {table}{\numberline {2}{\ignorespaces T2 Basis A: NAR-GAB 2025 official nine-method clustering (paired-TCR unit, $N{=}5{,}368$). Purity--Retention trade-off recomputed from the authors' released cluster outputs (HD/LD recomputed via string distance). Sens(top6) is sensitivity over the six highlighted pMHCs.\relax }}{4}{table.caption.5}\protected@file@percent }
+\newlabel{tab:t2-nargab}{{2}{4}{T2 Basis A: NAR-GAB 2025 official nine-method clustering (paired-TCR unit, $N{=}5{,}368$). Purity--Retention trade-off recomputed from the authors' released cluster outputs (HD/LD recomputed via string distance). Sens(top6) is sensitivity over the six highlighted pMHCs.\relax }{table.caption.5}{}}
+\newlabel{tab:t2-nargab@cref}{{[table][2][]2}{[1][4][]4}}
+\@writefile{lot}{\contentsline {table}{\numberline {3}{\ignorespaces T2 Basis B: TCR clustering (TCREmbedding, $K$-means mean over $K$). SCEPTR uses CDR3$\beta $+TRBV (native partial input); all other rows use CDR3$\beta $ only. Best value per column in \textbf  {bold}.\relax }}{4}{table.caption.6}\protected@file@percent }
+\newlabel{tab:t2}{{3}{4}{T2 Basis B: TCR clustering (TCREmbedding, $K$-means mean over $K$). SCEPTR uses CDR3$\beta $+TRBV (native partial input); all other rows use CDR3$\beta $ only. Best value per column in \best {bold}.\relax }{table.caption.6}{}}
+\newlabel{tab:t2@cref}{{[table][3][]3}{[1][4][]4}}
+\@writefile{toc}{\contentsline {paragraph}{T3: TCR representation (SCEPTR few-shot, deep 6-pMHC).}{4}{section*.7}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{T4: TCR generation (TCRT5 protocol \citep  {tcrt5_2025}).}{4}{section*.9}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.3}Protein--protein interaction (MINT GeneralPPI)}{4}{subsection.2.3}\protected@file@percent }
+\newlabel{sec:mint}{{2.3}{4}{Protein--protein interaction (MINT GeneralPPI)}{subsection.2.3}{}}
+\newlabel{sec:mint@cref}{{[subsection][3][2]2.3}{[1][4][]4}}
+\@writefile{lot}{\contentsline {table}{\numberline {4}{\ignorespaces T3 TCR representation, deep 6-pMHC few-shot NN AUROC (100 seeds, random${=}0.5$). Best value per column in \textbf  {bold}.\relax }}{5}{table.caption.8}\protected@file@percent }
+\newlabel{tab:t3}{{4}{5}{T3 TCR representation, deep 6-pMHC few-shot NN AUROC (100 seeds, random${=}0.5$). Best value per column in \best {bold}.\relax }{table.caption.8}{}}
+\newlabel{tab:t3@cref}{{[table][4][]4}{[1][4][]5}}
+\@writefile{lot}{\contentsline {table}{\numberline {5}{\ignorespaces T4 TCR generation. Left: Setting A unconditional ($n{=}5000$). Right: Setting B epitope-conditioned design (benchmark14, $K{=}100$). $\downarrow $ lower is better. \textsc  {Ophiuchus-X}{}(unseen) is the zero-leakage epitope subset.\relax }}{5}{table.caption.10}\protected@file@percent }
+\newlabel{tab:t4}{{5}{5}{T4 TCR generation. Left: Setting A unconditional ($n{=}5000$). Right: Setting B epitope-conditioned design (benchmark14, $K{=}100$). $\downarrow $ lower is better. \Ours {}(unseen) is the zero-leakage epitope subset.\relax }{table.caption.10}{}}
+\newlabel{tab:t4@cref}{{[table][5][]5}{[1][4][]5}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.4}Antibody tasks}{5}{subsection.2.4}\protected@file@percent }
+\newlabel{sec:ab}{{2.4}{5}{Antibody tasks}{subsection.2.4}{}}
+\newlabel{sec:ab@cref}{{[subsection][4][2]2.4}{[1][5][]5}}
+\@writefile{toc}{\contentsline {paragraph}{CDR infilling (SabDab 10-fold).}{5}{section*.15}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Heavy$\rightarrow $light pairing (OAS holdout500).}{5}{section*.17}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{FLAb property regression.}{5}{section*.19}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {6}{\ignorespaces T4 Setting B on the target-rich held20 split ($K{=}100$). $^{\dagger }$For \textsc  {Ophiuchus-X}{} this split has ${\sim }48\%$ training-pair leakage, so its row is a \emph  {seen}, optimistic control only; TcrDesign-G is the strongest official conditional generator here.\relax }}{6}{table.caption.11}\protected@file@percent }
+\newlabel{tab:t4-held20}{{6}{6}{T4 Setting B on the target-rich held20 split ($K{=}100$). $^{\dagger }$For \Ours {} this split has ${\sim }48\%$ training-pair leakage, so its row is a \emph {seen}, optimistic control only; TcrDesign-G is the strongest official conditional generator here.\relax }{table.caption.11}{}}
+\newlabel{tab:t4-held20@cref}{{[table][6][]6}{[1][4][]6}}
+\@writefile{lot}{\contentsline {table}{\numberline {7}{\ignorespaces T4 Setting C, full-length $\alpha /\beta $ assembly. \textsc  {Ophiuchus-X}{} (unconditional, $n{=}500$) attains high per-residue AA validity but only a small fraction of $\beta $ chains yield an ANARCI-extractable canonical CDR3$\beta $ --- its honest capability boundary is CDR3-level, not full-length de novo. TcrDesign (epitope-conditioned, 34 pMHC $K{=}100$) is the full-length SOTA. ``--'' = not applicable to that mode.\relax }}{6}{table.caption.12}\protected@file@percent }
+\newlabel{tab:t4-setc}{{7}{6}{T4 Setting C, full-length $\alpha /\beta $ assembly. \Ours {} (unconditional, $n{=}500$) attains high per-residue AA validity but only a small fraction of $\beta $ chains yield an ANARCI-extractable canonical CDR3$\beta $ --- its honest capability boundary is CDR3-level, not full-length de novo. TcrDesign (epitope-conditioned, 34 pMHC $K{=}100$) is the full-length SOTA. ``--'' = not applicable to that mode.\relax }{table.caption.12}{}}
+\newlabel{tab:t4-setc@cref}{{[table][7][]7}{[1][4][]6}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.5}Nanobody multi-task (NbBench)}{6}{subsection.2.5}\protected@file@percent }
+\newlabel{sec:nbbench}{{2.5}{6}{Nanobody multi-task (NbBench)}{subsection.2.5}{}}
+\newlabel{sec:nbbench@cref}{{[subsection][5][2]2.5}{[1][5][]6}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.6}Summary}{6}{subsection.2.6}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {8}{\ignorespaces MINT GeneralPPI binary classification (test set, 3-rep mean). HumanPPI/Bernett/YeastPPI report AUROC/AUPRC; MutationalPPI is class-imbalanced (read AUPRC). Best per row in \textbf  {bold}.\relax }}{7}{table.caption.13}\protected@file@percent }
+\newlabel{tab:mint-cls}{{8}{7}{MINT GeneralPPI binary classification (test set, 3-rep mean). HumanPPI/Bernett/YeastPPI report AUROC/AUPRC; MutationalPPI is class-imbalanced (read AUPRC). Best per row in \best {bold}.\relax }{table.caption.13}{}}
+\newlabel{tab:mint-cls@cref}{{[table][8][]8}{[1][5][]7}}
+\@writefile{lot}{\contentsline {table}{\numberline {9}{\ignorespaces MINT GeneralPPI regression. SKEMPI $\Delta \Delta G$ (3-fold complex-held-out) and PDB-Bind affinity (10-fold Ridge CV). Higher Spearman / lower RMSE is better. \textbf  {bold} marks the best value per column.\relax }}{7}{table.caption.14}\protected@file@percent }
+\newlabel{tab:mint-reg}{{9}{7}{MINT GeneralPPI regression. SKEMPI $\Delta \Delta G$ (3-fold complex-held-out) and PDB-Bind affinity (10-fold Ridge CV). Higher Spearman / lower RMSE is better. \best {bold} marks the best value per column.\relax }{table.caption.14}{}}
+\newlabel{tab:mint-reg@cref}{{[table][9][]9}{[1][5][]7}}
+\@writefile{lot}{\contentsline {table}{\numberline {10}{\ignorespaces Antibody CDR infilling, average AAR (\%) over SabDab 10-fold. Best per column in \textbf  {bold}. Baselines are re-run with official weights under zero-shot masked infilling; the Ophiuchus-Ab paper's own Table\nobreakspace  {}2 uses a different masking protocol and is not transcribed here.\relax }}{7}{table.caption.16}\protected@file@percent }
+\newlabel{tab:ab-cdr}{{10}{7}{Antibody CDR infilling, average AAR (\%) over SabDab 10-fold. Best per column in \best {bold}. Baselines are re-run with official weights under zero-shot masked infilling; the Ophiuchus-Ab paper's own Table~2 uses a different masking protocol and is not transcribed here.\relax }{table.caption.16}{}}
+\newlabel{tab:ab-cdr@cref}{{[table][10][]10}{[1][5][]7}}
+\@writefile{lot}{\contentsline {table}{\numberline {11}{\ignorespaces Antibody heavy$\rightarrow $light pairing (OAS holdout500, $n{=}8$/heavy, prompt3 for all rows). Reference ImmunoMatch ${=}0.699$; the Ophiuchus-Ab paper reports ${\approx }0.701$ under this protocol. Best per column in \textbf  {bold}. $^{\ddagger }$Chain match for \textsc  {Ophiuchus-X}{} is inflated by mask-fill length revelation (see text); not ranked against de-novo generators.\relax }}{7}{table.caption.18}\protected@file@percent }
+\newlabel{tab:ab-pair}{{11}{7}{Antibody heavy$\rightarrow $light pairing (OAS holdout500, $n{=}8$/heavy, prompt3 for all rows). Reference ImmunoMatch ${=}0.699$; the Ophiuchus-Ab paper reports ${\approx }0.701$ under this protocol. Best per column in \best {bold}. $^{\ddagger }$Chain match for \Ours {} is inflated by mask-fill length revelation (see text); not ranked against de-novo generators.\relax }{table.caption.18}{}}
+\newlabel{tab:ab-pair@cref}{{[table][11][]11}{[1][5][]7}}
+\@writefile{lot}{\contentsline {table}{\numberline {12}{\ignorespaces FLAb antibody property regression (Spearman, 5-fold CV). Best per column in \textbf  {bold}. This is an independent sanity-check, not a reproduction of the Ophiuchus-Ab GDPa1 developability table.\relax }}{7}{table.caption.20}\protected@file@percent }
+\newlabel{tab:ab-flab}{{12}{7}{FLAb antibody property regression (Spearman, 5-fold CV). Best per column in \best {bold}. This is an independent sanity-check, not a reproduction of the Ophiuchus-Ab GDPa1 developability table.\relax }{table.caption.20}{}}
+\newlabel{tab:ab-flab@cref}{{[table][12][]12}{[1][5][]7}}
+\@writefile{lot}{\contentsline {table}{\numberline {13}{\ignorespaces NbBench 12-task probing. Metrics: accuracy (VRClassification, nanobody\_type), BLOSUM62 recovery (CDRInfilling), AUPRC (Paratope), AUROC (SARS-CoV-2/hIL6/hTNFa/polyreaction), Spearman (thermo-tm/-seq, vhh\_affinity-seq/-score). ``E150 (ours)'' and \textsc  {Ophiuchus-X}{} share our frozen-probe pipeline; ``E150 (off.)'' and ``Best off.'' are transcribed from NbBench. Best-official codes: AbH${=}$AbLang-H, E650${=}$ESM2-650M, Ab2C${=}$AntiBERTa2-CSSP, Ab2${=}$AntiBERTa2, AbTy${=}$AntiBERTy, IgB${=}$IgBert, AbL${=}$AbLang-L. Best per row across all columns in \textbf  {bold}.\relax }}{8}{table.caption.21}\protected@file@percent }
+\newlabel{tab:nbbench}{{13}{8}{NbBench 12-task probing. Metrics: accuracy (VRClassification, nanobody\_type), BLOSUM62 recovery (CDRInfilling), AUPRC (Paratope), AUROC (SARS-CoV-2/hIL6/hTNFa/polyreaction), Spearman (thermo-tm/-seq, vhh\_affinity-seq/-score). ``E150 (ours)'' and \Ours {} share our frozen-probe pipeline; ``E150 (off.)'' and ``Best off.'' are transcribed from NbBench. Best-official codes: AbH${=}$AbLang-H, E650${=}$ESM2-650M, Ab2C${=}$AntiBERTa2-CSSP, Ab2${=}$AntiBERTa2, AbTy${=}$AntiBERTy, IgB${=}$IgBert, AbL${=}$AbLang-L. Best per row across all columns in \best {bold}.\relax }{table.caption.21}{}}
+\newlabel{tab:nbbench@cref}{{[table][13][]13}{[1][6][]8}}
+\bibdata{references}
+\bibcite{feng2025tcrembedding}{{1}{2025}{{Feng et~al.}}{{}}}
+\bibcite{nargab2025tcrcluster}{{2}{2025}{{i3~unit}}{{}}}
+\bibcite{tcrt5_2025}{{3}{2025}{{Karthikeyan et~al.}}{{}}}
+\bibcite{nathan2025tcrbench}{{4}{2025}{{Lu et~al.}}{{}}}
+\bibcite{nagano2024sceptr}{{5}{2024}{{Nagano et~al.}}{{}}}
+\bibcite{ullanat2026mint}{{6}{2026}{{Ullanat et~al.}}{{Ullanat, Jing, Sledzieski, and Berger}}}
+\bibstyle{iclr2026_conference}
+\@writefile{toc}{\contentsline {section}{\numberline {3}Conclusion}{9}{section.3}\protected@file@percent }
+\newlabel{sec:conclusion}{{3}{9}{Conclusion}{section.3}{}}
+\newlabel{sec:conclusion@cref}{{[section][3][]3}{[1][9][]9}}
+\@writefile{toc}{\contentsline {section}{\numberline {A}Reproducibility and caveats}{9}{appendix.A}\protected@file@percent }
+\newlabel{sec:appendix}{{A}{9}{Reproducibility and caveats}{appendix.A}{}}
+\newlabel{sec:appendix@cref}{{[appendix][1][2147483647]A}{[1][9][]9}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {A.1}Checkpoints}{9}{subsection.A.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {A.2}MINT GeneralPPI protocol caveat}{9}{subsection.A.2}\protected@file@percent }
+\newlabel{sec:mint-caveat}{{A.2}{9}{MINT GeneralPPI protocol caveat}{subsection.A.2}{}}
+\newlabel{sec:mint-caveat@cref}{{[subappendix][2][2147483647,1]A.2}{[1][9][]9}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {A.3}Data provenance}{10}{subsection.A.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {A.4}T1: additional official baselines and analyses}{10}{subsection.A.4}\protected@file@percent }
+\newlabel{sec:t1-extra}{{A.4}{10}{T1: additional official baselines and analyses}{subsection.A.4}{}}
+\newlabel{sec:t1-extra@cref}{{[subappendix][4][2147483647,1]A.4}{[1][10][]10}}
+\@writefile{toc}{\contentsline {paragraph}{Eight further official variants.}{10}{section*.23}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {14}{\ignorespaces T1 additional official baselines (cdr3b, AS, overall AUPRC/AUROC).\relax }}{10}{table.caption.24}\protected@file@percent }
+\newlabel{tab:t1-tier1}{{14}{10}{T1 additional official baselines (cdr3b, AS, overall AUPRC/AUROC).\relax }{table.caption.24}{}}
+\newlabel{tab:t1-tier1@cref}{{[table][14][2147483647]14}{[1][10][]10}}
+\@writefile{toc}{\contentsline {paragraph}{Negative-source sensitivity.}{10}{section*.25}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {15}{\ignorespaces T1 negative-source sensitivity (overall AUPRC). AS/PS/HS are the three official negative-sampling schemes.\relax }}{10}{table.caption.26}\protected@file@percent }
+\newlabel{tab:t1-neg}{{15}{10}{T1 negative-source sensitivity (overall AUPRC). AS/PS/HS are the three official negative-sampling schemes.\relax }{table.caption.26}{}}
+\newlabel{tab:t1-neg@cref}{{[table][15][2147483647]15}{[1][10][]10}}
+\@writefile{toc}{\contentsline {paragraph}{Near-duplicate removal.}{10}{section*.27}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {16}{\ignorespaces T1 near-duplicate removal (unseen split, overall AUPRC). Columns are increasing dedup radius $k$; ``kept'' is the number of remaining unseen test rows.\relax }}{11}{table.caption.28}\protected@file@percent }
+\newlabel{tab:t1-dedup}{{16}{11}{T1 near-duplicate removal (unseen split, overall AUPRC). Columns are increasing dedup radius $k$; ``kept'' is the number of remaining unseen test rows.\relax }{table.caption.28}{}}
+\newlabel{tab:t1-dedup@cref}{{[table][16][2147483647]16}{[1][10][]11}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {A.5}T3: broad-track and linear-probe views}{11}{subsection.A.5}\protected@file@percent }
+\newlabel{sec:t3-extra}{{A.5}{11}{T3: broad-track and linear-probe views}{subsection.A.5}{}}
+\newlabel{sec:t3-extra@cref}{{[subappendix][5][2147483647,1]A.5}{[1][10][]11}}
+\@writefile{lot}{\contentsline {table}{\numberline {17}{\ignorespaces T3 broad 24-epitope few-shot NN AUROC (random${=}0.5$).\relax }}{11}{table.caption.29}\protected@file@percent }
+\newlabel{tab:t3-broad}{{17}{11}{T3 broad 24-epitope few-shot NN AUROC (random${=}0.5$).\relax }{table.caption.29}{}}
+\newlabel{tab:t3-broad@cref}{{[table][17][2147483647]17}{[1][11][]11}}
+\@writefile{lot}{\contentsline {table}{\numberline {18}{\ignorespaces T3 24-way linear-probe / 1-NN (backward-compatible auxiliary view).\relax }}{11}{table.caption.30}\protected@file@percent }
+\newlabel{tab:t3-probe}{{18}{11}{T3 24-way linear-probe / 1-NN (backward-compatible auxiliary view).\relax }{table.caption.30}{}}
+\newlabel{tab:t3-probe@cref}{{[table][18][2147483647]18}{[1][11][]11}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {A.6}MINT: additional PLM baselines and Accuracy/F1}{11}{subsection.A.6}\protected@file@percent }
+\newlabel{sec:mint-extra}{{A.6}{11}{MINT: additional PLM baselines and Accuracy/F1}{subsection.A.6}{}}
+\newlabel{sec:mint-extra@cref}{{[subappendix][6][2147483647,1]A.6}{[1][11][]11}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {A.7}Antibody pairing: prompt-free (de-novo) variants}{11}{subsection.A.7}\protected@file@percent }
+\newlabel{sec:ab-extra}{{A.7}{11}{Antibody pairing: prompt-free (de-novo) variants}{subsection.A.7}{}}
+\newlabel{sec:ab-extra@cref}{{[subappendix][7][2147483647,1]A.7}{[1][11][]11}}
+\@writefile{lot}{\contentsline {table}{\numberline {19}{\ignorespaces MINT classification, additional PLM baselines (AUROC/AUPRC, 3-rep mean, \texttt  {--sep\_embed}). Only HumanPPI and Bernett have a released comparison.\relax }}{12}{table.caption.31}\protected@file@percent }
+\newlabel{tab:mint-plm}{{19}{12}{MINT classification, additional PLM baselines (AUROC/AUPRC, 3-rep mean, \texttt {--sep\_embed}). Only HumanPPI and Bernett have a released comparison.\relax }{table.caption.31}{}}
+\newlabel{tab:mint-plm@cref}{{[table][19][2147483647]19}{[1][11][]12}}
+\@writefile{lot}{\contentsline {table}{\numberline {20}{\ignorespaces MINT classification, Accuracy/F1 (3-rep mean).\relax }}{12}{table.caption.32}\protected@file@percent }
+\newlabel{tab:mint-accf1}{{20}{12}{MINT classification, Accuracy/F1 (3-rep mean).\relax }{table.caption.32}{}}
+\newlabel{tab:mint-accf1@cref}{{[table][20][2147483647]20}{[1][11][]12}}
+\@writefile{lot}{\contentsline {table}{\numberline {21}{\ignorespaces Antibody heavy$\rightarrow $light pairing, de-novo (prompt-free) variants (OAS holdout500, $n{=}8$/heavy). Reference ImmunoMatch ${=}0.699$.\relax }}{12}{table.caption.33}\protected@file@percent }
+\newlabel{tab:ab-pair-denovo}{{21}{12}{Antibody heavy$\rightarrow $light pairing, de-novo (prompt-free) variants (OAS holdout500, $n{=}8$/heavy). Reference ImmunoMatch ${=}0.699$.\relax }{table.caption.33}{}}
+\newlabel{tab:ab-pair-denovo@cref}{{[table][21][2147483647]21}{[1][11][]12}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {A.8}NbBench: full 11-model official leaderboard}{12}{subsection.A.8}\protected@file@percent }
+\newlabel{sec:nbbench-extra}{{A.8}{12}{NbBench: full 11-model official leaderboard}{subsection.A.8}{}}
+\newlabel{sec:nbbench-extra@cref}{{[subappendix][8][2147483647,1]A.8}{[1][12][]12}}
+\@writefile{lot}{\contentsline {table}{\numberline {22}{\ignorespaces NbBench full leaderboard, group A. VRCls/nanobody\_type ${=}$ Accuracy, CDRInfilling ${=}$ BLOSUM62 recovery, SARS-CoV-2/hIL6/polyreaction ${=}$ AUROC. Rows above the rule are transcribed from NbBench; rows below use our pipeline.\relax }}{13}{table.caption.34}\protected@file@percent }
+\newlabel{tab:nbbench-full-a}{{22}{13}{NbBench full leaderboard, group A. VRCls/nanobody\_type ${=}$ Accuracy, CDRInfilling ${=}$ BLOSUM62 recovery, SARS-CoV-2/hIL6/polyreaction ${=}$ AUROC. Rows above the rule are transcribed from NbBench; rows below use our pipeline.\relax }{table.caption.34}{}}
+\newlabel{tab:nbbench-full-a@cref}{{[table][22][2147483647]22}{[1][12][]13}}
+\@writefile{lot}{\contentsline {table}{\numberline {23}{\ignorespaces NbBench full leaderboard, group B (Spearman). Rows above the rule are transcribed from NbBench; rows below use our pipeline.\relax }}{13}{table.caption.35}\protected@file@percent }
+\newlabel{tab:nbbench-full-b}{{23}{13}{NbBench full leaderboard, group B (Spearman). Rows above the rule are transcribed from NbBench; rows below use our pipeline.\relax }{table.caption.35}{}}
+\newlabel{tab:nbbench-full-b@cref}{{[table][23][2147483647]23}{[1][12][]13}}

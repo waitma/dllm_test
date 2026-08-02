@@ -1,0 +1,34 @@
+---
+description: Volc 训练 YAML 的 batch 设定：同实验跨 encoder 对齐 global batch；单卡 micro-batch 按显存打满
+alwaysApply: true
+---
+
+# Volc 训练 Batch 设定规则
+
+适用：`/vepfs-mlp2/c20250601/251105016/project/dllm_test/train_jobs/*.yml` 及 resubmit/resume YAML。
+
+## 两条原则（同时满足）
+
+1. **同实验、不同 encoder 变体**（如 LLaDA ESMC-300M vs ESMC-600M）：**global effective batch 必须相同**，保证可比性。
+   - `global_batch = batch_size × grad_accum × world_size`（`world_size` = 节点数 × 每节点 GPU 数）
+2. **显存利用率优先**：在目标 GPU（如 `ml.pni2.28xlarge` 8×A100-80G）上，**尽量增大 per-GPU `--batch-size`**（在 OOM 前），再用 **`--grad-accum` 凑齐** 约定的 global batch。
+   - 目标：单卡 `mem_peak` 通常 **≥ ~75–85%** 可用显存（留 NCCL/碎片余量）；禁止长期 ~50% 空置却沿用「历史默认 micro-batch」。
+   - **禁止**仅为复刻旧 in-house decoder 的 micro-batch 而牺牲显存利用率；global batch 对齐即可。
+
+## Submit 前（必须）
+
+1. 在**与 Volc 同 flavor 的单机多卡或至少单卡**上，用最终 YAML 的 `--max-sequence-length`、model-type、encoder 做 **short run / dry steps**，记录日志里的 `mem_peak=XXGB/YYGB`。
+2. 若 `mem_peak` 明显低于 ~75%：增大 `batch_size`（优先），必要时微调 `grad_accum` 以保持 global batch 不变。
+3. 在 YAML `Description` 中写明：`global batch N`，当前 `bs×ga×gpu`，以及 profiling 得到的 `mem_peak`（或「待 profile」）。
+4. 同 suite 内所有 encoder YAML 使用**同一 global batch**；各变体可有不同 `batch_size`/`grad_accum`。
+
+## 示例
+
+- Suite 约定 global batch **128**，8 GPU：
+  - 大 encoder（600M，已 ~65GB/80G @ bs=4）：`batch_size=4`, `grad_accum=4` ✓
+  - 小 encoder（300M，仅 ~46GB/80G @ bs=4）：应 profile 后改为如 `batch_size=8`, `grad_accum=2`（仍 global 128，更高显存利用）
+
+## 文档
+
+- 长期规则摘要：`/vepfs-mlp2/c20250601/251105016/project/dllm_test/PROJ_GUIDE.md` §Training batch sizing
+- Submit 后：`PROJECT_PROCESS.md` dated 章节可记 mem_peak 与 batch 设定

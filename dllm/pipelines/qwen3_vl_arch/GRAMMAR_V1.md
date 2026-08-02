@@ -38,6 +38,7 @@ OAS (antibody):       <prots> <ab> HEAVY . LIGHT <protd>
 OTS (TCR):            <prots> <tcr> ALPHA . BETA <protd>
 Nanobody:             <prots> <nb> VHH <protd>
 TCR+peptide:          <prots> <pep> PEPTIDE <protd> <binding> <prots> <tcr> ALPHA . BETA <protd>
+TCR-beta+peptide:     <prots> <pep> PEPTIDE <protd> <binding> <prots> <tcr> BETA <protd>
 TCR-pMHC:             <prots> MHC . B2M <protd> <binding> <prots> <pep> PEPTIDE <protd> <binding> <prots> <tcr> ALPHA . BETA <protd>
 PPI (conditional):    <prots> PROTEIN_A <protd> <REL> <prots> PROTEIN_B <protd>
 AB-antigen:           <prots> ANTIGEN <protd> <binding> <prots> <ab> HEAVY . LIGHT <protd>
@@ -50,6 +51,11 @@ NB-antigen:           <prots> ANTIGEN <protd> <binding> <prots> <nb> VHH <protd>
 - `<REL>` is the inferred relation token for the PPI edge.
 - Antigen-conditioned tasks distinguish antibody vs nanobody via `<ab>` vs `<nb>`
   inside the generated receptor block.
+- TCR role lookup is role-first. Explicit `tcr_alpha` / `tcr_beta` roles are
+  preserved even when only one receptor chain is present; peptide, antigen, and
+  MHC context chains are never consumed by the legacy positional TCR-pair
+  fallback. Positional `[beta, alpha]` inference is limited to context-free
+  legacy records with neither receptor role present.
 
 ## Denoising (fixed vs generated)
 
@@ -63,7 +69,7 @@ residues in generated regions are both eligible).
 |------|----------------------|-----------------------------------------------|
 | OAS / OTS / nanobody | — | Entire `<prots> <type> … <protd>` block |
 | AB-antigen / NB-antigen | `<prots> ANTIGEN <protd> <binding>` | `<prots> <ab>/<nb> H . L <protd>` |
-| TCR+peptide | `<prots> <pep> PEPTIDE <protd> <binding>` | `<prots> <tcr> α . β <protd>` |
+| TCR+peptide | `<prots> <pep> PEPTIDE <protd> <binding>` | `<prots> <tcr> α . β <protd>` or beta-only `<prots> <tcr> β <protd>` |
 | TCR-pMHC | MHC block + `<binding>` + peptide block + `<binding>` | `<prots> <tcr> α . β <protd>` |
 | PPI conditional | A block + `<REL>` | B block (no type marker) |
 

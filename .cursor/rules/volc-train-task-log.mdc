@@ -13,7 +13,7 @@ alwaysApply: true
 2. 在文件末尾追加 dated 章节（`## YYYY-MM-DD ...`），记录：
    - 操作类型（submit / cancel / resubmit）
    - `task_id`（如 `t-20260621185805-78pr8`）
-   - 任务名、`train_jobs/*.yml` 绝对路径
+   - 任务名、YAML 绝对路径（训练 `train_jobs/*.yml`；评测 `eval_jobs/*.yml`）
    - 初始或最终状态（`Queue` / `Running` / `Killed` 等）
    - `Preemptible` 是否为闲时资源
 3. 更新 Active 表中的 `Last updated` 时间。
@@ -29,7 +29,8 @@ alwaysApply: true
 ## Volc CLI 要点
 
 - 取消任务：`volc ml_task cancel -i <task_id>`（无 `kill` 动词）
-- 提交任务：`volc ml_task submit --conf /vepfs-mlp2/c20250601/251105016/project/dllm_test/train_jobs/<file>.yml`
+- 提交训练任务：`volc ml_task submit --conf /vepfs-mlp2/c20250601/251105016/project/dllm_test/train_jobs/<file>.yml`
+- 提交评测任务：`volc ml_task submit --conf /vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/<file>.yml`
 - `--limit` 不得超过 300
 
 ## 示例：submit 后追加

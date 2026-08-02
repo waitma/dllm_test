@@ -16,6 +16,7 @@ import json
 import random
 import sys
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -68,15 +69,115 @@ class HeavyLightCsvDataset(Dataset):
         return self.heavy[index], self.light[index], self.metadata[index]
 
 
-def save_generation_csv(rows: list[dict], output_path: Path, num_seqs: int) -> Path:
-    output_path.parent.mkdir(parents=True, exist_ok=True)
+def generation_csv_path(output_path: Path, num_seqs: int) -> Path:
+    """Return the public, complete-only CSV path for one generation run."""
+
     if output_path.suffix:
         base, ext = output_path.stem, output_path.suffix
-        saved_path = output_path.with_name(f"{base}_n{num_seqs}{ext}")
-    else:
-        saved_path = Path(f"{output_path}_n{num_seqs}.csv")
-    pd.DataFrame(rows).to_csv(saved_path, index=False)
+        return output_path.with_name(f"{base}_n{num_seqs}{ext}")
+    return Path(f"{output_path}_n{num_seqs}.csv")
+
+
+def save_generation_csv(rows: list[dict], output_path: Path, num_seqs: int) -> Path:
+    """Atomically publish a complete generation CSV."""
+
+    saved_path = generation_csv_path(output_path, num_seqs)
+    saved_path.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path = saved_path.with_suffix(saved_path.suffix + ".tmp")
+    pd.DataFrame(rows).to_csv(tmp_path, index=False)
+    tmp_path.replace(saved_path)
     return saved_path
+
+
+def _progress_path(saved_csv: Path) -> Path:
+    return saved_csv.with_name(f"{saved_csv.stem}.progress.pt")
+
+
+def _generation_signature(args, dataset_len: int) -> dict[str, Any]:
+    """Fields that must be identical before a partial run can be resumed."""
+
+    csv_path = Path(args.csv_path).resolve()
+    csv_stat = csv_path.stat()
+    checkpoint_path = Path(args.checkpoint_path).resolve() if args.checkpoint_path else None
+    checkpoint_stat = checkpoint_path.stat() if checkpoint_path is not None else None
+    return {
+        "csv_path": str(csv_path),
+        "csv_size": int(csv_stat.st_size),
+        "csv_mtime_ns": int(csv_stat.st_mtime_ns),
+        "checkpoint_path": str(checkpoint_path) if checkpoint_path is not None else "",
+        "checkpoint_size": int(checkpoint_stat.st_size) if checkpoint_stat is not None else 0,
+        "checkpoint_mtime_ns": int(checkpoint_stat.st_mtime_ns) if checkpoint_stat is not None else 0,
+        "heavy_col": args.heavy_col,
+        "light_col": args.light_col,
+        "start_index": int(args.start_index),
+        "max_samples": args.max_samples,
+        "dataset_len": int(dataset_len),
+        "heavy_batch_size": int(args.heavy_batch_size),
+        "num_seqs": int(args.num_seqs),
+        "max_iter": int(args.max_iter),
+        "sampling_strategy": args.sampling_strategy,
+        "temperature": float(args.temperature),
+        "light_prompt_tokens": int(args.light_prompt_tokens),
+        "seed": args.seed,
+    }
+
+
+def _save_progress(
+    progress_path: Path,
+    *,
+    signature: dict[str, Any],
+    next_index: int,
+    rows: list[dict],
+) -> None:
+    """Atomically checkpoint rows and all RNG streams after a completed batch."""
+
+    payload: dict[str, Any] = {
+        "version": 1,
+        "signature": signature,
+        "next_index": int(next_index),
+        "rows": rows,
+        "python_rng_state": random.getstate(),
+        "numpy_rng_state": np.random.get_state(),
+        "torch_rng_state": torch.get_rng_state(),
+    }
+    if torch.cuda.is_available():
+        payload["torch_cuda_rng_state_all"] = torch.cuda.get_rng_state_all()
+    progress_path.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path = progress_path.with_suffix(progress_path.suffix + ".tmp")
+    torch.save(payload, tmp_path)
+    tmp_path.replace(progress_path)
+
+
+def _load_progress(
+    progress_path: Path,
+    *,
+    signature: dict[str, Any],
+    dataset_len: int,
+    num_seqs: int,
+) -> tuple[int, list[dict]]:
+    """Validate a progress checkpoint and restore its exact RNG continuation."""
+
+    payload = torch.load(progress_path, map_location="cpu", weights_only=False)
+    if payload.get("version") != 1 or payload.get("signature") != signature:
+        raise RuntimeError(
+            f"Refusing incompatible light-pairing progress checkpoint: {progress_path}"
+        )
+    next_index = int(payload["next_index"])
+    rows = list(payload["rows"])
+    if not (0 <= next_index <= dataset_len):
+        raise RuntimeError(f"Invalid next_index={next_index} in {progress_path}")
+    expected_rows = next_index * int(num_seqs)
+    if len(rows) != expected_rows:
+        raise RuntimeError(
+            f"Progress row mismatch in {progress_path}: got {len(rows)}, expected {expected_rows}"
+        )
+    random.setstate(payload["python_rng_state"])
+    np.random.set_state(payload["numpy_rng_state"])
+    torch.set_rng_state(payload["torch_rng_state"])
+    cuda_state = payload.get("torch_cuda_rng_state_all")
+    if cuda_state is not None and torch.cuda.is_available():
+        torch.cuda.set_rng_state_all(cuda_state)
+    return next_index, rows
 
 
 def generate_for_batch(
@@ -180,28 +281,53 @@ def run_generation(args) -> Path:
         end_index=end_index,
     )
     heavy_batch_size = max(1, args.heavy_batch_size)
+    output_path = Path(args.output_csv)
+    saved_path = generation_csv_path(output_path, args.num_seqs)
+    progress_path = _progress_path(saved_path)
+    signature = _generation_signature(args, len(dataset))
+    resume_index = 0
     all_rows: list[dict] = []
-    for start_idx in tqdm(range(0, len(dataset), heavy_batch_size), desc="grammar-heavy2light"):
+    if progress_path.is_file():
+        resume_index, all_rows = _load_progress(
+            progress_path,
+            signature=signature,
+            dataset_len=len(dataset),
+            num_seqs=args.num_seqs,
+        )
+        print(
+            f"Resuming light-pairing generation at heavy index {resume_index}/{len(dataset)} "
+            f"from {progress_path}",
+            flush=True,
+        )
+
+    for start_idx in tqdm(
+        range(resume_index, len(dataset), heavy_batch_size),
+        desc="grammar-heavy2light",
+    ):
         batch_samples = [
             dataset[seq_idx]
             for seq_idx in range(start_idx, min(start_idx + heavy_batch_size, len(dataset)))
         ]
-        all_rows.extend(
-            generate_for_batch(
-                batch_samples,
-                model=model,
-                collator=collator,
-                tokenizer=tokenizer,
-                device=device,
-                num_seqs=args.num_seqs,
-                max_iter=args.max_iter,
-                sampling_strategy=args.sampling_strategy,
-                temperature=args.temperature,
-                light_prompt_tokens=args.light_prompt_tokens,
-            )
+        all_rows.extend(generate_for_batch(
+            batch_samples,
+            model=model,
+            collator=collator,
+            tokenizer=tokenizer,
+            device=device,
+            num_seqs=args.num_seqs,
+            max_iter=args.max_iter,
+            sampling_strategy=args.sampling_strategy,
+            temperature=args.temperature,
+            light_prompt_tokens=args.light_prompt_tokens,
+        ))
+        next_index = min(start_idx + heavy_batch_size, len(dataset))
+        _save_progress(
+            progress_path,
+            signature=signature,
+            next_index=next_index,
+            rows=all_rows,
         )
 
-    output_path = Path(args.output_csv)
     saved_path = save_generation_csv(all_rows, output_path, args.num_seqs)
     print(f"Saved generation CSV: {saved_path} ({len(all_rows)} rows)")
     return saved_path
@@ -266,12 +392,14 @@ def main() -> None:
 
     saved_csv = run_generation(args)
     if args.skip_eval:
+        _progress_path(saved_csv).unlink(missing_ok=True)
         return
 
     metrics = run_comp_chain_eval(saved_csv, args.num_seqs)
     metrics_path = Path(args.metrics_json) if args.metrics_json else saved_csv.with_name(saved_csv.stem + "_metrics.json")
     metrics_path.parent.mkdir(parents=True, exist_ok=True)
     metrics_path.write_text(json.dumps(metrics, indent=2), encoding="utf-8")
+    _progress_path(saved_csv).unlink(missing_ok=True)
     print(f"Saved comp_chain metrics: {metrics_path}")
 
 

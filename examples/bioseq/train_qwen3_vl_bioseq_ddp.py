@@ -53,6 +53,8 @@ from dllm.pipelines.qwen3_vl_arch.modeling_bioseq import (  # noqa: E402
     BioSeqDiffusionOutput,
     BioSeqDiffusionTransformerConfig,
     BioSeqEncoderDiffusionModel,
+    BioSeqLLaDAEncoderDiffusionModel,
+    BioSeqLLaDA2EncoderDiffusionModel,
     BioSeqNoEncoderDiffusionModel,
     apply_decoder_corruption_to_encoder,
     compute_masked_cross_entropy,
@@ -92,17 +94,41 @@ def parse_args() -> argparse.Namespace:
         help="Skip duplicate records within a task-homogeneous batch.",
     )
     data.add_argument("--source-seed", type=int, default=0)
+    data.add_argument(
+        "--shuffle-buffer-size",
+        type=int,
+        default=0,
+        help="Per-shard streaming shuffle window over each source. 0/1 keeps the "
+        "stored-order stream; a few thousand decorrelates samples inside a "
+        "task-homogeneous batch while keeping sequential Arrow reads.",
+    )
     data.add_argument("--oas-weight", type=float, default=1.0)
     data.add_argument("--ots-weight", type=float, default=1.0)
     data.add_argument("--nanobody-weight", type=float, default=1.0)
     data.add_argument("--processed-v2-weight", type=float, default=1.0)
     data.add_argument("--tcr-weight", type=float, default=1.0)
     data.add_argument("--ppi-weight", type=float, default=1.0)
+    # Integrated-data (nine-source) recipe. WeightedMixtureDataset samples a
+    # source with probability weight/sum(weights) (independent of row count), so
+    # these balance mint_ppi's 82M rows against the immune-receptor pools.
+    data.add_argument("--mint-ppi-weight", type=float, default=1.0)
+    data.add_argument("--mint-actions-weight", type=float, default=1.0)
+    data.add_argument("--tcr-piste-weight", type=float, default=1.0)
+    data.add_argument("--tcr-pmhc-fulllength-weight", type=float, default=1.0)
+    data.add_argument("--neutralization-weight", type=float, default=1.0)
+    data.add_argument("--sabdab2-abag-weight", type=float, default=1.0)
     data.add_argument("--grammar-data-dir", type=Path, default=DEFAULT_GRAMMAR_DATA_DIR)
     data.add_argument("--tokenizer-path", type=Path, default=None, help="Optional HF tokenizer path, e.g. an ESMC snapshot.")
 
     model = parser.add_argument_group("model")
-    model.add_argument("--model-type", choices=["no_encoder", "encoder", "esm2"], default="no_encoder")
+    model.add_argument(
+        "--model-type",
+        choices=["no_encoder", "encoder", "esm2", "llada", "llada_esm2", "llada2", "llada2_esm2"],
+        default="no_encoder",
+        help="Denoiser/backbone: no_encoder (in-house decoder), encoder (ESMC+in-house), "
+        "esm2 (ESM2+in-house), llada (ESMC+LLaDA backbone), llada_esm2 (ESM2+LLaDA backbone), "
+        "llada2 (ESMC+LLaDA2-MoE backbone, from scratch), llada2_esm2 (ESM2+LLaDA2-MoE backbone).",
+    )
     model.add_argument(
         "--encoder-path",
         type=Path,
@@ -130,6 +156,21 @@ def parse_args() -> argparse.Namespace:
     )
     model.add_argument("--gradient-checkpointing", action="store_true")
     model.add_argument("--initializer-range", type=float, default=0.02)
+    # LLaDA2-MoE backbone knobs (only used by --model-type llada2 / llada2_esm2).
+    # Defaults mirror inclusionAI/LLaDA2.0-mini so the architecture stays faithful;
+    # scale experts/kv-heads down for a DDP-sized from-scratch run.
+    model.add_argument("--moe-num-experts", type=int, default=256)
+    model.add_argument("--moe-num-experts-per-tok", type=int, default=8)
+    model.add_argument("--moe-num-shared-experts", type=int, default=1)
+    model.add_argument("--moe-intermediate-size", type=int, default=512)
+    model.add_argument("--moe-n-group", type=int, default=8)
+    model.add_argument("--moe-topk-group", type=int, default=4)
+    model.add_argument("--moe-first-k-dense-replace", type=int, default=1)
+    model.add_argument("--moe-num-key-value-heads", type=int, default=4)
+    model.add_argument("--moe-head-dim", type=int, default=128)
+    model.add_argument("--moe-partial-rotary-factor", type=float, default=0.5)
+    model.add_argument("--moe-rope-theta", type=float, default=600000.0)
+    model.add_argument("--moe-routed-scaling-factor", type=float, default=2.5)
     model.add_argument("--max-position-embeddings", type=int, default=4096)
     model.add_argument("--max-chain-positions", type=int, default=64)
     model.add_argument("--max-chain-roles", type=int, default=32)
@@ -158,11 +199,19 @@ def parse_args() -> argparse.Namespace:
         type=int,
         default=0,
         help=(
-            "DataLoader workers. Default 0 is the safe path for the memory-mapped Arrow "
-            "sources: each extra worker is a separate process that shards the infinite "
-            "weighted stream independently, so >0 risks per-rank first-batch desync and "
-            "DDP collective hangs under torchrun."
+            "DataLoader workers. 0 loads/encodes in the main process (serial with the "
+            "GPU step). 1 moves encode to a side process while keeping the exact shard "
+            "identity of 0 (distributed_worker_shard -> (rank, world_size)), overlapping "
+            "CPU encode with GPU compute without changing DDP data order. Use >1 only with "
+            "a DDP-consistent batch order: each extra worker re-shards the infinite weighted "
+            "stream independently, so >1 risks per-rank first-batch desync and DDP hangs."
         ),
+    )
+    runtime.add_argument(
+        "--prefetch-factor",
+        type=int,
+        default=4,
+        help="Batches staged ahead per worker (only used when --num-workers > 0).",
     )
     runtime.add_argument("--log-interval", type=int, default=10)
     runtime.add_argument("--save-interval", type=int, default=200)
@@ -194,6 +243,18 @@ def parse_args() -> argparse.Namespace:
     wandb_group.add_argument("--wandb-entity", type=str, default=None)
     wandb_group.add_argument("--wandb-run-name", type=str, default=None)
     wandb_group.add_argument("--wandb-dir", type=Path, default=None)
+    wandb_group.add_argument(
+        "--wandb-run-id",
+        type=str,
+        default=None,
+        help="Reuse an existing wandb run id so resumed jobs append to the same run/log.",
+    )
+    wandb_group.add_argument(
+        "--wandb-resume",
+        choices=["allow", "must", "never", "auto"],
+        default=None,
+        help="wandb.init(resume=...). Defaults to 'must' when --wandb-run-id is set.",
+    )
     return parser.parse_args()
 
 
@@ -226,7 +287,7 @@ def infer_encoder_hidden_size_from_path(encoder_path: Path) -> int:
 
 
 def resolve_hidden_size(args: argparse.Namespace) -> int:
-    if args.model_type in {"encoder", "esm2"}:
+    if args.model_type in {"encoder", "esm2", "llada", "llada_esm2", "llada2", "llada2_esm2"}:
         return infer_encoder_hidden_size_from_path(args.encoder_path)
     if args.align_hidden_size_to_encoder:
         return infer_encoder_hidden_size_from_path(args.encoder_path)
@@ -254,6 +315,18 @@ def build_config(args: argparse.Namespace, tokenizer: Any) -> BioSeqDiffusionTra
         condition_norm=args.condition_norm,
         gradient_checkpointing=args.gradient_checkpointing,
         initializer_range=args.initializer_range,
+        moe_num_experts=args.moe_num_experts,
+        moe_num_experts_per_tok=args.moe_num_experts_per_tok,
+        moe_num_shared_experts=args.moe_num_shared_experts,
+        moe_intermediate_size=args.moe_intermediate_size,
+        moe_n_group=args.moe_n_group,
+        moe_topk_group=args.moe_topk_group,
+        moe_first_k_dense_replace=args.moe_first_k_dense_replace,
+        moe_num_key_value_heads=args.moe_num_key_value_heads,
+        moe_head_dim=args.moe_head_dim,
+        moe_partial_rotary_factor=args.moe_partial_rotary_factor,
+        moe_rope_theta=args.moe_rope_theta,
+        moe_routed_scaling_factor=args.moe_routed_scaling_factor,
     )
 
 
@@ -267,6 +340,40 @@ def build_model(args: argparse.Namespace, config: BioSeqDiffusionTransformerConf
             local_files_only=True,
             trust_remote_code=True,
             freeze_encoder=args.freeze_encoder,
+        )
+    if args.model_type == "llada_esm2":
+        return BioSeqLLaDAEncoderDiffusionModel.from_hf_encoder(
+            decoder_config=config,
+            encoder_name_or_path=str(args.encoder_path),
+            local_files_only=True,
+            trust_remote_code=True,
+            freeze_encoder=args.freeze_encoder,
+        )
+    if args.model_type == "llada":
+        return BioSeqLLaDAEncoderDiffusionModel.from_esmc(
+            decoder_config=config,
+            encoder_name_or_path=str(args.encoder_path),
+            local_files_only=True,
+            trust_remote_code=True,
+            freeze_encoder=args.freeze_encoder,
+            use_flash_attn=args.encoder_use_flash_attn,
+        )
+    if args.model_type == "llada2_esm2":
+        return BioSeqLLaDA2EncoderDiffusionModel.from_hf_encoder(
+            decoder_config=config,
+            encoder_name_or_path=str(args.encoder_path),
+            local_files_only=True,
+            trust_remote_code=True,
+            freeze_encoder=args.freeze_encoder,
+        )
+    if args.model_type == "llada2":
+        return BioSeqLLaDA2EncoderDiffusionModel.from_esmc(
+            decoder_config=config,
+            encoder_name_or_path=str(args.encoder_path),
+            local_files_only=True,
+            trust_remote_code=True,
+            freeze_encoder=args.freeze_encoder,
+            use_flash_attn=args.encoder_use_flash_attn,
         )
     return BioSeqEncoderDiffusionModel.from_esmc(
         decoder_config=config,
@@ -311,7 +418,10 @@ def optimizer_for_model(model: torch.nn.Module, args: argparse.Namespace) -> tor
 
 
 def should_find_unused_parameters(args: argparse.Namespace) -> bool:
-    return bool(args.find_unused_parameters or args.model_type in {"encoder", "esm2"})
+    return bool(
+        args.find_unused_parameters
+        or args.model_type in {"encoder", "esm2", "llada", "llada_esm2", "llada2", "llada2_esm2"}
+    )
 
 
 def compute_training_output(

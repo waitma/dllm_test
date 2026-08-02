@@ -134,19 +134,21 @@ dmypy.json
 /.vscode/
 /tmp/
 /.data/
+/data/
 /wandb/
 /.logs/
 /.models/
-/data/
 /model_weights/
 /logs/
 # /examples/
 /output/
+.venv_abnativ/
 
-# IRBench：只提交脚本，忽略 clone 的 baseline / 生成数据 / 评测产物
+# IRBench：只提交脚本，忽略 clone 的 baseline / 评测产物
 /downstream/benchmark/baselines/
-/downstream/benchmark/data/
 /downstream/benchmark/outputs/
+/downstream
+/baseline_models/
 *.ckpt 
 *.pt 
 *.pickle

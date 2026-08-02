@@ -112,6 +112,10 @@ def process_sequences_with_anarci_batch(sequences: List[str], n_jobs: int = -1, 
     from concurrent.futures import ProcessPoolExecutor, as_completed
     import multiprocessing as mp
     from tqdm import tqdm
+
+    env_n_jobs = os.environ.get("COMP_CHAIN_ANARCI_N_JOBS")
+    if env_n_jobs is not None and env_n_jobs != "":
+        n_jobs = int(env_n_jobs)
     
     if not sequences:
         return []

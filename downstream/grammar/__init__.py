@@ -10,7 +10,11 @@ from downstream.grammar.common import (
     load_untrained_no_encoder,
     run_grammar_generate,
 )
-from downstream.grammar.masks import cdr_generation_partial_mask, light_chain_generation_partial_mask
+from downstream.grammar.masks import (
+    cdr_generation_partial_mask,
+    framework_generation_partial_mask,
+    light_chain_generation_partial_mask,
+)
 from downstream.grammar.metrics import extract_chain_sequence, masked_token_accuracy
 
 __all__ = [
@@ -21,6 +25,7 @@ __all__ = [
     "collate_records",
     "cdr_generation_partial_mask",
     "extract_chain_sequence",
+    "framework_generation_partial_mask",
     "light_chain_generation_partial_mask",
     "load_sample_oas_record",
     "load_untrained_no_encoder",

@@ -2,7 +2,33 @@
 
 ## Goal
 
-Build a diffusion-model-based biosequence foundation model in `/vepfs-mlp2/c20250601/251105016/project/dllm_test` for antibody, antigen, TCR, TCR-pMHC, and PPI sequence tasks.
+Build a diffusion-model-based immune-receptor foundation model in
+`/vepfs-mlp2/c20250601/251105016/project/dllm_test` for paired antibody H/L,
+paired TCR α/β, antibody-antigen recognition, and TCR-epitope/pMHC recognition.
+
+## Active biological scope（2026-07-23）
+
+- The next foundation-training recipe has four planes only: antibody pairing,
+  TCR pairing, antibody-antigen, and TCR-epitope/pMHC.
+- Nanobody/VHH, MINT/STRING/general-PPI, the current antigen-free
+  `neutralization` shard, and specificity-free bulk TCR are excluded from the
+  active recipe. Their historical checkpoints, benchmark artifacts, and older
+  roadmap notes remain provenance, not active training requirements.
+- Antibody context means actual protein/peptide sequence, not only a target
+  name. TCR context keeps epitope separate from MHC/B2M and records whether an
+  MHC sequence is full length or a pseudosequence.
+- The canonical data record must preserve sequence scope, receptor/ligand
+  clusters, donor/assay, continuous value/unit/censor, and source record
+  provenance. Dataset rows with the same sequences but different HLA or assay
+  are not interchangeable duplicates.
+- Training must expose explicit view targets: H→L/L→H, α→β/β→α,
+  antigen-conditioned receptor generation, pMHC-conditioned TCR generation,
+  and chains→relation. The current grammar renderer fixes every relation token
+  and the Arrow loader drops `targets`; those two code paths must be changed
+  before the new data recipe is considered implemented.
+- The authoritative source counts, strict SAbDab2/AbRank filters, TCR source
+  overlap audit, and initial 30/30/20/20 plane sampling recipe are in
+  `/vepfs-mlp2/c20250601/251105016/project/dllm_test/TRAINING_DATA_CATALOG.md`.
 
 ## Code Location
 
@@ -10,6 +36,25 @@ Build a diffusion-model-based biosequence foundation model in `/vepfs-mlp2/c2025
 - Examples: `/vepfs-mlp2/c20250601/251105016/project/dllm_test/examples/bioseq`
 - Tests: `/vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/tests/bioseq`
 - Weight root: `/c20250601/mj/model_weights`
+
+## MINT downstream boundary (2026-07-21)
+
+- MINT 重建属于 benchmark/data-harness 修复，不改变 BioSeq 模型结构、训练数据或 checkpoint。
+- 当前 MINT 面板严格为 HumanPPI、YeastPPI、Gold-standard PPI、MutationalPPI、SKEMPI
+  五项；canonical 数据来自
+  `/vepfs-mlp2/c20250601/251105016/project/dllm_test/data/downstream/mint_official`。
+- 普通 PPI 分类输入两条 partner 序列；MutationalPPI/SKEMPI 输入 WT 与 mutant 的两条
+  partner 序列，并用 `embedding(WT PPI) - embedding(mutant PPI)` 训练下游 head。
+- 只有与论文数据、fold、head、重复次数全部对齐的本地结果才可称复现。当前不修改
+  BioSeq 模型，先修 baseline：HumanPPI、YeastPPI、Gold-standard PPI 的 8 模型结果
+  直接引用 Source Data 并标 `[P]`；MutationalPPI、SKEMPI 在可审计本地固定 fold 上重跑
+  同一组 8 模型并标 `[L]`，不跨协议排名为 paper-exact。
+- 本地两项统一用 separate-chain、`embedding(WT)-embedding(mutant)`、WT/mutant 对齐
+  窗口、3 次 640-hidden MLP；run cap=2048，ESM-1b 与 ProGen2-Large 按各自原生限制
+  使用 1024。MutationalPPI 用 WT pair-group 10-fold；
+  SKEMPI 用冻结的 notebook complex-held-out 三折。该变化只属于 benchmark harness。
+- 数据构建和协议审计入口是
+  `/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/mint_tasks/OFFICIAL_REBUILD_AUDIT.md`。
 
 ## Architecture
 
@@ -121,6 +166,10 @@ Build a diffusion-model-based biosequence foundation model in `/vepfs-mlp2/c2025
 - Validation should run on every meaningful checkpoint, not only the final checkpoint. Minimal cadence: Ophiuchus-Ab init, early `latest.pt`, mid-training `latest.pt`, and `final.pt`.
 - Tier 0, pretraining sanity: held-out diffusion loss on small OAS/OTS/nanobody/TCRdb2.0 slices, amino-acid distribution checks, valid-token rate, duplicate/near-neighbor rate against train, and chain-length distribution drift. This is the fastest failure detector for bad adapters or masks.
 - Tier 1, embedding-only IRBench: run the existing benchmark with frozen embeddings and cheap heads. Priority commands are T1 TCR binding, T3 TCR representation, P1 PPI, and NbBench scalar tasks under `/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark`. This checks whether the trained backbone representation is useful without generation noise.
+- T1 comparison boundary: Ours may continue to use the frozen-head protocol on its designated training split, but external baseline rows must not be retrained. Their canonical source is official original checkpoint + official inference + `/vepfs-mlp2/c20250601/251105016/project/dllm_test/data/ntmethod_binding/original.zip`; unavailable official runs fall back to the labelled paper original-model value. This keeps the model-development protocol separate from external-baseline provenance.
+- T1 retrained checkpoints are a separate artifact-reproduction audit, never a replacement for the canonical original-only table. The audit uses the released fold checkpoint + official inference + exact `retrain.zip` member and R `precrec`-compatible AUPRC. A local retrained value is selectable only when both five-fold mean AUROC and AUPRC round to the paper's four decimals; otherwise retain the local result as a diagnostic and report the marked paper retrained value. Any inference-time use of fold train data (currently only TCR-H descriptor-column reconstruction) must be declared and must not call model fitting.
+- Our-model T1 retrained comparison uses the same five official `retrain.zip` train/test folds but never updates the BioSeq checkpoint. Render peptide + CDR3β as one role-explicit joint binding grammar record, read the final post-LLaDA residue states, apply one global mean across both chains, and fit only a `960 -> 256 -> 128 -> 1` ReLU/dropout MLP per fold. Internal early stopping uses a stratified 10% subset of that fold's train rows only; no test rows select epochs. This is a frozen-backbone downstream head experiment, not continued foundation-model training and not an external-baseline retrain.
+- The primary rank for that experiment is against official-checkpoint baseline reruns on the same released CSV bytes (`ranking_local_release_AS.csv`). Paper means are kept in a separate `ranking_paper_reference_AS.csv` marked mixed-source, because the released seen files do not reproduce several paper means exactly. Neither ranking replaces the canonical original-only T1 table.
 - Tier 2, generation/infill: run small OTS/TCR CDR infilling and antibody heavy-to-light completion. Primary metrics should be AAR for known masked regions, novelty, nearest-neighbor distance, k-mer JSD, length validity, and invalid amino-acid rate.
 - Tier 3, task-specific fine-tuning: only after Tier 1/2 pass, fine-tune small heads or lightweight task adapters for IMMREP23 binding, FLAb developability, antibody specificity, and PPI. This separates representation quality from generation quality.
 - The main comparison table should always include `kmer`, `esm2_150m`, `esm2_650m` when feasible, `ophiuchus`, and `bioseq:/abs/path/checkpoint.pt`. Report both seen and unseen splits for TCR binding; unseen macro-AUC0.1/AUPRC is the primary signal.
@@ -187,6 +236,7 @@ Build a diffusion-model-based biosequence foundation model in `/vepfs-mlp2/c2025
 - BioSeq foundation streaming data is DDP-sharded inside `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/data/mixture.py`: source iterators use `global_shard_index = rank * num_workers + worker_id` and `num_shards = world_size * num_workers`, so DDP ranks do not read identical iterable records by default. DDP runs must use `--num-workers 0`: with `>0`, each worker process re-shards the infinite weighted stream independently and can desync the first batch across ranks, which previously triggered NCCL collective timeouts in the `no_encoder` jobs.
 - The first cluster template for this path is `/vepfs-mlp2/c20250601/251105016/project/dllm_test/train_jobs/qwen3_vl_bioseq_16gpu_smoke.yml`. It runs the no-encoder qwen3_vl_arch model on 2 nodes x 8 GPUs as a smoke/throughput check.
 - Foundation pretraining keeps the objective simple: the grammar-v2 renderer fixes type markers, relation tokens, and antigen / peptide / MHC-HLA context objects, and treats target structure tokens (including `<prots>`, `.`, `<protd>`) and target residues as diffusion targets. Antigen-conditioned receptor blocks include `<ab>` or `<nb>` inside `<prots>` to distinguish antibody vs nanobody design. Conditional capabilities such as chain completion, antigen-conditioned receptor generation, peptide design, and FR/CDR infilling are expressed as inference-time partial-mask prompts over the same grammar, not as a separate runtime view sampler.
+- TCR grammar role resolution is role-first in `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/data/grammar.py`: an explicitly tagged single `tcr_alpha` or `tcr_beta` is never positionally paired with a peptide, antigen, or MHC context chain. The positional `[beta, alpha]` fallback is restricted to legacy context-free records with neither receptor role present. Consequently, a peptide-conditioned beta-only record renders the peptide exactly once followed by a one-chain `<tcr>` block and reports `grammar_name="tcr_peptide"`; the regression guard lives at `/vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/tests/bioseq/test_grammar_tcr_role_resolution.py`.
 - To reduce multi-task imbalance, source mixture weights and optional future task schedulers should control the task distribution. The default physical batch itself is intentionally mixed rather than task-homogeneous.
 - Fixed context chains, such as antigen in antibody-antigen generation, should not be remasked and should not receive direct diffusion loss. They still participate in attention or encoder conditioning, and gradients should flow through their encoder/connector parameters from the target-chain diffusion loss.
 - In the BioSeq foundation loader, `full_denoise` means denoising all eligible target chains, not every chain unconditionally. Explicit `metadata["targets"]` is honored when present, but antigen, peptide, MHC, and HLA-like chains are fixed context by default and do not receive diffusion loss.
@@ -253,3 +303,66 @@ Build a diffusion-model-based biosequence foundation model in `/vepfs-mlp2/c2025
 - ESM2 15B is optional and should not be downloaded in the current default task.
 - Downloaded files should include Hugging Face/PyTorch-compatible weights, configs, tokenizer files, README files, and remote-code files; TensorFlow `.h5` duplicates are not required.
 - Ophiuchus-Ab checkpoint is stored at `/c20250601/mj/model_weights/ophiuchus_ab/Ophiuchus-Ab/Ophiuchus-Ab.ckpt` and comes from `https://zenodo.org/records/18478480`.
+
+## LLaDA Backbone Option (survey 2026-07-02)
+
+- Goal: after the biological encoder (ESMC/ESM2), swap the decoder from the in-house `BioSeqDiffusionDecoder` (`/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/modeling_bioseq.py`) to the **LLaDA architecture** as a comparison backbone. The encoder + per-chain-encode + gather pipeline stays unchanged; only the denoiser transformer changes.
+- In-repo implementation: `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/llada/models/modeling_llada.py` (`LLaDAModelLM` / `LLaDAModel`, HF `PreTrainedModel`-compatible; config in `configuration_llada.py`).
+- Same nature as the current decoder: LLaDA is a **bidirectional masked-diffusion transformer** (`is_causal=False`, `get_bidirectional_attention_bias`), LLaMA-style (RMSNorm / RoPE / SwiGLU). This matches the existing bidirectional masked-diffusion decoder, so it is a backbone swap, not an objective change.
+- Integration point (reuses existing encoder path): `LLaDAModelLM.forward` natively accepts `inputs_embeds` (forwarded as `LLaDAModel.forward(input_embeddings=...)`, `x = wte(input_ids) if input_embeddings is None else input_embeddings`). Wiring:
+  - encoder per-chain encode -> `gather_token_condition` -> `token_condition [B, S, E]` (unchanged);
+  - build `inputs_embeds [B, S, d_model]`: residue positions = encoder features, non-residue (structure/relation/special) positions = `llada.wte(x_t)`;
+  - `LLaDAModelLM(inputs_embeds=..., attention_mask=...)` -> logits -> `compute_masked_cross_entropy` on corrupted positions only.
+  - Requires `E == d_model` for pure replacement, or add a condition projection.
+- Key differences vs the in-house decoder (design decisions to lock before training):
+  - **Position**: LLaDA uses **RoPE on flat sequence positions**; the in-house decoder uses **learned absolute** `position_ids_inner` (chain-local) + `position_ids_chain` (chain slot). The first LLaDA variant loses chain-aware absolute positions and relies on flat RoPE + grammar boundary tokens; chain-aware / group-reset RoPE is a later enhancement.
+  - **Timestep**: LLaDA does **not** take `t` as input (RADD proves masked diffusion needs no timestep). The in-house decoder now replaces only the token-identity embedding at residue sites and **adds** inner-position / chain-slot / timestep on top; when moving to LLaDA the timestep addition can simply be dropped (RoPE supplies position).
+  - **Loss**: `LLaDAModelLM.forward` does not compute loss (labels only warn); keep the external `compute_masked_cross_entropy` (masked positions only).
+  - **Vocab**: LLaDA defaults to a text vocab (`vocab_size=50257`, `mask_token_id=50256`, `embedding_size=50304`). Using the architecture from scratch requires reconfiguring `vocab_size` / `mask_token_id` / `embedding_size` to the grammar vocab (ESM2=49 / ESMC=80).
+  - **`input_emb_norm`**: LLaDA can scale input embeddings by `sqrt(d_model)`, which rescales the encoder condition (related to the `condition_norm` scale discussion). Keep it fixed/known across A/B runs.
+- Config constraints: MDM usage asserts `rope=True`, `alibi=False`, and `use_cache=False` in `LLaDAModel.forward`.
+- Weights: `/c20250601/mj/model_weights` currently has **no** LLaDA checkpoint. From-scratch training with the LLaDA architecture needs no weights. Loading pretrained LLaDA text weights is not directly reusable — the text vocab and residue embeddings do not match the biological grammar vocab.
+- Open decisions: keep chain-aware positions (grouped RoPE) or accept flat RoPE; whether to re-inject timestep at residue sites; whether to add a condition projection (`use_condition_projection`) instead of pure replacement.
+
+## 2026-07-21 Public CDR3β generation comparison architecture
+
+- Track A is a model-output benchmark, not an architecture comparison. The common adapter contract is `generate(peptide, mhc_allele=None, mhc_pseudosequence=None, num_candidates=1000)` and the canonical row schema is defined in `/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/tcr_generation_bench/track_a.py`.
+- TCRT5 conditions on peptide plus the 34-aa MHC pseudo-sequence; GRATCR and TcrDesign condition on epitope. TcrDesign Track-A ranking rows are invoked only through `tcrdesign_G.py -mode beta`; V/J prediction, TcrDesign-B, and the full binding-filter pipeline are not part of the first-stage comparison.
+- After the β benchmark, a non-ranking TcrDesign addendum runs the released conditional chain `epitope -> generated β; (epitope, generated β) -> generated α`. It covers all 14×1,000 generated β conditions with 10 official α beams each. The batched adapter preserves the released architecture/checkpoint/tokenization/beam search and only avoids repeated model loads. Since the release contains no runnable alpha-reference or αβ pairing evaluator/checkpoint, the 140,000 paired rows are qualitative and no custom alpha metric is added.
+- TCR-epiDiff is guarded as `reconstruction_only` because its released sampler starts from a noised real TCR. A reconstruction path must never be adapted with test references and presented as de-novo generation.
+- The local BioSeq comparison is frozen to the only retained 7-layer checkpoint in the requested `11xxxx` range, `/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/grammar_v2_esmc300m_integrated_llada_7l_step117000/best.pt` (validation loss `0.4430236165889635`, SHA256 `e3d4c98ea84b4aa2280fe76ec5bf8a806de376699610e9a96960e66ceddb5c01`). It is also the retained Top-K checkpoint with the lowest recorded validation loss.
+- BioSeq Track-A generation is epitope-only and does not consume MHC allele or pseudo-sequence. The fixed reproducibility protocol is seed `42`, batch size `100`, `32` denoising iterations, temperature `1.0`, and `gumbel_argmax`; rank is deterministic seeded emission order and `raw_score` remains empty because this sampler does not expose a comparable candidate score. Raw sequences receive no anchor repair.
+- Under that protocol, BioSeq produced 14,000 candidates with `ValidRate=0.998786`, `UniqueRate=0.999714`, no exact or Recovery>=90% hits, one GIANA reference-cluster hit, and mean cross-epitope Jaccard `0.000044`. This indicates strong syntax/diversity but weak reference-neighborhood recovery under the current epitope-only generation protocol; it is not evidence by itself about binding or the architecture in general. The focused audit is `/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/outputs/tcr_beta_public_benchmark/results/bioseq_step117000_report.md`.
+- All models are evaluated after generation by one external validity/exact/recovery/GIANA/Jaccard implementation. Internal model scores may be retained as `raw_score` but cannot determine the cross-model result.
+- TCRT5 is the one rank-sensitive adapter: rank and `raw_score` must use cumulative generated-token log-likelihood (`compute_transition_scores(...).sum()`), matching the paper's rank-cutoff protocol, rather than Hugging Face's length-normalized beam score. The candidate set is independent of this bookkeeping correction.
+- Keep the paper-native TCRT5 recovery diagnostic separate from the common Track-A metric. The paper first chooses a same-length reference and uses position identity/Hamming (with an edit-distance fallback); the common leaderboard remains the user-specified normalized Levenshtein definition. Never compare their counts without a definition label.
+- The complete protocol and completed local result are frozen in `/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/TCR_BETA_PUBLIC_TRACK_A.md`.
+
+## 2026-07-22 MINT headline PPI evaluation lock
+
+- The user-selected model for the formal HumanPPI, YeastPPI, and Gold-standard PPI evaluation is the immutable BioSeq `step121000` snapshot at `/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/grammar_v2_esmc300m_integrated_llada_7l_step121000/best.pt` (SHA256 `51f0eee5fa7b127a0487a2ea8fdbc322bda6f6908ff2662087bd87d4980d4613`). Later/final checkpoints are not substituted.
+- Only the three requested classification tasks are in this run: HumanPPI (primary metric Accuracy), YeastPPI (Accuracy), and registry task `Bernett`, which is the MINT paper's Gold-standard PPI task (AUPRC). MutationalPPI and SKEMPI are explicitly outside this run.
+- Data come from the pinned public MINT `prepare_data.ipynb` rebuild under `/vepfs-mlp2/c20250601/251105016/project/dllm_test/data/downstream/mint_official`, with no row cap. HumanPPI uses 26,319/234/180 train/validation/test rows and YeastPPI uses 4,945/95/394; both exactly match the paper counts. Gold-standard uses 163,192/59,260/52,048; its validation/test counts match, but the public notebook has 173 more training rows than the paper's 163,019, so its local result must be marked non-paper-exact.
+- Each pair is rendered as one contextual two-chain `ppi` grammar record and pooled by one global mean over final decoder residue states; `--sep_chains` is not used. Each chain is deterministically left-truncated to the BioSeq native maximum of 1,024 residues. This differs from MINT baseline runs that can use a 2,048-token cap and must remain explicit in provenance.
+- The downstream probe follows the paper Methods rather than the inconsistent public task defaults: two linear layers with hidden width 640, ReLU, dropout 0.2, AdamW at `1e-4`, 100 epochs for all three tasks, best validation metric selection, batch size 16, and three seeded repetitions. The public code's input-width hidden layer and Gold-standard 30-epoch setting are not used for the headline comparison because they conflict with the paper's stated 640/100 protocol.
+- Before formal submission, `/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_mint_ours_step121000_three_ppi_profile.yml` profiles worst-case 1,024+1,024-residue pairs on the same `ml.pni2.3xlarge` A100 flavor. Formal extraction batch size is selected from that measured profile and recorded in `/vepfs-mlp2/c20250601/251105016/project/dllm_test/PROJECT_PROCESS.md`.
+- The formal run is complete. BioSeq `step121000` `[C]` obtains HumanPPI Accuracy `0.677778±0.018144`, YeastPPI Accuracy `0.602369±0.007846`, and Gold-standard PPI AUPRC `0.592089±0.001405`. The best paper `[P]` values are MINT `0.879630±0.006929`, `0.686971±0.010634`, and `0.687157±0.003256`, giving gaps `-0.201852/-0.084602/-0.095068`. Human/Yeast use exact public fixed splits; Gold remains `paper_comparable=false` because the public notebook has +173 training rows. The complete report is `/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/mint_tasks/_ours_step121000_official3ppi/REPORT.md`.
+
+## 2026-07-22 Retained-checkpoint CDR3β diagnostic policy and step189000 result
+
+- The canonical all-14 BioSeq Track-A row remains the frozen `step117000` run. Later retained checkpoints are evaluated under an isolated `checkpoint_comparison/<run_name>` root and must not be appended to the canonical leaderboard unless a complete all-target replacement run is explicitly selected.
+- The BioSeq adapter now validates the checkpoint manifest and derives `BioSeq-7L-step<manifest_step>` dynamically. Its default checkpoint and default label remain step117000, so existing reproduction commands and canonical rows are unchanged.
+- A checkpoint comparison must keep the same generation controls (seed `42`, batch `100`, 32 iterations, temperature `1.0`, `gumbel_argmax`, no anchor repair) and the same external Track-A evaluator. For a one-target diagnostic, cross-epitope Jaccard is undefined; candidate-set overlap across checkpoints may be reported separately and must not be labeled cross-epitope specificity.
+- Under this policy, step189000 generated 1,000 RVR candidates: ValidRate=`0.998`, UniqueRate=`1.000`, ExactHit@1000=`0`, ReferenceRecall=`0`, Recovery90Hit=`0`, median best recovery=`0.600000`, maximum recovery=`0.800000`, and GIANAHit=`0`. Relative to step117000, median recovery improved only from `0.588235`; this is not a meaningful target-specificity improvement.
+- This run remains an epitope-only conditional generation test. A future MHC-aware experiment requires a training-consistent MHC conditioning representation and is a separate model/data change, not an inference-time field injection into this checkpoint.
+- The complete focused artifact is `/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/outputs/tcr_beta_public_benchmark/checkpoint_comparison/bioseq_step189000_rvr_epitope_only/report.md`.
+
+## 2026-07-23 TCRT5 full-evaluation method lock
+
+- The paper-facing evaluator is now a separate evidence layer, implemented in `/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/tcr_generation_bench/tcrt5_full_eval.py`. It does not replace the common Track-A leaderboard: author top-20 `K=100`, sparse13/RVR `K=1000`, and current all-14 `K=1000` remain distinct protocols.
+- Paper-native recovery is a two-stage operation: select the closest same-length reference by Levenshtein distance, then compute positional Hamming identity to that selected sequence. Only the no-same-length branch uses reference-length-normalized Levenshtein identity. Track-A normalized-Levenshtein recovery remains a separate metric and must keep its definition label.
+- The paper's mAP is implemented literally as the pMHC macro mean of `mean(P@1,…,P@K)` after cumulative model-log-likelihood ranking. A value is paper-compatible only if the candidate block retains those scores. Current TCRT5 satisfies this condition; author main-table lists, BioSeq, GRATCR and TcrDesign do not, so their ordered AP values are diagnostics rather than calibrated cross-model mAP.
+- Diversity decisions are fixed to natural-log units: positional delta entropy is `H(generated)-H(reference)`, with gap-inclusive and residue-only tables both retained; k-mer Jensen–Shannon divergence uses natural logarithms for `k=2..12`, so its upper bound is `ln(2)`.
+- Evidence is three-tiered: (1) independently recomputed and checked against released sequences; (2) definition-complete but blocked from exact paper comparison by missing greedy hypotheses, likelihoods or final figure aggregation; (3) explicit extensions such as Hit@K/rank distributions. Reports must never collapse these tiers into a single “reproduced” label.
+- OLGA biological plausibility requires both the positive fraction and the positive `log10 Pgen` distribution. In the current all-14 run, BioSeq-7L-step117000 has `0.979786` positive Pgen but mean positive log10 Pgen `-17.925285`, compared with TCRT5 `1.0/-6.950375`; therefore a non-zero-only validity claim is insufficient.
+- The canonical comparison report is `/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/outputs/tcrt5_full_eval/TCRT5_FULL_EVAL_REPORT.md`. Its explicit non-reproducible boundaries—main-table mAP and Fig.4 Pgen moments—are part of the method contract, not missing implementation work.

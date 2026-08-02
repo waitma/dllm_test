@@ -196,17 +196,23 @@ def setup_wandb(args: argparse.Namespace, rank: int, world_size: int):
         if isinstance(value, Path):
             config[key] = str(value)
 
+    init_kwargs: dict[str, Any] = {
+        "project": args.wandb_project,
+        "entity": args.wandb_entity,
+        "name": args.wandb_run_name,
+        "dir": str(wandb_dir),
+        "config": config,
+    }
+    wandb_run_id = getattr(args, "wandb_run_id", None)
+    if wandb_run_id:
+        init_kwargs["id"] = wandb_run_id
+        init_kwargs["resume"] = getattr(args, "wandb_resume", None) or "must"
+
     for mode in (args.wandb_mode, "offline"):
         try:
-            run = wandb.init(
-                project=args.wandb_project,
-                entity=args.wandb_entity,
-                name=args.wandb_run_name,
-                dir=str(wandb_dir),
-                mode=mode,
-                config=config,
-            )
-            log(rank, f"[wandb] initialized mode={mode} dir={wandb_dir}")
+            run = wandb.init(mode=mode, **init_kwargs)
+            resume_note = f" id={wandb_run_id} resume={init_kwargs.get('resume')}" if wandb_run_id else ""
+            log(rank, f"[wandb] initialized mode={mode} dir={wandb_dir}{resume_note}")
             return run
         except Exception as exc:  # noqa: BLE001
             log(rank, f"[wandb] init failed mode={mode}: {exc}")
@@ -371,19 +377,30 @@ class BioSeqTrainer:
                         warmup_init_lr=args.warmup_init_lr,
                     )
 
-                forward_start = time.time()
-                with autocast:
-                    output = self.step_fns.compute_output(train_model, module, batch)
-                    assert output.loss is not None
-                    loss = output.loss / args.grad_accum
-                self._dbg(
-                    f"forward_done step={step} micro={micro_step} loss={float(output.loss.item()):.4f} "
-                    f"forward_s={time.time() - forward_start:.2f}"
+                # On grad-accum microsteps that are NOT the boundary, skip the DDP
+                # gradient all-reduce: grads accumulate locally and sync only on the
+                # final microstep before optimizer.step(). This halves inter-GPU
+                # gradient traffic at grad_accum=2 without changing math.
+                is_accumulating = (micro_step + 1) % args.grad_accum != 0
+                sync_context = (
+                    train_model.no_sync()
+                    if is_accumulating and isinstance(train_model, DistributedDataParallel)
+                    else nullcontext()
                 )
-                backward_start = time.time()
-                if any_rank_nonfinite(output.loss, distributed):
-                    raise FloatingPointError(f"non-finite training loss detected at step={step}")
-                loss.backward()
+                forward_start = time.time()
+                with sync_context:
+                    with autocast:
+                        output = self.step_fns.compute_output(train_model, module, batch)
+                        assert output.loss is not None
+                        loss = output.loss / args.grad_accum
+                    self._dbg(
+                        f"forward_done step={step} micro={micro_step} loss={float(output.loss.item()):.4f} "
+                        f"forward_s={time.time() - forward_start:.2f}"
+                    )
+                    backward_start = time.time()
+                    if any_rank_nonfinite(output.loss, distributed):
+                        raise FloatingPointError(f"non-finite training loss detected at step={step}")
+                    loss.backward()
                 self._dbg(
                     f"backward_done step={step} micro={micro_step} backward_s={time.time() - backward_start:.2f}"
                 )

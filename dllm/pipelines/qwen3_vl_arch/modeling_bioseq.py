@@ -71,6 +71,23 @@ class BioSeqDiffusionTransformerConfig:
     condition_norm: bool = False
     gradient_checkpointing: bool = False
     initializer_range: float = 0.02
+    # LLaDA2 MoE backbone knobs (only read by build_llada2_backbone /
+    # BioSeqLLaDA2EncoderDiffusionModel). Defaults mirror inclusionAI/LLaDA2.0-mini
+    # so the architecture stays faithful; scale them down via CLI for DDP-sized
+    # from-scratch runs. ``num_hidden_layers`` / ``num_attention_heads`` /
+    # ``hidden_size`` / ``intermediate_size`` are shared with the fields above.
+    moe_num_experts: int = 256
+    moe_num_experts_per_tok: int = 8
+    moe_num_shared_experts: int = 1
+    moe_intermediate_size: int = 512
+    moe_n_group: int = 8
+    moe_topk_group: int = 4
+    moe_first_k_dense_replace: int = 1
+    moe_num_key_value_heads: int = 4
+    moe_head_dim: int = 128
+    moe_partial_rotary_factor: float = 0.5
+    moe_rope_theta: float = 600000.0
+    moe_routed_scaling_factor: float = 2.5
 
 
 @dataclass
@@ -295,6 +312,41 @@ def sample_bioseq_diffusion_noise(
     return noised_input_ids, labels, corruption_mask, timesteps
 
 
+def _residue_slot_positions(encoder_residue_mask: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+    """Map each chain's ``k``-th residue to its encoder-stream position.
+
+    Vectorized replacement for ``torch.nonzero(residue_mask).flatten()[k]``: a
+    single cumsum + scatter builds the whole ``slot -> position`` table so the
+    gather / corruption-mirror paths need no per-chain Python loop.
+
+    Parameters
+    ----------
+    encoder_residue_mask : ``[B, C, L]`` bool — 1 at residue token slots
+        (``<cls>`` / ``<eos>`` / pad are 0).
+
+    Returns
+    -------
+    slot_pos : ``[B, C, L]`` long — ``slot_pos[b, c, k]`` is the encoder position
+        of the ``k``-th residue (ascending) in chain ``c``; entries with
+        ``k >= count`` stay 0 (never indexed because callers gate on ``count``).
+    counts : ``[B, C]`` long — residue count per chain.
+    """
+
+    batch_size, max_chains, chain_len = encoder_residue_mask.shape
+    mask_long = encoder_residue_mask.to(torch.long)
+    counts = mask_long.sum(dim=-1)  # [B, C]
+    slot_index = mask_long.cumsum(dim=-1) - 1  # 0-based residue slot at residue positions
+    positions = torch.arange(chain_len, device=encoder_residue_mask.device)
+    positions = positions.view(1, 1, chain_len).expand(batch_size, max_chains, chain_len)
+    # Route non-residue positions to a throwaway bucket column (index ``chain_len``)
+    # so they never overwrite a real slot; residues keep their unique slot index.
+    bucket = torch.full_like(slot_index, chain_len)
+    scatter_index = torch.where(encoder_residue_mask, slot_index.clamp(min=0), bucket)
+    slot_pos = encoder_residue_mask.new_zeros(batch_size, max_chains, chain_len + 1, dtype=torch.long)
+    slot_pos.scatter_(dim=2, index=scatter_index, src=positions)
+    return slot_pos[..., :chain_len], counts
+
+
 def apply_decoder_corruption_to_encoder(
     batch: dict[str, Any],
     corruption_mask: torch.Tensor,
@@ -319,45 +371,45 @@ def apply_decoder_corruption_to_encoder(
     encoder_input_ids = batch["encoder_input_ids"]
     encoder_position_ids = batch.get("encoder_position_ids")
     if encoder_position_ids is not None:
-        noised_encoder_input_ids = encoder_input_ids.clone()
         batch_size, max_chains, encoder_len = encoder_input_ids.shape
         if max_chains != 1:
             raise ValueError("Direct encoder_position_ids mapping requires a single proxy stream")
-        for batch_index in range(batch_size):
-            decoder_positions = torch.nonzero(corruption_mask[batch_index], as_tuple=False).flatten()
-            if decoder_positions.numel() == 0:
-                continue
-            encoder_positions = encoder_position_ids[batch_index, decoder_positions]
-            valid = encoder_positions.ge(0) & encoder_positions.lt(encoder_len)
-            noised_encoder_input_ids[
-                batch_index,
-                0,
-                encoder_positions[valid],
-            ] = int(mask_token_id)
+        # Corrupt every decoder token that maps to a valid proxy position in one scatter.
+        valid = corruption_mask & encoder_position_ids.ge(0) & encoder_position_ids.lt(encoder_len)
+        batch_index = (
+            torch.arange(batch_size, device=encoder_input_ids.device).unsqueeze(1).expand_as(valid)
+        )
+        noised_encoder_input_ids = encoder_input_ids.clone()
+        noised_encoder_input_ids[batch_index[valid], 0, encoder_position_ids[valid]] = int(mask_token_id)
         return noised_encoder_input_ids
 
     encoder_residue_mask = batch["encoder_residue_mask"]
     chain_ids = batch["chain_ids"]
     position_ids_inner = batch["position_ids_inner"]
 
-    noised_encoder_input_ids = encoder_input_ids.clone()
-    batch_size, max_chains, _ = encoder_input_ids.shape
-    for batch_index in range(batch_size):
-        corrupted_positions = torch.nonzero(corruption_mask[batch_index], as_tuple=False).flatten()
-        for decoder_pos in corrupted_positions.tolist():
-            chain_index = int(chain_ids[batch_index, decoder_pos].item())
-            residue_index = int(position_ids_inner[batch_index, decoder_pos].item())
-            if chain_index < 0 or chain_index >= max_chains or residue_index < 0:
-                continue
-            residue_token_positions = torch.nonzero(
-                encoder_residue_mask[batch_index, chain_index],
-                as_tuple=False,
-            ).flatten()
-            if residue_index >= residue_token_positions.numel():
-                continue
-            encoder_pos = residue_token_positions[residue_index]
-            noised_encoder_input_ids[batch_index, chain_index, encoder_pos] = int(mask_token_id)
-    return noised_encoder_input_ids
+    batch_size, max_chains, chain_len = encoder_input_ids.shape
+    slot_pos, counts = _residue_slot_positions(encoder_residue_mask.bool())  # [B,C,L], [B,C]
+
+    # Which corrupted decoder tokens map to a real residue slot in a real chain.
+    safe_chain = chain_ids.clamp(min=0, max=max_chains - 1)
+    token_residue_count = torch.gather(counts, 1, safe_chain)  # [B,S] residues in that chain
+    valid = (
+        corruption_mask
+        & chain_ids.ge(0)
+        & chain_ids.lt(max_chains)
+        & position_ids_inner.ge(0)
+        & position_ids_inner.lt(token_residue_count)
+    )
+
+    # Encoder position of each token's residue via flat (b*C + chain, inner) lookup.
+    slot_pos_flat = slot_pos.reshape(batch_size * max_chains, chain_len)
+    row = torch.arange(batch_size, device=encoder_input_ids.device).unsqueeze(1) * max_chains + safe_chain
+    safe_inner = position_ids_inner.clamp(min=0, max=chain_len - 1)
+    encoder_pos = slot_pos_flat[row.reshape(-1), safe_inner.reshape(-1)].reshape(batch_size, -1)
+
+    noised_flat = encoder_input_ids.clone().reshape(batch_size * max_chains, chain_len)
+    noised_flat[row[valid], encoder_pos[valid]] = int(mask_token_id)
+    return noised_flat.reshape(batch_size, max_chains, chain_len)
 
 
 def forbidden_diffusion_target_token_ids(config: BioSeqDiffusionTransformerConfig) -> tuple[int, ...]:
@@ -560,6 +612,25 @@ def load_local_esmc_encoder(
     with config_path.open() as handle:
         config = json.load(handle)
     hidden_size = int(config["d_model"])
+    # Flash-attention speeds up the ESMC input_ids forward (the path training
+    # uses), but only if the `flash_attn` package is importable on this host.
+    # Guard so `--encoder-use-flash-attn` is a safe no-op where flash_attn is
+    # missing (falls back to SDPA) instead of crashing training. Parity of the
+    # flash vs non-flash features is checked by
+    # scripts/tests/bioseq/check_esmc_flash_parity.py before it is relied on.
+    if use_flash_attn:
+        try:
+            import flash_attn  # noqa: F401
+        except Exception:
+            import warnings
+
+            warnings.warn(
+                "use_flash_attn=True but flash_attn is not importable; "
+                "falling back to non-flash ESMC attention.",
+                RuntimeWarning,
+                stacklevel=2,
+            )
+            use_flash_attn = False
     esmc = ESMC(
         d_model=hidden_size,
         n_heads=int(config["n_heads"]),
@@ -701,8 +772,9 @@ class BioSeqDiffusionDecoder(nn.Module):
         )
         # Re-scale the encoder condition before injection. With replacement
         # injection the condition enters the *residual stream* un-normalized
-        # (h = cond at residue positions) and is carried by skip connections to
-        # the final read-out: out = lm_head(RMSNorm(cond + Σ sublayer_outputs)).
+        # (at residue positions h = cond + inner/chain/timestep, with cond the
+        # token-identity term) and is carried by skip connections to the final
+        # read-out: out = lm_head(RMSNorm(cond + Σ sublayer_outputs)).
         # The per-position RMSNorm only normalizes sublayer *inputs*, not the
         # condition's weight in that residual sum, so the condition's influence
         # on the output is set by its magnitude relative to the rest of the
@@ -782,6 +854,26 @@ class BioSeqDiffusionDecoder(nn.Module):
             else self.token_embeddings(input_ids)
         )
 
+        # Replace ONLY the token-identity embedding at residue positions with the
+        # encoder feature, BEFORE adding position / chain / timestep. Position,
+        # chain-slot and timestep signals are then added on top of the encoder
+        # condition (they must survive at residue sites, not be overwritten).
+        # Projection mode adds the (projected) condition instead of replacing.
+        if encoder_condition is not None:
+            if self.condition_norm is not None:
+                encoder_condition = self.condition_norm(encoder_condition.to(hidden_states.dtype))
+            if self.config.use_condition_projection and self.condition_proj is not None:
+                hidden_states = hidden_states + self.condition_proj(encoder_condition)
+            elif encoder_condition_mask is not None:
+                replace_mask = encoder_condition_mask.to(hidden_states.dtype).unsqueeze(-1)
+                hidden_states = hidden_states * (1.0 - replace_mask) + encoder_condition.to(
+                    hidden_states.dtype
+                ) * replace_mask
+            else:
+                raise ValueError(
+                    "encoder_condition requires encoder_condition_mask or condition projection"
+                )
+
         # + chain-local position embed (residue index within each chain) -> [B, S, H]
         if position_ids_inner is None:
             position_ids_inner = torch.arange(seq_len, device=hidden_states.device).unsqueeze(0).expand(batch_size, -1)
@@ -798,27 +890,6 @@ class BioSeqDiffusionDecoder(nn.Module):
         # + diffusion timestep embed [B, H] broadcast to all S positions -> [B, S, H]
         if timesteps is not None:
             hidden_states = hidden_states + self.timestep_embeddings(timesteps).unsqueeze(1)
-
-        # + ESMC/ESM2 condition (encoder models): replace residue embeddings or add projection.
-        if encoder_condition is not None:
-            if self.condition_norm is not None:
-                encoder_condition = self.condition_norm(encoder_condition.to(hidden_states.dtype))
-            if encoder_condition_mask is not None and not self.config.use_condition_projection:
-                replace_mask = encoder_condition_mask.to(hidden_states.dtype).unsqueeze(-1)
-                hidden_states = hidden_states * (1.0 - replace_mask) + encoder_condition.to(
-                    hidden_states.dtype
-                ) * replace_mask
-            elif self.condition_proj is not None:
-                hidden_states = hidden_states + self.condition_proj(encoder_condition)
-            elif encoder_condition_mask is not None:
-                replace_mask = encoder_condition_mask.to(hidden_states.dtype).unsqueeze(-1)
-                hidden_states = hidden_states * (1.0 - replace_mask) + encoder_condition.to(
-                    hidden_states.dtype
-                ) * replace_mask
-            else:
-                raise ValueError(
-                    "encoder_condition requires encoder_condition_mask or condition projection"
-                )
 
         if attention_mask is not None:
             hidden_states = hidden_states * attention_mask.to(hidden_states.dtype).unsqueeze(-1)
@@ -1192,42 +1263,31 @@ class BioSeqEncoderDiffusionModel(nn.Module):
         """
 
         batch_size, seq_len = chain_ids.shape
-        _, max_chains, _, hidden_size = chain_token_condition.shape
-        token_condition = chain_token_condition.new_zeros(batch_size, seq_len, hidden_size)
-        valid_decoder = chain_ids.ge(0) & chain_ids.lt(max_chains) & position_ids_inner.ge(0)
+        _, max_chains, chain_len, hidden_size = chain_token_condition.shape
+        valid = chain_ids.ge(0) & chain_ids.lt(max_chains) & position_ids_inner.ge(0)
         if attention_mask is not None:
-            valid_decoder = valid_decoder & attention_mask.bool()
+            valid = valid & attention_mask.bool()
 
-        for batch_index in range(batch_size):
-            for chain_index in range(max_chains):
-                decoder_positions = torch.nonzero(
-                    valid_decoder[batch_index] & chain_ids[batch_index].eq(chain_index),
-                    as_tuple=False,
-                ).flatten()
-                if decoder_positions.numel() == 0:
-                    continue
-                if encoder_residue_mask is None:
-                    residue_token_positions = torch.arange(
-                        chain_token_condition.shape[2],
-                        device=chain_token_condition.device,
-                    )
-                else:
-                    residue_token_positions = torch.nonzero(
-                        encoder_residue_mask[batch_index, chain_index],
-                        as_tuple=False,
-                    ).flatten()
-                residue_indices = position_ids_inner[batch_index, decoder_positions]
-                in_bounds = residue_indices.lt(residue_token_positions.numel())
-                if not in_bounds.any():
-                    continue
-                decoder_positions = decoder_positions[in_bounds]
-                encoder_positions = residue_token_positions[residue_indices[in_bounds]]
-                token_condition[batch_index, decoder_positions] = chain_token_condition[
-                    batch_index,
-                    chain_index,
-                    encoder_positions,
-                ]
-        return token_condition
+        safe_chain = chain_ids.clamp(min=0, max=max_chains - 1)
+        # Flat row index into the [B*C, L(, E)] views; one lookup per decoder token.
+        row = torch.arange(batch_size, device=chain_ids.device).unsqueeze(1) * max_chains + safe_chain
+        if encoder_residue_mask is None:
+            # No residue mask: the k-th residue sits at encoder position k directly.
+            valid = valid & position_ids_inner.lt(chain_len)
+            encoder_pos = position_ids_inner.clamp(min=0, max=chain_len - 1)
+        else:
+            slot_pos, counts = _residue_slot_positions(encoder_residue_mask.bool())  # [B,C,L], [B,C]
+            token_residue_count = torch.gather(counts, 1, safe_chain)
+            valid = valid & position_ids_inner.lt(token_residue_count)
+            safe_inner = position_ids_inner.clamp(min=0, max=chain_len - 1)
+            slot_pos_flat = slot_pos.reshape(batch_size * max_chains, chain_len)
+            encoder_pos = slot_pos_flat[row.reshape(-1), safe_inner.reshape(-1)].reshape(batch_size, seq_len)
+
+        condition_flat = chain_token_condition.reshape(batch_size * max_chains, chain_len, hidden_size)
+        gathered = condition_flat[row.reshape(-1), encoder_pos.reshape(-1)].reshape(
+            batch_size, seq_len, hidden_size
+        )
+        return gathered * valid.to(gathered.dtype).unsqueeze(-1)
 
     def gather_proxy_token_condition(
         self,
@@ -1335,4 +1395,411 @@ class BioSeqEncoderDiffusionModel(nn.Module):
             timesteps=timesteps,
             noised_encoder_input_ids=noised_encoder_input_ids,
             encoder_condition=output.encoder_condition,
+        )
+
+
+def build_llada_backbone(config: "BioSeqDiffusionTransformerConfig", hidden_size: int) -> nn.Module:
+    """Build a LLaDA (LLaMA-style, bidirectional masked-diffusion) backbone sized to BioSeq config.
+
+    LLaDA supplies position through RoPE and takes no timestep input (RADD). The
+    returned ``LLaDAModelLM`` exposes ``forward(inputs_embeds=...) -> logits [B, S, V]``
+    with a grammar-sized (tied) vocabulary. Imported lazily so ``modeling_bioseq``
+    stays importable in environments without the LLaDA/transformers stack.
+    """
+
+    from dllm.pipelines.llada.models.configuration_llada import LLaDAConfig
+    from dllm.pipelines.llada.models.modeling_llada import (
+        LLaDAModel,
+        LLaDAModelLM,
+        create_model_config_from_pretrained_config,
+    )
+
+    _ = hidden_size  # decoder width already equals encoder hidden via config.hidden_size
+    llada_config = LLaDAConfig(
+        d_model=int(config.hidden_size),
+        n_heads=int(config.num_attention_heads),
+        n_layers=int(config.num_hidden_layers),
+        mlp_hidden_size=int(config.intermediate_size),
+        # LLaMA block gates via explicit ff_proj(gate) * up_proj(value), so the
+        # activation must be plain SiLU (output_multiplier 1.0), not the fused
+        # SwiGLU (which would halve the width and mismatch up_proj).
+        activation_type="silu",
+        block_type="llama",
+        layer_norm_type="rms",
+        rms_norm_eps=1e-5,
+        rope=True,
+        rope_theta=10000.0,
+        alibi=False,
+        include_bias=False,
+        include_qkv_bias=False,
+        weight_tying=True,
+        input_emb_norm=False,
+        scale_logits=False,
+        attention_dropout=float(config.dropout),
+        residual_dropout=float(config.dropout),
+        embedding_dropout=float(config.dropout),
+        max_sequence_length=int(config.max_position_embeddings),
+        vocab_size=int(config.vocab_size),
+        embedding_size=int(config.vocab_size),
+        pad_token_id=int(config.pad_token_id),
+        mask_token_id=int(config.mask_token_id),
+        use_cache=False,
+        init_device="cpu",
+    )
+    # Build the inner model explicitly on CPU (LLaDAModelLM's auto path forces cuda).
+    model_config = create_model_config_from_pretrained_config(llada_config)
+    model_config.init_device = "cpu"
+    inner = LLaDAModel(model_config, init_params=True)
+    backbone = LLaDAModelLM(llada_config, model=inner)
+    if bool(getattr(config, "gradient_checkpointing", False)):
+        # Wire BioSeq's --gradient-checkpointing flag into LLaDA's activation
+        # checkpointing (the in-house decoder used config.gradient_checkpointing
+        # directly; LLaDA needs its own hook). Essential to fit large backbones.
+        backbone.gradient_checkpointing_enable()
+    return backbone
+
+
+class BioSeqLLaDAEncoderDiffusionModel(BioSeqEncoderDiffusionModel):
+    """ESMC/ESM2 encoder + **LLaDA** denoiser backbone.
+
+    Reuses the exact per-chain encode + gather pipeline of
+    ``BioSeqEncoderDiffusionModel`` (``encode_chain_tokens`` / ``gather_token_condition``
+    / ``build_encoder_condition_mask``). The only change is the denoiser: instead of
+    the in-house ``BioSeqDiffusionDecoder``, gathered encoder features **replace** the
+    LLaDA token embedding (``wte``) at residue positions, and LLaDA denoises the flat
+    grammar stream. Grammar special/structure/relation tokens keep their ``wte``
+    embedding; position comes from LLaDA RoPE; there is no timestep input (LLaDA/RADD).
+
+    The backbone is stored as ``self.decoder`` so optimizer grouping, DDP wrapping,
+    and checkpoint plumbing that key on ``.decoder`` / ``.encoder`` keep working.
+    """
+
+    def __init__(
+        self,
+        decoder_config: BioSeqDiffusionTransformerConfig,
+        encoder: nn.Module,
+        encoder_hidden_size: int | None = None,
+        freeze_encoder: bool = False,
+    ) -> None:
+        nn.Module.__init__(self)
+        encoder_hidden_size = int(encoder_hidden_size or infer_encoder_hidden_size(encoder))
+        use_projection = bool(decoder_config.use_condition_projection)
+        if not use_projection and int(decoder_config.hidden_size) != encoder_hidden_size:
+            raise ValueError(
+                "LLaDA decoder d_model must match encoder hidden size when use_condition_projection=False "
+                f"(d_model={decoder_config.hidden_size}, encoder={encoder_hidden_size})"
+            )
+        self.config = replace(
+            decoder_config,
+            condition_hidden_size=encoder_hidden_size,
+            use_condition_projection=use_projection,
+        )
+        self.encoder = encoder
+        self.decoder = build_llada_backbone(self.config, encoder_hidden_size)
+        self.condition_proj = (
+            nn.Linear(encoder_hidden_size, int(decoder_config.hidden_size), bias=False)
+            if use_projection
+            else None
+        )
+        self.condition_norm = nn.LayerNorm(encoder_hidden_size) if self.config.condition_norm else None
+        if freeze_encoder:
+            for parameter in self.encoder.parameters():
+                parameter.requires_grad_(False)
+
+    def forward(
+        self,
+        input_ids: torch.Tensor | None = None,
+        diffusion_state: torch.Tensor | None = None,
+        attention_mask: torch.Tensor | None = None,
+        chain_ids: torch.Tensor | None = None,
+        position_ids_inner: torch.Tensor | None = None,
+        position_ids_chain: torch.Tensor | None = None,
+        timesteps: torch.Tensor | None = None,
+        residue_mask: torch.Tensor | None = None,
+        encoder_input_ids: torch.Tensor | None = None,
+        encoder_attention_mask: torch.Tensor | None = None,
+        encoder_residue_mask: torch.Tensor | None = None,
+        encoder_chain_mask: torch.Tensor | None = None,
+        encoder_position_ids: torch.Tensor | None = None,
+        encoder_kwargs: dict[str, Any] | None = None,
+        **_: Any,
+    ) -> BioSeqDiffusionOutput:
+        """Encode chains, gather condition, replace residue token embeddings, run LLaDA.
+
+        ``position_ids_*`` and ``timesteps`` are accepted for a uniform training call
+        signature but intentionally unused: LLaDA gets position from RoPE and needs no
+        timestep. Returns ``BioSeqDiffusionOutput`` with ``logits [B, S, V]``.
+        """
+        if input_ids is None:
+            raise ValueError("BioSeqLLaDAEncoderDiffusionModel requires input_ids")
+        if encoder_input_ids is None:
+            raise ValueError("encoder_input_ids are required for BioSeqLLaDAEncoderDiffusionModel")
+        if encoder_position_ids is None and chain_ids is None:
+            raise ValueError("chain_ids or encoder_position_ids are required for encoder conditions")
+
+        effective_encoder_residue_mask = encoder_residue_mask
+        if encoder_position_ids is not None and residue_mask is not None:
+            effective_encoder_residue_mask = residue_mask.unsqueeze(1)
+
+        # 1) per-chain encode -> [B, C, L, E]
+        chain_token_condition = self.encode_chain_tokens(
+            encoder_input_ids=encoder_input_ids,
+            encoder_attention_mask=encoder_attention_mask,
+            encoder_residue_mask=effective_encoder_residue_mask,
+            encoder_chain_mask=encoder_chain_mask,
+            encoder_kwargs=encoder_kwargs,
+        )
+        # 2) align to decoder token positions -> [B, S, E]
+        if encoder_position_ids is not None:
+            token_condition = self.gather_proxy_token_condition(
+                chain_token_condition,
+                encoder_position_ids=encoder_position_ids,
+                attention_mask=attention_mask,
+                residue_mask=residue_mask,
+            )
+        else:
+            token_condition = self.gather_token_condition(
+                chain_token_condition,
+                chain_ids=chain_ids,
+                position_ids_inner=position_ids_inner,
+                attention_mask=attention_mask,
+                encoder_residue_mask=encoder_residue_mask,
+            )
+        condition_mask = self.build_encoder_condition_mask(
+            chain_ids=chain_ids,
+            position_ids_inner=position_ids_inner,
+            attention_mask=attention_mask,
+            encoder_position_ids=encoder_position_ids,
+            residue_mask=residue_mask,
+        )
+
+        # 3) inputs_embeds = LLaDA wte(x_t), with residue positions replaced by encoder features
+        word_embeddings = self.decoder.get_input_embeddings()
+        inputs_embeds = word_embeddings(input_ids)
+        condition = token_condition.to(inputs_embeds.dtype)
+        if self.condition_norm is not None:
+            condition = self.condition_norm(condition)
+        if self.config.use_condition_projection and self.condition_proj is not None:
+            replace_mask = condition_mask.to(inputs_embeds.dtype).unsqueeze(-1)
+            inputs_embeds = inputs_embeds + self.condition_proj(condition) * replace_mask
+        else:
+            replace_mask = condition_mask.to(inputs_embeds.dtype).unsqueeze(-1)
+            inputs_embeds = inputs_embeds * (1.0 - replace_mask) + condition * replace_mask
+
+        # 4) LLaDA denoiser (bidirectional; RoPE positions; no timestep) -> logits [B, S, V]
+        llada_output = self.decoder(inputs_embeds=inputs_embeds, attention_mask=attention_mask)
+        return BioSeqDiffusionOutput(
+            loss=None,
+            logits=llada_output.logits,
+            hidden_states=None,
+            encoder_condition=token_condition,
+        )
+
+
+def build_llada2_backbone(config: "BioSeqDiffusionTransformerConfig", hidden_size: int) -> nn.Module:
+    """Build a LLaDA2-MoE (inclusionAI LLaDA2.0) backbone sized to BioSeq config.
+
+    Architecture is kept faithful to ``inclusionAI/LLaDA2.0-mini`` (MoE with
+    group-limited sigmoid routing + shared expert, partial-RoPE attention, RMSNorm,
+    ``is_causal=False``) — only from-scratch (no pretrained weights). The size knobs
+    (layers / heads / experts / hidden) come from ``config`` so a run can be scaled
+    down to fit plain DDP while the module classes/paths stay identical.
+
+    Returns ``LLaDA2MoeModelLM`` exposing ``forward(inputs_embeds=..., attention_mask=4D)
+    -> logits [B, S, V]`` with a grammar-sized vocabulary. The backbone is driven
+    **bidirectionally** by passing a 4D padding mask (see
+    ``BioSeqLLaDA2EncoderDiffusionModel.forward``), which bypasses the causal-mask
+    construction in ``LLaDA2MoeModel.forward``. Imported lazily so ``modeling_bioseq``
+    stays importable without the LLaDA2/transformers stack.
+    """
+
+    from dllm.pipelines.llada2.models.configuration_llada2_moe import LLaDA2MoeConfig
+    from dllm.pipelines.llada2.models.modeling_llada2_moe import LLaDA2MoeModelLM
+
+    _ = hidden_size  # decoder width already equals encoder hidden via config.hidden_size
+    llada2_config = LLaDA2MoeConfig(
+        vocab_size=int(config.vocab_size),
+        hidden_size=int(config.hidden_size),
+        intermediate_size=int(config.intermediate_size),
+        num_hidden_layers=int(config.num_hidden_layers),
+        num_attention_heads=int(config.num_attention_heads),
+        num_key_value_heads=int(config.moe_num_key_value_heads),
+        head_dim=int(config.moe_head_dim),
+        hidden_act="silu",
+        use_qkv_bias=False,
+        use_qk_norm=bool(config.qk_norm),
+        use_bias=False,
+        rms_norm_eps=1e-5,
+        embedding_dropout=float(config.dropout),
+        attention_dropout=float(config.dropout),
+        output_dropout=float(config.dropout),
+        initializer_range=float(config.initializer_range),
+        max_position_embeddings=int(config.max_position_embeddings),
+        rope_theta=float(config.moe_rope_theta),
+        partial_rotary_factor=float(config.moe_partial_rotary_factor),
+        use_cache=False,
+        num_experts=int(config.moe_num_experts),
+        num_shared_experts=int(config.moe_num_shared_experts),
+        num_experts_per_tok=int(config.moe_num_experts_per_tok),
+        n_group=int(config.moe_n_group),
+        topk_group=int(config.moe_topk_group),
+        moe_intermediate_size=int(config.moe_intermediate_size),
+        first_k_dense_replace=int(config.moe_first_k_dense_replace),
+        routed_scaling_factor=float(config.moe_routed_scaling_factor),
+        pad_token_id=int(config.pad_token_id),
+        tie_word_embeddings=False,
+    )
+    # SDPA is required so the 4D bidirectional mask is used verbatim (the eager path
+    # forces a causal mask). LLaDA2 attention already sets is_causal=False.
+    llada2_config._attn_implementation = "sdpa"
+    backbone = LLaDA2MoeModelLM(llada2_config)
+    if bool(getattr(config, "gradient_checkpointing", False)):
+        backbone.gradient_checkpointing_enable()
+    return backbone
+
+
+class BioSeqLLaDA2EncoderDiffusionModel(BioSeqEncoderDiffusionModel):
+    """ESMC/ESM2 encoder + **LLaDA2-MoE** denoiser backbone (from scratch).
+
+    Same wiring as :class:`BioSeqLLaDAEncoderDiffusionModel` (reuses the per-chain
+    encode + gather pipeline; gathered encoder features **replace** the backbone
+    ``word_embeddings`` at residue positions; grammar special/structure/relation
+    tokens keep their embedding; position via RoPE; no timestep). The only change is
+    the denoiser is LLaDA2-MoE, driven bidirectionally by a 4D padding mask.
+
+    The backbone is stored as ``self.decoder`` so optimizer grouping, DDP wrapping,
+    and checkpoint plumbing that key on ``.decoder`` / ``.encoder`` keep working.
+    """
+
+    def __init__(
+        self,
+        decoder_config: BioSeqDiffusionTransformerConfig,
+        encoder: nn.Module,
+        encoder_hidden_size: int | None = None,
+        freeze_encoder: bool = False,
+    ) -> None:
+        nn.Module.__init__(self)
+        encoder_hidden_size = int(encoder_hidden_size or infer_encoder_hidden_size(encoder))
+        use_projection = bool(decoder_config.use_condition_projection)
+        if not use_projection and int(decoder_config.hidden_size) != encoder_hidden_size:
+            raise ValueError(
+                "LLaDA2 decoder hidden_size must match encoder hidden size when use_condition_projection=False "
+                f"(hidden_size={decoder_config.hidden_size}, encoder={encoder_hidden_size})"
+            )
+        self.config = replace(
+            decoder_config,
+            condition_hidden_size=encoder_hidden_size,
+            use_condition_projection=use_projection,
+        )
+        self.encoder = encoder
+        self.decoder = build_llada2_backbone(self.config, encoder_hidden_size)
+        self.condition_proj = (
+            nn.Linear(encoder_hidden_size, int(decoder_config.hidden_size), bias=False)
+            if use_projection
+            else None
+        )
+        self.condition_norm = nn.LayerNorm(encoder_hidden_size) if self.config.condition_norm else None
+        if freeze_encoder:
+            for parameter in self.encoder.parameters():
+                parameter.requires_grad_(False)
+
+    def forward(
+        self,
+        input_ids: torch.Tensor | None = None,
+        diffusion_state: torch.Tensor | None = None,
+        attention_mask: torch.Tensor | None = None,
+        chain_ids: torch.Tensor | None = None,
+        position_ids_inner: torch.Tensor | None = None,
+        position_ids_chain: torch.Tensor | None = None,
+        timesteps: torch.Tensor | None = None,
+        residue_mask: torch.Tensor | None = None,
+        encoder_input_ids: torch.Tensor | None = None,
+        encoder_attention_mask: torch.Tensor | None = None,
+        encoder_residue_mask: torch.Tensor | None = None,
+        encoder_chain_mask: torch.Tensor | None = None,
+        encoder_position_ids: torch.Tensor | None = None,
+        encoder_kwargs: dict[str, Any] | None = None,
+        **_: Any,
+    ) -> BioSeqDiffusionOutput:
+        """Encode chains, gather condition, replace residue embeddings, run LLaDA2-MoE.
+
+        ``position_ids_*`` and ``timesteps`` are accepted for a uniform training call
+        signature but intentionally unused. Returns ``BioSeqDiffusionOutput`` with
+        ``logits [B, S, V]``.
+        """
+        if input_ids is None:
+            raise ValueError("BioSeqLLaDA2EncoderDiffusionModel requires input_ids")
+        if encoder_input_ids is None:
+            raise ValueError("encoder_input_ids are required for BioSeqLLaDA2EncoderDiffusionModel")
+        if encoder_position_ids is None and chain_ids is None:
+            raise ValueError("chain_ids or encoder_position_ids are required for encoder conditions")
+
+        effective_encoder_residue_mask = encoder_residue_mask
+        if encoder_position_ids is not None and residue_mask is not None:
+            effective_encoder_residue_mask = residue_mask.unsqueeze(1)
+
+        # 1) per-chain encode -> [B, C, L, E]
+        chain_token_condition = self.encode_chain_tokens(
+            encoder_input_ids=encoder_input_ids,
+            encoder_attention_mask=encoder_attention_mask,
+            encoder_residue_mask=effective_encoder_residue_mask,
+            encoder_chain_mask=encoder_chain_mask,
+            encoder_kwargs=encoder_kwargs,
+        )
+        # 2) align to decoder token positions -> [B, S, E]
+        if encoder_position_ids is not None:
+            token_condition = self.gather_proxy_token_condition(
+                chain_token_condition,
+                encoder_position_ids=encoder_position_ids,
+                attention_mask=attention_mask,
+                residue_mask=residue_mask,
+            )
+        else:
+            token_condition = self.gather_token_condition(
+                chain_token_condition,
+                chain_ids=chain_ids,
+                position_ids_inner=position_ids_inner,
+                attention_mask=attention_mask,
+                encoder_residue_mask=encoder_residue_mask,
+            )
+        condition_mask = self.build_encoder_condition_mask(
+            chain_ids=chain_ids,
+            position_ids_inner=position_ids_inner,
+            attention_mask=attention_mask,
+            encoder_position_ids=encoder_position_ids,
+            residue_mask=residue_mask,
+        )
+
+        # 3) inputs_embeds = backbone wte(x_t), residue positions replaced by encoder features
+        word_embeddings = self.decoder.get_input_embeddings()
+        inputs_embeds = word_embeddings(input_ids)
+        condition = token_condition.to(inputs_embeds.dtype)
+        if self.condition_norm is not None:
+            condition = self.condition_norm(condition)
+        replace_mask = condition_mask.to(inputs_embeds.dtype).unsqueeze(-1)
+        if self.config.use_condition_projection and self.condition_proj is not None:
+            inputs_embeds = inputs_embeds + self.condition_proj(condition) * replace_mask
+        else:
+            inputs_embeds = inputs_embeds * (1.0 - replace_mask) + condition * replace_mask
+
+        # 4) Bidirectional 4D padding mask (True = attend). Passing a 4D mask bypasses
+        # LLaDA2's causal-mask construction; the attention itself is is_causal=False,
+        # so the backbone runs as a full bidirectional masked-diffusion denoiser.
+        mask_4d = None
+        if attention_mask is not None:
+            keep = attention_mask.to(torch.bool)
+            batch_size, seq_len = keep.shape
+            mask_4d = keep[:, None, None, :].expand(batch_size, 1, seq_len, seq_len).contiguous()
+
+        llada2_output = self.decoder(
+            inputs_embeds=inputs_embeds,
+            attention_mask=mask_4d,
+            use_cache=False,
+            output_router_logits=False,
+        )
+        return BioSeqDiffusionOutput(
+            loss=None,
+            logits=llada2_output.logits,
+            hidden_states=None,
+            encoder_condition=token_condition,
         )

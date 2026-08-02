@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import argparse
-import os
+import json
 import sys
 from pathlib import Path
 from pprint import pprint
@@ -22,7 +22,16 @@ from dllm.pipelines.bioseq import Esm2ProteinTokenizer, ophiuchus_ab_checkpoint_
 class SAbDabDataset(Dataset):
     def __init__(self, file_path: str, mode: str, fold: int = 0):
         self.mode = mode
-        data = pd.read_json(os.path.join(file_path, mode, f"fold_{fold}", "test.json"), lines=True)
+        root = Path(file_path)
+        candidates = (
+            root / f"fold_{fold}" / "test.json",
+            root / mode / f"fold_{fold}" / "test.json",
+        )
+        test_json = next((path for path in candidates if path.is_file()), None)
+        if test_json is None:
+            tried = ", ".join(str(path) for path in candidates)
+            raise FileNotFoundError(f"SAbDab fold {fold} not found; tried: {tried}")
+        data = pd.read_json(test_json, lines=True)
         self.heavy = data["heavy_chain_seq"].astype(str).str.replace("J", "L").tolist()
         self.light = data["light_chain_seq"].astype(str).str.replace("J", "L").tolist()
         self.target = data[f"{mode}_seq"].tolist()
@@ -71,9 +80,37 @@ def evaluate(args):
         outer_aars.append(float(np.mean(inner_aars) * 100.0))
         all_aars.extend(inner_aars)
 
-    print("Average AAR:", float(np.mean(all_aars) * 100.0))
-    print("Average AAR all folds:", float(np.mean(outer_aars)))
-    print("AAR Standard deviation across all folds:", float(np.std(outer_aars)))
+    metrics = {
+        "baseline": "Ophiuchus-Ab",
+        "mode": args.mode,
+        "average_aar": float(np.mean(all_aars) * 100.0),
+        "average_aar_all_folds": float(np.mean(outer_aars)),
+        "aar_std_across_folds": float(np.std(outer_aars)),
+        "n_total": int(len(all_aars)),
+        "n_folds": int(len(outer_aars)),
+        "protocol": "official_checkpoint_mask_cdr_span_diffusion_decode_AAR",
+        "decode": {
+            "max_iter": args.max_iter,
+            "sampling_strategy": args.sampling_strategy,
+            "temperature": args.temperature,
+            "cfg_scale": args.cfg_scale,
+        },
+        "baseline_provenance": {
+            "evidence_type": "official_code_rerun",
+            "protocol_alignment": "compatible",
+            "paper_comparable": True,
+            "citation": "doi:10.64898/2026.02.02.703197",
+            "source_location": "Ophiuchus-Ab official checkpoint on released SAbDab folds",
+            "notes": "paper Table 2 remains a separate paper_reported row",
+        },
+    }
+    print(json.dumps(metrics, indent=2))
+    if args.output:
+        output = Path(args.output)
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_text(json.dumps(metrics, indent=2) + "\n", encoding="utf-8")
+        print(f"wrote {output}")
+    return metrics
 
 
 def main():
@@ -85,6 +122,8 @@ def main():
     parser.add_argument("--sampling-strategy", type=str, default="argmax")
     parser.add_argument("--max-iter", type=int, default=4)
     parser.add_argument("--cfg-scale", type=float, default=0.0)
+    parser.add_argument("--output", type=str, default="",
+                        help="optional metrics JSON path")
     args = parser.parse_args()
     pprint(vars(args))
     evaluate(args)

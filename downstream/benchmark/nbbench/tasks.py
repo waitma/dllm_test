@@ -67,6 +67,14 @@ NB_TASKS: dict[str, NbTask] = {
         metric="spearman",
         description="VHH binding affinity score regression",
     ),
+    "vhh_affinity-seq": NbTask(
+        name="vhh_affinity-seq",
+        task_type="regression",
+        seq_columns=("seq",),
+        label_column="score",
+        metric="spearman",
+        description="VHH binding affinity sequence-level regression",
+    ),
     "hTNFa": NbTask(
         name="hTNFa",
         task_type="classification",

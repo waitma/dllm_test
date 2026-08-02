@@ -6,7 +6,7 @@ from typing import Literal
 
 import torch
 
-from dllm.pipelines.qwen3_vl_arch.data import BioSeqChain, GrammarTokenizer
+from dllm.pipelines.qwen3_vl_arch.data import BioSeqChain, BioSeqRecord, GrammarTokenizer
 from dllm.pipelines.qwen3_vl_arch.sampling_bioseq import resolve_partial_mask
 
 
@@ -152,6 +152,96 @@ def cdr_generation_partial_mask(
     return resolve_partial_mask(batch, partial)
 
 
+def residue_positions_by_chain(
+    batch: dict[str, torch.Tensor],
+) -> list[dict[int, list[int]]]:
+    """Per row, map each rendered chain index -> its residue token columns.
+
+    Chain indices follow ``position_ids_chain`` from the grammar renderer, which
+    numbers residue chains 0,1,2,... in render order. TCR records render as:
+      * ``[tcr_beta]``                 -> beta = chain 0
+      * ``[antigen, tcr_beta]``        -> antigen = 0, beta = 1
+      * ``[antigen, tcr_alpha, beta]`` -> antigen = 0, alpha = 1, beta = 2
+      * ``[tcr_alpha, tcr_beta]``      -> alpha = 0, beta = 1
+    so the caller (which builds the records) knows the target index deterministically.
+    """
+
+    attention = batch["attention_mask"].bool()
+    residue = batch["residue_mask"].bool()
+    chain = batch["position_ids_chain"]
+    rows: list[dict[int, list[int]]] = []
+    for row in range(chain.size(0)):
+        by_chain: dict[int, list[int]] = {}
+        for col in range(chain.size(1)):
+            if not attention[row, col] or not residue[row, col]:
+                continue
+            idx = int(chain[row, col].item())
+            if idx < 0:
+                continue
+            by_chain.setdefault(idx, []).append(col)
+        rows.append(by_chain)
+    return rows
+
+
+def tcr_generation_partial_mask(
+    batch: dict[str, torch.Tensor],
+    target_chain_indices: int | set[int] | list[int],
+    *,
+    prompt_residues: int = 0,
+) -> torch.Tensor:
+    """Mask (generate) the residues of the given TCR chain index/indices.
+
+    Everything else -- structure tokens, relation tokens, fixed context (e.g. a
+    conditioning epitope / MHC), and all non-target chains -- stays visible.
+    ``prompt_residues`` keeps that many leading residues of each target chain
+    visible (e.g. a fixed ``C`` anchor for CDR3b).
+    """
+
+    if isinstance(target_chain_indices, int):
+        targets = {target_chain_indices}
+    else:
+        targets = set(int(i) for i in target_chain_indices)
+
+    attention = batch["attention_mask"].bool()
+    partial = attention.clone()
+    prompt_residues = max(int(prompt_residues), 0)
+    for row, by_chain in enumerate(residue_positions_by_chain(batch)):
+        for idx in targets:
+            positions = by_chain.get(idx, [])
+            for position in positions:
+                partial[row, position] = False
+            if prompt_residues > 0:
+                for position in positions[:prompt_residues]:
+                    partial[row, position] = True
+    return resolve_partial_mask(batch, partial)
+
+
+def cdr3b_span_partial_mask(
+    batch: dict[str, torch.Tensor],
+    chain_index: int,
+    span: tuple[int, int],
+) -> torch.Tensor:
+    """Mask a residue span ``[start, end)`` within one TCR chain (infill style).
+
+    ``span`` is measured in within-chain residue coordinates (0-based). Use for
+    CDR3b infilling inside a full-length beta chain while keeping the framework
+    and (optionally) the epitope/MHC context fixed.
+    """
+
+    attention = batch["attention_mask"].bool()
+    partial = attention.clone()
+    start, end = span
+    for row, by_chain in enumerate(residue_positions_by_chain(batch)):
+        positions = by_chain.get(int(chain_index), [])
+        if end > len(positions):
+            raise ValueError(
+                f"span [{start},{end}) exceeds chain length {len(positions)} (row {row})"
+            )
+        for position in positions[start:end]:
+            partial[row, position] = False
+    return resolve_partial_mask(batch, partial)
+
+
 def cdr_generation_partial_mask_from_subsequence(
     batch: dict[str, torch.Tensor],
     tokenizer: GrammarTokenizer,
@@ -171,3 +261,54 @@ def cdr_generation_partial_mask_from_subsequence(
         cdr_name="CDR",
         residue_span=(start, start + len(normalized)),
     )
+
+
+def framework_generation_partial_mask(
+    batch: dict[str, torch.Tensor],
+    tokenizer: GrammarTokenizer,
+    records: list[BioSeqRecord],
+    *,
+    light_keep_c_terminal: int = 3,
+) -> torch.Tensor:
+    """Mask FR residues on heavy+light; keep CDRs (and optional light C-term) visible.
+
+    Matches the Ophiuchus-Ab / AirGen humanization protocol: regenerate framework
+    while preserving CDR identity, and keep the last ``light_keep_c_terminal``
+    light-chain Fv residues native.
+    """
+
+    attention = batch["attention_mask"].bool()
+    residue = batch["residue_mask"].bool()
+    partial = attention.clone()
+    keep_c = max(int(light_keep_c_terminal), 0)
+
+    for row, record in enumerate(records):
+        for chain_role, chain in (("heavy", record.chains[0]), ("light", record.chains[1])):
+            positions = chain_residue_positions(
+                batch["input_ids"][row : row + 1],
+                attention[row : row + 1],
+                residue[row : row + 1],
+                tokenizer,
+                chain=chain_role,  # type: ignore[arg-type]
+                position_ids_chain=(
+                    batch["position_ids_chain"][row : row + 1]
+                    if "position_ids_chain" in batch
+                    else None
+                ),
+            )[0]
+            for region_name in ("FR1", "FR2", "FR3", "FR4"):
+                span = chain.region_span(region_name)
+                if span is None:
+                    continue
+                start, end = span
+                if end > len(positions):
+                    raise ValueError(
+                        f"{region_name} span [{start},{end}) exceeds {chain_role} length "
+                        f"{len(positions)} (row {row})"
+                    )
+                for position in positions[start:end]:
+                    partial[row, position] = False
+            if chain_role == "light" and keep_c > 0 and positions:
+                for position in positions[-keep_c:]:
+                    partial[row, position] = True
+    return resolve_partial_mask(batch, partial)

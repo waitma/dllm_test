@@ -1,0 +1,13 @@
+We present a downstream benchmark harness for \Ours{}, a grammar-conditioned
+ESMC$\rightarrow$LLaDA diffusion language model for immune-receptor and
+protein--protein interaction (PPI) sequences. The harness spans T-cell receptor
+(TCR), PPI, antibody, and nanobody tasks. Because several downloaded datasets
+and local probes do not exactly match their anchor papers, every reported cell
+is source-labelled: paper-transcribed values are the primary baseline whenever
+the local protocol differs, while official-artifact re-scores and local
+diagnostics are reported separately. A single string-spec interface plugs a
+checkpoint into each local task with post-LLaDA feature extraction. This audit
+removes cross-protocol rankings and establishes a reproducible baseline layer
+without changing the model or its checkpoints; paper-aligned evaluation of
+\Ours{} remains pending for benchmarks whose exact training/evaluation protocol
+has not yet been rerun.

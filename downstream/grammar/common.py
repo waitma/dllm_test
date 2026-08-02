@@ -65,16 +65,19 @@ def collate_records(records: list[BioSeqRecord], collator: GrammarBioSeqCollator
 
 
 def _namespace_from_checkpoint_args(raw: dict[str, Any]) -> Namespace:
-    parsed = dict(raw)
+    from examples.bioseq.train_qwen3_vl_bioseq_ddp import parse_args
+
+    old_argv = sys.argv
+    try:
+        sys.argv = [old_argv[0]]
+        defaults = vars(parse_args())
+    finally:
+        sys.argv = old_argv
+
+    parsed = {**defaults, **raw}
     for key in ("grammar_data_dir", "encoder_path", "tokenizer_path", "output_dir", "wandb_dir"):
         if key in parsed and parsed[key] is not None:
             parsed[key] = Path(parsed[key])
-    # Fields added after early grammar-v2 checkpoints were saved (eval-only defaults).
-    for key, value in (
-        ("condition_norm", False),
-        ("gradient_checkpointing", False),
-    ):
-        parsed.setdefault(key, value)
     return Namespace(**parsed)
 
 

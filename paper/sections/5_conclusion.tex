@@ -1,0 +1,13 @@
+\section{Conclusion}
+\label{sec:conclusion}
+
+We assembled a plug-in downstream harness for an immune-receptor and PPI
+sequence foundation model and audited its baseline layer. Paper-reported values,
+official-artifact re-scores, and local evaluations now carry distinct source
+labels, and cross-protocol rankings have been removed. The audit also corrected
+the T2 length-distance implementation, T4 sparse-13 target set, MINT regression
+metric space, FLAb nested-CV protocol, CDR fold paths, and NbBench metric/head
+separation without modifying the model or checkpoints. The string-spec interface
+remains reusable for future checkpoints. Paper-aligned local reruns are still
+needed for MINT regression, FLAb, and Ophiuchus-Ab CDR infilling before making
+direct claims about \Ours{} on those anchor leaderboards.

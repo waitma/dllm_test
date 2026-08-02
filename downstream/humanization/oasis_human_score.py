@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """
 Convert CSV file with generated sequences to FASTA format and run BioPhi OASis scoring.
-Author: [your name]
-Date: 2025-10-25
+
+Prefer the project-local wrapper:
+  python -m downstream.humanization.oasis_score <csv>
+which uses /vepfs-mlp2/c20250601/251105016/project/oasis.
 """
 
 import subprocess
@@ -15,45 +17,36 @@ from pathlib import Path
 def csv_to_fasta(csv_path, fasta_path):
     """
     Convert CSV file with generated sequences to FASTA format.
-    
+
     Parameters
     ----------
     csv_path : str
         Path to the CSV file containing generated sequences
     fasta_path : str
         Path for the output FASTA file
-        
+
     Returns
     -------
     int
         Number of sequences written to FASTA file
     """
     try:
-        # Read CSV file
         df = pd.read_csv(csv_path)
-        
-        # Check required columns
-        required_cols = ['pdb_id', 'variant_idx', 'generated_heavy', 'generated_light']
+
+        required_cols = ["pdb_id", "variant_idx", "generated_heavy", "generated_light"]
         missing_cols = [col for col in required_cols if col not in df.columns]
         if missing_cols:
             raise ValueError(f"Missing required columns: {missing_cols}")
-        
-        # Create FASTA file
-        with open(fasta_path, 'w') as f:
-            for idx, row in df.iterrows():
-                # Write heavy chain sequence with _VH suffix
-                heavy_seq_id = f">{row['pdb_id']}_{row['variant_idx']}_VH"
-                heavy_seq = row['generated_heavy']
-                f.write(f"{heavy_seq_id}\n{heavy_seq}\n")
-                
-                # Write light chain sequence with _VL suffix
-                light_seq_id = f">{row['pdb_id']}_{row['variant_idx']}_VL"
-                light_seq = row['generated_light']
-                f.write(f"{light_seq_id}\n{light_seq}\n")
-        
+
+        with open(fasta_path, "w") as f:
+            for _, row in df.iterrows():
+                antibody_id = f"{row.get('sample_id', row['pdb_id'])}_v{int(row['variant_idx'])}"
+                f.write(f">{antibody_id}_VH\n{row['generated_heavy']}\n")
+                f.write(f">{antibody_id}_VL\n{row['generated_light']}\n")
+
         print(f"Converted {len(df)} sequences to FASTA format: {fasta_path}")
-        return len(df) * 2  # Heavy and light chains
-        
+        return len(df) * 2
+
     except Exception as e:
         print(f"Error converting CSV to FASTA: {e}")
         return 0
@@ -90,9 +83,13 @@ def run_oasis(fasta_path, oasis_db_path, output_path="oasis.xlsx", biophi_cmd="b
         raise FileNotFoundError(f"OASis DB not found: {oasis_db_path}")
 
     cmd = [
-        biophi_cmd, "oasis", str(fasta_path),
-        "--oasis-db", str(oasis_db_path),
-        "--output", str(output_path)
+        biophi_cmd,
+        "oasis",
+        str(fasta_path),
+        "--oasis-db",
+        str(oasis_db_path),
+        "--output",
+        str(output_path),
     ]
 
     print("Running BioPhi OASis...")
@@ -112,7 +109,10 @@ def main():
     """
     if len(sys.argv) < 2:
         print("Usage: python oasis_human_score.py <csv_path> [oasis_db_path] [output.xlsx]")
-        print("Example: python oasis_human_score.py task_output.csv /vepfs-mlp2/c20250601/251105016/project/oasis/db/OASis_9mers_v1.db oasis_scores.xlsx")
+        print(
+            "Example: python oasis_human_score.py task_output.csv "
+            "/vepfs-mlp2/c20250601/251105016/project/oasis/db/OASis_9mers_v1.db oasis_scores.xlsx"
+        )
         sys.exit(1)
 
     csv_file = sys.argv[1]
@@ -128,34 +128,32 @@ def main():
             "/vepfs-mlp2/c20250601/251105016/project/oasis/db/OASis_9mers_v1.db",
         )
         output = "oasis_scores.xlsx"
-    
-    # Generate FASTA file name from CSV file name
-    fasta_file = csv_file.replace('.csv', '_sequences.fasta')
-    
+
+    fasta_file = csv_file.replace(".csv", "_sequences.fasta")
+
     print(f"Converting CSV to FASTA: {csv_file} -> {fasta_file}")
     num_sequences = csv_to_fasta(csv_file, fasta_file)
-    
+
     if num_sequences == 0:
         print("Failed to convert CSV to FASTA. Exiting.")
         sys.exit(1)
-    
+
     print(f"Running OASis scoring on {num_sequences} sequences...")
     return_code = run_oasis(fasta_file, oasis_db, output)
-    
+
     if return_code == 0:
         print(f"OASis scoring completed successfully! Results saved to: {output}")
-        
-        # Read and display OASis Identity scores
+
         try:
             df = pd.read_excel(output)
-            print("\n" + "="*60)
+            print("\n" + "=" * 60)
             print("OASis Scores Summary:")
-            print("="*60)
-            
-            if 'OASis Identity' in df.columns:
-                mean_identity = df['OASis Identity'].mean()
-                std_identity = df['OASis Identity'].std()
-                print(f"\nOASis Identity Score:")
+            print("=" * 60)
+
+            if "OASis Identity" in df.columns:
+                mean_identity = df["OASis Identity"].mean()
+                std_identity = df["OASis Identity"].std()
+                print("\nOASis Identity Score:")
                 print(f"  Mean: {mean_identity:.4f}")
                 print(f"  Std: {std_identity:.4f}")
                 print(f"  Range: [{df['OASis Identity'].min():.4f}, {df['OASis Identity'].max():.4f}]")
@@ -163,9 +161,9 @@ def main():
             else:
                 print(f"Available columns: {df.columns.tolist()}")
                 print(f"Total sequences: {len(df)}")
-            
-            print("="*60)
-            
+
+            print("=" * 60)
+
         except Exception as e:
             print(f"Warning: Could not read OASis results: {e}")
     else:

@@ -1,8 +1,10 @@
 #!/usr/bin/env python
-"""A1 -- NbBench antibody/nanobody head-only probing.
+"""A1 -- local NbBench antibody/nanobody linear-probe diagnostic.
 
 Frozen sequence embedder (ESM2 / Ophiuchus / BioSeq) + sklearn probe on the
-official NbBench train/test splits. No backbone fine-tuning.
+released NbBench train/test splits. No backbone fine-tuning.  This is not the
+paper's learned-MLP/three-seed protocol: paper Table 5 values are imported as
+``paper_reported`` rows and remain the primary external baselines.
 
 Examples:
     python nbbench/run.py --task VRClassification --embedder esm2_150m
@@ -13,6 +15,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 import time
 from pathlib import Path
@@ -30,6 +33,27 @@ from nbbench.tasks import NB_TASKS, data_dir  # noqa: E402
 OUT = BENCH / "outputs" / "nbbench"
 
 
+def out_dirname(spec: str, tag: str = "") -> str:
+    """Clean, filesystem-safe leaderboard dir name for an embedder spec.
+
+    Baseline specs (``esm2_150m`` / ``kmer`` / ``onehot`` / ``protbert`` ...)
+    have no special characters and are used verbatim, so existing dirs keep
+    working. A path-carrying spec like ``bioseq:/abs/x/<run>/best.pt`` would
+    otherwise create nested dirs from its slashes, so we derive
+    ``<kind>_<run>`` (e.g. ``bioseq_grammar_v2_esmc600m_cmp500k_llada``). An
+    explicit ``--tag`` always wins (recommended for concise names).
+    """
+    if tag:
+        return tag
+    if "/" in spec or ":" in spec:
+        kind = spec.split(":", 1)[0]
+        run = Path(spec.split(":", 1)[-1]).parent.name
+        if run:
+            return f"{kind}_{run}"
+        return re.sub(r"[^0-9A-Za-z_.-]+", "_", spec)
+    return spec
+
+
 def _concat_seq(df: pd.DataFrame, columns: tuple[str, ...]) -> list[str]:
     if len(columns) == 1:
         return df[columns[0]].astype(str).tolist()
@@ -37,6 +61,51 @@ def _concat_seq(df: pd.DataFrame, columns: tuple[str, ...]) -> list[str]:
         "|".join(vals).replace("nan", "")
         for vals in zip(*[df[c].astype(str) for c in columns])
     ]
+
+
+# GrammarRenderer hard-limits single chains to 1024 aa (grammar.py ppi_max_protein_length).
+# NbBench binding tasks (hTNFa/hIL6/SARS-CoV-2) can carry longer antigens; PALM baselines
+# truncate via tokenizer. For post-LLaDA grammar embedders we take the N-terminal head-1024
+# before embed — aligned with NBBENCH_DESIGN.md L3 long-antigen truncation caveat.
+_GRAMMAR_MAX_CHAIN_LEN = 1024
+_ANTIGEN_COLUMNS = frozenset({"Ag_sequence"})
+
+
+def _is_post_llada_grammar_spec(embedder_spec: str) -> bool:
+    if embedder_spec.startswith("bioseq-llada:"):
+        return True
+    if embedder_spec.startswith("grammar:"):
+        rest = embedder_spec.split(":", 1)[1]
+        source = rest.split(":", 1)[0]
+        return source not in ("encoder",)
+    return False
+
+
+def _maybe_truncate_antigen(seqs: list[str], column: str, embedder_spec: str) -> list[str]:
+    if column not in _ANTIGEN_COLUMNS or not _is_post_llada_grammar_spec(embedder_spec):
+        return seqs
+    cap = _GRAMMAR_MAX_CHAIN_LEN
+    out, n_trunc = [], 0
+    for s in seqs:
+        if len(s) > cap:
+            out.append(s[:cap])
+            n_trunc += 1
+        else:
+            out.append(s)
+    if n_trunc:
+        print(f"      head-{cap} truncate: {n_trunc}/{len(seqs)} unique '{column}' "
+              f"(NbBench L3 long-antigen caveat, grammar renderer limit)")
+    return out
+
+
+def _embed_key(seq: str, column: str, embedder_spec: str) -> str:
+    """Key for embed lookup — must match sequences passed to ``embed()``."""
+    s = str(seq)
+    if column in _ANTIGEN_COLUMNS and _is_post_llada_grammar_spec(embedder_spec):
+        cap = _GRAMMAR_MAX_CHAIN_LEN
+        if len(s) > cap:
+            return s[:cap]
+    return s
 
 
 def featurize(embedder_spec: str, train: pd.DataFrame, test: pd.DataFrame,
@@ -77,11 +146,12 @@ def featurize(embedder_spec: str, train: pd.DataFrame, test: pd.DataFrame,
     for c in columns:
         vals = pd.concat([train[c], test[c]]).astype(str)
         uniq = sorted(set(vals))
+        uniq = _maybe_truncate_antigen(uniq, c, embedder_spec)
         print(f"      embedding {len(uniq)} unique '{c}' ...")
         e = emb.embed(uniq)
         lut = {u: e[i] for i, u in enumerate(uniq)}
-        feats_tr.append(np.stack([lut[str(v)] for v in train[c]]))
-        feats_te.append(np.stack([lut[str(v)] for v in test[c]]))
+        feats_tr.append(np.stack([lut[_embed_key(v, c, embedder_spec)] for v in train[c]]))
+        feats_te.append(np.stack([lut[_embed_key(v, c, embedder_spec)] for v in test[c]]))
     return np.concatenate(feats_tr, 1), np.concatenate(feats_te, 1), emb.name
 
 
@@ -128,7 +198,7 @@ def run_regression(xtr, ytr, xte, yte, seed: int):
     }
 
 
-def evaluate_task(task_name: str, embedder_spec: str, seed: int) -> dict:
+def evaluate_task(task_name: str, embedder_spec: str, seed: int, tag: str = "") -> dict:
     task = NB_TASKS[task_name]
     ddir = data_dir(task_name)
     train = pd.read_csv(ddir / "train.csv").fillna("")
@@ -166,9 +236,19 @@ def evaluate_task(task_name: str, embedder_spec: str, seed: int) -> dict:
         "n_train": len(train),
         "n_test": len(test),
         "elapsed_sec": round(elapsed, 1),
+        "protocol": "local_sklearn_logreg_or_ridge_single_seed_train_test_only",
+        "split_usage": {"train": True, "validation": False, "test": True},
+        "baseline_provenance": {
+            "evidence_type": "local_reimplementation",
+            "protocol_alignment": "not_comparable",
+            "paper_comparable": False,
+            "citation": "doi:10.1088/2632-2153/ae20ec; arXiv:2505.02022",
+            "source_location": "local sklearn probe on released NbBench CSV splits",
+            "notes": "paper uses a learned MLP head, validation split, three seeds, and fixed ESM2-650M antigen features",
+        },
         **{k: v for k, v in result.items() if k not in ("scores", "predictions")},
     }
-    out_dir = OUT / task_name / embedder_spec
+    out_dir = OUT / task_name / out_dirname(embedder_spec, tag)
     out_dir.mkdir(parents=True, exist_ok=True)
     with (out_dir / "metrics.json").open("w") as fh:
         json.dump(out, fh, indent=2)
@@ -182,6 +262,9 @@ def main():
                     help="task name or 'all'")
     ap.add_argument("--embedder", default="esm2_150m")
     ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument("--tag", default="",
+                    help="clean leaderboard dir name (recommended for path-"
+                         "carrying specs like bioseq:/abs/best.pt)")
     args = ap.parse_args()
 
     tasks = list(NB_TASKS) if args.task == "all" else [args.task]
@@ -189,10 +272,10 @@ def main():
     for t in tasks:
         if t not in NB_TASKS:
             raise SystemExit(f"unknown task: {t}; available: {sorted(NB_TASKS)}")
-        summary.append(evaluate_task(t, args.embedder, args.seed))
+        summary.append(evaluate_task(t, args.embedder, args.seed, args.tag))
 
     if len(summary) > 1:
-        out_all = OUT / f"_summary_{args.embedder}.json"
+        out_all = OUT / f"_summary_{out_dirname(args.embedder, args.tag)}.json"
         out_all.parent.mkdir(parents=True, exist_ok=True)
         with out_all.open("w") as fh:
             json.dump(summary, fh, indent=2)

@@ -1,0 +1,332 @@
+\section{Reproducibility and caveats}
+\label{sec:appendix}
+
+\subsection{Checkpoints}
+All headline \OursCkpt{} numbers in the main text use the retrained integrated
+7-layer checkpoint
+\texttt{grammar\_v2\_esmc300m\_integrated\_llada\_7l}
+(\texttt{best.pt} at step 16{,}000; LLaDA \texttt{num\_hidden\_layers}${=}7$,
+\texttt{hidden\_size}${=}512$), an 8-source mixture trained from scratch with
+training shards deduplicated against every downstream test set. Features are
+extracted post-LLaDA via \texttt{grammar:decoder:global:}. Earlier
+\texttt{cmp500k}/\texttt{mint}/28-layer integrated checkpoints are retained
+on disk for ablation but are not the headline rows. Appendix tables that still
+show \tbd{} (T1 near-dedup enc-only control, T3 broad/probe, de-novo pairing)
+were not re-run for this checkpoint.
+
+\subsection{MINT GeneralPPI protocol caveat}
+\label{sec:mint-caveat}
+The primary MINT baseline in the main text is the paper's Source Data [P]. The
+local port [L] shares a cap of \texttt{max\_train}${=}3000$ but uses
+re-partitioned splits or alternative sources: Bernett is an IRBench subset
+rather than Gold-standard PPI, and PDB-Bind is built from the HuggingFace
+\texttt{proteinea/ppb\_affinity} mirror. It therefore answers only a local
+diagnostic question. Moreover, the old regression path evaluated values in a
+fold-specific PowerTransformer space. The implementation now inverse-transforms
+predictions before Pearson/RMSE, and all old regression rankings are withdrawn
+until the corrected run finishes.
+
+\subsection{Data provenance}
+Every baseline cell carries an evidence label. [P] values are immutable
+transcriptions in \texttt{outputs/external/paper\_reported\_baselines.csv}; [A]
+values are re-scores of released prediction artifacts; [L] values are local
+evaluations and remain separate when their data, head, seed count, or metric
+differs. The TCRT5 metric implementation additionally matches the official
+evaluator on 42 prediction blocks. A machine-readable provenance registry and
+an automated audit guard these distinctions.
+
+%====================================================================
+\subsection{T1: additional paper baselines and local analyses}
+\label{sec:t1-extra}
+
+\paragraph{Eight further paper variants.} Beyond the rows in \Cref{tab:t1},
+\Cref{tab:t1-tier1} transcribes eight additional variants from Supplementary
+Table~4 [P]. All show the same pattern: usable signal on seen epitopes
+(AUPRC $0.50$--$0.67$) collapsing to near-random on unseen ($0.50$--$0.52$),
+reinforcing that unseen-epitope generalisation failure is field-wide.
+
+\begin{table}[h]
+\centering
+\caption{T1 additional paper baselines [P] (cdr3b, AS, overall AUPRC/AUROC).}
+\label{tab:t1-tier1}
+\small
+\begin{tabular}{@{}lcccc@{}}
+\toprule
+Method & Seen AUPRC & Unseen AUPRC & Seen AUROC & Unseen AUROC \\
+\midrule
+TEINet-large     & 0.6588 & 0.5098 & 0.5929 & 0.5082 \\
+TEINet-small     & 0.6593 & 0.5003 & 0.5959 & 0.5058 \\
+ERGO-LSTM (VDJdb)& 0.6279 & 0.5171 & 0.5771 & 0.5116 \\
+ERGO-AE (VDJdb)  & 0.6150 & 0.5041 & 0.5428 & 0.4995 \\
+ERGO-LSTM (McPAS)& 0.6091 & 0.5067 & 0.5614 & 0.5108 \\
+ERGO-AE (McPAS)  & 0.5798 & 0.5206 & 0.5152 & 0.5051 \\
+TPBTE (McPAS)    & 0.4993 & 0.4988 & 0.5053 & 0.5037 \\
+TPBTE (VDJdb)    & 0.500 & 0.500 & 0.500 & 0.500 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{Negative-source sensitivity.} Swapping the negative-sampling source
+(AS/PS/HS) moves overall AUPRC by as much as the gaps between models
+(\Cref{tab:t1-neg}). This is a local sensitivity analysis [L], kept separate
+from the paper-transcribed AS main table. It illustrates that negative-set
+construction can materially change model rankings.
+
+\begin{table}[h]
+\centering
+\caption{T1 local negative-source sensitivity [L] (overall AUPRC). AS/PS/HS are
+the three benchmark negative-sampling schemes.}
+\label{tab:t1-neg}
+\small
+\setlength{\tabcolsep}{4pt}
+\begin{adjustbox}{max width=\textwidth}
+\begin{tabular}{@{}lcccccc@{}}
+\toprule
+ & \multicolumn{3}{c}{Seen} & \multicolumn{3}{c}{Unseen} \\
+\cmidrule(r){2-4}\cmidrule(l){5-7}
+Method & AS & PS & HS & AS & PS & HS \\
+\midrule
+ATM-TCR          & 0.696 & 0.682 & 0.666 & 0.522 & 0.508 & 0.519 \\
+NetTCR-2.2 (b)   & 0.611 & 0.622 & 0.578 & 0.505 & 0.572 & 0.526 \\
+TEIM             & 0.676 & 0.700 & 0.741 & 0.518 & 0.536 & 0.596 \\
+ERGO-II          & 0.545 & 0.556 & 0.554 & 0.510 & 0.507 & 0.509 \\
+epiTCR (noMHC)   & 0.557 & 0.541 & 0.543 & 0.482 & 0.500 & 0.490 \\
+PanPep           & 0.499 & 0.504 & 0.590 & 0.479 & 0.448 & 0.510 \\
+CDR3-kNN ($k{=}5$) & 0.553 & 0.526 & 0.649 & 0.544 & 0.544 & 0.544 \\
+\midrule
+\OursCkpt{}      & 0.528 & 0.517 & 0.622 & 0.525 & 0.480 & 0.559 \\
+\bottomrule
+\end{tabular}
+\end{adjustbox}
+\end{table}
+
+\paragraph{Near-duplicate removal.} Removing test rows whose CDR3$\beta$ lies
+within Levenshtein $\le k$ of any training CDR3$\beta$ (\Cref{tab:t1-dedup})
+shows that (i) unseen AUPRC stays near $0.5$ for all methods (the generalisation
+failure is real, not a duplicate artifact), while (ii) the training-free
+CDR3-kNN's apparent unseen edge collapses as soon as near-duplicates are removed
+($0.544\!\to\!0.487$ at $k\le1$).
+
+\begin{table}[h]
+\centering
+\caption{T1 near-duplicate removal (unseen split, overall AUPRC). Columns are
+increasing dedup radius $k$; ``kept'' is the number of remaining unseen test
+rows.}
+\label{tab:t1-dedup}
+\small
+\begin{tabular}{@{}lcccc@{}}
+\toprule
+ & $k{=}0$ & $k\le1$ & $k\le2$ & $k\le3$ \\
+\midrule
+unseen rows kept        & 690 & 559 & 225 & 51 \\
+CDR3-kNN                & 0.544 & 0.487 & 0.499 & 0.490 \\
+\OursCkpt{} (enc-only)  & \tbd & \tbd & \tbd & \tbd \\
+ATM-TCR                 & 0.522 & 0.523 & 0.564 & 0.542 \\
+TEIM                    & 0.518 & 0.507 & 0.528 & 0.560 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+%====================================================================
+\subsection{T3: broad-track and linear-probe views}
+\label{sec:t3-extra}
+
+The complementary broad 24-epitope few-shot track (clonotype-disjoint split,
+\Cref{tab:t3-broad}) is a local evaluation [L] and shares the deep-track
+ordering on a larger epitope surface. The 24-way linear-probe view
+(\Cref{tab:t3-probe}) has ample supervision
+so most embeddings read out epitope identity in a narrow band ($0.75$--$0.825$
+probe AUROC), which is why the few-shot protocol is our primary representation
+metric; SCEPTR's kNN top-1 lead ($0.506$) reflects its more epitope-clustered
+representation.
+
+\begin{table}[h]
+\centering
+\caption{T3 broad 24-epitope local [L] few-shot NN AUROC (random${=}0.5$).}
+\label{tab:t3-broad}
+\small
+\begin{tabular}{@{}lcccc@{}}
+\toprule
+Method & $k{=}1$ & $k{=}5$ & $k{=}20$ & $k{=}100$ \\
+\midrule
+SCEPTR (contrastive)        & \best{0.587} & \best{0.655} & \best{0.711} & \best{0.741} \\
+TCRdist (official)          & 0.577 & 0.644 & 0.687 & 0.728 \\
+CDR3-Levenshtein-NN         & 0.555 & 0.597 & 0.641 & 0.683 \\
+$k$-mer(3)                  & 0.543 & 0.597 & 0.643 & 0.673 \\
+ESM2-150M                   & 0.561 & 0.589 & 0.638 & 0.671 \\
+ProtBERT                    & 0.550 & 0.587 & 0.627 & 0.651 \\
+TCR-BERT                    & 0.547 & 0.577 & 0.623 & 0.641 \\
+Ophiuchus-Ab                & 0.576 & 0.612 & 0.664 & 0.677 \\
+\midrule
+\OursCkpt{}                 & \tbd & \tbd & \tbd & \tbd \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[h]
+\centering
+\caption{T3 local [L] 24-way linear-probe / 1-NN auxiliary view.}
+\label{tab:t3-probe}
+\small
+\begin{tabular}{@{}lccc@{}}
+\toprule
+Method & probe-AUROC & probe-Acc & kNN top-1 \\
+\midrule
+ESM2-150M     & 0.806 & 0.438 & 0.409 \\
+ProtBERT      & 0.793 & 0.405 & 0.393 \\
+TCR-BERT      & 0.748 & 0.416 & 0.431 \\
+Ophiuchus-Ab  & \best{0.825} & \best{0.452} & 0.443 \\
+$k$-mer(3)    & 0.800 & 0.430 & 0.447 \\
+SCEPTR (64-d) & 0.803 & 0.425 & \best{0.506} \\
+\midrule
+\OursCkpt{}   & \tbd & \tbd & \tbd \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+%====================================================================
+\subsection{MINT: additional PLM baselines and Accuracy/F1}
+\label{sec:mint-extra}
+
+For completeness, \Cref{tab:mint-plm,tab:mint-accf1} retain historical local
+diagnostics [L] under \texttt{max\_train}${=}3000$. They use the IRBench Bernett
+subset and a local head, so their ordering neither confirms nor contradicts the
+MINT paper and is not compared with \Cref{tab:mint-cls}.
+
+\begin{table}[h]
+\centering
+\caption{MINT-port local diagnostic [L]: additional PLM backbones
+(AUROC/AUPRC, 3-rep mean, \texttt{--sep\_embed}). Not paper-comparable.}
+\label{tab:mint-plm}
+\small
+\begin{tabular}{@{}lcccc@{}}
+\toprule
+ & \multicolumn{2}{c}{HumanPPI} & \multicolumn{2}{c}{Bernett} \\
+\cmidrule(r){2-3}\cmidrule(l){4-5}
+Backbone & AUROC & AUPRC & AUROC & AUPRC \\
+\midrule
+ESM-1b       & 0.937 & 0.931 & 0.727 & 0.711 \\
+ESM2-3B      & 0.938 & 0.938 & 0.711 & 0.694 \\
+ProtT5-XL    & \best{0.939} & \best{0.941} & \best{0.799} & \best{0.777} \\
+ProGen2-base & 0.925 & 0.906 & 0.622 & 0.603 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[h]
+\centering
+\caption{MINT-port local diagnostic [L]: Accuracy/F1 (3-rep mean).}
+\label{tab:mint-accf1}
+\small
+\begin{tabular}{@{}llccc@{}}
+\toprule
+Task & Metric & MINT weights [L] & ESM2-650M [L] & \OursCkpt{} [L] \\
+\midrule
+\multirow{2}{*}{HumanPPI} & Acc & 0.876 & 0.851 & 0.646 \\
+                          & F1  & 0.874 & 0.855 & 0.615 \\
+\multirow{2}{*}{Bernett}  & Acc & 0.661 & 0.709 & 0.509 \\
+                          & F1  & 0.625 & 0.686 & 0.314 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+%====================================================================
+\subsection{Antibody pairing: prompt-free (de-novo) variants}
+\label{sec:ab-extra}
+
+\Cref{tab:ab-pair} uses prompt3 for all rows. \Cref{tab:ab-pair-denovo} gives the
+prompt-free (de-novo) numbers; the \OursCkpt{} de-novo row was not re-run for
+the 7-layer checkpoint (main comparison uses prompt3). A key honesty note that
+still applies:
+\Ours{}'s mask-fill decoding uses a number of mask tokens equal to the reference
+light-chain length, so even in de-novo mode it reconstructs the target length,
+yielding chain-match ${\approx}1.0$ and low diversity by construction --- so its
+match/diversity columns are \emph{not} a like-for-like advantage over the truly
+variable-length de-novo generators p-IgGen/LICHEN.
+
+\begin{table}[h]
+\centering
+\caption{Antibody heavy$\rightarrow$light pairing local diagnostic [L], de-novo
+(prompt-free) variants (OAS holdout500, $n{=}8$/heavy). Reference ImmunoMatch
+${=}0.699$; p-IgGen/LICHEN are local runs, not paper-transcribed values.}
+\label{tab:ab-pair-denovo}
+\small
+\begin{tabular}{@{}lccccc@{}}
+\toprule
+Model & ImmunoMatch & gen${>}$ref & chain match & V (exact) & diversity \\
+\midrule
+p-IgGen & \best{0.686} & 0.482 & 0.552 & 0.050 & \best{0.695} \\
+LICHEN  & 0.666 & \best{0.498} & \best{0.622} & \best{0.053} & 0.519 \\
+\midrule
+\OursCkpt{}  & \tbd & \tbd & \tbd & \tbd & \tbd \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+%====================================================================
+\subsection{NbBench: full 11-model official leaderboard}
+\label{sec:nbbench-extra}
+
+\Cref{tab:nbbench-full-a,tab:nbbench-full-b} transcribe the complete NbBench
+11-model leaderboard from Table~5 [P] under the paper's MLP-head, three-seed
+protocol. Local sklearn probes are intentionally not appended: they use a
+different head/seed protocol. Paratope is reported in \Cref{tab:nbbench} using
+the paper's AUROC but omitted from these two wide tables. \textbf{Caveat:} the
+thermo tasks have substantial
+train/test near-duplication (${\sim}52\%$ / ${\sim}32\%$ of test within edit
+distance $2$ of train under NbBench's 75\%-similarity split), so composition-
+sensitive models are inflated there; the affinity tasks are the cleaner
+regression signal.
+
+\begin{table}[h]
+\centering
+\caption{NbBench paper leaderboard [P], group A. VRCls/nanobody\_type ${=}$
+Accuracy, CDRInfilling ${=}$ BLOSUM62 recovery, and
+SARS-CoV-2/hIL6/polyreaction ${=}$ AUROC.}
+\label{tab:nbbench-full-a}
+\small
+\setlength{\tabcolsep}{3.5pt}
+\begin{adjustbox}{max width=\textwidth}
+\begin{tabular}{@{}lcccccc@{}}
+\toprule
+Model & VRCls & nb\_type & CDRInf & SARS & hIL6 & poly \\
+\midrule
+ProtBERT & 0.998 & 0.957 & 1.520 & 0.852 & 0.878 & 0.837 \\
+ESM2-150M & 0.999 & 0.994 & 1.499 & 0.834 & 0.850 & 0.833 \\
+ESM2-650M & 0.998 & 0.995 & 1.551 & 0.850 & 0.857 & 0.842 \\
+AbLang-H & 0.998 & 0.997 & 1.452 & 0.884 & 0.925 & 0.831 \\
+AbLang-L & 0.998 & 0.988 & 1.360 & 0.811 & 0.914 & 0.819 \\
+AntiBERTy & 0.998 & 0.999 & 1.499 & 0.810 & 0.871 & 0.828 \\
+AntiBERTa2 & 0.999 & 0.995 & 1.489 & 0.824 & 0.887 & 0.833 \\
+AntiBERTa2-CSSP & 0.998 & 0.998 & 1.484 & 0.845 & 0.916 & 0.830 \\
+IgBert & 0.998 & 0.993 & 1.311 & 0.817 & 0.821 & 0.829 \\
+NanoBERT & 0.995 & 0.988 & 1.524 & 0.876 & 0.904 & 0.815 \\
+VHHBERT & 0.990 & 0.986 & 1.244 & 0.800 & 0.873 & 0.818 \\
+\bottomrule
+\end{tabular}
+\end{adjustbox}
+\end{table}
+
+\begin{table}[h]
+\centering
+\caption{NbBench paper leaderboard [P], group B (Spearman).}
+\label{tab:nbbench-full-b}
+\small
+\begin{tabular}{@{}lcccc@{}}
+\toprule
+Model & thermo-tm & thermo-seq & vhh\_aff-seq & vhh\_aff-score \\
+\midrule
+ProtBERT & 0.128 & 0.040 & 0.163 & 0.084 \\
+ESM2-150M & 0.301 & 0.389 & 0.170 & 0.063 \\
+ESM2-650M & 0.315 & 0.375 & 0.183 & 0.089 \\
+AbLang-H & 0.533 & 0.566 & 0.151 & 0.106 \\
+AbLang-L & 0.502 & 0.585 & 0.173 & 0.128 \\
+AntiBERTy & 0.385 & 0.474 & 0.167 & 0.119 \\
+AntiBERTa2 & 0.585 & 0.587 & 0.162 & 0.088 \\
+AntiBERTa2-CSSP & 0.593 & 0.575 & 0.149 & 0.085 \\
+IgBert & 0.344 & 0.351 & 0.184 & 0.090 \\
+NanoBERT & 0.298 & 0.440 & 0.061 & 0.118 \\
+VHHBERT & 0.532 & 0.484 & 0.145 & 0.115 \\
+\bottomrule
+\end{tabular}
+\end{table}

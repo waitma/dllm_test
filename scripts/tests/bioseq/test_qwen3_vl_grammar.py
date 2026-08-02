@@ -636,3 +636,71 @@ def test_grammar_renderer_rejects_long_ppi_without_loader_filter() -> None:
     tokenizer = GrammarTokenizer(Esm2SequenceTokenizer())
     with pytest.raises(ValueError, match="filter at loader"):
         GrammarRenderer(tokenizer, ppi_max_protein_length=1024).encode(record)
+
+
+def _shuffle_probe_records(count: int) -> list[BioSeqRecord]:
+    return [
+        BioSeqRecord(
+            chains=[BioSeqChain("A" * (index + 1), "protein_a")],
+            task_type="generic",
+            source="unit",
+        )
+        for index in range(count)
+    ]
+
+
+def test_streaming_shuffle_is_count_preserving_and_reproducible() -> None:
+    from dllm.pipelines.qwen3_vl_arch.data.grammar import _streaming_shuffle
+
+    records = _shuffle_probe_records(200)
+    original = [record.sequences[0] for record in records]
+
+    first = [
+        record.sequences[0]
+        for record in _streaming_shuffle(iter(records), 32, random.Random(123))
+    ]
+    second = [
+        record.sequences[0]
+        for record in _streaming_shuffle(iter(records), 32, random.Random(123))
+    ]
+
+    # Count preserving: same multiset, same length (keeps DDP batch counts intact).
+    assert sorted(first) == sorted(original)
+    assert len(first) == len(original)
+    # Reproducible for a fixed seed; actually reorders for buffer_size > 1.
+    assert first == second
+    assert first != original
+
+
+def test_streaming_shuffle_window_of_one_is_identity() -> None:
+    from dllm.pipelines.qwen3_vl_arch.data.grammar import _streaming_shuffle
+
+    records = _shuffle_probe_records(50)
+    passthrough = list(_streaming_shuffle(iter(records), 1, random.Random(0)))
+    assert [record.sequences[0] for record in passthrough] == [
+        record.sequences[0] for record in records
+    ]
+
+
+def test_grammar_arrow_source_shuffle_pass_seed_differs_per_pass() -> None:
+    """Two passes over the same shard should reshuffle (no repeated order)."""
+
+    from dllm.pipelines.qwen3_vl_arch.data.grammar import (
+        GrammarArrowSource,
+        GrammarArrowSourceConfig,
+    )
+
+    source = GrammarArrowSource.__new__(GrammarArrowSource)
+    source.config = GrammarArrowSourceConfig(
+        name="unit", split="train", shuffle_buffer_size=16, shuffle_seed=7
+    )
+    source._shuffle_pass = 0
+    records = _shuffle_probe_records(100)
+
+    source._raw_records = lambda shard_index, num_shards: iter(records)  # type: ignore[method-assign]
+    first = [r.sequences[0] for r in source.iter_records(shard_index=0, num_shards=1)]
+    source._raw_records = lambda shard_index, num_shards: iter(records)  # type: ignore[method-assign]
+    second = [r.sequences[0] for r in source.iter_records(shard_index=0, num_shards=1)]
+
+    assert sorted(first) == sorted(second)
+    assert first != second

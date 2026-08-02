@@ -19,6 +19,23 @@ with warnings.catch_warnings():
     warnings.simplefilter('ignore')
 from abnumber import Chain
 import os
+from pathlib import Path
+
+
+def _immunomatch_ckpt(chain_type: str) -> str:
+    """Resolve ImmunoMatch checkpoint path (Volc-safe under mounted vepfs)."""
+    name = chain_type.lower()
+    env_key = f"IMMUNOMATCH_{name.upper()}_PATH"
+    if os.environ.get(env_key):
+        return os.environ[env_key]
+    project_root = Path("/vepfs-mlp2/c20250601/251105016/project/dllm_test")
+    local = project_root / "data" / "downstream" / "immunomatch" / f"immunomatch-{name}"
+    if (local / "config.json").is_file():
+        return str(local)
+    legacy = f"/vepfs-mlp2/mlp-public/zhuyiheng/hub/checkpoints/immunomatch-{name}"
+    if os.path.isdir(legacy) and (Path(legacy) / "config.json").is_file():
+        return legacy
+    return f"fraternalilab/immunomatch-{name}"
 
 # Functions for the calculation of the pairing score for single VH-VL
 def preprocess_single_seq(seq):
@@ -75,8 +92,9 @@ def pairing_scores_batches(df_dir,hseq_col,lseq_col,model_checkpoint):
     model_checkpoint: the chesck point of the version of ImmunoMatch of your interest
     """
 
-    tokenizer = RoFormerTokenizer.from_pretrained(model_checkpoint,local_files_only=True)
-    model=RoFormerForSequenceClassification.from_pretrained(model_checkpoint,local_files_only=True)
+    local_only = os.path.isdir(model_checkpoint)
+    tokenizer = RoFormerTokenizer.from_pretrained(model_checkpoint, local_files_only=local_only)
+    model = RoFormerForSequenceClassification.from_pretrained(model_checkpoint, local_files_only=local_only)
 
     df, tokenized_datasets = tokenize_the_datasets(df_dir, hseq_col, lseq_col, tokenizer)
 
@@ -330,9 +348,10 @@ def main(
 
 
     else:
-        # Use local paths for models
-        immuno_kappa = '/vepfs-mlp2/mlp-public/zhuyiheng/hub/checkpoints/immunomatch-kappa'
-        immuno_lambda = '/vepfs-mlp2/mlp-public/zhuyiheng/hub/checkpoints/immunomatch-lambda'
+        immuno_kappa = _immunomatch_ckpt("kappa")
+        immuno_lambda = _immunomatch_ckpt("lambda")
+        print(f"ImmunoMatch kappa checkpoint: {immuno_kappa}")
+        print(f"ImmunoMatch lambda checkpoint: {immuno_lambda}")
         
         data_df = pd.read_csv(df_dir)
         data_df["_immunomatch_row_id"] = range(len(data_df))
