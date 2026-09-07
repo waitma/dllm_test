@@ -321,7 +321,7 @@ def main() -> None:
         ots_weight=args.ots_weight,
         nanobody_weight=args.nanobody_weight,
     ), args.sources)
-    dataset, counts = build_mixed_immune_dataset(
+    dataset, counts, _ = build_mixed_immune_dataset(
         specs=specs, split=args.split, max_rows_per_source=args.limit_per_source
     )
     log(rank, f"dataset sources={counts} total={len(dataset)}")

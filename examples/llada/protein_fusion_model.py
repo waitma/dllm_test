@@ -17,6 +17,12 @@ from dllm.pipelines.qwen3_vl_arch.modeling_bioseq import (
     apply_decoder_corruption_to_encoder,
     compute_masked_cross_entropy,
     sample_bioseq_diffusion_noise,
+    sample_chain_conditioned_timesteps,
+)
+from dllm.pipelines.qwen3_vl_arch.relation_aux import (
+    RELATION_AUX_MODES,
+    compute_relation_aux,
+    generated_heavy_light_masks,
 )
 
 logger = logging.getLogger(__name__)
@@ -44,6 +50,7 @@ def sample_bioseq_bert_noise(
     mask_prob: float = 0.8,
     random_prob: float = 0.1,
     residue_token_ids: torch.Tensor | None = None,
+    all_chain_targets: bool = True,
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     """Classic BERT MLM corruption (fixed rate + 80/10/10) on eligible residues.
 
@@ -54,9 +61,11 @@ def sample_bioseq_bert_noise(
     token, and the remainder keep their original id. Loss is computed on *all*
     selected positions (labels set there, ``-100`` elsewhere).
 
-    Eligibility mirrors the diffusion sampler exactly (``diffusion_eligible_mask``
-    / ``diffusion_loss_mask`` intersected with attention + residue masks) so the
-    two objectives train on the same target set.
+    ``all_chain_targets`` picks the eligible set. When True (the BERT default)
+    every residue in *all* chains is eligible (``residue_mask`` & attention), so
+    fixed grammar context such as MHC / peptide / antigen is trained too. When
+    False the eligible set mirrors the diffusion sampler
+    (``diffusion_eligible_mask``: generated chains only, context excluded).
 
     Returns
     -------
@@ -74,21 +83,29 @@ def sample_bioseq_bert_noise(
 
     input_ids = batch["input_ids"]
     attention_mask = batch.get("attention_mask")
-    loss_mask = batch.get("diffusion_loss_mask", batch.get("diffusion_target_mask"))
-    if loss_mask is None:
-        raise KeyError("batch requires diffusion_loss_mask or diffusion_target_mask")
+    residue_mask = batch.get("residue_mask")
 
-    explicit_eligible_mask = batch.get("diffusion_eligible_mask")
-    eligible_mask = (
-        explicit_eligible_mask.bool()
-        if explicit_eligible_mask is not None
-        else loss_mask.bool()
-    )
+    if all_chain_targets:
+        # BERT objective: predict every residue across *all* chains, including the
+        # fixed grammar context (MHC / peptide / antigen). Eligibility is the full
+        # residue set, not the diffusion "generated-only" (diffusion_eligible_mask).
+        if residue_mask is None:
+            raise KeyError("all_chain_targets=True requires residue_mask")
+        eligible_mask = residue_mask.bool()
+    else:
+        loss_mask = batch.get("diffusion_loss_mask", batch.get("diffusion_target_mask"))
+        if loss_mask is None:
+            raise KeyError("batch requires diffusion_loss_mask or diffusion_target_mask")
+        explicit_eligible_mask = batch.get("diffusion_eligible_mask")
+        eligible_mask = (
+            explicit_eligible_mask.bool()
+            if explicit_eligible_mask is not None
+            else loss_mask.bool()
+        )
+        if explicit_eligible_mask is None and residue_mask is not None:
+            eligible_mask = eligible_mask & residue_mask.bool()
     if attention_mask is not None:
         eligible_mask = eligible_mask & attention_mask.bool()
-    residue_mask = batch.get("residue_mask")
-    if explicit_eligible_mask is None and residue_mask is not None:
-        eligible_mask = eligible_mask & residue_mask.bool()
     if not eligible_mask.any():
         raise ValueError("batch has no eligible target tokens")
 
@@ -122,6 +139,27 @@ def sample_bioseq_bert_noise(
             noised_input_ids[to_random] = int(mask_token_id)
     # Remaining selected positions keep their original id (the "10% unchanged").
     return noised_input_ids, labels, selection_mask
+
+
+def all_residue_eligible_mask(batch: dict[str, Any]) -> torch.Tensor:
+    """``[B, S]`` bool — every residue of every chain, fixed context included.
+
+    The diffusion counterpart of the BERT ``all_chain_targets=True`` eligible set.
+    Grammar/structure/relation tokens and padding stay excluded; what is added
+    relative to ``diffusion_eligible_mask`` is precisely the fixed context
+    (antigen / MHC / peptide) that the renderer marks as never-corrupted.
+    """
+
+    residue_mask = batch.get("residue_mask")
+    if residue_mask is None:
+        raise KeyError("diffusion_all_chains=True requires residue_mask")
+    eligible_mask = residue_mask.bool()
+    attention_mask = batch.get("attention_mask")
+    if attention_mask is not None:
+        eligible_mask = eligible_mask & attention_mask.bool()
+    if not eligible_mask.any():
+        raise ValueError("batch has no eligible target tokens")
+    return eligible_mask
 
 
 def _base_id_to_token(base: Any) -> dict[int, str]:
@@ -241,7 +279,25 @@ class LLaDAEsmcFusion(BioSeqEncoderDiffusionModel):
         bert_mask_ratio: float = 0.15,
         bert_mask_prob: float = 0.8,
         bert_random_prob: float = 0.1,
+        bert_all_chains: bool = True,
+        diffusion_all_chains: bool = False,
         residue_token_ids: list[int] | None = None,
+        gidd_uniform_ratio: float = 0.0,
+        gidd_gamma: float = 1.0,
+        independent_loss_ratio: float = 0.0,
+        single_chain_ratio: float = 0.0,
+        heavy2light_loss_ratio: float = 0.0,
+        light2heavy_loss_ratio: float = 0.0,
+        joint_loss_ratio: float = 1.0,
+        focal: bool = False,
+        focal_gamma: float = 1.0,
+        loss_weight_type: str = "none",
+        softmin_snr: float = 20.0,
+        heavy_loss_weight: float = 1.0,
+        light_loss_weight: float = 1.0,
+        relation_aux: str = "none",
+        relation_aux_weight: float = 0.1,
+        relation_aux_temperature: float = 0.07,
     ) -> None:
         nn.Module.__init__(self)
         if residue_cond_mode not in {"token", "feature", "add"}:
@@ -252,6 +308,34 @@ class LLaDAEsmcFusion(BioSeqEncoderDiffusionModel):
             raise ValueError(
                 f"train_objective must be diffusion|bert, got {train_objective!r}"
             )
+        loss_weight_type = str(loss_weight_type)
+        if loss_weight_type not in {"none", "uniform", "reciprocal"}:
+            raise ValueError(
+                f"loss_weight_type must be none|uniform|reciprocal, got {loss_weight_type!r}"
+            )
+        relation_aux = str(relation_aux)
+        if relation_aux not in RELATION_AUX_MODES:
+            raise ValueError(
+                f"relation_aux must be one of {RELATION_AUX_MODES}, got {relation_aux!r}"
+            )
+        if float(relation_aux_weight) < 0.0:
+            raise ValueError("relation_aux_weight must be >= 0")
+        if float(relation_aux_temperature) <= 0.0:
+            raise ValueError("relation_aux_temperature must be > 0")
+        if not (0.0 <= float(gidd_uniform_ratio) < 1.0):
+            raise ValueError("gidd_uniform_ratio must be in [0, 1)")
+        if float(gidd_gamma) < 0.0:
+            raise ValueError("gidd_gamma must be >= 0")
+        chain_ratios = {
+            "single_chain_ratio": float(single_chain_ratio),
+            "heavy2light_loss_ratio": float(heavy2light_loss_ratio),
+            "light2heavy_loss_ratio": float(light2heavy_loss_ratio),
+            "independent_loss_ratio": float(independent_loss_ratio),
+            "joint_loss_ratio": float(joint_loss_ratio),
+        }
+        ratio_sum = sum(chain_ratios.values())
+        if abs(ratio_sum - 1.0) > 1e-6:
+            raise ValueError(f"Ophiuchus ratios must sum to 1.0, got {ratio_sum}")
         encoder_hidden_size = int(encoder_hidden_size)
         word_embeddings = decoder.get_input_embeddings()
         decoder_d_model = int(word_embeddings.embedding_dim)
@@ -267,6 +351,21 @@ class LLaDAEsmcFusion(BioSeqEncoderDiffusionModel):
         self._bert_mask_ratio = float(bert_mask_ratio)
         self._bert_mask_prob = float(bert_mask_prob)
         self._bert_random_prob = float(bert_random_prob)
+        self._bert_all_chains = bool(bert_all_chains)
+        self._diffusion_all_chains = bool(diffusion_all_chains)
+        self._gidd_uniform_ratio = float(gidd_uniform_ratio)
+        self._gidd_gamma = float(gidd_gamma)
+        self._chain_ratios = chain_ratios
+        self._focal = bool(focal)
+        self._focal_gamma = float(focal_gamma)
+        self._loss_weight_type = loss_weight_type
+        self._softmin_snr = float(softmin_snr)
+        self._heavy_loss_weight = float(heavy_loss_weight)
+        self._light_loss_weight = float(light_loss_weight)
+        self._relation_aux = relation_aux
+        self._relation_aux_weight = float(relation_aux_weight)
+        self._relation_aux_temperature = float(relation_aux_temperature)
+        self._last_relation_aux_loss: float | None = None
         # Non-persistent buffer: rides .to(device) with the model but is not saved
         # into checkpoints (integer, unaffected by .to(bfloat16)). Used to draw the
         # BERT "10% random" residue replacements in LLaDA id space.
@@ -292,15 +391,34 @@ class LLaDAEsmcFusion(BioSeqEncoderDiffusionModel):
             encoder_mask_token_id=self._encoder_mask_token_id,
             residue_cond_mode=self.residue_cond_mode,
             train_objective=self._train_objective,
+            bert_all_chains=self._bert_all_chains,
+            diffusion_all_chains=self._diffusion_all_chains,
+            gidd_uniform_ratio=self._gidd_uniform_ratio,
+            gidd_gamma=self._gidd_gamma,
+            independent_loss_ratio=self._chain_ratios["independent_loss_ratio"],
+            single_chain_ratio=self._chain_ratios["single_chain_ratio"],
+            heavy2light_loss_ratio=self._chain_ratios["heavy2light_loss_ratio"],
+            light2heavy_loss_ratio=self._chain_ratios["light2heavy_loss_ratio"],
+            joint_loss_ratio=self._chain_ratios["joint_loss_ratio"],
+            focal=self._focal,
+            focal_gamma=self._focal_gamma,
+            loss_weight_type=self._loss_weight_type,
+            softmin_snr=self._softmin_snr,
+            heavy_loss_weight=self._heavy_loss_weight,
+            light_loss_weight=self._light_loss_weight,
+            relation_aux=self._relation_aux,
+            relation_aux_weight=self._relation_aux_weight,
+            relation_aux_temperature=self._relation_aux_temperature,
             condition_norm=bool(condition_norm),
             hidden_size=decoder_d_model,
             condition_hidden_size=encoder_hidden_size,
             vocab_size=int(
                 getattr(dec_cfg, "vocab_size", word_embeddings.num_embeddings)
             ),
-            pad_token_id=getattr(dec_cfg, "pad_token_id", None),
+            pad_token_id=int(getattr(dec_cfg, "pad_token_id", 1) or 1),
             eos_token_id=getattr(dec_cfg, "eos_token_id", None),
             bos_token_id=getattr(dec_cfg, "bos_token_id", None),
+            forbidden_target_token_ids=None,
         )
         if freeze_encoder:
             for parameter in self.encoder.parameters():
@@ -322,6 +440,7 @@ class LLaDAEsmcFusion(BioSeqEncoderDiffusionModel):
         encoder_chain_mask: torch.Tensor | None = None,
         encoder_position_ids: torch.Tensor | None = None,
         encoder_kwargs: dict[str, Any] | None = None,
+        output_hidden_states: bool = False,
         **_: Any,
     ) -> BioSeqDiffusionOutput:
         _ = diffusion_state, position_ids_chain, timesteps
@@ -391,13 +510,54 @@ class LLaDAEsmcFusion(BioSeqEncoderDiffusionModel):
             else:
                 raise ValueError(f"unexpected residue_cond_mode={self.residue_cond_mode!r}")
 
-        out = self.decoder(inputs_embeds=inputs_embeds, attention_mask=attention_mask)
+        out = self.decoder(
+            inputs_embeds=inputs_embeds,
+            attention_mask=attention_mask,
+            output_hidden_states=output_hidden_states,
+            use_cache=False,
+        )
+        hidden = None
+        if output_hidden_states and getattr(out, "hidden_states", None):
+            hidden = out.hidden_states[-1]
         return BioSeqDiffusionOutput(
             loss=None,
             logits=out.logits,
-            hidden_states=None,
+            hidden_states=hidden,
             encoder_condition=None,
         )
+
+    @torch.no_grad()
+    def last_hidden_state(self, **batch: Any) -> torch.Tensor:
+        """Clean unmasked fusion hidden states for representation eval."""
+
+        output = self._denoise(output_hidden_states=True, **batch)
+        if output.hidden_states is None:
+            raise RuntimeError("LLaDA decoder did not return hidden_states")
+        return output.hidden_states
+
+    def _diffusion_token_weights(
+        self,
+        token_t: torch.Tensor,
+        zero_loss_mask: torch.Tensor,
+    ) -> torch.Tensor | None:
+        """Per-token loss weights for reciprocal / single-chain zero-out.
+
+        Continue-train defaults (``loss_weight_type='none'``, no single-chain
+        bucket) return ``None`` so CE is unchanged.
+        """
+
+        if self._loss_weight_type == "reciprocal":
+            if self._softmin_snr:
+                weights = 1.0 / (token_t + 1.0 / float(self._softmin_snr))
+            else:
+                weights = 1.0 / token_t.clamp(min=self._time_epsilon)
+        elif self._loss_weight_type in {"none", "uniform"}:
+            if not zero_loss_mask.any():
+                return None
+            weights = torch.ones_like(token_t)
+        else:
+            raise ValueError(f"Unsupported loss_weight_type: {self._loss_weight_type!r}")
+        return weights.masked_fill(zero_loss_mask, 0.0)
 
     def forward(self, **batch: Any) -> BioSeqDiffusionOutput:
         """DDP/FSDP-safe entry: HF Trainer calls ``model(**inputs)`` so the wrapper
@@ -405,6 +565,16 @@ class LLaDAEsmcFusion(BioSeqEncoderDiffusionModel):
         return self.compute_loss(batch)
 
     def compute_loss(self, batch: dict[str, Any]) -> BioSeqDiffusionOutput:
+        # Pair roles are defined on *generated* receptor residues. Snapshot
+        # before ``diffusion_all_chains`` widens eligibility, otherwise antigen
+        # / MHC / peptide would become "heavy" and the pairing aux would score
+        # the wrong chains.
+        heavy_pair_mask, light_pair_mask = generated_heavy_light_masks(batch)
+        want_aux = (
+            bool(self.training)
+            and self._relation_aux != "none"
+            and self._relation_aux_weight > 0.0
+        )
         if self._train_objective == "bert":
             noised_input_ids, labels, corruption_mask = sample_bioseq_bert_noise(
                 batch=batch,
@@ -413,13 +583,36 @@ class LLaDAEsmcFusion(BioSeqEncoderDiffusionModel):
                 mask_prob=self._bert_mask_prob,
                 random_prob=self._bert_random_prob,
                 residue_token_ids=self._residue_token_ids,
+                all_chain_targets=self._bert_all_chains,
             )
             timesteps = None
         else:
+            if self._diffusion_all_chains:
+                # Both the timestep sampler and the noise sampler re-derive
+                # eligibility from these two masks, so widening them here is what
+                # pulls the fixed context into corruption, labels and the encoder
+                # mirror. Nothing else about the objective changes: still one
+                # t ~ U(eps, 1) per sequence and Bernoulli(t) absorbing masking.
+                eligible_mask = all_residue_eligible_mask(batch)
+                batch = {
+                    **batch,
+                    "diffusion_eligible_mask": eligible_mask,
+                    "diffusion_loss_mask": eligible_mask,
+                }
+            timed = sample_chain_conditioned_timesteps(
+                batch,
+                ratios=self._chain_ratios,
+                time_epsilon=self._time_epsilon,
+                stage="val" if not self.training else "train",
+            )
             noised_input_ids, labels, corruption_mask, timesteps = sample_bioseq_diffusion_noise(
                 batch=batch,
                 mask_token_id=self._decoder_mask_token_id,
                 time_epsilon=self._time_epsilon,
+                uniform_ratio=self._gidd_uniform_ratio,
+                gidd_gamma=self._gidd_gamma,
+                residue_token_ids=self._residue_token_ids,
+                token_t=timed.token_t,
             )
         # For BERT, corruption_mask is the full selection (all 15%): mirror it onto
         # the encoder so the frozen ESMC never sees a target residue it must predict
@@ -446,13 +639,61 @@ class LLaDAEsmcFusion(BioSeqEncoderDiffusionModel):
             encoder_residue_mask=batch.get("encoder_residue_mask"),
             encoder_chain_mask=batch.get("encoder_chain_mask"),
             encoder_position_ids=batch.get("encoder_position_ids"),
+            output_hidden_states=want_aux,
         )
-        loss = compute_masked_cross_entropy(
-            output.logits,
-            labels,
-            loss_norm=self._loss_norm,
-            forbidden_token_ids=None,
-        )
+        if self._train_objective == "bert":
+            recon = compute_masked_cross_entropy(
+                output.logits,
+                labels,
+                loss_norm=self._loss_norm,
+                forbidden_token_ids=None,
+            )
+        else:
+            token_weights = self._diffusion_token_weights(
+                timed.token_t, timed.zero_loss_mask
+            )
+            # Continue-train defaults (both chain weights 1.0) keep the original
+            # pooled CE. Passing the masks would switch to AirGen's sum of
+            # per-chain means and change the loss scale.
+            use_chain_loss = (
+                self._heavy_loss_weight != 1.0 or self._light_loss_weight != 1.0
+            )
+            recon = compute_masked_cross_entropy(
+                output.logits,
+                labels,
+                loss_norm=self._loss_norm,
+                forbidden_token_ids=None,
+                focal=self._focal,
+                focal_gamma=self._focal_gamma,
+                token_weights=token_weights,
+                heavy_mask=timed.heavy_mask if use_chain_loss else None,
+                light_mask=timed.light_mask if use_chain_loss else None,
+                heavy_loss_weight=self._heavy_loss_weight,
+                light_loss_weight=self._light_loss_weight,
+            )
+        aux = recon.new_zeros(())
+        if want_aux:
+            if output.hidden_states is None:
+                raise RuntimeError(
+                    "relation_aux requested hidden_states but the LLaDA decoder "
+                    "did not return them"
+                )
+            aux = compute_relation_aux(
+                self._relation_aux,
+                output.hidden_states,
+                heavy_pair_mask,
+                light_pair_mask,
+                residue_mask=batch.get("residue_mask"),
+                attention_mask=batch.get("attention_mask"),
+                corruption_mask=corruption_mask,
+                temperature=self._relation_aux_temperature,
+            )
+            loss = recon + aux.to(dtype=recon.dtype) * self._relation_aux_weight
+            self._last_relation_aux_loss = float(aux.detach().float().item())
+        else:
+            loss = recon
+            # Eval stays reconstruction-only so top-k ranking is unchanged.
+            self._last_relation_aux_loss = None
         return BioSeqDiffusionOutput(
             loss=loss,
             logits=output.logits,
@@ -463,4 +704,5 @@ class LLaDAEsmcFusion(BioSeqEncoderDiffusionModel):
             timesteps=timesteps,
             noised_encoder_input_ids=noised_encoder_input_ids,
             encoder_condition=output.encoder_condition,
+            relation_aux_loss=aux.detach() if want_aux else None,
         )

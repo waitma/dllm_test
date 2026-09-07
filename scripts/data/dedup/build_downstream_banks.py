@@ -206,6 +206,18 @@ def build_tcr(banks: Banks) -> None:
                 c["tcr_cdr3a"] += banks.add_cdr3(banks.tcr_cdr3a, row.get("cdr3a") or row.get("CDR3a"))
         banks.note(str(base), c)
 
+    # Public TCR-beta specificity benchmark (Track-A): references.csv stores the
+    # protected CDR3-beta in a `cdr3b_reference` column (full CASS...F form). The
+    # generic csv loop above does NOT catch it (wrong column name), so ingest it
+    # explicitly -- these 1306 references are a hard-requirement protected set.
+    p = DOWN / "benchmark/data/tcr_beta_public_benchmark/references.csv"
+    c = {"tcr_cdr3b": 0}
+    for row in _read_csv(p):
+        c["tcr_cdr3b"] += banks.add_cdr3(
+            banks.tcr_cdr3b, row.get("cdr3b_reference") or row.get("cdr3b") or row.get("CDR3b")
+        )
+    banks.note(str(p), c)
+
 
 def build_ppi(banks: Banks) -> None:
     # IRBench STRING 90/90

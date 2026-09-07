@@ -1,3 +1,6 @@
+> ⚠️ **ARCHIVE — 范围已冻结（FLAb 不在评测范围内），仅历史/复现用。**
+> 范围定义：[`../benchmark/README.md`](../benchmark/README.md) §0。不要给本文填新数字。归档于 2026-09-02。
+
 # FLAb 抗体属性回归（MINT Figure 3b 口径）
 
 在 [Graylab/FLAb](https://github.com/Graylab/FLAb) 四个公开数据集上，用 frozen backbone 嵌入 + Ridge 回归预测抗体 fitness（结合亲和力 / 表达）。

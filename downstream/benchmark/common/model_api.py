@@ -1071,6 +1071,122 @@ class EsmcLladaBioSeqEmbedder(GrammarEmbedder):
         }
 
 
+def parse_grammar_embedder_spec(spec: str) -> tuple[str, str, str]:
+    """Split ``grammar:[source:][pool:]path`` without breaking absolute paths."""
+
+    if not spec.startswith("grammar:"):
+        raise ValueError(f"not a grammar embedder spec: {spec}")
+    rest = spec[len("grammar:"):]
+    source = "decoder"
+    pool = "global"
+    if rest.startswith("decoder:") or rest.startswith("encoder:"):
+        source, rest = rest.split(":", 1)
+    pool_aliases = {
+        "global": "global",
+        "wholefeat": "global",
+        "whole": "global",
+        "sequence": "global",
+        "seq": "global",
+        "segment": "segment_concat",
+        "seg": "segment_concat",
+        "segment_concat": "segment_concat",
+    }
+    for tag, mode in pool_aliases.items():
+        prefix = f"{tag}:"
+        if rest.startswith(prefix):
+            pool = mode
+            rest = rest[len(prefix):]
+            break
+    if not rest:
+        raise ValueError(f"grammar spec missing checkpoint path: {spec}")
+    return source, pool, rest
+
+
+class FusionGrammarEmbedder(GrammarEmbedder):
+    """Immune fusion mean-pool embedder (BERT and diffusion share this).
+
+    Renders a grammar-v2 record, runs the current ``LLaDAEsmcFusion`` clean
+    forward, and globally mean-pools residue hidden states.
+
+    The pooled vector is returned as-is. Note that this final hidden state is
+    strongly anisotropic (mean pairwise cosine ~0.99, effective rank ~17-20 of
+    768) -- see RESULTS.md 0.0 defect (f) for what that costs the downstream
+    cosine / K-means metrics. Re-scaling it was evaluated and **deliberately
+    not adopted**; the readout stays raw.
+    """
+
+    def __init__(
+        self,
+        checkpoint_dir: str,
+        device: str | None = None,
+        feature_source: str = "decoder",
+        pool_mode: str = "global",
+        pair_pooling: str | None = None,
+        batch_size: int = 8,
+        max_length: int = 1024,
+    ):
+        import sys as _sys
+        from pathlib import Path as _P
+        import torch
+        from dllm.pipelines.qwen3_vl_arch.data import BioSeqChain, BioSeqRecord
+        from examples.llada.load_fusion_checkpoint import (
+            load_fusion_for_eval,
+            resolve_fusion_dir,
+        )
+
+        dllm_test_dir = _P(__file__).resolve().parents[3]
+        if str(dllm_test_dir) not in _sys.path:
+            _sys.path.insert(0, str(dllm_test_dir))
+
+        self._torch = torch
+        self._Chain = BioSeqChain
+        self._Record = BioSeqRecord
+        self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
+        if feature_source not in ("decoder", "encoder"):
+            raise ValueError(
+                f"feature_source must be decoder|encoder, got {feature_source}"
+            )
+        if pair_pooling is not None:
+            pool_mode = (
+                "segment_concat" if pair_pooling == "segment"
+                else "global" if pair_pooling == "sequence"
+                else pool_mode
+            )
+        if pool_mode not in self._POOL_MODES:
+            raise ValueError(f"pool_mode must be global|segment_concat, got {pool_mode}")
+        if feature_source != "decoder" or pool_mode != "global":
+            raise ValueError(
+                "FusionGrammarEmbedder headline is decoder + global mean-pool only"
+            )
+        self.feature_source = "decoder"
+        self.pool_mode = "global"
+        self.pair_pooling = "sequence"
+        self.batch_size = int(batch_size)
+        self.max_length = int(max_length)
+        ckpt = resolve_fusion_dir(checkpoint_dir)
+        bundle = load_fusion_for_eval(
+            ckpt, device=self.device, max_length=self.max_length
+        )
+        self.model = bundle.model
+        self.tokenizer = bundle.grammar_tokenizer
+        self.collator = bundle.collator
+        self.model.eval()
+        for parameter in self.model.parameters():
+            parameter.requires_grad_(False)
+        self.hidden = int(bundle.d_model)
+        self.enc_hidden = int(bundle.encoder_hidden)
+        self.dim = self.hidden
+        self._state_dict_path = str(ckpt)
+        self._encoder_path = None
+        self._cache: dict[tuple, dict | np.ndarray] = {}
+        self._single_cache: dict[str, np.ndarray] = {}
+        self.name = f"Fusion-{ckpt.parent.name}-{ckpt.name}-decoder"
+
+    def _final_hidden(self, batch):
+        hidden = self.model.last_hidden_state(**batch)
+        return hidden, None
+
+
 def BioSeqEmbedder(state_dict_path: str, device: str | None = None, **kwargs):
     """Trained immune-receptor foundation-model embedder (auto-detects backbone).
 
@@ -1111,31 +1227,16 @@ def build_embedder(spec: str, **kwargs) -> SequenceEmbedder:
       * ``antiberty``                        -> AntiBERTy via the antiberty package.
       * ``hf:<repo_id>``                     -> any HF masked-LM (space-separated).
     """
+    if spec.startswith("fusion:"):
+        return FusionGrammarEmbedder(checkpoint_dir=spec.split(":", 1)[1], **kwargs)
     if spec.startswith("grammar:"):
-        # grammar:/abs/best.pt
-        # grammar:decoder:/abs/best.pt
-        # grammar:decoder:/abs/best.pt              (global pool, default)
-        # grammar:decoder:global:/abs/best.pt       (explicit global pool)
-        # grammar:decoder:wholefeat:/abs/best.pt    (alias)
-        # grammar:decoder:segment:/abs/best.pt      (deprecated segment concat)
-        rest = spec.split(":", 1)[1]
-        parts = rest.split(":")
-        if parts[0] in ("decoder", "encoder"):
-            source = parts[0]
-            kwargs.setdefault("feature_source", source)
-            if len(parts) >= 3 and parts[1] in (
-                    "global", "wholefeat", "whole", "sequence", "seq",
-                    "segment", "seg", "segment_concat"):
-                tag = parts[1]
-                if tag in ("global", "wholefeat", "whole", "sequence", "seq"):
-                    kwargs.setdefault("pool_mode", "global")
-                else:
-                    kwargs.setdefault("pool_mode", "segment_concat")
-                path = ":".join(parts[2:])
-            else:
-                path = ":".join(parts[1:])
-            return GrammarEmbedder(state_dict_path=path, **kwargs)
-        return GrammarEmbedder(state_dict_path=rest, **kwargs)
+        source, pool, path = parse_grammar_embedder_spec(spec)
+        kwargs.setdefault("feature_source", source)
+        kwargs.setdefault("pool_mode", pool)
+        from examples.llada.load_fusion_checkpoint import is_fusion_checkpoint
+        if is_fusion_checkpoint(path):
+            return FusionGrammarEmbedder(checkpoint_dir=path, **kwargs)
+        return GrammarEmbedder(state_dict_path=path, **kwargs)
     if spec.startswith("bioseq-llada:"):
         # Post-LLaDA口径: full ESMC->LLaDA pipeline, final LLaDA hidden state.
         return EsmcLladaBioSeqEmbedder(state_dict_path=spec.split(":", 1)[1], **kwargs)

@@ -48,14 +48,37 @@ NB-antigen:           <prots> ANTIGEN <protd> <binding> <prots> <nb> VHH <protd>
 - Chain identity (heavy vs light, alpha vs beta, partner A vs B) is expressed by
   `position_ids_chain` / `chain_ids` embedding indices plus object boundaries,
   not by per-role token names.
+
+  > 🔴 **This holds only for multi-chain blocks, where identity comes from
+  > position within the block. It does NOT hold for single-chain blocks.**
+  > Verified 2026-08-29: rendering the same sequence once as `role="tcr_alpha"`
+  > and once as `role="tcr_beta"`, both yield `grammar_name="tcr_single"` and
+  > **all 11 output fields are byte-identical** — `input_ids`,
+  > `position_ids_chain`, `position_ids_inner`, `token_class_ids`, and all three
+  > masks. There is no `<tcra>`/`<tcrb>` marker and no `chain_ids` key in the
+  > renderer output at all; the receptor block emits a bare `<tcr>`
+  > (`grammar.py:466-472`).
+  >
+  > Consequence: **single-chain alpha data cannot be ingested.** It would land
+  > in the same `tcr_single` distribution as the 2.13M `tcr_repertoire` CDR3β
+  > rows with nothing telling the model which chain to generate, and would
+  > corrupt the beta distribution that the T4 Setting-A benchmark measures.
+  > Fixing this means extending the vocabulary, which breaks existing
+  > checkpoints. Tracked in
+  > `examples/llada/DATA_PIPELINE_README.md` §6.2.
 - `<REL>` is the inferred relation token for the PPI edge.
 - Antigen-conditioned tasks distinguish antibody vs nanobody via `<ab>` vs `<nb>`
   inside the generated receptor block.
 - TCR role lookup is role-first. Explicit `tcr_alpha` / `tcr_beta` roles are
-  preserved even when only one receptor chain is present; peptide, antigen, and
+  honored when selecting and ordering chains; peptide, antigen, and
   MHC context chains are never consumed by the legacy positional TCR-pair
   fallback. Positional `[beta, alpha]` inference is limited to context-free
   legacy records with neither receptor role present.
+
+  Note "honored" means the roles drive *selection and ordering* only. With two
+  chains the order `[alpha, beta]` makes the identity recoverable; with one
+  chain the role leaves **no trace in the rendered output** (see the warning
+  above).
 
 ## Denoising (fixed vs generated)
 

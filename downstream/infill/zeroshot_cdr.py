@@ -1,3 +1,4 @@
+"""Historical port. Official-ckpt eval lives in ``downstream/ophiuchus_eval/cdr_sabdab.py``."""
 from __future__ import annotations
 
 import argparse

@@ -1,4 +1,4 @@
-"""Light-chain pairing eval adapter for grammar-v1 BioSeq models.
+"""Light-chain pairing eval adapter for grammar BioSeq / LLaDA-fusion models.
 
 Generate + evaluate (ImmunoMatch, diversity, ANARCI chain/V/J metrics):
   conda activate protenix_abtcr
@@ -7,6 +7,30 @@ Generate + evaluate (ImmunoMatch, diversity, ANARCI chain/V/J metrics):
     --checkpoint-path /vepfs-mlp2/c20250601/251105016/project/dllm_test/output/grammar_v1_esmc300m/latest.pt \\
     --output-csv /vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/grammar_v1_esmc300m_light_pairing.csv \\
     --device cuda --num-seqs 8 --light-prompt-tokens 3
+
+Target-length discipline (``--light-length-mode``)
+--------------------------------------------------
+The grammar-v2 record renders a chain as exactly ``len(sequence)`` residue slots
+and there is no in-block terminator the model could emit, so the number of masked
+slots *is* the generated length.  Building the record from the reference light
+chain therefore leaks the target length.
+
+``reference``
+    Legacy behaviour: allocate ``len(reference_light)`` slots.  **Leaks the
+    target length** -> generated light is a near-reconstruction of the reference
+    (measured: 100% length match, ~0.95 identity).  Kept only for reproducing
+    older diagnostics; never use it for a pairing capability claim.
+
+``prior`` (default)
+    Draw the light-chain length from a reference-independent prior histogram
+    built from the OAS *training* split
+    (``data/downstream/comp_chain/oas_train_light_length_prior.json``).  This is
+    the grammar-side analogue of the official AirGen protocol
+    (``AirGen-Dev/downstream/comp_chain/generate_light_from_csv.py``), which
+    allocates a fixed 128-token light buffer, masks everything after the prompt
+    and lets the model emit its own ``<eos>``.  Our model has no terminator, so
+    the length comes from the marginal prior instead of from this row's
+    reference.
 """
 
 from __future__ import annotations
@@ -26,11 +50,22 @@ from tqdm import tqdm
 
 PROJECT_ROOT = Path("/vepfs-mlp2/c20250601/251105016/project/dllm_test")
 DEFAULT_HOLDOUT_CSV = PROJECT_ROOT / "data" / "downstream" / "comp_chain" / "test_data_oas_holdout.csv"
+DEFAULT_LENGTH_PRIOR_JSON = (
+    PROJECT_ROOT / "data" / "downstream" / "comp_chain" / "oas_train_light_length_prior.json"
+)
+# Fully masked filler; only the slot count reaches the model, never this residue.
+LENGTH_PRIOR_FILLER = "A"
+# Bump whenever the generation protocol or decoding path changes semantically, so a
+# stale `.progress.pt` from the previous protocol can never be resumed into a new run.
+# v2 = light_length_mode + the ESMC encoder-stream leak fix (encoder now mirrors the
+# whole generation mask instead of the shrinking corruption mask).
+GENERATION_PROTOCOL_VERSION = 2
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from downstream.grammar.common import (
     antibody_pair_record,
+    build_eval_collator,
     build_grammar_collator,
     build_grammar_tokenizer,
     collate_records,
@@ -67,6 +102,40 @@ class HeavyLightCsvDataset(Dataset):
 
     def __getitem__(self, index: int):
         return self.heavy[index], self.light[index], self.metadata[index]
+
+
+class LightLengthPrior:
+    """Reference-independent light-chain length prior (OAS train histogram)."""
+
+    def __init__(self, path: Path):
+        payload = json.loads(Path(path).read_text())
+        histogram = payload["histogram"]
+        self.path = Path(path)
+        self.n_rows = int(payload.get("n_rows", 0))
+        self.lengths = np.array(sorted(int(k) for k in histogram), dtype=np.int64)
+        weights = np.array([float(histogram[str(int(k))]) for k in self.lengths], dtype=np.float64)
+        self.probs = weights / weights.sum()
+
+    def sample(self, size: int) -> np.ndarray:
+        return np.random.choice(self.lengths, size=size, p=self.probs)
+
+    def signature(self) -> dict[str, Any]:
+        return {
+            "path": str(self.path.resolve()),
+            "n_rows": self.n_rows,
+            "n_bins": int(self.lengths.size),
+            "min_length": int(self.lengths.min()),
+            "max_length": int(self.lengths.max()),
+        }
+
+
+def build_placeholder_light(reference_light: str, target_length: int, prompt_residues: int) -> str:
+    """Prompt residues from the reference, remaining slots filled and later masked."""
+
+    prompt_residues = max(int(prompt_residues), 0)
+    target_length = max(int(target_length), prompt_residues, 1)
+    prompt = reference_light[:prompt_residues]
+    return prompt + LENGTH_PRIOR_FILLER * (target_length - len(prompt))
 
 
 def generation_csv_path(output_path: Path, num_seqs: int) -> Path:
@@ -118,6 +187,8 @@ def _generation_signature(args, dataset_len: int) -> dict[str, Any]:
         "sampling_strategy": args.sampling_strategy,
         "temperature": float(args.temperature),
         "light_prompt_tokens": int(args.light_prompt_tokens),
+        "light_length_mode": str(args.light_length_mode),
+        "protocol_version": int(GENERATION_PROTOCOL_VERSION),
         "seed": args.seed,
     }
 
@@ -192,13 +263,31 @@ def generate_for_batch(
     sampling_strategy: str,
     temperature: float,
     light_prompt_tokens: int,
+    light_length_mode: str,
+    length_prior: LightLengthPrior | None,
 ) -> list[dict]:
     records = []
-    metadata_rows: list[tuple[str, str, int, dict]] = []
+    metadata_rows: list[tuple[str, str, int, dict, int]] = []
+
+    if light_length_mode == "prior":
+        if length_prior is None:
+            raise ValueError("light_length_mode='prior' requires a length prior")
+        drawn = length_prior.sample(len(samples) * num_seqs)
+    else:
+        drawn = None
+
+    cursor = 0
     for heavy, light, metadata in samples:
         for variant_idx in range(num_seqs):
-            records.append(antibody_pair_record(heavy, light))
-            metadata_rows.append((heavy, light, variant_idx, metadata))
+            if drawn is not None:
+                target_length = int(drawn[cursor])
+                slot_light = build_placeholder_light(light, target_length, light_prompt_tokens)
+            else:
+                target_length = len(light)
+                slot_light = light
+            cursor += 1
+            records.append(antibody_pair_record(heavy, slot_light))
+            metadata_rows.append((heavy, light, variant_idx, metadata, target_length))
 
     batch = collator(records)
     batch = {key: value.to(device) if torch.is_tensor(value) else value for key, value in batch.items()}
@@ -217,7 +306,7 @@ def generate_for_batch(
     )
 
     rows: list[dict] = []
-    for row_idx, (heavy, light, variant_idx, metadata) in enumerate(metadata_rows):
+    for row_idx, (heavy, light, variant_idx, metadata, target_length) in enumerate(metadata_rows):
         generated_light = extract_chain_sequence(
             output_tokens[row_idx],
             batch["attention_mask"][row_idx],
@@ -230,6 +319,10 @@ def generate_for_batch(
             "gen_l_sequence": generated_light,
             "raw_l_sequence": light,
             "variant_idx": variant_idx,
+            # Audit trail for the length-leakage fix: where the slot count came from.
+            "light_length_mode": light_length_mode,
+            "target_light_length": int(target_length),
+            "ref_light_length": len(light),
         }
         for key, value in metadata.items():
             if key not in result:
@@ -265,13 +358,28 @@ def run_generation(args) -> Path:
         np.random.seed(args.seed)
         random.seed(args.seed)
 
+    length_prior: LightLengthPrior | None = None
+    if args.light_length_mode == "prior":
+        length_prior = LightLengthPrior(Path(args.length_prior_json))
+        print(
+            f"Light-length prior: {length_prior.signature()} "
+            f"(reference-independent; target length is NOT taken from the reference)",
+            flush=True,
+        )
+    else:
+        print(
+            "WARNING: --light-length-mode=reference allocates len(reference_light) slots and "
+            "therefore LEAKS the target length. Diagnostic only; not a pairing capability claim.",
+            flush=True,
+        )
+
     if args.checkpoint_path:
         model, tokenizer = load_grammar_checkpoint(args.checkpoint_path, device=device)
     else:
         tokenizer = build_grammar_tokenizer()
         model = load_untrained_no_encoder(tokenizer.vocab_size, mask_token_id=tokenizer.mask_token_id).to(device)
 
-    collator = build_grammar_collator(tokenizer)
+    collator = build_eval_collator(model, tokenizer)
     end_index = None if args.max_samples is None else args.start_index + args.max_samples
     dataset = HeavyLightCsvDataset(
         args.csv_path,
@@ -319,6 +427,8 @@ def run_generation(args) -> Path:
             sampling_strategy=args.sampling_strategy,
             temperature=args.temperature,
             light_prompt_tokens=args.light_prompt_tokens,
+            light_length_mode=args.light_length_mode,
+            length_prior=length_prior,
         ))
         next_index = min(start_idx + heavy_batch_size, len(dataset))
         _save_progress(
@@ -374,6 +484,18 @@ def main() -> None:
     parser.add_argument("--sampling-strategy", type=str, default="gumbel_argmax")
     parser.add_argument("--temperature", type=float, default=1.0)
     parser.add_argument("--light-prompt-tokens", type=int, default=3)
+    parser.add_argument(
+        "--light-length-mode",
+        type=str,
+        default="prior",
+        choices=("prior", "reference"),
+        help=(
+            "prior: draw the light length from the OAS-train histogram (no target-length "
+            "leakage, default). reference: allocate len(reference_light) slots (LEAKS length; "
+            "diagnostic only)."
+        ),
+    )
+    parser.add_argument("--length-prior-json", type=str, default=str(DEFAULT_LENGTH_PRIOR_JSON))
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--metrics-json", type=str, default="")
     parser.add_argument("--skip-eval", action="store_true")

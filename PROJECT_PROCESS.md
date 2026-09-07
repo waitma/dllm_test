@@ -1,5 +1,458 @@
 # Project Process
 
+## 2026-09-07 T4 / CDR 四个阶段改本地单卡跑（不再等 `queue012`）
+
+**操作**：用户决定被 cancel 的 T4 与 CDR 四个阶段本地跑。本机有**一张空闲 A100-80G**
+（`nvidia-smi` 0% / 4MiB，无其他进程），这四个阶段本来就是单卡 `ml.pni2.3xlarge` 作业，
+本地跑与平台跑的计算完全等价 —— **pairing 仍留在 `queue012` 排队，不本地跑**
+（要 2.7 小时，且两条 pairing 是本轮关键路径，占住本地卡会把 T4/CDR 也拖慢）。
+
+Runner：`output/_local_runs/run_local_t4_cdr.sh`（`nohup` 后台，日志
+`output/_local_runs/local_run.log`，每阶段耗时与退出码写 `output/_local_runs/status.tsv`）。
+**四阶段串行**，因为只有一张卡；env 与 eval YAML 的 entrypoint 逐行对齐
+（`protenix_abtcr` env、`CUDA_VISIBLE_DEVICES=0`、`HF_HUB_OFFLINE=1`、`CDR_MAX_ITER=2`、
+batch `4 8`），故产物与平台跑出的完全同口径。
+
+| 顺序 | 阶段 | ckpt | tag | 对应已 cancel 的平台任务 |
+|---:|---|---|---|---|
+| 1 | T4 | `eval_snapshot_151000` | `ours_fusion_v3_allchains_8gpu2m_151000` | `t-20260907044310-wlm9h` |
+| 2 | T4 | `eval_snapshot_44000` | `ours_fusion_v3_genonly_8gpu2m_44000` | `t-20260907044324-tcmhs` |
+| 3 | CDR | `eval_snapshot_151000` | `ours_fusion_v3_allchains_8gpu2m_151000` | `t-20260907044303-ks4x6` |
+| 4 | CDR | `eval_snapshot_44000` | `ours_fusion_v3_genonly_8gpu2m_44000` | `t-20260907044317-kfhk2` |
+
+预计合计约 1 小时（T4 12min×2 + CDR 16min×2 的历史中位数）。**21:28:38Z 起跑**，
+第一条 T4 held20 已在出序列（7/20 epitope，GPU 60%）。产物仍写
+`output/downstream_generation/<tag>_*`，与平台任务同路径。
+
+⚠️ **本地跑与闲时旧九条有同路径写冲突风险**：`c20250601` 上未停的
+`t-20260906233455-djlmk`（151000-t4）、`t-20260906233513-mpfv5`（44000-t4）、
+`t-20260907001930-qtf2s`（151000-cdr）、`t-20260906233504-x2n8b`（44000-cdr）
+一旦抢到闲时资源，会和本地跑写同一批文件。**控制台停旧九条这件事现在更紧迫了。**
+
+BERT 105000 表征（`t-20260907044328-wwfjn`）与两条 repr 未纳入本次本地跑，用户未要求；
+要补做同样可本地跑（`run_immune_fusion_repr.sh`，历史中位 28min）。
+
+---
+
+## 2026-09-07 只留两条 pairing，其余七条 cancel（`queue012` 单卡排不动）
+
+**操作**：用户决定只保留 pairing。`queue012` 上那批非闲时九条排了 41 分钟仍 **9/9 `Queue`**，
+按历史耗时中位数排序（T4 12min / CDR 16min / repr 28min / **pairing 165min**），pairing 是关键路径，
+其余七条先让位。cancel 时七条**都还在 `Queue`**，未中断任何已起跑的计算。
+
+| 保留（`queue012` 非闲时） | Task ID |
+|---|---|
+| `eval-v3-allchains-8gpu2m-151000-pairing` | `t-20260907044307-btjxr` |
+| `eval-v3-genonly-8gpu2m-44000-pairing` | `t-20260907044321-ht8b6` |
+
+已 cancel 七条（均 `cancel success`）：`t-20260907044259-qd52v`（151000-repr）、
+`t-20260907044303-ks4x6`（151000-cdr）、`t-20260907044310-wlm9h`（151000-t4）、
+`t-20260907044314-mtzn9`（44000-repr）、`t-20260907044317-kfhk2`（44000-cdr）、
+`t-20260907044324-tcmhs`（44000-t4）、`t-20260907044328-wwfjn`（bert-105000-repr）。
+这七条的 ckpt / tag 未变，要补做直接用原 YAML 重提即可。
+
+**下游各阶段实测耗时（36 条历史 Success 的中位数，供以后排优先级用）**
+
+| 阶段 | 中位 | 范围 | 解码步数 |
+|---|---:|---|---|
+| T4 生成 | 12 min | 11–28 | 脚本写死 32 |
+| AB CDR | 16 min | 16–43 | `CDR_MAX_ITER=2` |
+| 表征 T1/T2/T3 | 28 min | 27–55 | — |
+| **AB light pairing** | **165 min** | 164–180 | `PAIR_MAX_ITER=124` |
+
+pairing 慢一个数量级是解码步数差异所致，不是数据量。偏慢的离群值（repr 55min / CDR 43min）都来自
+`4gpu-42000` 那批，与阶段无关。
+
+🔴 **`c20250601` 闲时旧九条仍全在 `Queue`，其中两条 pairing 与保留的两条同名同产物前缀**
+（`t-20260906233451-fjzmm` / `t-20260906233508-svn2t`）。本账号无权 cancel，**需控制台停掉**，
+优先停这两条 pairing：跑满要 2.7 小时且是闲时资源，中途被抢即白跑，还会把新任务产物覆盖成半成品。
+
+---
+
+## 2026-09-07 九条单卡下游改投 `queue012` 非闲时重提（`c20250601` 权限已失）
+
+**操作**：用户要求把仍未起跑的单卡采样/评测任务改成非闲时重提。九条 `eval-v3-*`（全链 151000 全套、
+generated-only 44000 全套、BERT 1M 105000 表征）在 `c20250601` 闲时排了 **4.9 小时仍全是 `Queue`**，
+零起跑。改 `Preemptible: false`，队列由 `c20250601` 改为 **`queue012`**，单卡 `ml.pni2.3xlarge` 不变。
+
+**为什么连队列一起换**：本账号对 `c20250601`（`q-20260121145036-6fztt`）**已无 `CreateCustomTask` 权限**，
+非闲时重提直接被 IAM 拒（`RequestID=202609070441150F35291B10C95F36E668` 等九条）。用一条探针任务
+（`probe-perm-check-donotrun` → `t-20260907044147-jvzpn`，提交后立即 cancel 成功、已 `Killed`）确认
+`queue012` 可提交可取消，故九条统一改投 `queue012`。
+
+| Job | 新 Task ID（queue012 非闲时） | 旧 Task ID（c20250601 闲时，仍 Queue） |
+|---|---|---|
+| `eval-v3-allchains-8gpu2m-151000-repr` | `t-20260907044259-qd52v` | `t-20260906233442-d2gzt` |
+| `eval-v3-allchains-8gpu2m-151000-cdr` | `t-20260907044303-ks4x6` | `t-20260907001930-qtf2s` |
+| `eval-v3-allchains-8gpu2m-151000-pairing` | `t-20260907044307-btjxr` | `t-20260906233451-fjzmm` |
+| `eval-v3-allchains-8gpu2m-151000-t4` | `t-20260907044310-wlm9h` | `t-20260906233455-djlmk` |
+| `eval-v3-genonly-8gpu2m-44000-repr` | `t-20260907044314-mtzn9` | `t-20260906233500-9f7vp` |
+| `eval-v3-genonly-8gpu2m-44000-cdr` | `t-20260907044317-kfhk2` | `t-20260906233504-x2n8b` |
+| `eval-v3-genonly-8gpu2m-44000-pairing` | `t-20260907044321-ht8b6` | `t-20260906233508-svn2t` |
+| `eval-v3-genonly-8gpu2m-44000-t4` | `t-20260907044324-tcmhs` | `t-20260906233513-mpfv5` |
+| `eval-v3-bert-1m-105000-repr` | `t-20260907044328-wwfjn` | `t-20260906233517-9x8kq` |
+
+九条新任务已 `ml_task get` 回读确认 `Preemptible=False` + `ResourceQueueId=q-20260524172355-rnqtf`
+（`queue012`），初始状态均 `Queue`。账本
+`output/downstream_generation/eval_v3_bestval_queue012_nonpreempt_20260907_task_ids.tsv`。
+
+🔴 **旧九条 cancel 不掉，有双跑风险**：它们的 `Creator` 是 `251105016`，本账号（`zhuyiheng`）
+`ml_task cancel` 报 `User is not authorized to perform: ml_platform:StopCustomTask`。同名任务与新九条
+**共用同一 `output/downstream_generation/` 产物前缀**，若闲时那批之后抢到资源会与新批互相覆盖。
+**需要到控制台手动停掉旧九条**（或用 `251105016` 账号 cancel）。
+
+🔴 **同时发现主训练已停**：`protein_esmc_llada270m_diffusion_allchains_immune_v3_8gpu_2m`
+`t-20260902021013-bm79q` 已于 **2026-09-06T19:37:05Z `Killed`**（日志末尾 `signal: 15`，非代码报错）。
+盘上最新满包 `checkpoint-161000`。该条不在本次改动范围内，未重提，待决策。
+
+⚠️ **20:54 重复提交九条，已全部 cancel，不要引用**：另一路会话未先查平台就按同样九个 YAML
+重提了一遍 —— `t-20260907045438-fxzf8` / `t-20260907045450-qv244` / `t-20260907045454-wxclf` /
+`t-20260907045457-hhtrg` / `t-20260907045500-mmlhg` / `t-20260907045504-jqlzl` /
+`t-20260907045507-tgxm9` / `t-20260907045511-978hn` / `t-20260907045514-jx2rs`，
+9/9 `cancel success`。**教训**：`eval_jobs/*.yml` 落盘或被改写**不等于**没提交过；
+重提前必须先 `bash scripts/volc-no-proxy.sh ml_task list -n eval-v3 --limit 40 -o json`
+查平台实况，按 `Creator` + `Start` 认清哪批是自己的。
+
+---
+
+## 2026-09-06 三条长跑最好 val 点下游（闲时单卡）
+
+**操作**：评当前三条训练各自最低 `eval_loss` 点。全链 **151000 / 0.6326** 全套；generated-only 8 卡 2M **44000 / 0.7520** 全套；BERT 1M **105000 / 0.4263** 只 T1/T2/T3。**不打断**三条训练。权重硬链接 `eval_snapshot_{151000,44000,105000}/`（nlink=2）。队列 `c20250601`，单卡 `ml.pni2.3xlarge`，`Preemptible: true`。
+
+| Job | Task ID | YAML | 覆盖 |
+|---|---|---|---|
+| `eval-v3-allchains-8gpu2m-151000-repr` | `t-20260906233442-d2gzt` | `eval_jobs/eval_v3_allchains_8gpu2m_151000_repr.yml` | T1/T2/T3 |
+| `eval-v3-allchains-8gpu2m-151000-cdr` | `t-20260907001930-qtf2s`（前次 `t-20260906233447-rh2j9` Killed） | `eval_jobs/eval_v3_allchains_8gpu2m_151000_cdr.yml` | CDR |
+| `eval-v3-allchains-8gpu2m-151000-pairing` | `t-20260906233451-fjzmm` | `eval_jobs/eval_v3_allchains_8gpu2m_151000_pairing.yml` | pairing |
+| `eval-v3-allchains-8gpu2m-151000-t4` | `t-20260906233455-djlmk` | `eval_jobs/eval_v3_allchains_8gpu2m_151000_t4.yml` | T4 |
+| `eval-v3-genonly-8gpu2m-44000-repr` | `t-20260906233500-9f7vp` | `eval_jobs/eval_v3_genonly_8gpu2m_44000_repr.yml` | T1/T2/T3 |
+| `eval-v3-genonly-8gpu2m-44000-cdr` | `t-20260906233504-x2n8b` | `eval_jobs/eval_v3_genonly_8gpu2m_44000_cdr.yml` | CDR |
+| `eval-v3-genonly-8gpu2m-44000-pairing` | `t-20260906233508-svn2t` | `eval_jobs/eval_v3_genonly_8gpu2m_44000_pairing.yml` | pairing |
+| `eval-v3-genonly-8gpu2m-44000-t4` | `t-20260906233513-mpfv5` | `eval_jobs/eval_v3_genonly_8gpu2m_44000_t4.yml` | T4 |
+| `eval-v3-bert-1m-105000-repr` | `t-20260906233517-9x8kq` | `eval_jobs/eval_v3_bert_1m_105000_repr.yml` | T1/T2/T3 only |
+
+账本 `output/downstream_generation/eval_v3_bestval_151000_44000_105000_20260906_task_ids.tsv`。数字进 RESULTS §0.8，跑完再回填。三条 `eval_loss` 不可互比。
+
+---
+
+## 2026-09-04 补提 69000 T4（原 ckpt 已剪、闲时 Killed）
+
+**操作**：盘点先前全链评测。`checkpoint-18000` / `checkpoint-26000` / `checkpoint-69000` 均已被 top-k 剪掉。18000 / 26000 四条下游产物齐全，无法也无需重跑。69000 表征/CDR/pairing 已 Success；**T4 被闲时抢走**（held20 只写了 2/20），权重仍在 `eval_snapshot_69000/`。用原 YAML 重提 T4，不打断续训。
+
+| Job | Task ID | YAML | 初始状态 | Preemptible |
+|---|---|---|---|---|
+| `eval-v3-allchains-8gpu2m-69000-t4` | `t-20260904104404-t6j7v`（前次 `t-20260904013725-7zcvf` Killed） | `eval_jobs/eval_v3_allchains_8gpu2m_69000_t4.yml` | Queue | **true** |
+
+账本 `output/downstream_generation/eval_v3_allchains_69000_t4_resubmit_20260904_task_ids.tsv`。
+
+---
+
+## 2026-09-04 全链 8 卡 2M `checkpoint-73000` 全套下游（抢占单卡）
+
+**操作**：评当前 8 卡 2M top-k 最好 val 点 `checkpoint-73000`（eval **0.6535**；最新满包 83000 为 0.6567，未评）。覆盖与 69000 相同：T1/T2/T3 + AB CDR + pairing + T4。**不打断**续训 `t-20260902021013-bm79q`。权重硬链接到 `eval_snapshot_73000/`（nlink=2），避免 top-k 剪枝弄丢评测输入。队列 `c20250601`，单卡 `ml.pni2.3xlarge`，`Preemptible: true`。
+
+| Job | Task ID | YAML | 初始状态 | Preemptible |
+|---|---|---|---|---|
+| `eval-v3-allchains-8gpu2m-73000-repr` | `t-20260904104145-77cfr` | `eval_jobs/eval_v3_allchains_8gpu2m_73000_repr.yml` | Queue | **true** |
+| `eval-v3-allchains-8gpu2m-73000-cdr` | `t-20260904104148-6x5m9` | `eval_jobs/eval_v3_allchains_8gpu2m_73000_cdr.yml` | Queue | **true** |
+| `eval-v3-allchains-8gpu2m-73000-pairing` | `t-20260904104152-pxjd4` | `eval_jobs/eval_v3_allchains_8gpu2m_73000_pairing.yml` | Queue | **true** |
+| `eval-v3-allchains-8gpu2m-73000-t4` | `t-20260904104155-tctxm` | `eval_jobs/eval_v3_allchains_8gpu2m_73000_t4.yml` | Queue | **true** |
+
+tag `ours_fusion_v3_allchains_8gpu2m_73000`。账本 `output/downstream_generation/eval_v3_allchains_73000_20260904_task_ids.tsv`。数字进 RESULTS §0.8 组 D，跑完再回填。
+
+69000 四条已终态，不列入 Active：repr/cdr/pairing Success，t4 `t-20260904013725-7zcvf` **Killed**（闲时抢走，held20 只写了 2/20）。
+
+---
+
+## 2026-09-04 全链 8 卡 2M `checkpoint-69000` 全套下游（抢占单卡）
+
+**操作**：评当前 8 卡 2M 最好 val 点 `checkpoint-69000`（eval **0.6577**；最新满包 72000 为 0.6609，未评）。覆盖与 18000/26000 相同：T1/T2/T3 + AB CDR + pairing + T4。**不打断**续训 `t-20260902021013-bm79q`。权重硬链接到 `eval_snapshot_69000/`，避免 top-k 剪枝弄丢评测输入。
+
+首提 4 条非抢占（`t-20260904013629-skjzb` / `…-fbkqp` / `…-sjc44` / `…-kzls5`）后按用户要求改为抢占单卡，已 `cancel`。重提：
+
+| Job | Task ID | YAML | 初始状态 | Preemptible |
+|---|---|---|---|---|
+| `eval-v3-allchains-8gpu2m-69000-repr` | `t-20260904013714-4w8nk` | `eval_jobs/eval_v3_allchains_8gpu2m_69000_repr.yml` | Staging | **true** |
+| `eval-v3-allchains-8gpu2m-69000-cdr` | `t-20260904013717-rhmzz` | `eval_jobs/eval_v3_allchains_8gpu2m_69000_cdr.yml` | Staging | **true** |
+| `eval-v3-allchains-8gpu2m-69000-pairing` | `t-20260904013720-nprjc` | `eval_jobs/eval_v3_allchains_8gpu2m_69000_pairing.yml` | Queue | **true** |
+| `eval-v3-allchains-8gpu2m-69000-t4` | `t-20260904013725-7zcvf` | `eval_jobs/eval_v3_allchains_8gpu2m_69000_t4.yml` | 已提交 | **true** |
+
+队列 `c20250601`，单卡 `ml.pni2.3xlarge`。tag `ours_fusion_v3_allchains_8gpu2m_69000`。账本 `output/downstream_generation/eval_v3_allchains_69000_20260904_task_ids.tsv`。数字进 RESULTS §0.8 组 D，跑完再回填。
+
+---
+
+## 2026-09-01 8 卡长跑（1M/2M 步）起跑；磁盘配额把一条 8 卡任务卡成 4 连 Failed
+
+**触发**：核对"那条 Running 的 8 卡 2M 任务前面 4 连 Failed"到底是什么问题。
+
+**方向变化**：50k 短跑已收口出数（RESULTS §0.8），本轮把步数拉长一个数量级。现役三条
+全部 **global 256 + polynomial power=1**，与 50k 那批**不可混排**（目标函数、batch 口径、
+LR 调度三样都变了）：`..._diffusion_allchains_immune_v3_8gpu_2m`（Running）、
+`..._bert_immune_v3_1m`（Queue）、`..._diffusion_immune_v3_spot_2m`（Queue）；
+4 卡版 `t-20260901032611-npf27` 已 Killed，换成 8 卡。
+
+**根因**：`safetensors_rust.SafetensorError: Error while serializing: I/O error:
+Disk quota exceeded (os error 122)`，崩在 `Trainer._save → safetensors.torch.save_file`，
+**不在训练步**。首跑 14h07m 从 step 0 跑到 17000 后在存盘时爆，留下 132 MiB 半截
+`model.safetensors`；随后 3 次重试各 58 分钟，「从 16000 续 → 跑满 1000 步 → 同一处再爆」，
+**约 3 小时 8 卡非抢占资源换到 0 步净进度**。`RetryOptions: MaxRetryTimes: 50` 会一直循环下去。
+
+⚠️ **别看 `df` 下结论。** 底层 `fs_vepfs-cnbj2c98dea54433` 3.1P 已用 2.3P、**尚余 809T** ——
+爆的是**目录/租户配额**。一次 save 需要约 **9.0 GB 一次性余量**（`model.safetensors` 2.3G +
+`pytorch_model_fsdp.bin` 2.3G + `optimizer.bin` 4.5G），而 **top-k 剪枝发生在写完之后**，
+峰值 = 现有占用 + 一整个新 checkpoint。第 5 次（`t-20260902021013-bm79q`）于 19:10:42
+存盘成功，但只是期间别的任务腾出了空间，**配额仍贴临界、问题未修**。
+
+✅ **`pick_latest_full` 的三件套判据救了一次。** 它要求 `optimizer.bin` +
+`pytorch_model_fsdp.bin` + `scheduler.pt` 齐全才认 checkpoint，因此正确跳过了半截的
+`checkpoint-17000`、回退到完整的 16000，**没有重演 §4.2.6 那种「从坏 ckpt 反复续跑」死循环**。
+新增 checkpoint 挑选逻辑时必须保留这个判据。
+
+**新发现：`TopKValLossCheckpointCallback` 在重启时重置账本。** 它只从**本进程**的
+`log_history` 取 `eval_loss` 重建 top-k，看不到上一个进程存过什么，于是每次崩溃-重启都把
+上一轮 checkpoint 甩成账本外孤儿、永不被剪 —— **崩溃循环自己在抬高占用，形成正反馈**。
+实测该目录 `topk_val_manifest.json` 只剩 `checkpoint-17000` 一条，盘上却还有
+7000/13000/15000（各 2.3G 已 slim）+ 16000（9.0G 未 slim）。
+
+**全 `output/` 只读盘点**（1.2T，其中 checkpoint 数据 790.8 G）：
+
+| 口径 | 量 |
+|---|---:|
+| resume-only（`optimizer.bin`/`pytorch_model_fsdp.bin`/`rng_state_*`/`scheduler.pt`，剪掉不丢权重） | **328.3 G** |
+| 账本外孤儿 checkpoint 整体 | **132.9 G** |
+| `checkpoint-final` 与 `checkpoint-50000/model.safetensors` **md5 逐字节相同**却各存一份 | **69.1 G** |
+| 两条已终态 8B run 的 `checkpoint-50000`（fat，各 124.5 G） | 249.0 G |
+
+⚠️ `output/grammar_v2_esmc300m_integrated_llada_7l_step{117000,121000,164000,189000,359000,389500}/best.pt`
+是**硬链接**到 `..._7l/checkpoints/*` 与 `..._7l/latest.pt`（共享 29.2 G），**删单边不释放空间**；
+且 `PROJ_GUIDE.md` 把 `..._7l_step117000/best.pt` 及其 SHA256 钉为 TCR-β public Track-A 的
+canonical 行，**不能动**。这些 `.pt` 内部也没有 optimizer，没有"只剪 optimizer"的省法。
+
+**核实过、不是 bug 的两项**：① resume 健康 —— 续跑后 step 16300–17000 的 train loss 7.2–7.7、
+`learning_rate 9.925e-05` 与首跑同 step 逐条吻合；② train loss ~7.3 与 `eval_loss` 0.7028
+差一个数量级**原因未查明**，但两条路径 CE 计算相同（`loss_weight_type='none'`、
+`token_weights=None`）且首跑与 resume 一致，登记为未解项，**不得跨口径比较**。
+
+**✅ 已执行磁盘回收：`output/` 1.2 T → 767 G，释放 389 GB**（19:30Z，任务全程 Running 未受影响）：
+
+| 组 | 动作 | 释放 |
+|---|---|---:|
+| 1a | 删 `ABORTED_gb128_..._4gpu/` 整目录 | 9.1 G |
+| 1b | 两条已终态 8B run 的 `checkpoint-50000` 剪 resume-only | 94 G × 2 |
+| 1c | 5 处 `checkpoint-final/model.safetensors` **改硬链接**指向同 run 的 `checkpoint-50000` | 69 G |
+| 2a–2c | 已 Killed 的 spot ×2 / 4 卡 ×2 / 早期 `diffusion_immune` 的账本外孤儿 | 117 G |
+| 2d | 正在跑的 `..._8gpu_2m` 的 slim 孤儿 `checkpoint-7000/13000/15000` | 6.9 G |
+
+⚠️ `checkpoint-final` 是**改硬链接不是删** —— `eval_jobs` 引用它 8 处、`train_jobs` 引用
+`checkpoint-50000` 2 处，两边路径都得留。改前逐个自查大小 + 首尾 64 MB md5，改后 `nlink=2`、
+inode 相同、`safetensors.safe_open` 正常解析（8B 602 张量／270m 386 张量）。
+**今后不要原地覆写这两个路径中的任何一个 —— 改一个就是改另一个。**
+
+⚠️ **刻意保留**：`..._diffusion_allchains_immune_v3_4gpu/checkpoint-33000`（2M 的权重来源）、
+`..._bert_immune_v3/checkpoint-50000` 完整满包（1M 的 resume 来源）。
+
+**未做 / 待拍板**：**配额本身没修** —— callback 账本重建与 save 前配额预检两项均未实现，
+回收只是把 9.0 GB 的窄门往后推；grammar_v2 五条 339 G 是否保留待科研决策；
+2M 步 ≈ **68 天**独占 8 卡（2.95 s/it）的规划意图待确认。
+
+**文档同步**：`examples/llada/PROTEIN_PRETRAIN_PROGRESS.md`（新增 §4.2.7、§4 状态表新增 H/I 行并
+修正已过期的 E 行、§7 待办、§8 变更日志）、`examples/llada/README.md`（当前训练任务节重写）、
+本文件（Active 表回填三条 + 本节）。
+
+---
+
+## 2026-08-29 布局口径纠错：前缀采样把 `tcr_pmhc` 低估 4 倍；两个新发现
+
+**触发**：回答"数据处理是否完整"时要按 grammar 布局核对任务覆盖，跑
+`scripts/count_grammar_layouts.py` 得到 `tcr_peptide` 8.10% / `tcr_pmhc` 2.47%，
+与"三个表位源大多带 MHC"的直觉相反，于是做了一次独立全量扫描交叉核对。
+
+**根因**：该脚本读满 `--per-source` 就 `break`，取的是**前缀而非随机样本**。
+布局是「行填了哪些字段」的函数，而 `tcr_papers_v2` 是 7 个论文语料首尾拼接的
+（`tcrt5` / `tcrdesign26_pmhc` / `tcrdiff` / `tcrdesign26_beta` / …），
+**前 3 万行 100% 是 `tcr_peptide`**，全量却是 80.3% `tcr_pmhc`。
+547,274 条被归错布局，`tcr_pmhc` 低估约 **4 倍**。
+
+同一陷阱也坑过 `PROTEIN_PRETRAIN_PROGRESS.md` §4.5 "取各源真实首行"举例的做法：
+`trait` 首行恰好无 MHC，被画成 `tcr_peptide`，而全量 `trait` **95.2% 是 `tcr_pmhc`**。
+
+**修法**：改蓄水池采样 + `--seed`；`rows=` 列改名 `kept=`（它统计的是加载期过滤后的
+行数，不是磁盘行数）。新数字与独立全量扫描一致：`tcr_pmhc` 671,678 vs 673,686、
+`tcr_peptide` 137,833 vs 135,825（采样噪声内）。
+
+**修正后的六布局 loss 预算**（`gen%` = 占全部待预测残基）：
+
+| 布局 | 保留行数 | 记录% | gen% |
+|---|---:|---:|---:|
+| `antibody_pair` | 2,485,471 | 31.9% | **49.64%** |
+| `tcr_pair` | 2,094,231 | 26.9% | **40.92%** |
+| `antigen_antibody` | 276,412 | 3.6% | **4.55%** |
+| `tcr_single` | 2,128,750 | 27.3% | **2.90%** |
+| `tcr_pmhc` | 671,678 | 8.6% | **1.78%** |
+| `tcr_peptide` | 137,833 | 1.8% | **0.20%** |
+
+三个无条件/抗体布局吃掉 **95.1%**，表位条件生成合计仅 **1.98%**。根因是残基数量级
+（232 vs 13–31）而非行数，**加数据改不动**——`tcr_papers` 翻 3 倍也只到约 3%。
+
+**新发现①：单链 α 摄入不了，卡在 grammar 而非数据。** 实测同一序列分别标
+`tcr_alpha` / `tcr_beta`，两者 `grammar_name` 都是 `tcr_single` 且**全部 11 个输出
+字段逐字节相同**。`GrammarTokenizer` 只有一个 `<tcr>`；配对布局靠 `[alpha, beta]`
+位置编码身份，单链时无位置可用（`grammar.py:466-472`）。
+顺带纠正 `GRAMMAR_V1.md` 的错误陈述——它写"链身份由 `position_ids_chain` /
+`chain_ids` 编码"，该说法**只对多链块成立**，且渲染输出里根本没有 `chain_ids` 键。
+要摄入 α 须扩词表 → 现有 checkpoint 不兼容，属建模决策，未做。
+
+**新发现②：加载期过滤在 train/valid 上丢弃率严重不对称。**
+
+| 源 | train 丢弃率 | valid 丢弃率 |
+|---|---:|---:|
+| `asd_antibody` | **67.5%**（850,134→276,412） | **5.0%**（47,230→44,866） |
+| `tcr_native` | 32.7%（143,391→96,552） | 12.2%（4,390→3,855） |
+| `trait` | 54.5%（69,251→31,515） | 54.3%（3,050→1,393） |
+
+`trait` 对称说明这不是通病。后果：**ASD 的 valid loss 不能做 early-stopping** ——
+valid 保留了大量被从 train 剥掉的 Kong 相似簇抗体家族，在测一个训练时被刻意屏蔽的
+分布。无泄漏风险（valid 非 Kong 基准本身）。机制未查清，猜测是 step6 整簇装箱让
+Kong 相似簇集中落进 train，未验证。**待决策**：重建语料使两 split 去污一致，
+或在监控里标注该指标不可比。
+
+**文档同步**：`examples/llada/DATA_PIPELINE_README.md`（§1 采样陷阱 / §1.1 预算表 /
+§6.2 单链 α / §6.4 split 不对称）、`examples/llada/PROTEIN_PRETRAIN_PROGRESS.md`
+（§4.5 首行警告 / 新增 §4.5.1 / §8 变更日志）、`scripts/data/README.md`（第 5 坑 +
+采样规则）、`downstream/asd/README.md`、`data/tcr_repertoire/README.md`、
+`dllm/pipelines/qwen3_vl_arch/GRAMMAR_V1.md`。
+
+---
+
+## 2026-08-28 v3 三源补做 valid 近重复搬迁；§3 构成错配收尾
+
+**触发**：审查「模型选择发生在与训练分布不同的集合上」（RETRAIN_PLAN §3）时发现，
+2026-08-28 早先做过的 valid 近重复搬迁只覆盖 `tcr_native` 和 `tcr_papers` **v1**，
+而 v3 训练用的是 `tcr_papers_v2` —— 后者由 `finalize_papers.py --out-root` 从零重建，
+**不继承 v1 已清洗的 split**。「这个源处理过了」不能推广到它的重建版本，与 §7.3 的
+blocklist 新鲜度事故是同一类错误。
+
+**实测的近重复率**（valid 行的 CDR3β core 与 train 某行 Lev≤1）：
+
+| source | valid 近重复率 | 处理 |
+|---|---:|---|
+| `tcr_papers_v2` | 49.2% | 已搬迁，valid 14,449→7,336，train 668,331→682,383（+2.10%） |
+| `tcr_repertoire` | **38.9%** | 已搬迁，valid 201,504→123,049，train 1,971,794→**2,128,750**（+7.96%） |
+| `trait` | 19.1% | 已搬迁，valid 3,769→3,050，train 67,842→69,251（+2.08%） |
+
+搬迁而非丢弃，迭代到不动点（v2 用 3 轮、trait 用 5 轮——搬入 train 的行会成为新参考）。
+所有源被搬走的 eval 行里，`(CDR3β, epitope)` 在 train 中精确出现的都是 **0 行**：
+这修的是选模信号的可信度，不是补答案键泄漏。原文件备份为 `*.csv.pre_neardedup`。
+
+**另外三个源补测后判定无需处理**。此前只查了带 `cdr3b` 列的源，而 `oas`+`ots`+
+`asd_antibody` 占训练残基的 94%、从未查过。按各源真实生成目标测：`asd_antibody`
+（`heavy_fv`+`light_fv`）exact 0.00% / Lev≤1 4.20%，`ots`（全长配对 Fv）0.00% / 1.85%，
+`oas` 0.00% / 0.45%。
+
+**度量单位必须匹配生成目标，否则结论会反过来**——这是本轮最容易做错的一点。`ots` 若按
+CDR3 量是 exact 27.25% / Lev≤1 69.90%，看着像重大泄漏；按全长配对量则是 0.00% / 1.85%。
+天然 repertoire 中同一条 CDR3β 本就会与不同 α 链配对，而模型生成整条链，CDR3 复现不构成
+答案键。反之四个 TCR 源的 epitope/MHC 是固定上下文、CDR3 才是去噪目标，那边必须按 CDR3
+量。判据是 `ImmuneSourceSpec.roles`（实测 `oas`/`ots` 的 `gen_res == res`，
+`asd_antibody` 为 36%）。
+
+**§3 的构成错配是过期记录，已改判**。那条「valid 73% / train 8%」描述的是「单一混合
+eval + 前缀截断」时代。现在 `subsample_seed=0` 走 reservoir 抽样、eval 分源各截 2,000 行，
+实测 eval 构成是七源近等权（各 14.8%，`trait` 11.0%）。错配仍在但方向相反且是有意选择——
+按 train 比例加权会让占 86% 的 `oas+ots+tcr_repertoire` 主导选模。**要做的是在论文里写清
+`eval_loss` 是源等权口径，不是继续改代码。** 详见 RETRAIN_PLAN §3c。
+
+**顺带修的三个坑**：
+- `move_near_dup_eval_rows.py` 的 CDR3β 锚点约定改为按源配置：`trait` 存带锚点全 junction，
+  与 `tcr_native`/`tcr_papers` 的 anchor-free core 相反，写死一个值会静默算错。
+- `cdist` 分块由固定 2000 改为按参考集大小自适应（`tcr_repertoire` 的 1.97M 参考集下，
+  固定 2000 会申请 ~16 GB 矩阵）。
+- 报告 JSON 改为按数据集合并写入：此前跑子集会抹掉上一次其他数据集的记录。
+
+**搬迁后重测的 v3 语料口径**（2026-08-29 05:30，`count_immune_mix.py`）：train 合计
+**7,794,375** 条（原 7,626,737），总残基 1,273,914,576 / 生成链残基 1,150,746,721。
+`tcr_repertoire` raw 2,128,750 / kept 2,128,750（**剔 0**）——搬回 train 的 156,956 行无一
+命中 blocklist，它们本就与 train 同处一个已去污染的 pool。启动断言
+`assert_corpus_fresh.py` 通过（搬迁不触碰 blocklist）。两个 v3 训练任务
+（`t-20260829031748-96vjf` / `t-20260829031757-2qnjn`）当时仍在 **Queue**，排队 10 小时未
+启动，所以重写期间没有任何作业在读这些 CSV，启动后读到的是修好的语料。
+
+**一个必须记住的副作用**：`tcr_repertoire` 的 train 超出了当初刻意设的 2,000,000 token
+预算上限 6.4%（残基占比 2.04%→2.19%，判为可接受未回切）。**若重跑 `build_repertoire.py`，
+那个上限会把搬回来的行重新截掉，届时须重跑搬迁。**
+
+**顺带发现一处并发改动（非本次工作）**：`trait_benchmark` blocklist 于 2026-08-28
+17:25:35Z 被另一会话从 862 键重建到 **59,212** 键，`trait` 的 train 保留数由 34,872 降到
+31,515（−9.6%）、valid 由 1,485 降到 1,393。`trait` 是**加载期**过滤，所以不需要重建语料
+就自动跟上；这与 `tcr_repertoire`（构建期去污染，blocklist 变了必须重跑构建）正好相反。
+
+**未做**：`trait` 只有 1,393 行 valid（低于 2,000 配额，主因是 `replaces_trait` 顶替过滤
+与上述 blocklist 重建，而非本次搬迁），七源未严格等权（各 14.93% vs `trait` 10.40%），
+已登记不修。
+
+## 2026-08-04 AB/TCR v2 cluster 去污染与 technical export 完成
+
+- 本轮继续只处理 AB/TCR 数据层，没有修改模型、renderer、checkpoint 或 sampling
+  weights，也没有启动训练。修复 benchmark role parser 对 `tcra`/`tcrb` 和抗体
+  `CDRH*`/`CDRL*` 的识别；重跑后 bank 为 antibody heavy 14,883、light 10,596、
+  TCR alpha 25,629、beta 92,811、peptide 449。2026-08-03 记录中的旧 overlap 数值由
+  本节及机器报告取代。
+- core build `ir2exp_f7a60484c7e3a20db6a2` 已应用 exact blocklist 与 MMseqs2
+  connected-component near-neighbor quarantine。TCR primary 从 41,489 隔离 37,060，
+  保留 4,429（3,986/222/221）；另产生 3,970 条 train-only negatives，known-positive
+  collision=0。antibody recognition 从 308,267 隔离 144,936，保留 163,331
+  （146,998/8,167/8,166）；property 从 19,981 隔离 6,395，保留 13,586
+  （12,227/722/637）。全部 protocol 的 split audit 通过且 residual benchmark cluster
+  match=0；80-artifact manifest 共 2,578,231,408 bytes。
+- strict pairing build `ir2pair_6a1a5b62752caccd2cd5` 不复用旧 valid/holdout，只从
+  source train 按 upstream pair group 重分 98/1/1。OAS 输入 2,486,442，隔离
+  987,593，保留 1,498,849（1,468,754/15,295/14,800）；OTS 输入 2,102,715，隔离
+  627,438，保留 1,475,277（1,445,804/14,732/14,741）。OTS 的 261,753 条缺 required
+  bucket 均为 B-D/B-B/A-A/D-D scope exclusion，已整组 block，不是 parser 丢链。
+  28-artifact manifest 共 5,409,708,251 bytes。
+- 候选 recipe `ir2recipe_1e3eac44551e88aedc6e` 固定 OAS H/L、OTS alpha/beta、
+  antibody recognition、TCR recognition 和 antibody property 五个 plane/pack，合计
+  real train 3,077,769、valid 39,138、test 38,565，另保留 3,970 条独立 train-only
+  synthetic negatives。manifest SHA256 为
+  `2119da4bc0f36cefd805aea4a409508399734b2d19694bd55423db6662e166be`。
+- 当前 gate 为 `technical_data_export_ready=true`，但
+  `rights_review_complete=false`、`runtime_views_ready=false`、
+  `sampling_weights_frozen=false`，因此 `export_ready=false`、
+  `training_ready=false`、`training_started=false`。剩余 blocker 是 SAbDab2/CATNAP
+  权利审查、per-chain/per-region mask 与 relation-target renderer、四平面 sampling/
+  token-budget 冻结。
+- 权威报告：
+  `/vepfs-mlp2/c20250601/251105016/project/dllm_test/IMMUNE_RECEPTOR_DATA_V2.md`；
+  machine summary：
+  `/vepfs-mlp2/c20250601/251105016/project/dllm_test/data/immune_receptor_v2/reports/summary.json`。
+
+## 2026-08-03 AB/TCR canonical v2 构建完成
+
+- 本轮只执行 antibody/TCR 数据层，不修改模型、renderer、训练 recipe 或 checkpoint，
+  也没有启动训练。新增可重建 `bioseq.v2` schema、source adapters、稳定 group/component
+  split、benchmark quarantine/leakage audit 与 artifact manifest。
+- 官方源已完整下载并校验：IEDB receptor/T-cell exports、CATNAP 2026-08-01 六文件、
+  SAbDab2 0.1.0 `splits.tar.gz`。此前“SAbDab2 无 `abag_split.csv`”来自损坏旧下载，
+  完整归档已确认同时含 antibody-only 与 antigen-aware split。
+- TCR 六源 adapter 输入 1,021,452 条，exact-measurement merge 后 union 为 922,479，
+  strict core 41,489；antibody 六源输入 472,922，union 为 470,949，interaction core
+  308,267，含 intrinsic property 后总 core 328,248。
+- 九套 deterministic split 全部通过 disjoint audit。antibody-antigen joint-hard 因
+  74.32% 巨型连通分量只能得到约 98.11/0.94/0.94，保留严格 disjointness，不拆分
+  component 伪造 90/5/5。
+- 修复 benchmark quarantine 只扫描 TCR 根导致 antibody overlap=0 的审计错误；新 bank
+  覆盖 16 个根、142 个文件。候选 union 命中 TCR exact receptor-peptide 187,002、
+  paired-alpha/beta-peptide 15,885、receptor-pMHC 16,632；antibody exact receptor
+  102,837。以上是重叠审计命中，尚不是最终删除行数。
+- 当前状态固定为 `canonicalized=true`、`split_ready=true`、
+  `export_ready=false`、`training_started=false`。下一步仍须应用 quarantine、完成
+  cluster-level near-neighbor decontamination、仅在 train 内构造 negatives，并补齐
+  SAbDab2/CATNAP 权利记录后才能物化训练 export。
+- 权威说明：
+  `/vepfs-mlp2/c20250601/251105016/project/dllm_test/IMMUNE_RECEPTOR_DATA_V2.md`；
+  机器可读 summary：
+  `/vepfs-mlp2/c20250601/251105016/project/dllm_test/data/immune_receptor_v2/reports/summary.json`。
+
 ## 2026-07-23 免疫受体训练数据范围审计
 
 - 下一版训练范围固定为 antibody H/L、TCR α/β、antibody-antigen 和
@@ -53,14 +506,43 @@
 
 > Only non-terminal jobs (`Initialized` / `Queue` / `Staging` / `Running` / `Killing`). Remove a row when the job reaches `Success`, `Failed`, or `Killed`.
 
-Last updated: 2026-08-02T22:54Z (UTC — resubmitted ESMC×LLaDA-8B fusion after wandb to_dict fix)
+Last updated: 2026-09-01T19:20Z (UTC+8 09-02 03:20 — 回填 8 卡长跑三条；此前"表为空"已过期)
 
-| Status | Task ID | Job Name | YAML |
-|--------|---------|----------|------|
-| Submitted | t-20260803065402-dqmbg | protein_esmc_llada8b_add_diffusion | train_jobs/protein_esmc_llada8b_add_diffusion.yml |
-| Submitted | t-20260803065406-5rsk8 | protein_esmc_llada8b_add_bert | train_jobs/protein_esmc_llada8b_add_bert.yml |
+| Task ID | Job / TaskName | 队列 | 卡数 | max_steps | 状态 |
+|---|---|---|---:|---:|---|
+| **`t-20260902021013-bm79q`** | `protein_esmc_llada270m_diffusion_allchains_immune_v3_8gpu_2m` | `c20250601` 非抢占 | 8 | **2,000,000** | **Running** @step 17k |
+| `t-20260901235433-q76qw` | `protein_esmc_llada270m_bert_immune_v3_1m` | `queue012` 非抢占 | 8 | **1,000,000** | Queue |
+| `t-20260901032620-vvngv` | `protein_esmc_llada270m_diffusion_immune_v3_spot_2m` | `c20250601` **闲时** | 8 | 2,000,000 | Queue（看护循环在追） |
 
-**当前训练**：ESMC-300M × LLaDA-8B fusion 两条线（`residue_cond_mode=add`；diffusion + bert 目标）重新提交，见上表。前一版 `t-20260713235356-8t6c9` 已 cancel → **Killed**（停前 `latest.pt` ≈ step **389500**）。watchdog 已停且 `paused=true` / `monitor_only=true`，不会自动续跑。
+🔴 **`..._8gpu_2m` 前 4 条同名任务全部 `Failed`，根因是目录磁盘配额**（不是文件系统满，底层尚余 809T）：
+`t-20260901033935-h55f4` / `t-20260901230256-ns4q4` / `t-20260902000627-j4mqm` / `t-20260902010820-t6hq6`。
+每轮「从 `checkpoint-16000` 续 → 跑满 1000 步 → 在 step 17000 的 `save_model` 上
+`Disk quota exceeded (os error 122)`」耗 58 分钟，**净进度 0**。已终态故不列入本表。
+经过、可回收量盘点与分级方案见
+[`examples/llada/PROTEIN_PRETRAIN_PROGRESS.md`](examples/llada/PROTEIN_PRETRAIN_PROGRESS.md) §4.2.7。
+
+已终态、已从本表移除：`t-20260901032611-npf27`（`..._4gpu_2m`，Killed，换成 8 卡版）、
+`t-20260901030607-zmrrv`（`..._v3_1m` 首条，Failed）。
+
+**历史（2026-08-28 记录，仍有效）**：2026-08-28 23:46 逐条查询确认，此前挂在本表的 8 条**全部 `Success`**，按
+`volc-train-task-log.mdc` 移除：`t-20260816051821-fj6p7`（8b_bert_immune）、
+`t-20260816051844-zm4cl`（8b_diffusion_immune）、`t-20260820053314-4gmfb`、
+`t-20260820053318-blk66`、`t-20260820053506-l62kt`、`t-20260820053323-29dln`、
+`t-20260820053327-m5c6n`、`t-20260820053511-p8p2r`（后六条为 `eval-immune-*`
+repr/gen，本不该记在训练表里）。
+
+四条 immune fusion 训练均已跑满 50k 并留有 `checkpoint-final`：
+`270m_bert` / `270m_diffusion` / `8b_bert` / `8b_diffusion`。
+
+**v3 尚未提交**：`train_jobs/protein_esmc_llada270m_diffusion_immune_v3.yml`
+（2026-08-28 11:47 落盘）为七源 from-scratch 配置，启动前调用
+`assert_corpus_fresh.py`。提交是算力决策，等确认。
+
+**当前训练**：
+1. **Immune fusion（queue012）**：① `8b_bert_immune` / ② `8b_diffusion_immune`（Running，`Preemptible: false`）；③ `270m_bert_immune` 已 **Success**（50k）；④ `270m_diffusion_immune` 从闲时改为非闲时续训（`t-20260817153216-qvtwx`，resume `checkpoint-9000`）。数据 `oas+ots+asd_antibody+trait+tcr_native`，无 nanobody，ASD 不过 benchmark filter。
+2. **旧 ablation 已终态，已从 Active 表移除**：`bert_esmctrain`/`bert_noesmc`/`bert_noesmc_scratch` = Failed；`270m_bert_esmctrain_scratch` = Success。
+
+**队列策略（2026-08-04 起）**：本系列新提交一律用 **`queue012`**，不要用 `spot-share-queue`；相关 `train_jobs/protein_esmc_*.yml` 已全部改为 `ResourceQueueName: queue012`。
 
 ### 2026-08-02 ESMC×LLaDA-8B fusion wandb `to_dict` 崩溃修复 + 重提
 
@@ -68,14 +550,71 @@ Last updated: 2026-08-02T22:54Z (UTC — resubmitted ESMC×LLaDA-8B fusion after
 - **22:47Z 源码修复**：`examples/llada/protein_fusion_model.py` 已把 `_FusionConfig` 定义为 `SimpleNamespace` 子类并实现 `to_dict()`（返回 `dict(vars(self))`），供 HF W&B 集成序列化超参。修复落盘时间晚于两个任务的启动时间，故旧进程仍跑旧代码。
 - **22:53Z cancel**：`t-20260803061533-q8r98`、`t-20260803062133-blhfm` 均 `ml_task cancel` 成功。
 - **22:54Z 重提**：用相同 YAML 重新 `ml_task submit`（走 no-proxy 封装），新任务将导入已修复代码。add_diffusion → `t-20260803065402-dqmbg`；add_bert → `t-20260803065406-5rsk8`。
+- **22:57Z 确认恢复**：两个新任务日志显示 wandb offline run 正常初始化（`to_dict` 修复生效）、loss 稳步下降（`~78/71 → ~34 → ~22 → ~17`），无 Traceback。取日志命令：`ml_task logs -t <id> -i worker-0 -l 40`。
+
+### 2026-08-02 训练设计调整：改为 bert ESMC-conditioning ablation
+
+- **背景（用户澄清本意）**：本质对照应为"**都用 bert 目标**，一条用 ESMC 提序列 feature、一条不用 ESMC"，且 **ESMC 参数要参与训练**。原在跑的 `add_bert`(bert,add,frozen) + `add_diffusion`(diffusion,add,frozen) 与此不符（是 bert-vs-diffusion，且 ESMC 均冻结）。
+- **单链编码确认**：ESMC 走单链提取——`encoder_input_ids`=`[B,C,L]`，`encode_chain_tokens` reshape 成 `[B*C,L]` 单次前向，每链独立编码互不 attend，符合预期。
+- **23:12Z cancel**：`t-20260803065402-dqmbg`、`t-20260803065406-5rsk8` 均 `ml_task cancel` 成功。
+- **23:13Z 新建 + 提交**：新增两个 job（bert 目标）并提交：
+  - `train_jobs/protein_esmc_llada8b_bert_esmctrain.yml`（add + **可训练 ESMC** `freeze_encoder=False`，per_device 2/ga 8 保住全局 128 并给 ESMC 反传留显存）→ `t-20260803071310-fvhz6`
+  - `train_jobs/protein_esmc_llada8b_bert_noesmc.yml`（token + 无 ESMC，per_device 4/ga 4）→ `t-20260803071313-9hmjw`
+- **待观察**：`bert_esmctrain` 解冻 ESMC 后显存上升，需确认加载 8B 后不 OOM；`bert_noesmc` 的 token 路径此前只在 add 模式跑过 smoke，需确认首个 step 正常。
+- **01:14Z 省盘 save 策略**：根因是 `save_only_model` 未开 → FSDP 同时写 `model.safetensors`(32G) + `pytorch_model_fsdp.bin`(32G 重复) + `optimizer.bin`(60G+)，单 ckpt ~125G。已改 `protein_pretrain_esmc.py` 默认 `save_only_model=True` + `slim_checkpoints=True`（存后删 resume-only 大文件），job yml 同步显式打开；已有 ckpt 现场瘦身 **~130G→33G**。用户要求**不停训**；在跑任务内存仍是旧代码，下次 save 可能再写胖文件，需事后瘦身。
+- **01:17Z top-k 改为 3**：`save_top_k` 默认与 yml 从 5 → **3**（仍按最低 eval_loss）。不停现有任务；磁盘侧已按 top-3 对齐 manifest。
+- **02:26Z 再次瘦身（不停训）**：旧进程写出的胖 ckpt 已现场处理——删除 `optimizer.bin`/`pytorch_model_fsdp.bin`/`rng_state_*`，并按 eval_loss 裁到 top-3。`bert_esmctrain` 保留 2000/1000（~33G×2）；`bert_noesmc` 保留 4000/3000/2000（~33G×3），删掉最差的 step1000。
 
 ## Active Volc Evaluation Tasks
 
-Last updated: 2026-07-22T07:06Z (UTC — MINT step121000 three-PPI evaluation complete)
+Last updated: 2026-09-07T04:45Z (UTC+8 09-07 12:45 — 九条改投 queue012 非闲时重提；73000/69000 那批已终态移除)
 
-| Status | Family | Task ID | YAML |
-|--------|--------|---------|------|
-| *(none)* | — | — | — |
+| Task ID | Job / TaskName | 队列 | 卡数 | 覆盖 | 状态 |
+|---|---|---|---|---|---|
+| `t-20260907044259-qd52v` | `eval-v3-allchains-8gpu2m-151000-repr` | `queue012` **非闲时** | 1 | T1 / T2 / T3 | Queue |
+| `t-20260907044303-ks4x6` | `eval-v3-allchains-8gpu2m-151000-cdr` | `queue012` **非闲时** | 1 | AB CDR infill | Queue |
+| `t-20260907044307-btjxr` | `eval-v3-allchains-8gpu2m-151000-pairing` | `queue012` **非闲时** | 1 | AB light pairing | Queue |
+| `t-20260907044310-wlm9h` | `eval-v3-allchains-8gpu2m-151000-t4` | `queue012` **非闲时** | 1 | T4 generation | Queue |
+| `t-20260907044314-mtzn9` | `eval-v3-genonly-8gpu2m-44000-repr` | `queue012` **非闲时** | 1 | T1 / T2 / T3 | Queue |
+| `t-20260907044317-kfhk2` | `eval-v3-genonly-8gpu2m-44000-cdr` | `queue012` **非闲时** | 1 | AB CDR infill | Queue |
+| `t-20260907044321-ht8b6` | `eval-v3-genonly-8gpu2m-44000-pairing` | `queue012` **非闲时** | 1 | AB light pairing | Queue |
+| `t-20260907044324-tcmhs` | `eval-v3-genonly-8gpu2m-44000-t4` | `queue012` **非闲时** | 1 | T4 generation | Queue |
+| `t-20260907044328-wwfjn` | `eval-v3-bert-1m-105000-repr` | `queue012` **非闲时** | 1 | T1 / T2 / T3 only | Queue |
+| `t-20260906233442-d2gzt` | `eval-v3-allchains-8gpu2m-151000-repr` | `c20250601` 闲时 | 1 | T1 / T2 / T3 | Queue（🔴 待控制台停） |
+| `t-20260907001930-qtf2s` | `eval-v3-allchains-8gpu2m-151000-cdr` | `c20250601` 闲时 | 1 | AB CDR infill | Queue（🔴 待控制台停） |
+| `t-20260906233451-fjzmm` | `eval-v3-allchains-8gpu2m-151000-pairing` | `c20250601` 闲时 | 1 | AB light pairing | Queue（🔴 待控制台停） |
+| `t-20260906233455-djlmk` | `eval-v3-allchains-8gpu2m-151000-t4` | `c20250601` 闲时 | 1 | T4 generation | Queue（🔴 待控制台停） |
+| `t-20260906233500-9f7vp` | `eval-v3-genonly-8gpu2m-44000-repr` | `c20250601` 闲时 | 1 | T1 / T2 / T3 | Queue（🔴 待控制台停） |
+| `t-20260906233504-x2n8b` | `eval-v3-genonly-8gpu2m-44000-cdr` | `c20250601` 闲时 | 1 | AB CDR infill | Queue（🔴 待控制台停） |
+| `t-20260906233508-svn2t` | `eval-v3-genonly-8gpu2m-44000-pairing` | `c20250601` 闲时 | 1 | AB light pairing | Queue（🔴 待控制台停） |
+| `t-20260906233513-mpfv5` | `eval-v3-genonly-8gpu2m-44000-t4` | `c20250601` 闲时 | 1 | T4 generation | Queue（🔴 待控制台停） |
+| `t-20260906233517-9x8kq` | `eval-v3-bert-1m-105000-repr` | `c20250601` 闲时 | 1 | T1 / T2 / T3 only | Queue（🔴 待控制台停） |
+
+> 上表后九条（`c20250601` 闲时）与前九条**同名、共用同一产物前缀**。本账号无 `StopCustomTask`
+> 权限（creator 是 `251105016`），cancel 失败，**必须到控制台停掉**，否则两批可能互相覆盖产物。
+
+> **2026-08-25 23:47 收口**：SAb23H2 sweep 与 pairing `max_iter=124` 均已 Success，数字写入 `downstream/benchmark/RESULTS.md` §0.5 / §0.6。活跃 `eval-immune-*` 列表为空。SAbDab Kong + 官方 ckpt 复现已在 §0.5。仍待做：T4-held20 immune 语料泄露报告、T4 sparse-13 重评分。
+
+> **2026-08-25 01:41 那批八条已全部终态**（7 Success + 1 Failed）。`eval-immune-8b-diff-pairing` 的 Failed 是最后写 metrics JSON 时 `OSError: [Errno 122] Disk quota exceeded`，**指标已算完并留在日志里**（ImmunoMatch 0.4376 / diversity 0.5288）。`output/` 已占 1.1T，其中两条 8B immune 训练各 250G，需要清理决策。
+> 那批的 CDR / pairing 数字均为 `max_iter=8 / 32`，**已被本轮 `max_iter=2 / 124` 的对齐重跑取代**。
+
+### 2026-08-25 生成评测改为阶段并行
+
+- **问题**：`run_immune_fusion_gen.sh` 是串行的，实测（上一轮 8B）CDR 79 分钟 → pairing 106 分钟 → T4 28 分钟，共约 **3h40m**，pairing 白等前面 80 分钟才开始。
+- **改动**：runner 新增 `GEN_STAGES`（`cdr,pairing,t4`，默认全跑），三阶段输出互不重叠；日志按阶段命名，避免并行互相覆盖。
+- **效果**：拆成 2 ckpt × 3 阶段共 6 条单卡作业并行，墙钟从 ~3h40m 降到 ~1h45m（由最长的 pairing 决定），pairing 结果提前约 80 分钟。
+- **已取消**：串行的 `t-20260825010632-krz7q` / `t-20260825010636-jvpsn`（各跑了约 32 分钟，仅完成 CDR-h1）。
+- **8B pairing 首次提交被拒**：Volc `Description` 上限 500 可见字符，原文 528。缩短后重提成功。
+- **resume 隐患已修**：`light_chain_pairing.py` 的 `_generation_signature` 只比对数据/ckpt/参数，不含代码版本，导致被取消的旧作业留下的 `.progress.pt`（泄露版代码生成的半成品）会被新作业当成可续跑。已删除残留文件，并新增 `GENERATION_PROTOCOL_VERSION=2` 进签名，协议或解码路径变更后旧 partial 自动失效。
+- **旧产物隔离**：只修长度泄露、未修 encoder 泄露的那批 pairing 产物移到 `output/downstream_generation/_stale_pre_encoder_fix/`（含 README 说明为混合口径、不可用）。
+
+> 2026-08-20 提交的六条 `eval-immune-*` repr/gen 作业已全部 Success，结果见 `downstream/benchmark/RESULTS.md` §0，已从本表移除。
+
+### 2026-08-15 Ophiuchus-Ab official-ckpt eval Success
+
+- `t-20260815220631-lmjr9` **Success**（14:06→14:47Z，elapsed 2465s），已从 Active 表移除。
+- pairing 完成：OAS holdout500 prompt3 argmax，gen ImmunoMatch=`0.352`（ref `0.699`），chain-match=`0.998`，v-gene-family=`0.904`。产物 `output/downstream_generation/ophiuchus_ab/light_pairing_holdout500_prompt3_metrics.json`。
+- SAbDab/SAb23H2 沿用先前 JSON（skip 未重跑）。本轮不含 humanization。
 
 ### 2026-07-21 MINT baseline local-fixed reruns
 
@@ -421,7 +960,10 @@ Cancelled/superseded earlier: `t-20260705173643-cjtdl` / `t-20260705175135-ghb4z
 
 **mint_ppi（最大源，82.4M 对/16.4M 蛋白）专用去重**：generic 逐行 Arrow extractor 过慢，改用 `scripts/data/dedup/dedup_mint_ppi.py`——(1) 对"PPI test bank ∪ mint_ppi 蛋白全集"跑一次 `easy-linclust`@40%，co-cluster 到 test 的 mint 蛋白记为泄漏；(2) 按 shard builder 同序同过滤（`ppi_record`：双链 valid 且 ≤1024aa）流式 links，任一链泄漏则该 arrow-row 泄漏。产同格式 report+blocklist 供 `apply_blocklists.py --promote` 消费。**进行中**（linclust ~16.4M 蛋白，RSS ~27GB）。
 
-**SAbDab2 blocker（build-shards）**：Zenodo 20083995 仅 1 个文件 `splits.tar.gz`（876MB，已下全），解包后**只有 `ab_split.csv`（15,641 行，抗体相似度划分）+ 427 CIF**，**无 `abag_split.csv`（抗原感知划分）**。`ab_split.csv` 含抗原列（`agtypes`/`agresolvedseqs`，8,455 行有抗原序列）。→ 决定：**SAbDab2 从主路线解耦**，整合版先上 8 源；SAbDab2 作首个 follow-up（可用 `ab_split.csv` 抗原列建抗原条件 shard，惟划分为 ab-相似度而非理想 abag）。
+**SAbDab2 blocker（build-shards，当时结论，已由 2026-08-03 校正）**：当时的
+本地 `splits.tar.gz` 解包后只看到 `ab_split.csv` + 427 CIF，因而暂时把 SAbDab2
+从主路线解耦。后续 MD5 校验确认该本地件损坏/不完整；完整官方归档实际包含
+`abag_split.csv`。该段只保留为历史过程，不能再作为当前数据事实。
 
 **mint_ppi 重建已完成**：`rebuild_mint_training_shards.sh` 跑约 2h25min 完成，`mint_ppi/train`=82,441,955 行、relation 全 `binding`（bug 已修）、136 shard；marker `.mint_shards_filter1024_v12v11` 已写。其脚本重写的 `manifest.json` 为 6 源（含已去重的 oas/ots/tcr/ppi/mint_actions 计数 + 原始 mint_ppi），最终整合 manifest 由 `inventory_integrated.py --write-manifest` 覆盖为 8 源。
 
@@ -1008,3 +1550,420 @@ env -u http_proxy -u https_proxy -u HTTP_PROXY -u HTTPS_PROXY -u ALL_PROXY volc 
 - **OLGA boundary**：对作者公开候选运行完整 human_T_beta Pgen，non-zero=`1996/2000` 与论文精确一致。公开候选的 occurrence-weighted生成 `log10 Pgen=-6.876846±0.890584`，论文为 `-7.04±0.85`；target-deduplicated reference all-positive 为 `-10.854881±3.716057`，论文为 `-9.83±2.356`。按 Fig.4 可见窗口 `[-16,-5]` 后 reference 为 `-9.840730±2.369588`，仍不反向调 cutoff。OLGA 1.2.4 wheel 与本地 human_T_beta 四个模型文件 SHA256 相同，版本不能解释差异；分布矩标记为缺少最终 Figure 聚合/过滤快照。
 - **Current rebuilt result**：BioSeq/TCRT5/TcrDesign/GRATCR 的 all-14 exact=`0/10/4/0`，paper-native ≥90%=`0/154/142/4`，GIANA hit=`1/335/402/4`，global unique=`13988/7788/13083/629`。Pgen-positive fraction=`0.9798/1.0000/0.9928/1.0000`，但 mean positive log10 Pgen=`-17.9253/-6.9504/-8.8010/-6.8664`；BioSeq 的非零率不能替代概率分布校准或 target-specific 功能邻域。
 - **Validation and outputs**：`/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/scripts/test_tcrt5_full_eval.py` 为 `8/8 passed`，Python compile 通过。权威人读报告为 `/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/outputs/tcrt5_full_eval/TCRT5_FULL_EVAL_REPORT.md`，总对应表为 `/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/outputs/tcrt5_full_eval/paper_correspondence.csv`。
+
+## 2026-08-15 Submitted Ophiuchus-Ab official-ckpt eval on Volc
+
+- **操作**：submit（停掉开发机本地 pairing 后改走集群）
+- **task_id**：`t-20260815220631-lmjr9`
+- **任务名**：`eval_ophiuchus_ab_official`
+- **YAML**：`/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_ophiuchus_ab_official.yml`
+- **初始状态**：`Queue`，队列 `q-20260121145036-6fztt`，单卡 `ml.pni2.3xlarge`
+- **Preemptible**：true
+- **口径**：官方 ckpt、不含 humanization；已完成的 SAbDab/SAb23H2 JSON 会 skip，实际跑 OAS holdout500 pairing（prompt3 argmax）
+- **权重**：仓库内已有副本 `dllm_test/model_weights/ophiuchus_ab/Ophiuchus-Ab/Ophiuchus-Ab.ckpt`（与 `/c20250601/mj/model_weights/ophiuchus_ab/...` 同源，不是新下载）
+
+## 2026-08-16 Submitted three ESMC×LLaDA immune fusion jobs
+
+- **操作**：submit（前三个 immune 任务；第四个 270m diffusion 未交）
+- **数据**：`oas+ots+asd_antibody+trait+tcr_native`；**不用 ASD nanobody**；`--asd_antibody_benchmark_blocklist ""`（ASD 不过 benchmark filter）
+- **ASD relation**：重标后写入 CSV 的只有 `binding`/`nonbinding`。train 850,134 行，binding 471,676（55.5%），nonbinding 378,458（44.5%）。`bool==0` 与 BUZZ `fuzzy` l/m → nonbinding；弱定量（alphaseq>3 等）已删除，不标成 binding
+- **队列**：`queue012`（`q-20260524172355-rnqtf`），1×8 卡 `ml.pni2.28xlarge`，`Preemptible: false`
+- **任务**：
+  - `protein_esmc_llada8b_bert_immune` → `t-20260816051821-fj6p7`，YAML `train_jobs/protein_esmc_llada8b_bert_immune.yml`，初始 `Staging`
+  - `protein_esmc_llada8b_diffusion_immune` → `t-20260816051844-zm4cl`，YAML `train_jobs/protein_esmc_llada8b_diffusion_immune.yml`，初始 `Staging`
+  - `protein_esmc_llada270m_bert_immune` → `t-20260816051844-dnj4s`，YAML `train_jobs/protein_esmc_llada270m_bert_immune.yml`，初始 `Staging`
+
+## 2026-08-16 Submitted fourth immune fusion job on preemptible
+
+- **操作**：submit（第四个 immune 任务；前三个未 cancel / 未重提）
+- **task_id**：`t-20260816052434-76qtw`
+- **任务名**：`protein_esmc_llada270m_diffusion_immune`
+- **YAML**：`/vepfs-mlp2/c20250601/251105016/project/dllm_test/train_jobs/protein_esmc_llada270m_diffusion_immune.yml`
+- **初始状态**：`Queue`，队列 `queue012`（`q-20260524172355-rnqtf`），1×8 卡 `ml.pni2.28xlarge`
+- **Preemptible**：true（闲时；queue012 接受 preemptible，未切 spot-share-queue）
+- **数据**：`oas+ots+asd_antibody+trait+tcr_native`；不用 nanobody；`--asd_antibody_benchmark_blocklist ""`
+
+## 2026-08-16 Immune job monitor + stale Active cleanup
+
+- **操作**：monitor（未 submit / 未 cancel / 未重提）
+- **平台核对**：旧 ablation 均为终态，从 Active 表删除——`t-20260803071310-fvhz6` Failed、`t-20260803071313-9hmjw` Failed、`t-20260804004804-2s4rx` Failed、`t-20260804004807-tgw8s` Success
+- **四个 immune 均为 Running**：`fj6p7` / `zm4cl` / `dnj4s` / `76qtw`；前三个已出有限 loss（无 NaN/OOM/traceback），第四个刚进 Running、仍在 tokenizer/加载
+- **旧 ckpt**：中间 `checkpoint-*` 此前已裁完，本轮未再删文件（释放 0）
+
+## 2026-08-16 Resubmitted 270m diffusion immune after preempt kill
+
+- **操作**：resubmit（闲时抢占 / 平台 SIGTERM；无代码/数据 bug）
+- **旧 task_id**：`t-20260816052434-76qtw`，终态 `Killed`（Elapsed 25276s ≈ 7h，End `2026-08-16T04:25:50Z`）
+- **杀因**：worker-0 在 step ~11980、loss ~2.2–2.4 正常训练中收到 `Received 15 death signal` / `got signal: 15`（SIGTERM）；无 traceback/OOM/NaN。YAML `Preemptible: true`，判定为闲时抢占。
+- **新 task_id**：`t-20260816123736-gwff2`
+- **任务名**：`protein_esmc_llada270m_diffusion_immune`
+- **YAML**：`/vepfs-mlp2/c20250601/251105016/project/dllm_test/train_jobs/protein_esmc_llada270m_diffusion_immune.yml`（未改；未手写 resume）
+- **初始状态**：`Queue`，队列 `queue012`（`q-20260524172355-rnqtf`），1×8 卡 `ml.pni2.28xlarge`
+- **Preemptible**：true（闲时，按用户要求保持）
+- **ckpt**：`output/protein_esmc_llada270m_diffusion_immune/checkpoint-11000` 为 latest full resume；YAML/脚本无自动 resume，未发明 `--resume_from_checkpoint`
+- **未动**：`t-20260816051821-fj6p7` / `t-20260816051844-zm4cl` / `t-20260816051844-dnj4s`
+
+## 2026-08-17 270m diffusion immune 改为非闲时并 resume
+
+- **操作**：闲时 `t-20260816123736-gwff2` 已 Killed（抢占）；YAML 改为 `Preemptible: false`，从 `checkpoint-9000`（本轮带 optimizer 的最新完整 ckpt）续训后提交
+- **新 task_id**：`t-20260817153216-qvtwx`
+- **任务名**：`protein_esmc_llada270m_diffusion_immune`
+- **YAML**：`/vepfs-mlp2/c20250601/251105016/project/dllm_test/train_jobs/protein_esmc_llada270m_diffusion_immune.yml`
+- **初始状态**：`Queue`，队列 `queue012`（`q-20260524172355-rnqtf`），1×8 卡 `ml.pni2.28xlarge`
+- **Preemptible**：false（与另外三个非闲时一致）
+- **未动**：`t-20260816051821-fj6p7` / `t-20260816051844-zm4cl`；`dnj4s` 已 Success，从 Active 表移除
+
+## 2026-08-20 Submitted data-ready immune fusion evals (BERT vs diffusion)
+
+- **操作**：submit 六条评测（四条表征 + 两条 diffusion 生成）；随后 cancel 同名重复提交（并行 agent 早约 5s）
+- **口径**：只评本地已有数据。BERT=表征-only（T1 冻骨干+五折 MLP，T2/T3 表征）。Diffusion=表征+生成（SAbDab/SAb23H2 CDR、OAS holdout500 prompt3、T4 held20/unseen）。Humanization / GDPa1 / HD-Flu-CoV / m396 不跑。
+- **锁定 ckpt**：8B BERT/diffusion `checkpoint-40000`；270m BERT `checkpoint-49000`；270m diffusion `checkpoint-42000`
+- **队列**：`c20250601`（`q-20260121145036-6fztt`），单卡 `ml.pni2.3xlarge`，`Preemptible: false`
+- **保留（本 executor 提交）**：
+  - `eval-immune-270m-bert-repr` → `t-20260820053043-hwbv7`，YAML `eval_jobs/eval_immune_270m_bert_repr.yml`，初始 `Running`
+  - `eval-immune-270m-diff-repr` → `t-20260820053046-pkljp`，YAML `eval_jobs/eval_immune_270m_diff_repr.yml`，初始 `Running`
+  - `eval-immune-270m-diff-gen` → `t-20260820053049-pcpf8`，YAML `eval_jobs/eval_immune_270m_diff_gen.yml`，初始 `Running`
+  - `eval-immune-8b-bert-repr` → `t-20260820053052-5svsz`，YAML `eval_jobs/eval_immune_8b_bert_repr.yml`，初始 `Running`
+  - `eval-immune-8b-diff-repr` → `t-20260820053056-2k6dz`，YAML `eval_jobs/eval_immune_8b_diff_repr.yml`，初始 `Running`
+  - `eval-immune-8b-diff-gen` → `t-20260820053059-ddtbc`，YAML `eval_jobs/eval_immune_8b_diff_gen.yml`，初始 `Running`
+- **cancel 同名重复**：`t-20260820053038-zdffw`、`t-20260820053041-c9hhp`、`t-20260820053044-2t8mk`、`t-20260820053047-r77pn`、`t-20260820053050-rrs4s`、`t-20260820053053-44d9s`（均 `cancel success`）
+- **进度**：`dllm_test/downstream/DATA_READY_EVAL_PROGRESS.md`
+
+## 2026-08-20 Data-ready eval ID correction after duplicate race
+
+- **操作**：cancel extras; **do not resubmit again** unless a keeper fails
+- **原因**：supervisor + executor both submitted; first keepers (`hwbv7` etc.) were cancelled in the race. Second-wave **canonical live IDs**:
+  - `eval-immune-270m-bert-repr` → `t-20260820053314-4gmfb`
+  - `eval-immune-270m-diff-repr` → `t-20260820053318-blk66`
+  - `eval-immune-270m-diff-gen` → `t-20260820053320-gszxv`
+  - `eval-immune-8b-bert-repr` → `t-20260820053323-29dln`
+  - `eval-immune-8b-diff-repr` → `t-20260820053327-m5c6n`
+  - `eval-immune-8b-diff-gen` → `t-20260820053330-9sj65`
+- **队列**：`c20250601`，`ml.pni2.3xlarge`，`Preemptible: false`
+- **政策**：GPU eval/train 只走 `volc ml_task`；禁止在登录机跑 T1 retrain / embed / generation
+
+## 2026-08-20 Resubmitted immune fusion evals after cancel race
+
+- **操作**：第一波六条（`…hwbv7` 等）与并行 agent 互 cancel，随后 Failed/Killing。立即 `ml_task submit` 重提；保留每个 JobName 最早仍 Running 的一条，cancel 同名 extras
+- **保留**：
+  - `eval-immune-270m-bert-repr` → `t-20260820053314-4gmfb` Running
+  - `eval-immune-270m-diff-repr` → `t-20260820053318-blk66` Running
+  - `eval-immune-270m-diff-gen` → `t-20260820053320-gszxv` Running
+  - `eval-immune-8b-bert-repr` → `t-20260820053323-29dln` Running
+  - `eval-immune-8b-diff-repr` → `t-20260820053327-m5c6n` Running
+  - `eval-immune-8b-diff-gen` → `t-20260820053330-9sj65` Running
+- **cancel extras**：`t-20260820053325-5spmk`、`t-20260820053337-s2s4r`、`t-20260820053331-pzpnf`、`t-20260820053328-vqld7`、`t-20260820053335-rpnwl`、`t-20260820053339-ltb6g`
+- **第一波终态**：`…hwbv7`/`…pkljp`/`…5svsz`/`…2k6dz` Killing→Killed；`…pcpf8`/`…ddtbc` Failed（cancel，非 harness bug）
+- **Preemptible**：false；队列 `c20250601`；单卡 `ml.pni2.3xlarge`
+- **请勿再 cancel 上述六条 keepers**（gen keepers 已于 05:35 因 harness 失败换成 `l62kt` / `p8p2r`，见下一节）
+
+## 2026-08-25 top-k ckpt 全量 sweep（24 条）
+
+**动机**：此前每条 run 只评了 `eval_loss` 最低的那一步，但 `save_top_k=3` 还留着另外几步。评一遍能回答「下游指标对 ckpt 选择有多敏感」——如果波动大于模型间差距，那么「8B 优于 270m」「diffusion 优于 BERT」这类结论就不稳。
+
+**范围与成本权衡**（实测单 ckpt 耗时）：
+
+| 阶段 | 耗时 | 是否铺 |
+|---|---|---|
+| T1（463k 对冻结特征抽取 + 五折 MLP） | **~113 分钟**（8B） | **不铺**，16 ckpt 要 30 小时 |
+| T2 clustering | ~5 分钟 | 铺 |
+| T3 few-shot | ~8 分钟 | 铺 |
+| CDR（SAbDab 3 + SAb23H2 6，max_iter=2） | ~15 分钟（270m）/ ~30 分钟（8B） | 铺（仅 diffusion） |
+
+**代码改动**：`run_immune_fusion_repr.sh` 新增 `REPR_STAGES`（默认 `t1,t2,t3`），日志按阶段命名。T1 太贵，sweep 只跑 `t2,t3`。
+
+**评的 step**（各 run 的 top-k 备份，含 best；**排除** `checkpoint-final` 与 270m diffusion 的 6k/8k/9k resume 点）：
+
+| Run | steps | best |
+|---|---|---|
+| 8B BERT | 43000 / 44000 / 46000 / 50000 | **43000** |
+| 8B diffusion | 44000 / 45000 / 48000 / 50000 | **45000** |
+| 270m BERT | 41000 / 44000 / 49000 / 50000 | **49000** |
+| 270m diffusion | 39000 / 42000 / 47000 / 50000 | **42000** |
+
+**提交**：24 条，全部成功（前缀 `eval-topk-`，YAML `eval_jobs/topk_*.yml`）
+- **T2+T3 × 16**：四条 run 各 4 个 step（表征 BERT 与 diffusion 都测）
+- **CDR × 8**：仅两条 diffusion run（生成只测 diffusion），`max_iter=2`
+
+代表性 ID：`topk_8b_diff_45000_t23` → `t-20260825172608-429kg`；`topk_8b_diff_45000_cdr` → `t-20260825172604-986nr`；`topk_270m_bert_49000_t23` → `t-20260825172513-dpf9b`。完整 24 个 ID 见提交日志。
+
+**读法**：best step 那几条应与已有 §0.2/§0.3/§0.5 数字一致（可作回归校验）；其余 step 用来给每个指标画出「ckpt 选择带来的波动带」。若波动带宽于模型间差距，相关结论必须降级为「无显著差异」。
+
+## 2026-08-25 解码参数全线对齐官方（`max_iter` 是唯一有官方依据的设置）
+
+**sweep 结论（官方 ckpt，`t-20260825131918-nxsqg` Success，22 分钟）**
+
+SAb23H2 在 `max_iter=2` 上**几乎逐格复现论文 Table 1**，证明模型权重 / 解码路径 / CDR 定义 / AAR 算法全部正确：
+
+| | L1 | L2 | L3 | H1 | H2 | H3 |
+|---|---|---|---|---|---|---|
+| max_iter=1 | 80.88 | 80.68 | 72.36 | 73.81 | 68.32 | 35.40 |
+| **max_iter=2** | 80.92 | 80.21 | 72.81 | 74.52 | **68.59** | **36.70** |
+| max_iter=4（旧默认） | 81.19 | 79.64 | 72.48 | 74.05 | 67.32 | 34.65 |
+| max_iter=8 | 80.80 | 79.88 | 73.28 | 74.05 | 67.60 | 34.83 |
+| 论文 `[P]` | 81.1 | 80.1 | 73.7 | 74.8 | **68.6** | **36.8** |
+
+`max_iter=2` 时 H2 差 **0.01**、H3 差 **0.10**。之前 SAb23H2 那 2.3 pp 缺口**纯粹来自 argparse 默认值 4**。
+
+SAbDab 单调随步数下降（AAR 是逐位指标，错误提交会向后传播）：
+
+| max_iter | H1（论文 75.50） | H2（论文 70.18） | H3（论文 43.55） |
+|---|---|---|---|
+| 1 | 75.47 (−0.03) | 70.73 (+0.55) | **42.00 (−1.55)** |
+| 2 | 75.44 (−0.06) | 70.71 (+0.53) | 41.43 (−2.12) |
+| 4 | 75.54 (+0.04) | 70.63 (+0.45) | 40.96 (−2.59) |
+| 8 | 75.62 (+0.12) | 70.64 (+0.46) | 40.70 (−2.85) |
+
+H1 任意步数精确命中、H2 稳定高 0.5、H3 最好仍差 1.55 pp。**同 ckpt 同代码在 SAb23H2 上 H3 差 0.10、在 SAbDab 上差 1.55 → 剩余缺口不是解码，只能是样本口径**（3320 行 vs 3131 unique pdb_id vs 论文 3,127 complexes）。逐样本诊断 `eval-ophiuchus-cdrh3-persample` → `t-20260825135453-lh966`（dump 逐行 AAR + pdb_id + CDR 长度）。
+
+**参数对照（`run/zero_shot_test.sh` 是论文真实设置，argparse 默认不是）**
+
+| 任务 | 官方 | 我们（旧） | 现已改为 |
+|---|---|---|---|
+| CDR SAb23H2 | `max_iter 2` + argmax | 4（基线）/ **8**（我们模型） | **2** |
+| CDR SAbDab | 脚本未列 | 4 / **8** | **2** |
+| Light pairing | **`max_iter 124`** + gumbel + cfg **0/1/1.5** | 32 + gumbel + cfg 0 | **124**，cfg 扫 0/1/1.5 |
+| probe 类（flab/dev/in_silico） | `--use_multimer --sep_chains` | 未接（无数据） | 将来接线时须对齐这两个开关 |
+
+采样策略两边本来就一致（CDR=argmax 重建任务、pairing=gumbel_argmax 设计任务），`num_seqs 8` / `light_prompt_tokens 3` 一致，`cleaned_*` 列与原列在本地 CSV 完全相同（500/500）。
+
+**代码改动**：`run_immune_fusion_gen.sh` / `run_immune_fusion_pairing.sh` / `ophiuchus_eval/run_eval.sh` 新增 `CDR_MAX_ITER`（默认 **2**）、`PAIR_MAX_ITER`（默认 **124**）、`PAIR_CFG_SCALE`（默认 0.0），**产物文件名带上 `iter{N}` / `cfg{X}`**，不同预算的结果互不覆盖、旧结果保留。T4 仍用 32（TCRT5 是另一套协议，无官方对应值）。
+
+**注意：我们模型此前那批 CDR 数字（270m H3 41.91 / 8B H3 42.03）是在 `max_iter=8` 下测的，即对自己最不利的设置**；encoder 泄露修复的结论不受影响（那是 10+ pp 量级，`max_iter` 只值 1–2 pp）。
+
+**已提交（对齐后重跑）**：
+- `eval-immune-270m-diff-cdr` → `t-20260825150935-2kq2h`（max_iter=2）
+- `eval-immune-8b-diff-cdr` → `t-20260825150938-h59fp`（max_iter=2）
+- `eval-immune-270m-diff-pairing` → `t-20260825150942-whmkl`（max_iter=124）
+- `eval-immune-8b-diff-pairing` → `t-20260825150946-sxd64`（max_iter=124）
+- `eval-ophiuchus-pairing-official` → `t-20260825150949-7f74h`（max_iter=124，cfg 0/1/1.5 三档）
+
+## 2026-08-25 Ophiuchus 复现缺口定位：argparse 默认值 ≠ 论文实际参数
+
+- **现象**：官方 ckpt 复跑 SAbDab H1/H2 与论文吻合（75.58/70.61 vs 75.50/70.18），但 **H3 低 2.7 pp**（40.89 vs 43.55）；SAb23H2 H3 低 2.3 pp（34.50 vs 36.8）。
+- **已排除**：
+  - **长度截断**：heavy 最长 168 残基（170 token）超出 150 上限的只有 3 行 / 3320；CDR-H3 掩码上界被截断的仅 **2 行**（CDR 长 62/63 的牛源超长 loop），无「掩码完全落在 150 之外」的行。0.06% 的样本解释不了 2.7 pp。
+  - **CDR 定义 / 位置**：`heavy[start:end+1]` 与 `cdrh3_seq` 3320/3320 完全匹配。
+  - **`cleaned_*` 列**：pairing holdout CSV 里 `cleaned_h_sequence` 与 `h_sequence` 完全一致（500/500），非变量。
+- **样本口径差异（已量化，非主因）**：release 的 fold 共 **3320 行**，但 **unique pdb_id = 3131**，论文 Table 2 声明 **3,127 complexes**。172 个 PDB 条目贡献 2–3 个不同 Fv 对（其中仅 2 个 H/CDR3 完全相同）。论文按复合物计数、我们按行计数。算术上：若论文那 3127 条为 43.55、额外 193 行为 0，合并均值 = 41.02，接近我们的 40.89——但要求额外行 AAR≈0 不合理，故仅记为口径差异，不作为解释。
+- **🔑 根因方向：`run/zero_shot_test.sh` 显示论文没有用 argparse 默认值。**
+
+  | 参数 | argparse 默认（我们用的） | 官方 run 脚本（论文实际） |
+  |---|---|---|
+  | CDR SAb23H2 `max_iter` | 4 | **2** |
+  | pairing `max_iter` | 32 | **124** |
+  | pairing `sampling_strategy` | argmax | **gumbel_argmax** |
+  | pairing `cfg_scale` | 0.0 | **0.0 / 1.0 / 1.5 三档都跑** |
+  | pairing 输入列 | `h_sequence` | `cleaned_h_sequence`（本地等价） |
+
+- **理论支持**：AAR 是逐位准确率。迭代解码在已提交（可能错误）token 上继续条件化，误差会传播并**拉低** AAR；`max_iter=1` 是纯一次性 marginal argmax，最大化期望逐位准确率。所以「步数越少 AAR 越高」，方向与「论文 43.55 > 我们 40.89（max_iter=4）」一致，且官方 SAb23H2 那行正是 `max_iter 2`。
+- **已提交 sweep**：`eval-ophiuchus-cdr-maxiter-sweep` → **`t-20260825131918-nxsqg`**，脚本 `scripts/downstream/sweep_ophiuchus_cdr_maxiter.sh`，扫 `max_iter ∈ {1,2,4,8}` × {cdrh3, cdrh1, cdrh2}（SAbDab 10 折）+ SAb23H2 六 CDR，产物 `output/downstream_generation/ophiuchus_ab/maxiter_sweep/`，末尾自动打印与论文的 delta 表。
+- **pairing 待办**：我们的 Ophiuchus pairing 基线（gumbel，ImmunoMatch 0.641 vs 论文 0.695）用的是 `max_iter=32`，官方是 **124**，且论文扫过 `cfg_scale ∈ {0,1,1.5}`。这 0.054 的残差很可能同源，待 CDR sweep 结论出来后一并按官方参数复跑。
+
+## 2026-08-24 【核心 bug】ESMC encoder 条件流在迭代解码中泄露参考序列
+
+- **发现路径**：修完 pairing 长度泄露后，270m 重跑结果崩到 ImmunoMatch 0.0 / valid 0.0。诊断显示**长度恰好相同**的那 15.5% 行 identity 仍只有 0.150——这些行 decoder 输入与旧 reference 模式**完全一致**，却给出截然不同的结果，说明泄露不在 decoder 侧。
+- **根因**：`dllm/pipelines/qwen3_vl_arch/sampling_bioseq.py::_model_logits` 原来把 `corruption_mask = output_tokens.eq(mask) & generation_mask` 传给 `apply_decoder_corruption_to_encoder`。该函数只在**掩码置位处**写 `<mask>`，其余位置保留 `batch["encoder_input_ids"]`——而这个张量是 collator 从**干净 record** 建的。迭代解码每提交一个位置，`corruption_mask` 就缩小一格，于是 ESMC 条件流**重新暴露该位置的真实参考残基**，decoder 下一步直接抄。
+- **实测（单条 light-pairing record，104 个待生成残基）**：提交 0% → 暴露 0/104；**提交 50% → 暴露 52/104**；**提交 90% → 暴露 93/104**。
+- **为什么训练没这个问题**：训练是单次前向，`corruption_mask` 就等于全部 target 集合，encoder 恰好把所有 target 位置都掩掉。迭代推理才会出现「掩码随步数收缩」这一情形。
+- **修复**：推理时改为镜像**整个 `generation_mask`**（全轨迹恒定），保证 ESMC 在任何一步都看不到 target 残基；cfg 分支同步改为 `generation_mask | partial_mask`。修复后实测全轨迹暴露 0/104。
+- **回归测试**：`scripts/tests/bioseq/test_sampling_bioseq.py::test_encoder_never_sees_target_residues_during_decoding`，6 个测试全通过。
+- **影响面（全部旧生成数字作废）**：所有走 `generate_bioseq` 的 ESMC-fusion 生成任务——**AB CDR infilling、light pairing、T4 TCR generation**。这解释了 CDR AAR 为何异常高（SAbDab H3 比论文高 11–14 pp）：不是（只是）OAS 语料重叠，而是解码过程被喂了答案。**RESULTS §0.4/§0.5/§0.6 的旧数字全部作废。**
+- **重跑（修复后代码 + 8B 换新 ckpt）**：`eval-immune-270m-diff-gen` → `t-20260825010632-krz7q`；`eval-immune-8b-diff-gen` → `t-20260825010636-jvpsn`；`eval-immune-8b-bert-repr` → `t-20260825010639-qpshc`；`eval-immune-8b-diff-repr` → `t-20260825010642-sgm7d`。均 Running。
+- **表征任务不受此 bug 影响**（单次前向 mean-pool，无迭代解码）；8B 两条 repr 重跑只是因为 ckpt-40000 被剪枝删除、必须换 43000/45000。270m 两条 repr 数字仍有效。
+- **已取消**：`t-20260824235242-glhcr`（8B pairing，跑的是修复前代码，结果无意义）。
+
+## 2026-08-24 Pairing 协议修复 + 重提（长度泄露 / argmax 塌缩）
+
+- **诊断依据**：对照官方 `airgen/AirGen-Dev/downstream/comp_chain/generate_light_from_csv.py`。官方 `LightMaskingCollate` 用**固定 128-token light 缓冲区**（`chain_lengths={'fv_heavy':150,'fv_light':128}`），`light_tokens[i, 4:]` 全部置 mask，解码后 `split('<eos>')[0]` 截断——**长度由模型自己吐 EOS 决定，不泄露**。
+- **我们的缺陷 (a) 长度泄露**：`downstream/grammar/light_chain_pairing.py` 用 `antibody_pair_record(heavy, light)` 把真实 light 装进 grammar record，`masks.py::light_chain_generation_partial_mask` 只把这些位置改 mask，故槽位数 = 参考长度。grammar-v2 的 `<prots>…<protd>` 块**没有链内终止符**，槽位数就是生成长度。实测 4000 对：长度 100% 一致、平均相同度 0.946、逐字复制 4.7%（8B）/9.7%（270m）。
+- **修复 (a)**：新增 `--light-length-mode {prior,reference}`，默认 **prior**——从 OAS **train** split（300 万行）统计的 light 长度直方图采样，与本行参考无关。先验落盘 `data/downstream/comp_chain/oas_train_light_length_prior.json`（mean 108.86 / median 108 / 范围 91–141，与 holdout 边际 108.798 基本一致）。placeholder = `ref[:prompt] + 'A'*(L-prompt)`，填充位全被 mask，只有槽位数进模型。输出新增 `light_length_mode` / `target_light_length` / `ref_light_length` 三列可审计。`reference` 模式保留但打印警告。
+- **基线缺陷 (b) argmax 塌缩**：`downstream/ophiuchus_eval/light_pairing.py` 的移植是忠实的（同样固定 128 槽位 + `<eos>` 截断，**不泄露长度**，实测长度一致率仅 40.6%），唯一问题是 `argmax` 确定性解码使 n=8 完全相同（diversity 4.9e-16、每 heavy 唯一数 1.00），所以 ImmunoMatch 0.352 是**单次采样重复 8 遍**。论文报 diversity 0.335，显然不是纯 argmax。
+- **修复 (b)**：`run_eval.sh` 新增 `PAIRING_SAMPLING`（默认 `gumbel_argmax`），产物按策略命名，旧 argmax 结果保留作 provenance。`dplm_multichain.py` 支持 `vanilla/argmax/gumbel_argmax`，与我们同口径。
+- **新增自动诊断**：`scripts/downstream/pairing_leakage_diagnostic.py`，每次 pairing 跑完输出 same_length_frac / mean_identity / exact_copy_frac / unique_per_heavy 与 verdict。已用旧产物回归验证：旧 Ours 判定 `length_leak_suspected=true`，旧 Ophiuchus 判定 `sampler_collapse_suspected=true`。
+- **新增只跑 pairing 的 runner**：`scripts/downstream/run_immune_fusion_pairing.sh`（不重跑 CDR/T4）。
+- **⚠️ 8B checkpoint-40000 已被删除**：8B 两条训练已跑完 50k，`TopKValLossCheckpointCallback` 按 top-3 剪枝把 40000 删了。现存最优：**8B diffusion `checkpoint-45000`（0.5348，优于旧 40000 的 0.5411）**、**8B BERT `checkpoint-43000`（0.2566，优于旧 40000 的 0.2624）**。270m 两条（BERT 49000 / diffusion 42000）仍在。**RESULTS §0 里 8B 那几行对应的权重已不存在，不可复现，需在新 ckpt 上重跑。**
+- **提交（队列 `c20250601`，`ml.pni2.3xlarge`，非抢占）**：
+  - `eval-immune-8b-diff-pairing-fix` → **`t-20260824235242-glhcr`** Running（ckpt-45000，tag `ours_fusion_8b_diff_45000`）。首次提交 `t-20260824234939-88m2t` **Failed**：`test -f ${CKPT}/model.safetensors` 因 40000 被剪枝而失败，已换 45000 重提。
+  - `eval-immune-270m-diff-pairing-fix` → **`t-20260824234942-zp2vg`** Running（ckpt-42000）
+  - `eval-ophiuchus-pairing-sampling` → **`t-20260824234946-r9bx2`** Running（`PAIRING_SAMPLING=gumbel_argmax`；CDR 阶段因 JSON 已存在而 skip）
+
+## 2026-08-20 FusionConfig gen crash + cluster-only policy
+
+- **政策（用户纠偏）**：训练与 GPU eval **立刻** `volc ml_task` 提交。禁止等本地卡，禁止在登录机跑 T1 retrain / embed / generation。登录机无本轮 eval Python；A100 上 `occupy.py`（Jul20 起）与本评测无关。
+- **失败**：`t-20260820053320-gszxv` / `t-20260820053330-9sj65` Failed：`_FusionConfig` 缺 `forbidden_target_token_ids`（`generate_bioseq`）。
+- **修复**：`examples/llada/protein_fusion_model.py` 给 `_FusionConfig` 补 `forbidden_target_token_ids=None` 与数值 `pad_token_id`。
+- **只重提 gen**：`eval-immune-270m-diff-gen` → `t-20260820053506-l62kt`；`eval-immune-8b-diff-gen` → `t-20260820053511-p8p2r`（Staging）。四条 repr keepers 未动。
+- **监督日志**：`dllm_test/downstream/DATA_READY_EVAL_SUPERVISOR.md`
+
+## 2026-08-28 训练语料口径修正 + 补齐缺失 TCR 源（无任务提交）
+
+本轮只动数据层与审计脚本，**未提交/取消任何 volc 任务，未改模型**，Active 表不变。
+数据侧权威记录已同步到
+`/vepfs-mlp2/c20250601/251105016/project/dllm_test/DATA_FORMAT_AUDIT.md`
+「当前训练语料实测快照（2026-08-28）」。
+
+- **`max_length` 默认值统一为 1024**（此前是量错语料的根因）。
+  `examples/llada/protein_pretrain_esmc.py` 与 `examples/llada/protein_pretrain.py` 的
+  `DataArguments` 把基类 `dllm/utils/configs.py` 的 1024 往下覆盖成 512，而四个
+  `train_jobs/protein_esmc_*immune*.yml` 都显式传 1024。任何不显式传参的辅助脚本因此
+  静默量到另一个语料。已删除覆盖。
+- **`asd_antibody` 行数修正 159,331 → 276,412**。该源抗原中位数 607 aa，卡在 512 与
+  1024 的总长预算之间（512 下抗原只剩 ~268 aa），是唯一对该参数敏感的源。
+  `RETRAIN_PLAN.md` §7.2b/§7.8 初版数字作废，已在文内标注修正。
+- **ASD 去污染代价修正并已决策**。此前记为「砍掉 81%」，实测真实去除率
+  **67.49%**（长度过滤在 1024 下只剔 0.3%）。阈值为 `mmseqs easy-linclust
+  --cluster-mode 1`（connected component）：CDR-H3 core 0.80 identity / 0.80 coverage，
+  heavy 0.95/0.80，light 不参与。**用户 2026-08-28 确认接受该代价，三个 benchmark 全
+  保护**，不放宽阈值。
+- **审计脚本修正**：`scripts/count_immune_mix.py` / `scripts/count_immune_drops.py`
+  改为一律使用 `DataArguments` 默认值，不再硬编码 512 与空 blocklist 路径；关闭
+  blocklist 只能传 `none`（`""` 会被 `load_exclusion_keys` fail-fast 抛错，见
+  RETRAIN_PLAN §7.3）。
+- **七源实测（v3 mix，1024，全 blocklist 生效，共 7,626,737 条）**：`oas` 2,485,471 /
+  `ots` 2,094,231 / `tcr_repertoire` 1,971,794 / `tcr_papers`(v2) 667,405 /
+  `asd_antibody` 276,412 / `tcr_native` 96,552 / `trait` 34,872。总残基
+  1,271,440,536。v2 mix（`tcr_papers` 指 v1，407,112）为 **7,366,444**。
+- ~~**`tcr_papers` 的默认目录仍是 v1**~~，只有 v3 的 yml 用 `--tcr_papers_dir` 覆盖到 v2。
+  不传该参数的统计量到的是 v2 mix。已给 `count_immune_mix.py` 加尾随 `field=value`
+  覆盖参数，便于复现 v3。
+  **→ 2026-08-29 已改默认为 v2**（见下节）；本条描述的坑已消除。
+- **⚠️ `tcr_repertoire` 于 11:50 被并行会话重建**：`t4_refbinder` blocklist 从 61,136
+  刷到 62,893 core（并集 123,135 → 124,176），train 1,971,136 → **1,971,794**。
+  本轮所有表格已是重建后的口径；引用前先读 `build_report.json`。
+- **语料新鲜度机制（并行会话同日修复，已记录）**：构建报告的 `PASS` 只对「构建时那份
+  blocklist」有效，blocklist 重建后语料不会自动跟随，过期语料与干净语料报告同形。
+  实测 `tcr_repertoire` 曾有 3 个 T4 参考 binder 残留在 train 中。修复为报告新增
+  `blocklist_provenance`（path+mtime+sha1）、新增
+  `scripts/data/tcr_native/assert_corpus_fresh.py`（校验 `PASS` 且比对活文件 hash，
+  无 provenance 报 UNVERIFIED），v3 yml 启动前改调该脚本。
+  **规则：blocklist 重建后依赖它的语料必须重跑并重校验。**
+- **`tcr_papers` 决策：加，且已在跑 v2**。`TCR_PAPERS_DIR` 已指向
+  `data/tcr_papers_v2/dataset`（train 668,331、唯一 epitope 3,218、净新 epitope
+  +1,763，v1 为 +881），比 v1 四源多 TcrDesign-2026 三层；未新增 dataset token，
+  `--dataset_args` 里仍写 `tcr_papers`。
+- **`tcr_repertoire` 已接入 v3**（1,971,136 条无标签单链 CDR3β，唯一渲染为
+  `tcr_single` 布局的源，此前该布局训练覆盖为 0）。
+- **补齐两个盘上缺失的源**（脚本
+  `scripts/data/download_missing_tcr_sources.sh`，走实验室代理 3128，逐文件核对官方
+  MD5，可重跑）：VDJdb 2026-06-03（`vdjdb_full.txt` 139,745 → 192,754 行，+37.9%）；
+  Zenodo 11208211 OTS/TCRLang（三个 tar.gz，MD5 全部与官方一致）。**两者均未接线训练。**
+- **⚠️ TCRLang 官方 test/eval 不可用作本项目 benchmark**：按全长 β+α 精确配对比对
+  `data/ots_paired_clean/final/train.csv`，test 命中 98.2%、eval 命中 98.3%。同源于 OTS
+  但本项目自行重切 split，把对方测试集切进了训练集；反向也不能与该论文数字直接比较。
+- **遗留未解**：`ImmuneSourceSpec.weight` 在 `ImmuneBioSeqDataset.__getitem__` 中被丢弃，
+  混合比例纯由磁盘行数决定。`tcr_repertoire` 占 25.85% 记录但只占 2.04% 残基，
+  `asd_antibody` 反向（3.62% 记录 / 11.37% 残基）。要真正控制配比需先让 `weight` 生效。
+
+### 2026-08-28 23:46 状态核对 + Active 表清空
+
+- 逐条查询确认 Active 训练表里残留的 8 条**全部 `Success`**（含六条本不该记在训练表里的
+  `eval-immune-*`），评测表的两条 sab23h2 亦已 Success。两张表按
+  `volc-train-task-log.mdc` 清空并刷新时间戳。
+- `volc ml_task list --status Queue,Staging,Running,Killing` 按 `immune`/`esmc`/
+  `ophiuchus` 过滤均返回「没有匹配条件的任务」：**本项目当前零非终态任务**。
+- 四条 immune fusion 训练均已跑满 50k，`checkpoint-final` 齐全。现存 top-k：
+  `270m_bert` 41000/44000/49000/50000；`270m_diffusion` 39000/42000/47000/50000
+  （另存早期 6000/8000/9000）；`8b_bert` 43000/44000/46000/50000；
+  `8b_diffusion` 44000/45000/48000/50000。
+- `output/` 仍占 **1.1T**，但**当前不构成风险，无需清理**（2026-08-29 00:54 复核）：
+  `/vepfs-mlp2/c20250601/251105016` 是 3.1P 共享 vepfs，**可用 841T / 已用 74%**，
+  500MB 写入测试瞬时通过（3.9 GB/s），且未配置用户级 quota。2026-08-25 那次
+  `Errno 122 Disk quota exceeded` 是**暂时性**的（共享盘或目录配额当时触顶），
+  并非我们自己的用量所致——1.1T 相对 841T 可用量无关紧要。
+  如果该错误再现，先看 `df -h` 与共享盘水位，不要先删自己的 checkpoint。
+- 语料新鲜度复检通过：`assert_corpus_fresh.py` 对 `tcr_papers_v2` 与
+  `tcr_repertoire` 均 OK。`tcr_papers_v2/finalize_report.json` 于 11:56 重写，
+  但仅新增 `blocklist_provenance`，行数口径未变（`final_rows=696,920`、
+  train 668,331）。
+- **v3 未提交**：`train_jobs/protein_esmc_llada270m_diffusion_immune_v3.yml`
+  已就绪（七源 from-scratch，启动前调 `assert_corpus_fresh.py`），等算力决策。
+
+### 2026-08-29 01:45 下游泄漏审计：TRAIT 黑名单构造缺陷 + T4 参考集缺陷
+
+新增 `scripts/data/dedup/audit_downstream_leakage.py`（5 个 TCR 源 × 11 个下游测试集
+的残留泄漏矩阵，把每行推过该源**真实的** `row_to_record` 后再比对，即训练真正看到的数据）。
+最终状态 **`HARD-REQUIREMENT hits = 0 -> PASS`**（`NM2025_seen` / `NM2025_unseen` /
+`public_trackA` 三个零容忍基准全零）；`tcr_repertoire` 对全部 11 个测试集均为 0。
+
+- **⚠️ 上一节的七源表已过期。** 我改了 trait 黑名单，另一并行会话在 17:16 UTC
+  重建了 TRAIT 与 `tcr_papers_v2` 语料。新口径：
+
+  | 源 | 旧 | 新 | 差 |
+  |---|---:|---:|---:|
+  | `tcr_papers`(v2) | 667,405 | **681,444** | +14,039 |
+  | `trait` | 34,872 | **31,515** | −3,357 |
+  | 合计 | 7,626,737 | **7,637,419** | +10,682 |
+
+  其余五源不变（`oas` 2,485,471 / `ots` 2,094,231 / `tcr_repertoire` 1,971,794 /
+  `asd_antibody` 276,412 / `tcr_native` 96,552）。
+- **TRAIT 黑名单是 `语料 ∩ benchmark` 的交集写法，结构上挡不住语料重建**（已修）。
+  `decontam_extra.py::decontaminate_trait` 原本先扫语料收集 core 再与 benchmark 求交集，
+  所以黑名单只对构建时那份语料完备；新增行的 core 从没进过候选集。实测那 862 个键
+  只覆盖 hard-requirement 保护集的 **4.2%**（277/6,570，分基准 0.8% / 6.4% / 13.2%）——
+  **本源此前 0 命中是运气，不是过滤起了作用**。17:16 那次重建加了 600 行，
+  4 行直接落在保护 core 上（`ASSVGGISPLH`、`ASSYGGPEQF` → NM2025_unseen；
+  `ASSVGTGYEQY`、`ASSVGRNTEAF` → public_trackA），等 mtime 稳定 40s 后复核确认为真泄漏。
+  改为 `簇级交集 ∪ binding_benchmark ∪ full_bank` = **59,212 键**（原 862），
+  与 `build_repertoire.py` / `finalize_papers.py` 早已采用的写法一致。
+  代价 trait −11.2%；附带 T2/T3 四列从 162/2,332/287/208 全部归零。
+  原文件备份 `trait_benchmark_blocklist.txt.pre_union_bak`。
+  **规则：精确黑名单必须 benchmark 派生，不能写成 `语料 ∩ benchmark`。**
+- **§前节「语料新鲜度机制」补一半**：断言只能*发现*脱节，*挡住*后果的是加载期过滤。
+  `tcr_repertoire` 原先没有加载期过滤（注释写"构建期已去污、无表位可作键"），
+  故那 3 条落盘即等于进训练。已补 `repertoire_core_exclusions`
+  （`t4` ∪ `t2t3` 投影成裸 core ∪ `ots_benchmark`），实测 3 条全部被挡下。
+- **⚠️ T4 Setting-A 参考集自身有构造缺陷（既存问题，未修正打分）**：
+  `prepare_tcr_generation.py --train-cap` 默认 200,000 而 OTS train 有 2,102,700 行，
+  只覆盖 **9.5%**；该参数同时决定 novelty 参照集和 holdout 去重对象。后果是
+  **19.4% 的 holdout 序列其实躺在训练数据里**（多出的 1,893 条逐条核验全部确认在
+  train 内），且 novelty 参照只有全量的 10.5%（180,918 vs 1,718,935）。
+  两个方向都虚高分数。已加 `--train-cap 0` / `--out-dir` 并生成修正版到
+  `downstream/benchmark/data/tcr_generation_fullref/`（验证 holdout ∩ train 全量 = 0），
+  **未覆盖线上文件、未重跑打分** —— 换参考会改动已有 novelty/JSD 数值，等决策。
+  引用 T4 Setting A 数字前先确认口径。
+- **审计脚本自身的结论行也修了**：原来把配对键投影出的裸 core 命中一并加总报
+  `TOTAL residual hits = 75929 -> LEAKAGE`，而那些按构造就该非零
+  （实测 `tcr_papers_v2` 约 7.7 万、`tcr_native` 约 7.4 万裸 core 命中 T4，
+  但 `(core|epitope)` 配对层命中为 **0**；T4 黑名单 68,846 键 100% 含 `|`）。
+  改为只用 hard-requirement 行驱动结论，其余标为 info 并注明为何非零合理。
+- **`TCR_PAPERS_DEFAULT_DIR` 改为 v2**（`data/tcr_papers/dataset` →
+  `data/tcr_papers_v2/dataset`）。原来的默认是个静默坑：所有不传
+  `--tcr_papers_dir` 的东西（临时统计、`count_grammar_layouts.py`、泄漏审计）
+  都在量 v1，而 v3 训的是 v2，两者差 274k 行。三个 job 配置都显式传目录，
+  不受影响——`bert_immune` / `diffusion_immune` 钉 v1（保已跑 checkpoint 可复现），
+  `diffusion_immune_v3` 钉 v2。v1 语料仍在盘上。
+- **训练就绪性实测（2026-08-29 02:10）**：照 v3 yml 跑完整 pre-flight——
+  9 个数据目录 + ESMC/LLaDA 权重齐、4 个 blocklist 非空、
+  `assert_corpus_fresh.py` 通过；再用 v3 全参数做 `--dry_run`，
+  七源各 64 行全部加载成功（`DRY RUN OK`），词表 remap 覆盖 43 id，
+  抗体/TCR 两种布局渲染正常，日志确认 `trait_benchmark=59212` 新黑名单生效。
+  **数据侧可以开训。**
+- **遗留（不阻塞开训）**：`ImmuneSourceSpec.weight` 仍被丢弃——
+  `ImmuneCsvDataset` 把 `spec.weight` 写进每条 record，但下游无人消费
+  （`protein_fusion_model.py` 里的 `weights` 是 `_diffusion_token_weights`，
+  按扩散时间的 per-token 权重，与 per-sample 源权重无关）。
+  实测七源 weight 全为默认 1.0，**故这是缺失功能而非静默 bug**；
+  但配比只能靠行数控制，也因此表位条件的 loss 预算提不上去。
+- **⚠️ 追记（2026-08-29 13:30 复核）**：`tcr_repertoire` 于 **03:35 UTC**
+  切分比例变了：train 1,971,794 → **2,128,750**（+156,956），
+  valid 201,504 → **123,049**，holdout 201,170 → **122,669**。
+  **成因更正（2026-08-29）：这不是"语料被重建"，而是本文件顶部那条记录的
+  valid 近重复搬迁**（`move_near_dup_eval_rows.py --datasets tcr_repertoire --apply`，
+  把 valid/holdout 中与 train Lev≤1 的行移入 train，5 轮迭代约 10 小时）。
+  `build_repertoire.py` 未重跑，blocklist 也未变动——这也是
+  `assert_corpus_fresh.py` 仍然通过的原因。
+  复核结论：`assert_corpus_fresh.py` 通过；泄漏审计在新语料上
+  **`HARD-REQUIREMENT hits = 0 -> PASS`**，本源对 11 个下游测试集全 0，
+  新增的 15.7 万行未带进泄漏（与 `count_immune_mix.py` 测得的 kept=raw、剔 0 一致）。
+  新七源合计 **7,794,375**（原 7,637,419）：
+  `oas` 31.89% / `tcr_repertoire` 27.31% / `ots` 26.87% / `tcr_papers` 8.74% /
+  `asd_antibody` 3.55% / `tcr_native` 1.24% / `trait` 0.40%。
+  无标签合计 86.07%，有标签 TCR 识别 10.39%，抗体-抗原 3.55%。
+  **本源近期反复在变，引用规模前先读 `build_report.json`。**
+- **文档**：新增 `examples/llada/DATA_PIPELINE_README.md`（数据源 / 黑名单清单 /
+  两个键空间 / 运行手册 / 三次去污事故复盘）；同步更新
+  `examples/llada/PROTEIN_PRETRAIN_PROGRESS.md`、`scripts/data/README.md`、
+  `downstream/trait/README.md`、`downstream/benchmark/README.md`、
+  `data/trait/README.md`（原写着 "not yet wired"，早已接线）、
+  `data/tcr_repertoire/README.md`、`data/tcr_papers/EXPANSION_AUDIT_2026_08_28.md`。

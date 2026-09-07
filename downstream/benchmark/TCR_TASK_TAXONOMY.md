@@ -1,3 +1,7 @@
+> ⚠️ **ARCHIVE — 非现行入口，仅历史/复现用。**
+> 现行：[`../tasks/TCR_T1_BINDING.md`](../tasks/TCR_T1_BINDING.md) 等六份任务文档。T1 **主榜已被 `RESULTS.md` §0.1 的 NM2025 AUPRC-retrain 取代**，本文「IMMREP23 / macro-AUC0.1 为主榜」作废。
+> 与任务文档或 `RESULTS.md` 冲突时**以后两者为准**。不要给本文填新数字。归档于 2026-09-02。
+
 # TCR 下游任务精简方案（文献调研 → 四类嵌合）
 
 > 原则：**贵精不贵多**。每个大类只保留 1 个主任务 + 最多 1 个辅任务；其余文献任务作为指标变体或后续扩展，不单独开榜。
@@ -13,7 +17,7 @@
 | **IMMREP23** (Nielsen et al.) | 2024 | TCR–pMHC 二分类；seen vs **unseen epitope**；强调数据泄露 | **T1 金标准**；主排名必须用 unseen |
 | **Nature Methods 大基准** (50 模型) | 2025 | AUPRC 主指标；独立测试集；负样本来源；paired αβ+MHC | T1 辅指标用 AUPRC/AUC0.1；列配置支持 αβ+peptide(+MHC) |
 | **ePytope-TCR** (Drost et al.) | 2025 | 21 个预测器统一接口；低频表位全面失败 | T1 只接一个主数据集即可，不堆多个相似 binding 榜 |
-| **SCEPTR** (Yermanos et al.) | 2024 | 嵌入质量 + **per-epitope NN binding**；对比 TCRdist/ESM2 | **T3 主任务** + T1 上可作为 few-shot NN 子协议 |
+| **SCEPTR** (Yermanos et al.) | 2024 | 嵌入质量 + **per-epitope NN binding**；对比 TCRdist/ESM2 | **T3 主任务与主口径**：few-shot per-epitope NN AUROC（原表此处写「T1 上可作为 few-shot NN 子协议」，已更正——它是 T3 主协议，不是 T1 子协议） |
 | **Clustering 对比** (Valkiers et al. 2024) | 2024 | Purity / Retention / Consistency；ClusTCR·tcrdist3·GLIPH2 | **T2 指标协议**已对齐 |
 | **DecoderTCR** (Lai et al.) | 2026 | 零样本 binding AUROC + **表位特异性 TCR 识别** + 条件生成 | T1 零样本分、T3 池内排序、T4 条件 infill 的文献依据 |
 | **IMMREP22** | 2023 | 17 表位 MicroAUC | 仅作**外部参考行**，不与 IRBench-T1 混排 |
@@ -68,19 +72,23 @@
 
 ### T3 — Representation（表征质量）
 
+> ⚠️ **本节原内容已过期（2026-08-30 更正）。** 原方案把 24-way linear probe 定为主榜、few-shot NN 归到 T1 子协议。实际落地相反：**主口径是 SCEPTR (Cell Systems 2024) Table SI III.1 的 few-shot per-epitope NN AUROC**，24-way probe 已降为辅报。原因是 24-way probe 有充足监督，各法 probe-AUROC 都挤在 0.80–0.825，区分度不足（见 RESULTS.md §0.3 辅报表）。下表已按实际口径重写。
+
 | 状态 | 任务 | 数据 | 主指标 | 文献依据 |
 |------|------|------|--------|----------|
-| **保留·主榜** | 克隆型隔离的 **epitope linear probe** | 与 T2 共享 24 表位 split | macro probe-AUROC + Acc | NbBench 范式; SCEPTR 对比 PLM |
-| **保留·辅报** | **kNN top-1** 表位检索 | 同上 | kNN top-1 Acc | SCEPTR nearest-neighbour |
+| **保留·主榜** | **few-shot per-epitope NN AUROC**（冻表征、不训头） | deep：paper6 六 pMHC（universe 25,816，100 seeds）；broad：24 表位（与 T2 共享克隆型隔离 split） | macro AUROC vs shots k∈{1,5,20,100,200} | SCEPTR Cell Systems 2024, Table SI III.1 |
+| **保留·辅报** | 克隆型隔离的 **epitope linear probe** + **kNN top-1** | 24 表位 split | macro probe-AUROC + Acc；kNN top-1 | NbBench 范式；SCEPTR nearest-neighbour |
 | **砍掉** | 单独「CDR3 二分类」等小任务 | — | — | 被 T1/T3 覆盖 |
 | **延后** | 池内 TCR 识别（DecoderTCR: 给定表位从库中找 binder） | 需结合子集构造 | AUROC | 与 T1 kNN 协议合并为一个「retrieval」子指标 |
 
 **T3 最终形态（精）**
 ```
-主任务 = 冻结嵌入 + 线性 probe（24-way）
-辅指标 = kNN top-1
-特征列 = CDR3β + CDR3α（与文献一致）
+主任务 = 冻结表征 + few-shot per-epitope NN AUROC（SCEPTR 口径）
+辅指标 = 24-way 线性 probe + kNN top-1
+我们的特征列 = CDR3β + CDR3α（无 V/J、无 peptide）
 ```
+
+> ⚠️ **输入字段不对等，必须随表披露。** 两个 native 距离基线拿到的字段多于我们：SCEPTR 用 CDR3β+CDR3α**+TRBV+TRAV**，tcrdist3 还额外用 **TRBJ+TRAJ**；其余（ESM2 / ProtBERT / k-mer / Levenshtein / Ours）只有 CDR3β+CDR3α，TCR-BERT 只有 CDR3β。因此与 SCEPTR/TCRdist 的差距不能当作纯模型能力差距。详见 RESULTS.md §0.3 的输入字段对照表。
 
 ---
 
@@ -123,7 +131,7 @@ Generation 是一个方向，含两种 conditioning setting（都是"生成 CDR3
 |----|-----------|--------|------------|
 | **T1 Binding** | IMMREP23 paired-chain | **unseen macro-AUC0.1** | 克隆型去重 + unseen 表位 |
 | **T2 Clustering** | VDJdb 表位 repertoire | **Purity** (+ Retention) | 标签不参与聚类 |
-| **T3 Representation** | 24-way epitope probe | **probe-AUROC** | 克隆型隔离 split |
+| **T3 Representation** | few-shot per-epitope NN（SCEPTR 口径） | **macro AUROC vs k** | 克隆型隔离 split；**输入字段需随表披露**（SCEPTR/TCRdist 多拿 V/(J) 基因） |
 | **T4 Generation** | 无条件 OTS CDR3β + 表位条件设计（+ infill 辅），两种 setting | 无条件 **JSD** / 表位条件 **recovery·exact** / **AAR** | holdout 新颖度 + 表位分层 zero-shot |
 
 > PPI（P1）与抗体（A1 NbBench）保持独立维度，不并入 TCR 四类。

@@ -182,7 +182,9 @@ class DataArguments(dllm.utils.DataArguments):
     train_split: str = "train"
     eval_split: str = "valid"
     max_rows_per_source: int | None = None
-    max_length: int = 512
+    # Kept in step with protein_pretrain_esmc.py and the base DataArguments so a
+    # flagless run never silently trains on a shorter-truncated corpus.
+    max_length: int = 1024
 
 
 @dataclass
@@ -409,7 +411,7 @@ def train() -> None:
     if training_args.dry_run and max_rows is None:
         max_rows = 8
 
-    base_train, train_counts = build_mixed_immune_dataset(
+    base_train, train_counts, _ = build_mixed_immune_dataset(
         specs, split=data_args.train_split, max_rows_per_source=max_rows
     )
     logger.info("Train source counts: %s", train_counts)
@@ -453,7 +455,7 @@ def train() -> None:
         model = dllm.utils.load_peft(model=model, model_args=model_args)
 
     # ----- Eval dataset -----------------------------------------------------------
-    base_eval, eval_counts = build_mixed_immune_dataset(
+    base_eval, eval_counts, _ = build_mixed_immune_dataset(
         specs, split=data_args.eval_split, max_rows_per_source=max_rows
     )
     logger.info("Eval source counts: %s", eval_counts)

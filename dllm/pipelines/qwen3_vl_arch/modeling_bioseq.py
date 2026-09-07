@@ -104,6 +104,7 @@ class BioSeqDiffusionOutput:
     - ``timesteps``: ``[B]`` float in ``(time_epsilon, 1]``.
     - ``noised_encoder_input_ids``: ``[B, C, L]`` (encoder path only).
     - ``encoder_condition``: ``[B, S, E]`` gathered ESMC features (encoder path only).
+    - ``relation_aux_loss``: scalar pairing / chain-drop auxiliary (opt-in).
     """
 
     loss: torch.Tensor | None
@@ -115,6 +116,7 @@ class BioSeqDiffusionOutput:
     timesteps: torch.Tensor | None = None
     noised_encoder_input_ids: torch.Tensor | None = None
     encoder_condition: torch.Tensor | None = None
+    relation_aux_loss: torch.Tensor | None = None
 
 
 class BioSeqRMSNorm(nn.Module):
@@ -251,10 +253,64 @@ class BioSeqTimestepEmbedding(nn.Module):
         return self.proj(embeddings)
 
 
+def _diffusion_eligible_mask(
+    batch: dict[str, Any],
+    *,
+    require_residue: bool = False,
+) -> torch.Tensor:
+    """Boolean ``[B, S]`` mask of tokens that may be corrupted / receive loss.
+
+    Matches the historical ``sample_bioseq_diffusion_noise`` rule: when an
+    explicit ``diffusion_eligible_mask`` is present it is trusted (residue is
+    *not* AND-ed unless ``require_residue=True``). Otherwise residue tokens are
+    required when ``residue_mask`` exists.
+    """
+
+    loss_mask = batch.get("diffusion_loss_mask", batch.get("diffusion_target_mask"))
+    if loss_mask is None:
+        raise KeyError("batch requires diffusion_loss_mask or diffusion_target_mask")
+    explicit_eligible_mask = batch.get("diffusion_eligible_mask")
+    eligible_mask = (
+        explicit_eligible_mask.bool()
+        if explicit_eligible_mask is not None
+        else loss_mask.bool()
+    )
+    attention_mask = batch.get("attention_mask")
+    if attention_mask is not None:
+        eligible_mask = eligible_mask & attention_mask.bool()
+    residue_mask = batch.get("residue_mask")
+    if residue_mask is not None and (require_residue or explicit_eligible_mask is None):
+        eligible_mask = eligible_mask & residue_mask.bool()
+    return eligible_mask
+
+
+def _sample_uniform_residues(
+    current_ids: torch.Tensor,
+    residue_token_ids: torch.Tensor,
+) -> torch.Tensor:
+    """Draw a residue id different from ``current_ids`` when the pool allows it."""
+
+    pool = residue_token_ids.reshape(-1)
+    pool_size = int(pool.numel())
+    if pool_size <= 0:
+        raise ValueError("residue_token_ids must be non-empty")
+    draw_index = torch.randint(pool_size, current_ids.shape, device=current_ids.device)
+    picks = pool[draw_index]
+    if pool_size > 1:
+        same = picks.eq(current_ids)
+        if same.any():
+            picks = torch.where(same, pool[(draw_index + 1) % pool_size], picks)
+    return picks
+
+
 def sample_bioseq_diffusion_noise(
     batch: dict[str, Any],
     mask_token_id: int,
     time_epsilon: float = 1e-3,
+    uniform_ratio: float = 0.0,
+    gidd_gamma: float = 1.0,
+    residue_token_ids: torch.Tensor | None = None,
+    token_t: torch.Tensor | None = None,
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
     """Sample masked-diffusion corruption for one training step.
 
@@ -263,53 +319,283 @@ def sample_bioseq_diffusion_noise(
     token with probability ``t``. Fixed grammar context (``<fixs>...<fixd>``)
     is excluded via ``diffusion_loss_mask`` / ``diffusion_eligible_mask``.
 
+    When ``uniform_ratio == 0`` (the default) this is exactly Bernoulli(``t``)
+    absorbing-mask, including the per-row ``>=1`` mask guarantee. Optional
+    ``token_t`` ``[B, S]`` replaces the per-sequence ``t`` on a per-token basis
+    without changing that algorithm.
+
+    When ``0 < uniform_ratio < 1``, eligible *residue* positions use the GIDD
+    hybrid marginal (keep / ``<mask>`` / uniform other residue). Grammar and
+    structure tokens are never uniformly replaced. Labels cover both mask and
+    uniform sites; ``corruption_mask`` is True on both so encoder mirroring
+    hides every corrupted target.
+
     Returns
     -------
-    noised_input_ids : ``[B, S]`` — clean ids with corrupted positions set to ``mask_token_id``.
+    noised_input_ids : ``[B, S]`` — clean ids with corrupted positions rewritten.
     labels : ``[B, S]`` — clean ids on corrupted positions; ``-100`` elsewhere.
-    corruption_mask : ``[B, S]`` bool — True where ``<mask>`` was applied.
-    timesteps : ``[B]`` float — sampled noise level per sequence.
+    corruption_mask : ``[B, S]`` bool — True on mask *and* uniform sites.
+    timesteps : ``[B]`` float — per-sequence noise level (mean of ``token_t``
+        on eligible positions when ``token_t`` is provided).
+    """
+
+    if not (0.0 < time_epsilon < 1.0):
+        raise ValueError("time_epsilon must be in (0, 1)")
+    if not (0.0 <= float(uniform_ratio) < 1.0):
+        raise ValueError("uniform_ratio must be in [0, 1)")
+    if float(gidd_gamma) < 0.0:
+        raise ValueError("gidd_gamma must be >= 0")
+
+    input_ids = batch["input_ids"]
+    eligible_mask = _diffusion_eligible_mask(batch, require_residue=False)
+    if not eligible_mask.any():
+        raise ValueError("batch has no eligible diffusion target tokens")
+
+    batch_size, seq_len = input_ids.shape
+    device = input_ids.device
+    if token_t is None:
+        # Per-sequence noise level t ~ U(eps, 1); each eligible token masked independently with prob t
+        timesteps = torch.empty(batch_size, device=device, dtype=torch.float32).uniform_(time_epsilon, 1.0)
+        mask_probs = timesteps[:, None].expand(batch_size, seq_len)
+    else:
+        if tuple(token_t.shape) != (batch_size, seq_len):
+            raise ValueError(
+                f"token_t must have shape [B, S]=[{batch_size}, {seq_len}], got {tuple(token_t.shape)}"
+            )
+        mask_probs = token_t.to(device=device, dtype=torch.float32)
+        eligible_float = eligible_mask.to(dtype=torch.float32)
+        timesteps = (mask_probs * eligible_float).sum(dim=1) / eligible_float.sum(dim=1).clamp_min(1.0)
+
+    use_gidd = 0.0 < float(uniform_ratio) < 1.0
+    if not use_gidd:
+        # Identical to the original Bernoulli(t) sampler (continue-train default).
+        corruption_mask = (torch.rand(batch_size, seq_len, device=device) < mask_probs) & eligible_mask
+        _guarantee_at_least_one_corruption(corruption_mask, eligible_mask, mask_probs, token_t is not None)
+        noised_input_ids = input_ids.masked_fill(corruption_mask, int(mask_token_id))  # x_t [B,S]
+        labels = input_ids.masked_fill(~corruption_mask, -100)  # targets only at masked sites [B,S]
+        return noised_input_ids, labels, corruption_mask, timesteps
+
+    residue_mask = batch.get("residue_mask")
+    residue_eligible = (
+        eligible_mask & residue_mask.bool()
+        if residue_mask is not None
+        else torch.zeros_like(eligible_mask)
+    )
+    other_eligible = eligible_mask & ~residue_eligible
+
+    t = mask_probs.clamp(0.0, 1.0)
+    gidd_b = (2.0 ** float(gidd_gamma)) * float(uniform_ratio) / (1.0 - float(uniform_ratio))
+    half_gamma = 0.5 * float(gidd_gamma)
+    c_t = gidd_b * t.pow(half_gamma) * (1.0 - t).pow(half_gamma)
+    normalizer = 1.0 + c_t
+    p_keep = (1.0 - t) / normalizer
+    p_mask = t / normalizer
+    roll = torch.rand(batch_size, seq_len, device=device)
+    mask_draw = (roll >= p_keep) & (roll < (p_keep + p_mask))
+    uniform_draw = roll >= (p_keep + p_mask)
+    mask_sites = (mask_draw & residue_eligible) | ((roll < t) & other_eligible)
+    uniform_sites = uniform_draw & residue_eligible
+    if residue_token_ids is None or int(residue_token_ids.numel()) == 0:
+        mask_sites = mask_sites | uniform_sites
+        uniform_sites = torch.zeros_like(uniform_sites)
+
+    corruption_mask = mask_sites | uniform_sites
+    _guarantee_at_least_one_corruption(corruption_mask, eligible_mask, mask_probs, token_t is not None)
+    mask_sites = mask_sites | (corruption_mask & ~uniform_sites)
+
+    noised_input_ids = input_ids.clone()
+    noised_input_ids[mask_sites] = int(mask_token_id)
+    if uniform_sites.any():
+        pool = residue_token_ids.to(device=device, dtype=noised_input_ids.dtype)
+        noised_input_ids[uniform_sites] = _sample_uniform_residues(
+            input_ids[uniform_sites],
+            pool,
+        )
+    labels = input_ids.masked_fill(~corruption_mask, -100)
+    return noised_input_ids, labels, corruption_mask, timesteps
+
+
+def _guarantee_at_least_one_corruption(
+    corruption_mask: torch.Tensor,
+    eligible_mask: torch.Tensor,
+    mask_probs: torch.Tensor,
+    per_token_t: bool,
+) -> None:
+    """Force one corrupted site per row that can still receive noise.
+
+    The historical sampler always forced ``>=1`` mask on rows with any eligible
+    token. When ``token_t`` is provided, rows whose eligible tokens all have
+    ``t == 0`` (Ophiuchus heavy2light / light2heavy clean side) stay clean.
+    """
+
+    batch_size = corruption_mask.shape[0]
+    device = corruption_mask.device
+    for row in range(batch_size):
+        if not eligible_mask[row].any() or corruption_mask[row].any():
+            continue
+        if per_token_t and not (eligible_mask[row] & mask_probs[row].gt(0)).any():
+            continue
+        valid_positions = torch.nonzero(eligible_mask[row], as_tuple=False).flatten()
+        choice = valid_positions[torch.randint(valid_positions.numel(), (1,), device=device)]
+        corruption_mask[row, choice] = True
+
+
+@dataclass
+class ChainConditionedTimesteps:
+    """Per-token noise levels and chain roles for Ophiuchus-style training."""
+
+    token_t: torch.Tensor
+    seq_t: torch.Tensor
+    heavy_mask: torch.Tensor
+    light_mask: torch.Tensor
+    zero_loss_mask: torch.Tensor
+
+
+def sample_chain_conditioned_timesteps(
+    batch: dict[str, Any],
+    *,
+    ratios: dict[str, float],
+    time_epsilon: float = 1e-3,
+    stage: str | None = None,
+) -> ChainConditionedTimesteps:
+    """Sample per-token ``t`` from Ophiuchus multi-chain ratio buckets.
+
+    Generated chains are the unique non-negative ``chain_ids`` on positions
+    where ``diffusion_eligible_mask & residue_mask`` is True. The smallest id
+    is treated as heavy (antibody_heavy / tcr_beta typically encode first);
+    the next is light. Samples with fewer than two generated chains share one
+    ``t`` on every eligible token.
+
+    Ratio keys (must sum to 1):
+
+    - ``single_chain_ratio``
+    - ``heavy2light_loss_ratio``
+    - ``light2heavy_loss_ratio``
+    - ``independent_loss_ratio``
+    - ``joint_loss_ratio``
+
+    Each row is drawn independently from this categorical (not ``int(B * ratio)``,
+    which floors every non-joint bucket to 0 at the usual per-device batch of
+    2 or 4). ``joint_loss_ratio=1.0`` still always picks the shared-``t`` bucket,
+    so existing continue-train runs are unchanged. ``stage=='val'`` assigns every
+    sample to independent. ``t=0`` means no corruption on that chain; ``t=1``
+    fully masks it. The fully-masked side of a ``single_chain`` draw is marked in
+    ``zero_loss_mask``.
     """
 
     if not (0.0 < time_epsilon < 1.0):
         raise ValueError("time_epsilon must be in (0, 1)")
 
-    input_ids = batch["input_ids"]
-    attention_mask = batch.get("attention_mask")
-    loss_mask = batch.get("diffusion_loss_mask", batch.get("diffusion_target_mask"))
-    if loss_mask is None:
-        raise KeyError("batch requires diffusion_loss_mask or diffusion_target_mask")
-
-    explicit_eligible_mask = batch.get("diffusion_eligible_mask")
-    eligible_mask = (
-        explicit_eligible_mask.bool()
-        if explicit_eligible_mask is not None
-        else loss_mask.bool()
+    ratio_keys = (
+        "single_chain_ratio",
+        "heavy2light_loss_ratio",
+        "light2heavy_loss_ratio",
+        "independent_loss_ratio",
+        "joint_loss_ratio",
     )
-    if attention_mask is not None:
-        eligible_mask = eligible_mask & attention_mask.bool()
-    residue_mask = batch.get("residue_mask")
-    if explicit_eligible_mask is None and residue_mask is not None:
-        eligible_mask = eligible_mask & residue_mask.bool()
-    if not eligible_mask.any():
-        raise ValueError("batch has no eligible diffusion target tokens")
+    defaults = {
+        "single_chain_ratio": 0.0,
+        "heavy2light_loss_ratio": 0.0,
+        "light2heavy_loss_ratio": 0.0,
+        "independent_loss_ratio": 0.0,
+        "joint_loss_ratio": 1.0,
+    }
+    parsed = {key: float(ratios.get(key, defaults[key])) for key in ratio_keys}
+    ratio_sum = sum(parsed.values())
+    if abs(ratio_sum - 1.0) > 1e-6:
+        raise ValueError(f"Ophiuchus ratios must sum to 1.0, got {ratio_sum}")
 
+    input_ids = batch["input_ids"]
     batch_size, seq_len = input_ids.shape
-    # Per-sequence noise level t ~ U(eps, 1); each eligible token masked independently with prob t
-    timesteps = torch.empty(batch_size, device=input_ids.device, dtype=torch.float32).uniform_(time_epsilon, 1.0)
-    mask_probs = timesteps[:, None].expand(batch_size, seq_len)
-    corruption_mask = (torch.rand(batch_size, seq_len, device=input_ids.device) < mask_probs) & eligible_mask
+    device = input_ids.device
+    # Chain roles are defined on generated residues only.
+    role_eligible = _diffusion_eligible_mask(batch, require_residue=True)
+    eligible = _diffusion_eligible_mask(batch, require_residue=False)
 
-    # Guarantee >=1 masked token per row (avoid zero-loss microbatch)
-    for row in range(batch_size):
-        if eligible_mask[row].any() and not corruption_mask[row].any():
-            valid_positions = torch.nonzero(eligible_mask[row], as_tuple=False).flatten()
-            choice = valid_positions[torch.randint(valid_positions.numel(), (1,), device=input_ids.device)]
-            corruption_mask[row, choice] = True
+    chain_ids = batch.get("chain_ids")
+    heavy_mask = torch.zeros(batch_size, seq_len, dtype=torch.bool, device=device)
+    light_mask = torch.zeros(batch_size, seq_len, dtype=torch.bool, device=device)
+    if chain_ids is not None:
+        sentinel = torch.iinfo(torch.int64).max
+        cid = chain_ids.to(dtype=torch.int64)
+        cid = cid.masked_fill((~role_eligible) | cid.lt(0), sentinel)
+        heavy_id = cid.min(dim=1).values
+        has_heavy = heavy_id.lt(sentinel)
+        cid_without_heavy = cid.masked_fill(cid.eq(heavy_id.unsqueeze(1)), sentinel)
+        light_id = cid_without_heavy.min(dim=1).values
+        has_light = light_id.lt(sentinel)
+        heavy_mask = role_eligible & has_heavy.unsqueeze(1) & chain_ids.eq(heavy_id.unsqueeze(1))
+        light_mask = role_eligible & has_light.unsqueeze(1) & chain_ids.eq(light_id.unsqueeze(1))
+    else:
+        has_light = torch.zeros(batch_size, dtype=torch.bool, device=device)
 
-    noised_input_ids = input_ids.masked_fill(corruption_mask, int(mask_token_id))  # x_t [B,S]
-    labels = input_ids.masked_fill(~corruption_mask, -100)  # targets only at masked sites [B,S]
-    return noised_input_ids, labels, corruption_mask, timesteps
+    heavy_t = torch.empty(batch_size, device=device, dtype=torch.float32).uniform_(time_epsilon, 1.0)
+    light_t = torch.empty(batch_size, device=device, dtype=torch.float32).uniform_(time_epsilon, 1.0)
+
+    # Per-row categorical. ``int(B * ratio)`` floors every non-joint bucket to
+    # 0 at per_device 2 or 4, so opening the Ophiuchus ratios would have been a
+    # no-op on the real training jobs. joint=1.0 still always hits the last bin.
+    bucket_probs = torch.tensor(
+        [
+            parsed["single_chain_ratio"] / 2.0,
+            parsed["single_chain_ratio"] / 2.0,
+            parsed["heavy2light_loss_ratio"],
+            parsed["light2heavy_loss_ratio"],
+            parsed["independent_loss_ratio"],
+            parsed["joint_loss_ratio"],
+        ],
+        device=device,
+        dtype=torch.float32,
+    )
+    if stage == "val":
+        choice = torch.full((batch_size,), 4, device=device, dtype=torch.long)
+    else:
+        if float(bucket_probs.sum()) <= 0.0:
+            raise ValueError("Ophiuchus ratio buckets are all zero")
+        choice = torch.multinomial(bucket_probs.expand(batch_size, -1), num_samples=1).squeeze(1)
+    mask_heavy_index = choice.eq(0)
+    mask_light_index = choice.eq(1)
+    heavy2light_index = choice.eq(2)
+    light2heavy_index = choice.eq(3)
+    _independent_index = choice.eq(4)
+    joint_index = choice.eq(5)
+    _ = _independent_index
+
+    # t=0 → no corruption on that chain; t=1 → fully masked (AirGen construct_x_t).
+    heavy_t = heavy_t.masked_fill(heavy2light_index, 0.0)
+    heavy_t = heavy_t.masked_fill(mask_heavy_index, 1.0)
+    light_t = light_t.masked_fill(light2heavy_index, 0.0)
+    light_t = light_t.masked_fill(mask_light_index, 1.0)
+    light_t = light_t.masked_scatter(joint_index, heavy_t[joint_index])
+
+    token_t = torch.zeros(batch_size, seq_len, device=device, dtype=torch.float32)
+    token_t = torch.where(heavy_mask, heavy_t[:, None].expand_as(token_t), token_t)
+    token_t = torch.where(light_mask, light_t[:, None].expand_as(token_t), token_t)
+    leftover = eligible & ~heavy_mask & ~light_mask
+    token_t = torch.where(leftover, heavy_t[:, None].expand_as(token_t), token_t)
+
+    two_chain = has_light
+    zero_loss_mask = torch.zeros(batch_size, seq_len, dtype=torch.bool, device=device)
+    zero_loss_mask = zero_loss_mask | (mask_heavy_index.unsqueeze(1) & heavy_mask & two_chain.unsqueeze(1))
+    zero_loss_mask = zero_loss_mask | (mask_light_index.unsqueeze(1) & light_mask & two_chain.unsqueeze(1))
+
+    chain_count = heavy_mask.any(dim=1).to(dtype=torch.float32) + light_mask.any(dim=1).to(dtype=torch.float32)
+    seq_t = torch.where(
+        chain_count.gt(0),
+        (
+            heavy_t * heavy_mask.any(dim=1).to(dtype=torch.float32)
+            + light_t * light_mask.any(dim=1).to(dtype=torch.float32)
+        )
+        / chain_count.clamp_min(1.0),
+        heavy_t,
+    )
+    return ChainConditionedTimesteps(
+        token_t=token_t,
+        seq_t=seq_t,
+        heavy_mask=heavy_mask,
+        light_mask=light_mask,
+        zero_loss_mask=zero_loss_mask,
+    )
 
 
 def _residue_slot_positions(encoder_residue_mask: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
@@ -452,15 +738,49 @@ def mask_forbidden_target_logits(
     return masked_logits
 
 
+def _reduce_masked_token_loss(
+    token_loss: torch.Tensor,
+    loss_mask: torch.Tensor,
+    loss_norm: str,
+    batch_size: int,
+) -> torch.Tensor:
+    """Reduce a ``[B, S]`` per-token NLL with the same rules as the original CE.
+
+    ``loss_mask`` must be applied before the sum: ignored / off-chain positions
+    can still hold nonzero NLL (``ignore_index`` only zeros ``labels == -100``).
+    """
+
+    masked = token_loss * loss_mask.to(dtype=token_loss.dtype)
+    if loss_norm == "token":
+        return masked.sum() / loss_mask.sum().clamp_min(1)
+    if loss_norm == "sequence":
+        per_sequence = masked.sum(dim=1) / loss_mask.sum(dim=1).clamp_min(1)
+        return per_sequence.mean()
+    if loss_norm == "batch":
+        return masked.sum() / batch_size
+    raise ValueError(f"Unsupported loss_norm: {loss_norm}")
+
+
 def compute_masked_cross_entropy(
     logits: torch.Tensor,
     labels: torch.Tensor,
     loss_norm: str = "token",
     forbidden_token_ids: tuple[int, ...] | None = None,
+    focal: bool = False,
+    focal_gamma: float = 1.0,
+    token_weights: torch.Tensor | None = None,
+    heavy_mask: torch.Tensor | None = None,
+    light_mask: torch.Tensor | None = None,
+    heavy_loss_weight: float = 1.0,
+    light_loss_weight: float = 1.0,
 ) -> torch.Tensor:
     """Cross-entropy on corrupted positions only (``labels != -100``).
 
     ``logits``: ``[B, S, V]``, ``labels``: ``[B, S]``. Returns a scalar loss.
+
+    Defaults (``focal=False``, no ``token_weights``, no chain masks) are the
+    original token/sequence/batch CE. Optional focal, reciprocal/token weights,
+    and AirGen heavy/light reductions are opt-in.
     """
     logits = mask_forbidden_target_logits(logits, forbidden_token_ids)
     token_loss = F.cross_entropy(
@@ -469,15 +789,33 @@ def compute_masked_cross_entropy(
         ignore_index=-100,
         reduction="none",
     ).view_as(labels)
+    # ignore_index already zeros NLL on ``-100``; focal / weights keep those zeros.
+    if focal:
+        token_loss = token_loss * (1.0 - torch.exp(-token_loss)).pow(float(focal_gamma))
+    if token_weights is not None:
+        if tuple(token_weights.shape) != tuple(token_loss.shape):
+            raise ValueError(
+                f"token_weights must have shape {tuple(token_loss.shape)}, "
+                f"got {tuple(token_weights.shape)}"
+            )
+        token_loss = token_loss * token_weights.to(dtype=token_loss.dtype)
     loss_mask = labels.ne(-100)
-    if loss_norm == "token":
-        return token_loss.sum() / loss_mask.sum().clamp_min(1)
-    if loss_norm == "sequence":
-        per_sequence = token_loss.sum(dim=1) / loss_mask.sum(dim=1).clamp_min(1)
-        return per_sequence.mean()
-    if loss_norm == "batch":
-        return token_loss.sum() / labels.shape[0]
-    raise ValueError(f"Unsupported loss_norm: {loss_norm}")
+    batch_size = int(labels.shape[0])
+    if heavy_mask is not None and light_mask is not None:
+        heavy_valid = heavy_mask.bool() & loss_mask
+        light_valid = light_mask.bool() & loss_mask
+        neither_valid = loss_mask & ~heavy_mask.bool() & ~light_mask.bool()
+        if heavy_valid.any() or light_valid.any():
+            heavy_loss = _reduce_masked_token_loss(token_loss, heavy_valid, loss_norm, batch_size)
+            light_loss = _reduce_masked_token_loss(token_loss, light_valid, loss_norm, batch_size)
+            loss = float(heavy_loss_weight) * heavy_loss + float(light_loss_weight) * light_loss
+            if neither_valid.any():
+                # Positions in neither generated chain keep the single-stream reduction.
+                loss = loss + _reduce_masked_token_loss(
+                    token_loss, neither_valid, loss_norm, batch_size
+                )
+            return loss
+    return _reduce_masked_token_loss(token_loss, loss_mask, loss_norm, batch_size)
 
 
 class LocalESMCEncoder(nn.Module):

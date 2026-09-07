@@ -22,6 +22,42 @@
   `/vepfs-mlp2/c20250601/251105016/project/dllm_test/TRAINING_DATA_CATALOG.md`;
   data layout/schema facts must stay synchronized with
   `/vepfs-mlp2/c20250601/251105016/project/dllm_test/DATA_FORMAT_AUDIT.md`.
+- The canonical AB/TCR v2 implementation and data root are
+  `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/bioseq/immune_receptor_v2`
+  and
+  `/vepfs-mlp2/c20250601/251105016/project/dllm_test/data/immune_receptor_v2`;
+  the detailed authority is
+  `/vepfs-mlp2/c20250601/251105016/project/dllm_test/IMMUNE_RECEPTOR_DATA_V2.md`.
+- Never train directly from the v2 `canonical/` or `splits/` trees while
+  `reports/summary.json::export_ready` is false. Training requires an immutable,
+  decontaminated export with its own SHA256/provenance manifest.
+- The only current candidate recipe authority is
+  `/vepfs-mlp2/c20250601/251105016/project/dllm_test/data/immune_receptor_v2/exports/ir2recipe_1e3eac44551e88aedc6e/recipe_manifest.json`.
+  It is technically complete but not training-approved: rights, runtime-view,
+  and sampling-weight gates remain false.
+- Pairing exports must start only from the original OAS/OTS train CSV and create
+  a new stable SHA256 group split; never reuse the old source valid/holdout.
+  One exact/near benchmark hit blocks the complete upstream pair group, and all
+  required chains are checked. Active OTS pairing is alpha/beta only.
+- Benchmark-neighbor clustering uses connected components and these frozen
+  minimum identity/coverage pairs: antibody CDR3 0.70/0.80, TCR CDR3 0.80/0.80,
+  receptor full/variable chain 0.95/0.80, peptide 0.80/0.90, and antigen
+  0.80/0.80. Threshold or bank changes require a new immutable build ID.
+- Source-released synthetic negatives, reconstructed full-chain evidence,
+  peptide-pool responses, name-only/proxy targets, and low-confidence records
+  remain outside the primary core. Synthetic specificity negatives may be
+  generated only from train positives, must be checked against all known
+  positives, and must never be emitted for validation/test.
+- Released source splits are provenance only. Do not majority-vote conflicts or
+  erase HLA, assay, censor, sequence-scope, evidence-tier, or source-row
+  distinctions during canonical merging.
+- CATNAP associated Env accessions are a separate exact-accession evidence tier,
+  not guaranteed assay-clone sequences. SAbDab2 structural Ab-Ag records must
+  come from paired VH/VL `abag_split.csv`; single-domain rows stay excluded.
+- Benchmark quarantine discovery must scan the actual antibody and TCR task data
+  roots, including `data/downstream/comp_chain`, converted SAbDab/SAb23 CDR,
+  humanization, FLAb task, and TCR benchmark roots. Scanning only
+  `downstream/benchmark/data/tcr_*` is invalid.
 
 ## MINT benchmark rules
 

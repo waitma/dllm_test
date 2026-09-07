@@ -227,9 +227,22 @@ def _confusion_row(y: np.ndarray, s: np.ndarray, threshold: float = 0.5) -> dict
 
     Mirrors ``Evaluation_metrics_calculation.ipynb``: ROC/PRC AUC from the
     continuous score plus accuracy / precision / recall / specificity / mcc / f1
-    from a 0.5-threshold confusion matrix. PRC-AUC is reported as sklearn
-    ``average_precision_score`` (the official precrec uses trapezoidal PRC
-    interpolation, which differs slightly; see RESULTS.md).
+    from a 0.5-threshold confusion matrix.
+
+    Two PRC-AUC estimators are returned because they are not interchangeable:
+
+    * ``prc_auc`` -- sklearn ``average_precision_score`` (step-wise sum). Kept
+      as the historical key so existing consumers are unaffected.
+    * ``prc_auc_precrec`` -- the R ``precrec::evalmod`` port, which is the
+      estimator the Nature Methods 2025 paper actually used for Supplementary
+      Table 4.
+
+    Measured on the 13 original-protocol baselines that have paper values
+    (``scripts/t1_original_auprc_convention.py``): restricted to the 19 rows
+    whose AUROC also agrees to <=0.001, ``prc_auc_precrec`` reproduces the paper
+    to a mean |delta| of 0.00017, whereas ``prc_auc`` is off by 0.00114 and is
+    **one-sided high** (17 of 19 rows positive, 0 negative). Quote
+    ``prc_auc_precrec`` whenever local values share a table with paper values.
     """
     y = np.asarray(y).astype(int)
     s = np.asarray(s, dtype=float)
@@ -237,9 +250,14 @@ def _confusion_row(y: np.ndarray, s: np.ndarray, threshold: float = 0.5) -> dict
     cm = confusion_matrix(y, pred, labels=[0, 1])
     tn, fp, fn, tp = int(cm[0, 0]), int(cm[0, 1]), int(cm[1, 0]), int(cm[1, 1])
     spec = float(tn / (tn + fp)) if (tn + fp) else float("nan")
+    try:
+        prc_precrec = precrec_pr_auc(y, s)
+    except ValueError:
+        prc_precrec = float("nan")
     return {
         "roc_auc": _safe_auroc(y, s),
         "prc_auc": _safe_auprc(y, s),
+        "prc_auc_precrec": prc_precrec,
         "accuracy": float(accuracy_score(y, pred)),
         "precision": float(precision_score(y, pred, zero_division=0)),
         "recall": float(recall_score(y, pred, zero_division=0)),
@@ -260,10 +278,11 @@ def official_binding_report(
     """Per-epitope + overall report mirroring the official R ``calculate``.
 
     Splits predictions by epitope and, per epitope AND overall ("all_values"),
-    computes ROC-AUC and PRC-AUC (sklearn AP) plus the 0.5-threshold confusion
-    metrics. Also returns macro-averages over epitopes (the paper's headline is
-    AUPRC), so both the paper's macro-across-epitopes and its overall pooled
-    numbers are available.
+    computes ROC-AUC, both PRC-AUC estimators (see :func:`_confusion_row`:
+    ``prc_auc`` = sklearn AP, ``prc_auc_precrec`` = the paper's estimator) and
+    the 0.5-threshold confusion metrics. Also returns macro-averages over
+    epitopes (the paper's headline is AUPRC), so both the paper's
+    macro-across-epitopes and its overall pooled numbers are available.
     """
     labels = np.asarray(labels).astype(int)
     scores = np.asarray(scores, dtype=float)
@@ -280,8 +299,8 @@ def official_binding_report(
         return float(np.mean(vals)) if vals else float("nan")
 
     macro = {k: _macro(k) for k in
-             ("roc_auc", "prc_auc", "accuracy", "precision", "recall",
-              "specificity", "mcc", "f1")}
+             ("roc_auc", "prc_auc", "prc_auc_precrec", "accuracy", "precision",
+              "recall", "specificity", "mcc", "f1")}
     return {
         "all_values": _confusion_row(labels, scores, threshold),
         "macro": macro,
@@ -573,12 +592,21 @@ def generation_metrics(
     dist_reference: Sequence[str] | None = None,
     train_set: Sequence[str] | None = None,
     k: int = 3,
+    novelty_train_set: Sequence[str] | None = None,
 ) -> dict:
     """Generation/infilling metrics.
 
     ``paired_reference``: one ground-truth per generated seq (infilling) -> AAR.
     ``dist_reference``   : a held-out distribution (unconditional gen) -> k-mer JSD.
     ``train_set``        : training corpus -> novelty + nearest-neighbour distance.
+    ``novelty_train_set``: optional larger corpus used for novelty only.
+
+    Novelty is exact set membership and costs O(n_train) to build, while
+    nearest-neighbour distance is O(n_generated x n_train) Levenshtein and has to
+    run against a subsample.  Sharing one reference forces novelty down to the
+    subsample too, which inflates it: a sequence absent from a 20k sample but
+    present in the full 1.7M corpus is counted as novel.  Pass the full corpus
+    here so novelty is exact while the distance stays tractable.
     """
     out = {}
     if paired_reference is not None:
@@ -587,8 +615,12 @@ def generation_metrics(
     elif dist_reference is not None:
         out["kmer_jsd"] = kmer_jsd(generated, dist_reference, k=k)
     if train_set is not None:
-        out["novelty"] = novelty(generated, train_set)
+        out["novelty"] = novelty(generated, novelty_train_set
+                                 if novelty_train_set is not None else train_set)
+        out["n_novelty_reference"] = int(len(set(
+            novelty_train_set if novelty_train_set is not None else train_set)))
         out["mean_nn_distance"] = mean_nn_distance(generated, train_set)
+        out["n_nn_reference"] = int(len(train_set))
     out["n_generated"] = int(len(generated))
     out["n_unique"] = int(len(set(generated)))
     return out

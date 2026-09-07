@@ -1,3 +1,9 @@
+> ⚠️ **ARCHIVE — 范围已冻结（MINT GeneralPPI 不在评测范围内），仅历史/复现用。**
+> 范围定义的唯一权威：[`benchmark/README.md`](benchmark/README.md) §0。现行阅读顺序：
+> [`benchmark/PROJGUIDE.md`](benchmark/PROJGUIDE.md) → [`tasks/<TASK>.md`](tasks/) → [`benchmark/RESULTS.md`](benchmark/RESULTS.md) §0。
+> 冻结含义：代码/数据/已落盘产物全部保留，但**不再更新数字、不进 headline、不写入论文表、不作结论依据**。
+> 归档于 2026-09-02，内容保留未改动。
+
 # MINT downstream 任务迁移计划
 
 > 目的：把 MINT（`github.com/VarunUllanat/mint`，*Learning the language of protein-protein interactions*）官方仓库 `downstream/` 里的评测任务，迁移到本仓库 `/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/` 下，用于评测我们的 grammar / Ophiuchus / no-encoder 模型。

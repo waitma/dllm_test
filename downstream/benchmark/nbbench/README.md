@@ -1,3 +1,6 @@
+> ⚠️ **ARCHIVE — 范围已冻结（NbBench 不在评测范围内），仅历史/复现用。**
+> 范围定义：[`../README.md`](../README.md) §0。不要给本文填新数字。归档于 2026-09-02。
+
 # A1 — NbBench 抗体/纳米抗体维度
 
 > 复用 NbBench 官方 train/val/test split + 冻结主干 + head-only probe 范式。

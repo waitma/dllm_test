@@ -30,6 +30,42 @@ paired TCR α/β, antibody-antigen recognition, and TCR-epitope/pMHC recognition
   overlap audit, and initial 30/30/20/20 plane sampling recipe are in
   `/vepfs-mlp2/c20250601/251105016/project/dllm_test/TRAINING_DATA_CATALOG.md`.
 
+## Canonical data execution（2026-08-04）
+
+- The AB/TCR-only `bioseq.v2` canonical layer is implemented under
+  `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/bioseq/immune_receptor_v2`;
+  the reproducible build entry is
+  `/vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/data/build_immune_receptor_v2.py`.
+- The frozen candidate unions contain 922,479 TCR records and 470,949 antibody
+  records. The strict split populations are 41,489 TCR specificity records,
+  308,267 antibody-antigen interactions, and 19,987 canonical antibody-property
+  records; 19,981 property records satisfy the export-core rules.
+- All nine deterministic component/group split manifests pass their disjointness
+  audit. A source's released train/test assignment is provenance only and is
+  never silently treated as the new training split.
+- Exact measurement duplicates may merge provenance; conflicting labels,
+  different assay values/censors, HLA contexts, or target mapping scopes remain
+  separate. No majority-vote label collapse is allowed.
+- Frozen benchmark exact/near quarantine, MMseqs2 sequence-cluster
+  decontamination, group-disjoint resplitting, train-only negative construction,
+  and immutable SHA256 manifests are complete. Core build
+  `ir2exp_f7a60484c7e3a20db6a2` and strict OAS/OTS pairing build
+  `ir2pair_6a1a5b62752caccd2cd5` both pass their technical audits with zero
+  residual benchmark-cluster matches.
+- Candidate recipe `ir2recipe_1e3eac44551e88aedc6e` selects strict OAS H/L,
+  strict OTS alpha/beta, antibody-cluster-disjoint recognition,
+  receptor-cluster-disjoint TCR recognition, and parent-disjoint antibody
+  properties. It references 3,077,769 real train, 39,138 valid, and 38,565 test
+  records, plus a separate 3,970-row train-only synthetic TCR-negative pack.
+- This execution did not change the model, renderer, checkpoint, or sampling
+  weights and did not start training. `technical_data_export_ready=true`, but
+  `export_ready=false` and `training_ready=false` until the SAbDab2/CATNAP rights
+  review, per-chain/per-region target rendering, and four-plane sampling/token
+  budget policy are completed.
+- Full schema, source decisions, counts, hashes, leakage audit, and export gates
+  are authoritative in
+  `/vepfs-mlp2/c20250601/251105016/project/dllm_test/IMMUNE_RECEPTOR_DATA_V2.md`.
+
 ## Code Location
 
 - Main pipeline: `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/bioseq`

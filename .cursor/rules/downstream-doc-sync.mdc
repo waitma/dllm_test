@@ -1,0 +1,78 @@
+---
+description: downstream/ 下游评测的文档同步与排行榜构造规则（论文值优先、一个问题一个 owner）
+alwaysApply: true
+---
+
+# 下游评测文档规则
+
+补根 `doc-sync.mdc` 缺失的 `downstream/` 映射。所有路径用**绝对路径**，仓库根 =
+`/vepfs-mlp2/c20250601/251105016/project/dllm_test`（下称 `$ROOT`）。改动发生的**同一回合内**更新文档。
+
+## 1. 一个问题一个 owner（最重要）
+
+任何一个事实**只允许一处是权威**，其他地方只能放链接，不许复述。复述就是下一次矛盾的来源。
+
+| 事实 | 唯一权威 |
+|---|---|
+| 排行榜数字 | `$ROOT/downstream/benchmark/RESULTS.md` §0.x |
+| 评测范围（在范围 / 已冻结） | `$ROOT/downstream/benchmark/README.md` §0 |
+| 任务锚点论文 / 出处层 / 可引用性 | `$ROOT/downstream/benchmark/README.md` §3.1 |
+| 单任务协议、数据根、入口、缺陷、执行手册 | `$ROOT/downstream/tasks/<TASK>.md` |
+| post-LLaDA 口径 / embedder spec / 呈现规约 | `$ROOT/downstream/benchmark/PROJGUIDE.md` |
+| 过程 changelog | `$ROOT/downstream/benchmark/PROGRESS.md` |
+| Volc submit/cancel | `$ROOT/PROJECT_PROCESS.md` |
+| 官方产物获取与 SHA256 | `$ROOT/downstream/benchmark/baselines/_download_manifest.tsv` |
+
+## 2. 改了什么 → 必须同步什么
+
+| 你改了什么 | 必须实时更新 |
+|---|---|
+| 新增/修改 headline 数字 | `RESULTS.md` §0.x + `PROGRESS.md` changelog |
+| 任务协议、数据根、入口、gate、缺陷 | `$ROOT/downstream/tasks/<TASK>.md` |
+| 评测范围冻结/解冻 | `README.md` §0（唯一定义处，另四处同步点在该节内列明） |
+| baseline 出处层 / provenance 判定 | `README.md` §3.1 + `BASELINE_VERIFICATION.md` |
+| 官方产物新下载 / 重新校验 | `baselines/_download_manifest.tsv`（含 `sha256`） |
+| 提交/取消 Volc eval 作业 | `$ROOT/PROJECT_PROCESS.md`（规则见 `volc-train-task-log.mdc`） |
+| 发现口径错误 | 立即在 `RESULTS.md` 对应节标「不作 headline」+ 在任务文档 §7 登记 |
+
+## 3. 排行榜构造：论文值优先（强制）
+
+**取代 2026-07-21「来源规约」中 `[R]` 优先的部分。** 旧规约只在协议不一致时才把论文值升为主
+baseline；现在**无条件**论文值优先。
+
+1. **每个已列 baseline 必须带上它自己的最佳已发表值，作为 `[P]` 主榜行。**
+2. **`[R]` 官方代码/权重本地复跑作附行或附列，永不取代 `[P]` 主榜行。** 复跑的作用是证明我们的
+   harness 正确，不是充当该 baseline 的代表值。
+3. **不得因为复跑失败就把 baseline 从表里删掉。** 论文值与复跑都没有时，行保留并显式标
+   `未获取` + 原因。
+4. **论文值协议与我们不一致时，同行披露协议差**（数据版本 / split / 解码 / 负采样 / 聚合），
+   不靠删行回避。
+
+检索范围：只覆盖表内已列 baseline，**不做全文献 SOTA 搜寻**。
+
+**为什么**：只摆本地复跑会系统性抬高我们的相对身位。实测例证在 T1 —— `seen_test` 上 8 个官方
+baseline 有 7 个的本地复跑**低于**论文值约 0.010，主榜若只放复跑值，Ours 的名次就被无偿抬高。
+
+排版仍受 `PROJGUIDE.md` §2.4 约束：**Ours 全部行（含消融/control）作为一个整块置于表末**，
+绝不与 baseline 按分数穿插排序。
+
+出处层记号：`[P]` 论文报告值 · `[A]` 官方 artifact 重评分 · `[R]` 官方代码本地重跑 ·
+`[L]` 本地重实现 · `[C]` 本地控制。
+
+## 4. 数字纪律
+
+- `RESULTS.md` 主表每个数字必须能指到 `$ROOT/downstream/benchmark/outputs/` 或
+  `$ROOT/output/downstream_generation/` 下具体的 `metrics.json` / `summary.json` / `fewshot.json`。
+- **禁止编造**，禁止跨 checkpoint 拼接一行（曾发生，见 `RESULTS.md` §0.1 修正记录）。
+- 在测试集上扫超参后再宣称"超过论文"不成立；只能说"落在论文值附近"。
+
+## 5. 新建任务文档
+
+从 `$ROOT/downstream/tasks/_TEMPLATE.md` 整份复制，8 节结构不许改动。§8 执行手册必须做到
+**零上下文可照做**。
+
+## 6. 禁止
+
+- 在任务文档里复述 `RESULTS.md` 的数字（§7 为说明缺陷引用个别数字时必须带出处行号）。
+- 给已归档文档（带 `⚠️ ARCHIVE` 头部者）填新数字。
+- 改了协议却不更新对应任务文档。

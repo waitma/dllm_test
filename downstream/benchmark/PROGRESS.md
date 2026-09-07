@@ -1,5 +1,24 @@
 # IRBench 过程记录
 
+## 2026-09-07 全链 151k / generated-only 44k 的 T4 + CDR 回填（本地单卡跑）
+
+- **为什么本地跑**：这两个 ckpt 的九条单卡评测先投 `c20250601` 闲时排 5 小时零起跑；改投 `queue012` + 非抢占后又排 41 分钟零起跑（该队列非终态 758 条里单卡 607 排队 / 106 Running，多卡排队仅 27 条，拥堵全在单卡档）。按实测耗时中位数 T4 12min < CDR 16min < repr 28min ≪ **pairing 165min**，保留两条 pairing 在队列、cancel 其余七条，并把四个 T4/CDR 阶段拿到本机 A100-80G 串行跑完（56 分钟，4/4 exit 0）。env 直接激活 eval YAML 里指定的 `/vepfs-mlp2/c20250601/251105016/conda/envs/protenix_abtcr`，`CDR_MAX_ITER=2`、batch `4 8` 与平台 entrypoint 逐行一致，故与平台跑同口径。Runner 与耗时表：`output/_local_runs/{run_local_t4_cdr.sh,local_run.log,status.tsv}`。
+- **§0.4 T4**：common-6 主对照表补 allch@121k / allch@151k / genonly-2M@44k 三行（三者 `summary.bioseq_unseen_common` 均 n=6/6）；held20 表同步补三行。全链 26k → 121k → 151k 的 d_edit **8.58 → 8.78 → 8.80，不降反微升**；151k 对 genonly 44k **落后 0.19**。三者仍远差于旧 270m（6.99）与不看表位的 OLGA（6.34）——「unseen 表位条件信号接近不存在」这条主结论未被长跑撼动。
+- **§0.5 CDR**：SAbDab **旧快照** iter=2 表补 151k（H1 75.88 / H2 71.33 / H3 41.92）与 44k（75.60 / 70.88 / 41.79）；SAb23H2 v3 iter=2 表同步补两行。Kong 3,127 主表**未动**（wrapper 默认走旧 `sabdab/`，该缺陷 2026-09-02 已登记）。两臂差 ≤0.45 pp、落在同臂 ckpt 波动与已登记的 `max_iter` 协议不确定性带宽内，**不得据此声称全链与 generated-only 谁更好**。
+- **§0.8 组 D** 生成表加三列并新增读法第 9 条：长跑到 151k（2M 的 7.6%）未改变任何结论，全链相对 generated-only **无可见收益**。
+- ⚠️ **两列 pairing 未跑**（`t-20260907044307-btjxr` / `t-20260907044321-ht8b6` 仍 `queue012` Queue），而 pairing 是 headline。§0 表头、§0.8「还缺」、三处表下说明均已标注**半套数字、尚未收口**。`bert_1m_105000` 表征作业已 cancel、未跑。
+- ⚠️ **`c20250601` 上九条同名闲时任务仍未停**（本账号无 `StopCustomTask` 权限，需控制台处理），其中四条与本次本地产物**同名同路径**，一旦抢到资源会覆盖 `output/downstream_generation/<tag>_*`。
+
+## 2026-09-02 下游任务文档体系 + 论文值优先
+
+- 新建 `downstream/tasks/` 六份自包含任务文档 + `_TEMPLATE.md`；规则 `.cursor/rules/downstream-doc-sync.mdc`（论文值优先四条硬规则）。
+- `RESULTS.md` §0.1 补 Supplementary Table 7 `[P]` 主榜行，原 `[R]` 降为附行。Ours-Diffusion 8B seen_test AUPRC 0.7776 现低于 ATM-TCR/TEIM/epiTCR 论文值。
+- §0.4 登记已列生成器的最佳已发表值（sparse-13 `[P]`/`[A]`），与 Setting-B K=100 禁止合表。
+- 10 处口径矛盾已修或加归档指针：PRIMARY→immune fusion、8B@40000 归档头、T1 主榜、T4 双协议、T2 universe 4779、T1–T3 可引用性、CDR「打平」撤回、污染率 54.4 vs 29.8、SAb23H2 路径、pairing max_iter 124。
+- 非文档缺陷仅登记：v3 CDR wrapper 默认旧 `sabdab/`；`scripts/ab_cdr_leakage.py` 缺失。
+- 收口：唯一阅读顺序写进 `downstream/README.md` / `benchmark/README.md` / `PROJGUIDE.md`；`AB_TCR_EVAL_SUMMARY.md` 不再当范围同步点；`PROJGUIDE` §7 grammar_v2 命令标 VOID；`mint_tasks/*` 与 `nbbench/*` 全部加 ARCHIVE 头；`TCR_BETA_PUBLIC_TRACK_A.md` 归档并禁止与 Setting-B 合表。
+- 官方产物：`_download_manifest.tsv` 扩到 38 行（sha256 / acquired_at / task / artifact_kind）。clusTCR / soNNia / TEIM 已用 ghfast tarball 恢复为 `OK_RECOVERED`。tcr-bert 源码 dest 仍 `DL_FAIL`（体积大，未再拉）；HF `tcr-bert-mlm-only` 权重继续用。`sha256` 是 dest 内 README/LICENSE 探针，不是 git-archive。
+
 ## 2026-07-21 T1 retrained checkpoint 五折审计
 
 - Figshare `retrain.zip` / `Retraining_model.zip` 已完整下载并按发布 MD5 校验；新增 retrained protocol/runner、`precrec` PR-AUC port、checkpoint 嵌套提取与逐层 CRC/SHA provenance。

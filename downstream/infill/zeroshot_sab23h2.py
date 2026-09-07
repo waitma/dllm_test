@@ -1,6 +1,8 @@
+"""Historical port. Official-ckpt eval lives in ``downstream/ophiuchus_eval/cdr_sab23h2.py``."""
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import sys
 from pathlib import Path
@@ -18,6 +20,7 @@ from downstream.common import Sab23H2Collator, load_model, run_generate
 from dllm.pipelines.bioseq import ophiuchus_ab_checkpoint_path
 
 
+# Released IgGM/SAb23H2 tree uses h_cdr*; AirGen-Dev original script used cdrh*.
 SAB23H2_MODE_DIRS = {
     "cdrh1": "h_cdr1",
     "cdrh2": "h_cdr2",
@@ -30,8 +33,14 @@ SAB23H2_MODE_DIRS = {
 
 class SAb23H2Dataset(Dataset):
     def __init__(self, file_path: str, mode: str):
-        design_mode = SAB23H2_MODE_DIRS.get(mode, mode)
-        self.design_path = os.path.join(file_path, "fasta.files.design", design_mode)
+        candidates = []
+        mapped = SAB23H2_MODE_DIRS.get(mode)
+        if mapped:
+            candidates.append(mapped)
+        candidates.append(mode)
+        design_root = os.path.join(file_path, "fasta.files.design")
+        design_mode = next((name for name in candidates if os.path.isdir(os.path.join(design_root, name))), mode)
+        self.design_path = os.path.join(design_root, design_mode)
         self.native_path = os.path.join(file_path, "fasta.files.native")
         with open(os.path.join(file_path, "prot_ids.txt"), encoding="utf-8") as handle:
             self.prot_ids = [line.strip() for line in handle.readlines()]
@@ -86,9 +95,34 @@ def evaluate(args):
         std_aar = float(np.round(np.std(inner_aars), 4) * 100.0)
         print(f"Average AAR for {mode}: {mean_aar}")
         print(f"AAR Standard deviation for {mode}: {std_aar}")
-        results[mode] = mean_aar
+        results[mode] = {
+            "average_aar": mean_aar,
+            "aar_std": std_aar,
+            "n": int(len(inner_aars)),
+        }
 
-    print(results)
+    metrics = {
+        "baseline": "Ophiuchus-Ab",
+        "dataset": "SAb23H2",
+        "protocol": "official_checkpoint_mask_cdr_span_diffusion_decode_AAR",
+        "n_proteins": int(len(SAb23H2Dataset(args.test_set, "cdrh3"))),
+        "by_cdr": results,
+        "baseline_provenance": {
+            "evidence_type": "official_code_rerun",
+            "protocol_alignment": "compatible",
+            "paper_comparable": True,
+            "citation": "doi:10.64898/2026.02.02.703197",
+            "source_location": "Ophiuchus-Ab official checkpoint on SAb23H2",
+            "notes": "paper Table 1 remains a separate paper_reported row",
+        },
+    }
+    print(json.dumps(metrics, indent=2))
+    if args.output:
+        output = Path(args.output)
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_text(json.dumps(metrics, indent=2) + "\n", encoding="utf-8")
+        print(f"wrote {output}")
+    return metrics
 
 
 def main():
@@ -99,6 +133,7 @@ def main():
     parser.add_argument("--sampling-strategy", type=str, default="argmax")
     parser.add_argument("--max-iter", type=int, default=4)
     parser.add_argument("--cfg-scale", type=float, default=0.0)
+    parser.add_argument("--output", type=str, default="", help="optional metrics JSON path")
     args = parser.parse_args()
     pprint(vars(args))
     evaluate(args)

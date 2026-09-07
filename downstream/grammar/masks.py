@@ -219,20 +219,33 @@ def tcr_generation_partial_mask(
 def cdr3b_span_partial_mask(
     batch: dict[str, torch.Tensor],
     chain_index: int,
-    span: tuple[int, int],
+    span: tuple[int, int] | list[tuple[int, int]],
 ) -> torch.Tensor:
     """Mask a residue span ``[start, end)`` within one TCR chain (infill style).
 
     ``span`` is measured in within-chain residue coordinates (0-based). Use for
     CDR3b infilling inside a full-length beta chain while keeping the framework
     and (optionally) the epitope/MHC context fixed.
+
+    Pass a single tuple to apply the same span to every row, or a list of one
+    tuple per row when the rows differ in length (e.g. a centred window whose
+    offset depends on each sequence's own length).
     """
 
     attention = batch["attention_mask"].bool()
     partial = attention.clone()
-    start, end = span
-    for row, by_chain in enumerate(residue_positions_by_chain(batch)):
+    rows = residue_positions_by_chain(batch)
+    if isinstance(span, tuple):
+        spans = [span] * len(rows)
+    else:
+        spans = list(span)
+        if len(spans) != len(rows):
+            raise ValueError(
+                f"got {len(spans)} spans for {len(rows)} batch rows"
+            )
+    for row, by_chain in enumerate(rows):
         positions = by_chain.get(int(chain_index), [])
+        start, end = spans[row]
         if end > len(positions):
             raise ValueError(
                 f"span [{start},{end}) exceeds chain length {len(positions)} (row {row})"

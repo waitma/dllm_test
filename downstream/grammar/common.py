@@ -59,6 +59,26 @@ def antibody_pair_record(
     )
 
 
+def tcr_pair_record(
+    alpha_sequence: str,
+    beta_sequence: str,
+    *,
+    alpha_regions: dict[str, str] | None = None,
+    beta_regions: dict[str, str] | None = None,
+    source: str = "ots_paired",
+) -> BioSeqRecord:
+    """Paired TCR record. Grammar renders ``tcr_pair`` as alpha=chain 0, beta=chain 1."""
+
+    return BioSeqRecord(
+        chains=[
+            BioSeqChain(alpha_sequence, "tcr_alpha", regions=alpha_regions or {}),
+            BioSeqChain(beta_sequence, "tcr_beta", regions=beta_regions or {}),
+        ],
+        task_type="tcr",
+        source=source,
+    )
+
+
 def collate_records(records: list[BioSeqRecord], collator: GrammarBioSeqCollator | None = None) -> dict[str, Any]:
     collator = collator or build_grammar_collator()
     return collator(records)
@@ -87,6 +107,14 @@ def load_grammar_checkpoint(
 ) -> tuple[torch.nn.Module, GrammarTokenizer]:
     if str(PROJECT_ROOT) not in sys.path:
         sys.path.insert(0, str(PROJECT_ROOT))
+    from examples.llada.load_fusion_checkpoint import is_fusion_checkpoint, load_fusion_for_eval
+
+    if is_fusion_checkpoint(checkpoint_path):
+        bundle = load_fusion_for_eval(checkpoint_path, device=device)
+        model = bundle.model
+        model._fusion_eval_collator = bundle.collator
+        return model, bundle.grammar_tokenizer
+
     from examples.bioseq.train_qwen3_vl_bioseq_ddp import build_config, build_model, build_tokenizer
 
     payload = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
@@ -97,6 +125,15 @@ def load_grammar_checkpoint(
     model.load_state_dict(payload["model_state_dict"])
     model.eval()
     return model.to(device), tokenizer
+
+
+def build_eval_collator(model: nn.Module, tokenizer: GrammarTokenizer) -> GrammarBioSeqCollator:
+    """Collator matching the loaded checkpoint (fusion remaps decoder ids)."""
+
+    fusion_collator = getattr(model, "_fusion_eval_collator", None)
+    if fusion_collator is not None:
+        return fusion_collator
+    return build_grammar_collator(tokenizer)
 
 
 def load_untrained_no_encoder(vocab_size: int, **overrides: Any) -> BioSeqNoEncoderDiffusionModel:
@@ -130,7 +167,20 @@ def run_grammar_generate(
         temperature=temperature,
         cfg_scale=cfg_scale,
     )
-    return generate_bioseq(model, batch, partial_mask=partial_mask, config=config)
+    output_tokens, scores = generate_bioseq(
+        model, batch, partial_mask=partial_mask, config=config
+    )
+    return _inverse_remap_llada_tokens(model, output_tokens), scores
+
+
+def _inverse_remap_llada_tokens(model: nn.Module, tokens: torch.Tensor) -> torch.Tensor:
+    inverse = getattr(model, "llada_to_grammar_ids", None)
+    if inverse is None:
+        return tokens
+    inverse = inverse.to(device=tokens.device)
+    clamped = tokens.clamp(min=0, max=int(inverse.numel()) - 1)
+    mapped = inverse[clamped]
+    return torch.where(mapped.ge(0), mapped, tokens)
 
 
 def load_sample_oas_record(

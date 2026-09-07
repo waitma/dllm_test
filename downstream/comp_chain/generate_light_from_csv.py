@@ -1,3 +1,4 @@
+"""Historical port. Official-ckpt eval lives in ``downstream/ophiuchus_eval/light_pairing.py``."""
 from __future__ import annotations
 
 import argparse
@@ -123,7 +124,12 @@ def generate_for_batch(
     results = []
     for i, (heavy_str, raw_light_str, variant_idx, metadata) in enumerate(metadata_rows):
         light_core = output_tokens[i, heavy_max_len + 1 :]
-        gen_light = tokenizer.decode(light_core.tolist(), skip_special_tokens=True)
+        # AirGen-Dev/comp_chain/generate_light_from_csv.py: decode then cut at <eos>.
+        gen_light = tokenizer.decode(light_core.tolist(), skip_special_tokens=False)
+        for stop in ("<eos>", "<pad>", "<cls>", "<mask>"):
+            if stop in gen_light:
+                gen_light = gen_light.split(stop)[0]
+        gen_light = "".join(gen_light.split())
         results.append(build_result_row(heavy_str, raw_light_str, gen_light, variant_idx, metadata))
     return results
 
@@ -229,7 +235,7 @@ def parse_args():
     parser.add_argument("--heavy-col", type=str, default="h_sequence")
     parser.add_argument("--light-col", type=str, default="l_sequence")
     parser.add_argument("--temperature", type=float, default=1.0)
-    parser.add_argument("--sampling-strategy", type=str, default="gumbel_argmax")
+    parser.add_argument("--sampling-strategy", type=str, default="argmax")
     parser.add_argument("--max-iter", type=int, default=32)
     parser.add_argument("--cfg-scale", type=float, default=0.0)
     parser.add_argument("--device", type=str, default="auto")

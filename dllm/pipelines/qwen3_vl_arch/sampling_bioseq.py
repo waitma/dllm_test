@@ -37,6 +37,10 @@ class BioSeqGenerateConfig:
     temperature: float = 1.0
     decoding_strategy: str = "confidence-deterministic-linear"
     cfg_scale: float = 0.0
+    editing_threshold: float = 0.0
+    max_post_steps: int = 16
+    self_correct: bool = False
+    self_correct_temperature: float = 0.1
 
 
 def resolve_partial_mask(
@@ -120,7 +124,8 @@ def _model_logits(
     cfg_scale: float,
     partial_mask: torch.Tensor,
 ) -> torch.Tensor:
-    corruption_mask = output_tokens.eq(int(mask_token_id)) & generation_mask
+
+    encoder_corruption_mask = generation_mask
     forward_kwargs: dict[str, Any] = {
         "input_ids": output_tokens,
         "attention_mask": batch.get("attention_mask"),
@@ -132,10 +137,14 @@ def _model_logits(
     if isinstance(model, BioSeqEncoderDiffusionModel):
         encoder_batch = dict(batch)
         encoder_batch["input_ids"] = output_tokens
+        encoder_mask_id = int(
+            getattr(getattr(model, "config", None), "encoder_mask_token_id", None)
+            or mask_token_id
+        )
         noised_encoder_input_ids = apply_decoder_corruption_to_encoder(
             batch=encoder_batch,
-            corruption_mask=corruption_mask,
-            mask_token_id=int(mask_token_id),
+            corruption_mask=encoder_corruption_mask,
+            mask_token_id=encoder_mask_id,
         )
         forward_kwargs.update(
             {
@@ -153,31 +162,45 @@ def _model_logits(
             unmasked_tokens[partial_mask] = int(mask_token_id)
             un_encoder_batch = dict(encoder_batch)
             un_encoder_batch["input_ids"] = unmasked_tokens
-            un_corruption = unmasked_tokens.eq(int(mask_token_id)) & generation_mask
             un_noised_encoder = apply_decoder_corruption_to_encoder(
                 batch=un_encoder_batch,
-                corruption_mask=un_corruption,
-                mask_token_id=int(mask_token_id),
+                corruption_mask=encoder_corruption_mask | partial_mask,
+                mask_token_id=encoder_mask_id,
             )
-            cond_out = model(
-                **forward_kwargs,
-                input_ids=output_tokens,
-                encoder_input_ids=noised_encoder_input_ids,
-            )
-            uncond_out = model(
-                **forward_kwargs,
-                input_ids=unmasked_tokens,
-                encoder_input_ids=un_noised_encoder,
-            )
+            denoise = getattr(model, "_denoise", None)
+            if callable(denoise):
+                cond_out = denoise(
+                    **forward_kwargs,
+                    input_ids=output_tokens,
+                    encoder_input_ids=noised_encoder_input_ids,
+                )
+                uncond_out = denoise(
+                    **forward_kwargs,
+                    input_ids=unmasked_tokens,
+                    encoder_input_ids=un_noised_encoder,
+                )
+            else:
+                cond_out = model(
+                    **forward_kwargs,
+                    input_ids=output_tokens,
+                    encoder_input_ids=noised_encoder_input_ids,
+                )
+                uncond_out = model(
+                    **forward_kwargs,
+                    input_ids=unmasked_tokens,
+                    encoder_input_ids=un_noised_encoder,
+                )
             logits = uncond_out.logits + (cfg_scale + 1.0) * (cond_out.logits - uncond_out.logits)
             forbidden = forbidden_diffusion_target_token_ids(model.config)
             return mask_forbidden_target_logits(logits, forbidden)
 
-        output = model(**forward_kwargs)
+        denoise = getattr(model, "_denoise", None)
+        output = denoise(**forward_kwargs) if callable(denoise) else model(**forward_kwargs)
         forbidden = forbidden_diffusion_target_token_ids(model.config)
         return mask_forbidden_target_logits(output.logits, forbidden)
 
-    output = model(**forward_kwargs)
+    denoise = getattr(model, "_denoise", None)
+    output = denoise(**forward_kwargs) if callable(denoise) else model(**forward_kwargs)
     forbidden = forbidden_diffusion_target_token_ids(model.config)
     return mask_forbidden_target_logits(output.logits, forbidden)
 
@@ -245,6 +268,130 @@ def _confidence_decoding(
     return still_masked, output_tokens, output_scores
 
 
+def _committed_generation_mask(
+    generation_mask: torch.Tensor,
+    still_masked: torch.Tensor | None = None,
+) -> torch.Tensor:
+    committed = generation_mask.bool()
+    if still_masked is not None:
+        committed = committed & ~still_masked.bool()
+    return committed
+
+
+def llada2_edit_positions(
+    tokens: torch.Tensor,
+    pred: torch.Tensor,
+    confidence: torch.Tensor,
+    generation_mask: torch.Tensor,
+    threshold: float,
+    still_masked: torch.Tensor | None = None,
+) -> torch.Tensor:
+    """LLaDA2 edit-remask index: committed generation sites the model wants to rewrite.
+
+    A position is selected iff it is in ``generation_mask``, is not still masked,
+    ``pred`` differs from the current token, and ``confidence`` exceeds ``threshold``.
+    Fixed context / remaining masks are never selected. ``threshold <= 0`` yields
+    an empty mask so the default generate path stays a no-op.
+    """
+
+    if threshold <= 0.0:
+        return torch.zeros_like(generation_mask, dtype=torch.bool)
+    committed = _committed_generation_mask(generation_mask, still_masked)
+    return committed & pred.ne(tokens) & confidence.gt(threshold)
+
+
+def apply_llada2_edits(
+    tokens: torch.Tensor,
+    pred: torch.Tensor,
+    confidence: torch.Tensor,
+    generation_mask: torch.Tensor,
+    threshold: float,
+    still_masked: torch.Tensor | None = None,
+) -> torch.Tensor:
+    """Apply one LLaDA2 threshold-edit step. Returns a new token tensor."""
+
+    replace = llada2_edit_positions(
+        tokens,
+        pred,
+        confidence,
+        generation_mask,
+        threshold,
+        still_masked,
+    )
+    if not replace.any():
+        return tokens
+    return tokens.masked_scatter(replace, pred[replace])
+
+
+def gidd_self_correct_positions(
+    tokens: torch.Tensor,
+    pred: torch.Tensor,
+    pred_prob: torch.Tensor,
+    generation_mask: torch.Tensor,
+    still_masked: torch.Tensor | None = None,
+) -> torch.Tensor:
+    """GIDD self-correct index: at most one committed disagreement per sequence.
+
+    Among ``generation_mask`` positions that are already committed and where
+    ``pred != current``, pick the site with the highest model probability of
+    the *new* token. Returns a boolean mask (empty if nothing disagrees).
+    """
+
+    committed = _committed_generation_mask(generation_mask, still_masked)
+    eligible = committed & pred.ne(tokens)
+    replace = torch.zeros_like(generation_mask, dtype=torch.bool)
+    if not eligible.any():
+        return replace
+    scores = pred_prob.to(dtype=torch.float32).masked_fill(~eligible, float("-inf"))
+    best = scores.argmax(dim=-1)
+    has_any = eligible.any(dim=-1) & torch.isfinite(scores.max(dim=-1).values)
+    if not has_any.any():
+        return replace
+    batch_idx = torch.arange(tokens.size(0), device=tokens.device)
+    replace[batch_idx[has_any], best[has_any]] = True
+    return replace
+
+
+def apply_gidd_self_correct(
+    tokens: torch.Tensor,
+    pred: torch.Tensor,
+    pred_prob: torch.Tensor,
+    generation_mask: torch.Tensor,
+    still_masked: torch.Tensor | None = None,
+) -> torch.Tensor:
+    """Apply one GIDD self-correct step. Returns a new token tensor."""
+
+    replace = gidd_self_correct_positions(
+        tokens,
+        pred,
+        pred_prob,
+        generation_mask,
+        still_masked,
+    )
+    if not replace.any():
+        return tokens
+    return tokens.masked_scatter(replace, pred[replace])
+
+
+def token_softmax_confidence(logits: torch.Tensor, tokens: torch.Tensor) -> torch.Tensor:
+    """Softmax probability of ``tokens`` under ``logits`` (``[B, S, V]`` → ``[B, S]``)."""
+
+    probs = torch.softmax(logits.float(), dim=-1)
+    return probs.gather(-1, tokens.unsqueeze(-1)).squeeze(-1)
+
+
+def _self_correct_prediction(
+    logits: torch.Tensor,
+    temperature: float,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    scaled = logits.float()
+    if temperature > 0.0:
+        scaled = scaled / temperature
+    probs = torch.softmax(scaled, dim=-1)
+    pred_prob, pred = probs.max(dim=-1)
+    return pred, pred_prob
+
+
 @torch.no_grad()
 def generate_bioseq(
     model: nn.Module,
@@ -300,6 +447,71 @@ def generate_bioseq(
         )
         if not still_masked.any():
             break
+
+    if config.editing_threshold > 0.0 or config.self_correct:
+        edit_timesteps = _inference_timesteps(
+            config.max_iter,
+            config.max_iter,
+            model.config.time_epsilon,
+            device,
+        )
+        if config.editing_threshold > 0.0:
+            for _ in range(config.max_post_steps):
+                logits = _model_logits(
+                    model=model,
+                    batch=batch,
+                    output_tokens=output_tokens,
+                    generation_mask=generation_mask,
+                    mask_token_id=mask_token_id,
+                    timesteps=edit_timesteps,
+                    cfg_scale=config.cfg_scale,
+                    partial_mask=partial_mask,
+                )
+                sampled_tokens, sampled_scores = _sample_tokens(
+                    logits, config.sampling_strategy, config.temperature
+                )
+                confidence = token_softmax_confidence(logits, sampled_tokens)
+                replace = llada2_edit_positions(
+                    output_tokens,
+                    sampled_tokens,
+                    confidence,
+                    generation_mask,
+                    config.editing_threshold,
+                    still_masked,
+                )
+                if not replace.any():
+                    break
+                output_tokens = output_tokens.masked_scatter(replace, sampled_tokens[replace])
+                output_scores = output_scores.masked_scatter(replace, sampled_scores[replace])
+                history.append(output_tokens.clone())
+
+        if config.self_correct:
+            for _ in range(config.max_post_steps):
+                logits = _model_logits(
+                    model=model,
+                    batch=batch,
+                    output_tokens=output_tokens,
+                    generation_mask=generation_mask,
+                    mask_token_id=mask_token_id,
+                    timesteps=edit_timesteps,
+                    cfg_scale=config.cfg_scale,
+                    partial_mask=partial_mask,
+                )
+                pred, pred_prob = _self_correct_prediction(
+                    logits, config.self_correct_temperature
+                )
+                replace = gidd_self_correct_positions(
+                    output_tokens,
+                    pred,
+                    pred_prob,
+                    generation_mask,
+                    still_masked,
+                )
+                if not replace.any():
+                    break
+                output_tokens = output_tokens.masked_scatter(replace, pred[replace])
+                output_scores = output_scores.masked_scatter(replace, pred_prob[replace])
+                history.append(output_tokens.clone())
 
     if return_history:
         return output_tokens, output_scores, history

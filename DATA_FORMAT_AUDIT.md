@@ -4,7 +4,404 @@ Date: 2026-06-14
 
 Root: `/vepfs-mlp2/c20250601/251105016/project/dllm_test/data`
 
-## 当前训练数据单一入口（2026-07-23）
+## 当前训练语料实测快照（2026-08-28）
+
+本节取代下方「当前训练数据单一入口（2026-07-23）」。那一节描述的是
+`data/bioseq_grammar_v1` 的 7 源 Arrow 配方（7L step389500 lineage），**与现在
+`examples/llada/protein_pretrain_esmc.py` 实际读取的语料无关**。当前唯一训练入口为：
+
+`/vepfs-mlp2/c20250601/251105016/project/dllm_test/examples/llada/protein_pretrain_esmc.py`
+
+它按 `--dataset_args` 的 `+` token 列表直读 CSV，不经过 `bioseq_grammar_v1`，也不经过
+`data/immune_receptor_v2`（后者仍 `training_ready=false`）。
+
+### 七源实测（v3 mix，`max_length=max_protein_length=1024`，全部 blocklist 生效）
+
+2026-08-29 05:30 由
+`/vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/count_immune_mix.py`
+实测，非文档转抄。**这是 valid 近重复搬迁全部落地后的口径。**
+
+| source | 目录 | 原始 | 保留 | 剔除 | 记录% | 残基% | 生成残基% | res/rec |
+|---|---|---:|---:|---:|---:|---:|---:|---:|
+| `oas` | `data/oas_previous_clean/splits` | 2,486,442 | 2,485,471 | 0.04% | 31.89% | 45.17% | 50.01% | 232 |
+| `tcr_repertoire` | `data/tcr_repertoire/dataset` | 2,128,750 | 2,128,750 | 0.00% | 27.31% | 2.19% | 2.42% | **13** |
+| `ots` | `data/ots_paired_clean/final` | 2,102,715 | 2,094,231 | 0.40% | 26.87% | 37.22% | 41.21% | 226 |
+| `tcr_papers` | `data/tcr_papers_v2/dataset` | 682,383 | 681,444 | 0.14% | 8.74% | 2.84% | 0.91% | 53 |
+| `asd_antibody` | `downstream/asd/step6_final/antibody` | 850,134 | 276,412 | **67.49%** | 3.55% | **11.35%** | 4.57% | **523** |
+| `tcr_native` | `data/tcr_native/dataset` | 143,391 | 96,552 | 32.67% | 1.24% | 1.06% | 0.82% | 140 |
+| `trait` | `downstream/trait/step4_final` | 69,251 | 31,515 | **54.49%** | 0.40% | 0.16% | 0.07% | 66 |
+| **合计** | | | **7,794,375** | | | | | |
+
+总残基 1,273,914,576，生成链残基 1,150,746,721。
+
+相对 2026-08-28 11:50 那一版（合计 7,626,737）的两处变化，**成因不同，不要混为一谈**：
+
+1. **valid 近重复搬迁**（本会话所做）把 eval 行移入 train，抬高了三个源的 raw：
+   `tcr_repertoire` 1,971,794→2,128,750（**+7.96%**）、`tcr_papers` 668,331→682,383、
+   `trait` 67,842→69,251。`tcr_repertoire` 保留数 = raw（剔 0），说明搬进 train 的
+   156,956 行没有任何 blocklist 命中——它们本来就在同一个去污染过的 pool 里。
+2. **`trait_benchmark` blocklist 被并发会话重建**（文件 mtime 2026-08-28 17:25:35Z，
+   862 → **59,212** 键），使 `trait` 的剔除率从 48.60% 升到 54.49%、保留数从 34,872 掉到
+   31,515。**这不是搬迁造成的**：搬迁只增加 raw。`trait` 是加载期过滤，所以无需重建语料
+   即自动跟上新 blocklist。
+
+> ⚠️ `tcr_repertoire` 的 train 现在是 **2,128,750**，超过了当初刻意设的 **200 万** token
+> 预算上限（见 `data/tcr_repertoire/README.md`「为什么 train 截到 200 万」）。超出 6.4%，
+> 残基占比从 2.04% 升到 2.19%，判断为可接受，未回切。若日后重建该语料，注意 2,000,000
+> 这个上限会把搬迁回来的行重新截掉。
+
+v2 mix 与 v3 只差 `tcr_papers` 一个目录：指 v1 的 `data/tcr_papers/dataset` 时
+raw 408,037 / kept 407,112，合计 **7,366,444** 条，总残基 1,258,656,430，
+生成链残基 1,144,047,600。
+
+按监督类型（当前口径）：无标签配对（`oas`+`ots`）58.76%，无标签单链 CDR3β
+（`tcr_repertoire`）27.31% → **无标签合计 86.07%**；有标签 TCR 识别
+（`trait`+`tcr_native`+`tcr_papers`）**10.39%**；抗体-抗原（`asd_antibody`）**3.55%**。
+
+#### 按 grammar 布局的 loss 预算（2026-08-29 蓄水池采样实测）
+
+上表是**按源**的，但一个源可以产出多种布局，所以它答不了"模型在学哪些任务"。
+按布局看（`gen%` = 占全部待预测残基）：
+
+| 布局 | 条件 → 生成 | 来源 | 保留行数 | 记录% | **gen%** |
+|---|---|---|---:|---:|---:|
+| `antibody_pair` | 无条件 → 抗体 H+L | `oas` | 2,485,471 | 31.9% | **49.64%** |
+| `tcr_pair` | 无条件 → TCR α+β 全长 | `ots` | 2,094,231 | 26.9% | **40.92%** |
+| `antigen_antibody` | 抗原 → 抗体 H+L | `asd_antibody` | 276,412 | 3.6% | **4.55%** |
+| `tcr_single` | 无条件 → 单链 CDR3β | `tcr_repertoire` | 2,128,750 | 27.3% | **2.90%** |
+| `tcr_pmhc` | MHC+表位 → TCR | `trait`+`tcr_native`+`tcr_papers` | 671,678 | 8.6% | **1.78%** |
+| `tcr_peptide` | 仅表位 → TCR | 同上三源里无 MHC 的部分 | 137,833 | 1.8% | **0.20%** |
+
+三源到布局的实测拆分（全量扫描）：`trait` 95.2% pmhc / 4.8% peptide、
+`tcr_native` 99.9% / 0.1%、`tcr_papers` 80.3% / 19.7%。
+
+三个无条件/抗体布局吃掉 **95.1%** 的 loss 预算，表位条件生成合计仅 **1.98%**。
+根因是残基数量级（232 vs 13–31）而非行数，**加数据改不动这个比例**。
+
+> 🔴 **2026-08-29 前所有布局占比数字都是错的。** `count_grammar_layouts.py` 当时读满
+> `--per-source` 就 `break`，取的是**前缀**。`tcr_papers_v2` 是 7 个论文语料首尾拼接的，
+> 前 3 万行 **100% 是 `tcr_peptide`**，全量却是 80.3% `tcr_pmhc` —— 547,274 条被归错，
+> `tcr_pmhc` 低估约 4 倍（旧值 8.10%/2.47%，实为 1.8%/8.6%）。已改蓄水池采样 + `--seed`，
+> 新数字与独立全量扫描一致（671,678 vs 673,686）。
+> **规则：源内不同质时任何抽样都必须随机抽，并与一次全量扫描对齐过。**
+
+#### 剔除率在 train 与 valid 上不对称（2026-08-29 实测）
+
+上表的「剔除%」只是 **train** 的。同一份 blocklist 换到 valid 上差别很大：
+
+| 源 | train 剔除 | valid 剔除 |
+|---|---:|---:|
+| `asd_antibody` | **67.5%** | **5.0%**（47,230 → 44,866） |
+| `tcr_native` | 32.7% | 12.2%（4,390 → 3,855） |
+| `trait` | 54.5% | 54.3%（3,050 → 1,393） |
+
+`trait` 对称，另两个不对称。后果是 **ASD 的 valid loss 不适合做模型选择** ——
+valid 保留了大量被从 train 剥掉的 Kong 相似簇。详见
+`downstream/asd/README.md` 与 `examples/llada/DATA_PIPELINE_README.md` §6.4。
+
+<details>
+<summary>到达当前口径的三步（历史，展开看）</summary>
+
+| 时点（UTC） | 合计 | 变动原因 |
+|---|---:|---|
+| 08-28 11:50 | 7,626,737 | 首次七源实测基线 |
+| 08-29 01:45 | 7,637,419 | `trait_benchmark` blocklist 862→59,212 键（`trait` 34,872→31,515）；TRAIT 与 `tcr_papers_v2` 语料被重建（`tcr_papers` 667,405→681,444） |
+| 08-29 05:30 | **7,794,375** | **`tcr_repertoire` valid 近重复搬迁**（train 1,971,794→2,128,750） |
+| 08-31 | **7,794,375（行数不变）** | `tcr_papers_v2/train.csv` 第 3046 行 `cdr3b` 剥空位 `ASSKVAARVP-TLKLS`→`ASSKVAARVPTLKLS`；全量 21 个 split 仅此一格。见该目录 README「残基字母表」 |
+
+**第三步的成因曾被误记为「语料被并行会话重建」，实为 `move_near_dup_eval_rows.py --apply`
+把 valid/holdout 中与 train Lev≤1 的行移入 train**：`build_repertoire.py` 未重跑、
+blocklist 未变动，这也是 `assert_corpus_fresh.py` 依然通过的原因。并发会话的泄漏审计在
+新语料上给出 `HARD-REQUIREMENT hits = 0 -> PASS`（本源对 11 个基准全 0），与
+`count_immune_mix.py` 测得的 kept=raw、剔 0 一致。
+
+</details>
+
+> 🔴 **不要用 `data/tcr_repertoire/dataset/build_report.json::split_counts` 查行数。**
+> 它记的是构建期的 1,971,794 / 201,504 / 201,170，而近重复搬迁只改 CSV、不重写该报告。
+> 行数以 CSV 与 `data/tcr_native/dataset/near_dup_eval_move_report.json` 为准；
+> `build_report.json` 仍是**去污染**口径的权威来源（`PASS` / `decontam_mode` /
+> `blocklist_provenance`）。
+
+> ~~⚠️ **`tcr_papers` 的默认目录是 v1，不是 v2。**~~
+> **已于 2026-08-29 修正：`TCR_PAPERS_DEFAULT_DIR` 现指向
+> `data/tcr_papers_v2/dataset`。** 不传 `--tcr_papers_dir` 的脚本现在量到的就是
+> v3 口径。改默认的原因正是本条警告描述的坑：所有临时统计、布局计数、泄漏审计
+> 都在静默地量 v1，而 v3 训的是 v2，两者差 274k 行。
+>
+> 三个 job 配置都显式传目录，不受影响：`bert_immune` / `diffusion_immune`
+> 钉 v1（保已跑 checkpoint 可复现），`diffusion_immune_v3` 钉 v2。
+> `count_immune_mix.py` 仍支持尾随 `field=value` 覆盖，用于反过来复现 v1：
+>
+> ```bash
+> python scripts/count_immune_mix.py train \
+>   "oas+ots+asd_antibody+trait+tcr_native+tcr_papers+tcr_repertoire" \
+>   tcr_papers_dir=/vepfs-mlp2/c20250601/251105016/project/dllm_test/data/tcr_papers_v2/dataset
+> ```
+
+> ⚠️ **`tcr_repertoire` 于 2026-08-28 11:50 被重建过，本表已是重建后的口径。**
+> 重建把 `t4_refbinder` blocklist 从 61,136 core 刷新到 62,893（并集 123,135 →
+> 124,176），train 从 1,971,136 变为 **1,971,794**。**引用本源规模前请先看
+> `data/tcr_repertoire/dataset/build_report.json` 的当前内容**，该语料近期在变。
+
+### 语料新鲜度：`PASS: true` 不是充分证据
+
+同日发现的事故：构建报告的 `PASS` 只表示「对**构建时那份** blocklist 干净」。
+blocklist 是活文件会被重建，语料不会自动跟着重建，于是**过期语料与干净语料在报告上
+完全同形**。`tcr_repertoire` 09:04 建库、其 T4 黑名单 09:52 被重建（67,013 → 68,846
+键），语料未重跑而 `PASS` 仍为 true，实测 3 个 T4 参考 binder 留在 train 中。
+
+结构性修复（已生效）：
+
+- `build_repertoire.py` / `finalize_papers.py` 的报告新增
+  **`blocklist_provenance`**：每个依赖 blocklist 的 path + mtime + 内容 sha1。
+- 新增 `scripts/data/tcr_native/assert_corpus_fresh.py`：校验 `PASS` **并且**逐个比对
+  blocklist 活文件 hash；无 provenance 的语料报 UNVERIFIED 而非静默放过。
+- `train_jobs/protein_esmc_llada270m_diffusion_immune_v3.yml` 启动前调用该脚本
+  （原来是只看 `PASS` 的内联断言）。
+
+**规则：任何 blocklist 重建后，依赖它的语料必须重跑并重新校验。** 事故全过程见
+`data/tcr_papers/EXPANSION_AUDIT_2026_08_28.md` §3.8。
+
+补一半（2026-08-29）：**断言只能*发现*脱节，*挡住*后果的是加载期过滤。**
+`tcr_repertoire` 原先没有加载期过滤（注释写"构建期已去污、无表位可作键，故不叠"），
+所以那 3 条落在磁盘上就等于会进训练。已在 `build_immune_specs` 补上
+`repertoire_core_exclusions`（`t4` ∪ `t2t3` **投影成裸 core** ∪ `ots_benchmark`——
+本源无表位，配对键永远匹配不上，故必须投影；这是故意过挡）。
+实测那 3 条现在全部被挡下。**双层不是冗余，它是唯一能兜住"黑名单重建了但语料没跟着
+重建"的机制。**
+
+### 黑名单自己也可能不是充分证据：`语料 ∩ benchmark` 的交集写法
+
+同一类问题的第三个面，2026-08-29 发现。前两节问的是"报告绿了能不能信"，
+这节问的是"黑名单本身够不够"。
+
+`decontam_extra.py::decontaminate_trait` 原本先扫**语料**收集 CDR3β core，
+再与 benchmark 求交集，把交集写成黑名单。于是黑名单是 `语料 ∩ benchmark`，
+**只对构建时那份语料完备**——语料一重建，新增行的 core 从没进过候选集，
+黑名单**结构上不可能**挡住它们。实测那 862 个键只覆盖 hard-requirement
+保护集的 **4.2%**（277 / 6,570）：
+
+| 基准 | 保护 core | 被旧黑名单覆盖 | 覆盖率 |
+|---|---:|---:|---:|
+| `NM2025_seen` | 4,254 | 36 | 0.8% |
+| `NM2025_unseen` | 1,091 | 70 | 6.4% |
+| `public_trackA` | 1,306 | 172 | 13.2% |
+
+**也就是说 TRAIT 此前 0 命中是运气，不是过滤起了作用。** 17:16 UTC 那次语料重建
+加了 600 行，其中 4 行直接落在保护 core 上（`ASSVGGISPLH`、`ASSYGGPEQF` →
+`NM2025_unseen`；`ASSVGTGYEQY`、`ASSVGRNTEAF` → `public_trackA`，全是无表位的裸
+CDR3b 行）。等 mtime 稳定 40 秒后复核确认是真泄漏，不是读到半写文件。
+
+修复：改为 `簇级交集 ∪ binding_benchmark ∪ full_bank` = **59,212 键**（原 862）。
+这不是新发明——`build_repertoire.py` / `finalize_papers.py` 早就直接用
+`binding_benchmark | full_bank` 做与语料无关的精确黑名单，`decontaminate_trait`
+是唯一的例外。簇级那一半仍只能语料派生（近重复是语料的属性而非 benchmark 的属性），
+限制已写进 docstring。代价 trait 保留行 **−11.2%**；附带 T2/T3 四列
+从 162/2,332/287/208 全部归零。原文件备份 `*.pre_union_bak`。
+
+**规则：精确黑名单必须 benchmark 派生，不能写成 `语料 ∩ benchmark`。**
+前者对任何语料都完备，后者只对一份快照完备。
+
+验证工具：`scripts/data/dedup/audit_downstream_leakage.py`（5 源 × 11 基准矩阵，
+把每行推过该源真实的 `row_to_record` 后再比对）。当前
+**`HARD-REQUIREMENT hits = 0 -> PASS`**。读矩阵注意：非零格子不等于泄漏，
+只有上表三个基准按裸 core 保护，其余按 `(core|epitope)` 配对键保护，
+投影成裸 core 会按构造过报（`tcr_papers_v2` 约 7.7 万裸 core 命中 T4，
+配对层命中为 **0**）。详见
+[`examples/llada/DATA_PIPELINE_README.md`](examples/llada/DATA_PIPELINE_README.md) §3。
+
+### valid/train 近重复：`split_disjoint_PASS` 也不是充分证据
+
+同一类问题的第二个面：各源报告里的 `split_disjoint_PASS=true` 只保证三 split 的 CDR3β
+**精确**互斥。编辑距离 1 的变体不算 overlap，于是 valid 里可以塞满 train 序列的单点突变
+体，报告照样全绿。ckpt 是按 valid 的 `eval_loss` 选的，这直接影响选模。
+
+**先说度量单位，这是这件事最容易做错的地方**：近重复必须按**该源的生成目标**来量，不是
+一律按 CDR3。`ImmuneSourceSpec` 的 `roles` 决定哪些链是固定上下文、哪些是去噪目标：
+
+- `tcr_native` / `tcr_papers` / `trait` / `tcr_repertoire`：epitope 和 MHC 是固定上下文，
+  **CDR3 才是生成目标** → 按 CDR3β core 量。
+- `oas` / `ots`：两条链 100% 都是生成目标（实测 `gen_res == res`）→ 按**全长配对 Fv** 量。
+- `asd_antibody`：抗原是固定上下文（生成残基仅占 36%）→ 按 **heavy_fv + light_fv** 量。
+
+按错单位会得出完全相反的结论。`ots` 若按 CDR3 量是 exact 27.25% / Lev≤1 69.90%，看着像
+重大泄漏；但它按全长配对量是 exact 0.00% / Lev≤1 1.85%。差异不是切分失败，而是天然
+repertoire 里同一条 CDR3β 本来就会与不同 α 链配对——而模型要生成的是整条链，CDR3 复现
+不构成答案键。
+
+2026-08-28 晚七源全测（valid 抽样 2,000–全量，train 全量为参考）：
+
+| source | 度量单位 | exact | Lev≤1 | 处置 |
+|---|---|---:|---:|---|
+| `tcr_papers`(v2，v3 在用) | CDR3β core | — | **49.2%** | 已搬迁 |
+| `tcr_papers`(v1) | CDR3β core | — | 46.8% | 已搬迁（当日早先） |
+| `tcr_native` | CDR3β core | — | 40.9% | 已搬迁（当日早先） |
+| `tcr_repertoire` | CDR3β core | 0.00% | **38.9%** | 已搬迁 |
+| `trait` | CDR3β 全 junction | — | **19.1%** | 已搬迁 |
+| `asd_antibody` | heavy_fv+light_fv | 0.00% | 4.20% | **无需处理** |
+| `ots` | 全长配对 Fv | 0.00% | 1.85% | **无需处理** |
+| `oas` | 全长配对 Fv | 0.00% | 0.45% | **无需处理** |
+
+即：占训练**残基** 94% 的三个全长源（`oas`+`ots`+`asd_antibody`）在自己的生成目标上
+几乎没有 valid/train 近重复，问题**集中在 CDR3 生成类的四个源**，且都已处理。
+
+`tcr_papers_v2` 漏做的原因值得记：v1 当天早些时候做过这一步，但 v2 是
+`finalize_papers.py --out-root data/tcr_papers_v2` 从零重建的，**不继承 v1 已清洗的
+split**。「某个源已经处理过」不能推广到它的重建版本。
+
+处理方式是**搬进 train 而非丢弃**（`scripts/data/tcr_native/move_near_dup_eval_rows.py`），
+迭代到收敛——搬入 train 的行会成为新参考，单轮不够（v2 用 3 轮，trait 用 5 轮）。
+
+**这不是答案键泄漏。** 所有已处理源中，被搬走的 eval 行里 `(CDR3β, epitope)` 组合在
+train 中精确出现的都是 **0 行**。修的是选模信号的可信度，不是补泄漏窟窿。
+
+连带后果：新旧 `eval_loss` 不可比（valid 变小、变难、构成变了），不要与上一轮的
+0.2578 / 0.5638 横向对比。
+
+**顺带纠正一个常被引用的过期数字**：「valid 里 73% 是 `tcr_pmhc_fulllength`，train 只
+8%」描述的是「单一混合 eval + 前缀截断」时代。现在 `subsample_seed=0` 走 reservoir 抽样、
+eval 分源各截 `max_eval_rows_per_source=2000` 行，实测 eval 构成是**七源近等权**（各
+14.93%，`trait` 因只有 1,393 行占 10.40%），而非任何单源占 73%。逐源实测表与「等权 vs
+按 train 比例加权哪个才是对的选模口径」的论证见
+`downstream/benchmark/audit_2026_08_27/RETRAIN_PLAN.md` §3c。
+
+**record 与 residue 口径严重脱节，且当前无法调节**：`ImmuneSourceSpec.weight` 在
+`ImmuneBioSeqDataset.__getitem__` 中被丢弃，混合比例纯由磁盘行数决定。
+`tcr_repertoire` 占 25.85% 记录但仅 2.03% 残基（裸 CDR3β，均长 13）；
+`asd_antibody` 反向，3.62% 记录吃掉 11.37% 残基（长抗原，均长 523）。
+
+### 长度上限口径（2026-08-28 修正）
+
+`DataArguments.max_length` / `max_protein_length` 的默认值已由 **512 改为 1024**，
+与全部 `train_jobs/protein_esmc_*immune*.yml` 显式传参一致。基类
+`dllm/utils/configs.py::DataArguments.max_length` 本来就是 1024，是两个 protein 入口
+把它往下覆盖了。
+
+过滤语义为 `_record_chain_lengths_ok`：每条链 ≤ `max_protein_length`，**且**
+`sum(len(chain)) + 3*n_chains + 8 ≤ max_length`。第二个（总长）约束才是实际生效的那个。
+
+**只有 `asd_antibody` 对该参数敏感**，因为它是 antigen+heavy+light 三链，抗原长度分位数
+为 q0.25=395、q0.5=q0.75=q0.9=q0.95=**607**（超半数行共用同一条 607 aa 抗原，
+来自 `buzz`/trastuzumab 突变库）：
+
+| `max_length` | 抗原预算中位数 | `asd_antibody` 保留 |
+|---:|---:|---:|
+| 512 | ~268 aa | 159,331（24.3%） |
+| 768 | ~524 aa | 295,583（34.8%） |
+| **1024** | ~780 aa | **276,412**（32.5%，叠加去污染后） |
+
+607 正好夹在 512 与 1024 的预算之间，故该参数是悬崖式的。其余六源在 512 与 1024 下
+逐行相同。历史报告若未显式传 1024，其 `asd_antibody` 行数不可用——
+`RETRAIN_PLAN.md` §7.2b/§7.8 初版即因此误记为 159,331，已修正为 276,412。
+
+### 新增数据源（2026-08-28）
+
+- **`data/tcr_repertoire/dataset`** — TcrDesign-2026 `pretrain/bCDR3_train.csv` 的无标签
+  单链 CDR3β。读 40,308,610 行，池 40,257,598，train 上限截到 2,000,000、簇级去污染
+  再剔 28,206 后为 **1,971,794**（valid 201,504 / holdout 201,170）。
+  `build_report.json` 记录 `decontam_mode=exact+cluster_0.80_0.80`，blocklist 并集
+  124,176 核心，`residual_blocked_in_train=0`，三 split 互斥。**唯一渲染为
+  `tcr_single` 布局的源**，T4 Setting-A 无条件生成 benchmark 用该布局解码，此前训练
+  覆盖为 0。详见 `data/tcr_repertoire/README.md`。
+- **`data/tcr_papers_v2/dataset`** — v1 四源（`tcrt5` 295,316 / `tcrdiff` 100,590 /
+  `gratcr_tep` 17,768 / `epidiff` 2,484）加 TcrDesign-2026 三层（`tcrdesign26_beta`
+  98,536 / `tcrdesign26_paired` 18,383 / `tcrdesign26_pmhc` 163,843）；以上为
+  `finalize_report.json::by_source`，即去重后跨 split 的 final rows，合计 696,920。
+  split 为 train 668,331 / valid 14,449 / holdout 14,140，唯一 epitope 3,218，
+  相对现役语料净新 epitope **+1,763**（v1 为 +881）。`decontam_mode
+  =exact+cluster_0.80_0.80`，`residual_binding_exact_hits=0`、`residual_t4_hits=0`、
+  `split_disjoint_PASS=true`。v3 通过把 `TCR_PAPERS_DIR` 指向该目录接入，
+  **未新增 dataset token**，因此 `--dataset_args` 里仍写 `tcr_papers`。
+
+### 新落盘但未接线的原始数据（2026-08-28）
+
+由 `/vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/data/download_missing_tcr_sources.sh`
+下载，该脚本可重跑（已校验文件跳过）。
+
+| 路径 | bytes | 校验 |
+|---|---:|---|
+| `data/tcr/vdjdb-2026-06-03.zip` | 41,017,409 | 与 GitHub `content-length` 一致 |
+| `data/ots_tcrlang/raw/TCRLang_Datasets.tar.gz` | 126,348,093 | MD5 `f2d5cbdcbc518c7f4b73f27515ecb37d` ✓ 官方 |
+| `data/ots_tcrlang/raw/tcrlang-weights.tar.gz` | 166,045,148 | MD5 `8bbade5ba653096a490467cbc68b4034` ✓ 官方 |
+| `data/ots_tcrlang/raw/OTS_CoherenceCode.tar.gz` | 86,914 | MD5 `53900bf6864a5f4a2cd07876698eba8c` ✓ 官方 |
+
+**VDJdb 2026-06-03**：`vdjdb_full.txt` 由 139,745 行（2025-12-29）增至 192,754 行
+（+53,009，+37.9%），已解包至 `data/tcr/vdjdb_2026_06_03/vdjdb-2026-06-03/`。发布包
+结构变了：2026 版不再含 `*_scored.txt` / `*_broken.txt` / `_filtered`，只有 10 个核心
+文件，因此 zip 从 72.8 MB 缩到 41 MB——**不代表数据变少**。
+`scripts/data/tcr_native/ingest_papers.py` 中「+3 net-new epitopes for UniPMT /
+VDJdb / McPAS / GLIPH combined」是针对旧版的判断，**已过期**，需用
+`assess_candidate.py` 重评。
+
+**Zenodo 11208211（OTS/TCRLang，CC-BY-4.0）**：解包至
+`data/ots_tcrlang/TCRLang_Data/`，格式为每行 `<BETA_FV>|<ALPHA_FV>` 全长可变域。
+train paired 1,361,284 / test paired 100,000 / eval paired 100,000；
+train heavy 4,624,002 / light 4,585,975（其 "heavy" 指 β、"light" 指 α）。
+
+> ⚠️ **该记录的官方 test/eval 不能作为本项目的 held-out benchmark。** 按全长 β+α 精确
+> 配对比对 `data/ots_paired_clean/final/train.csv`（即 `OTS_DEFAULT_DIR`，2,102,715 行）：
+> test 命中 98,221/100,000 = **98.2%**，eval 命中 98,304/100,000 = **98.3%**。两边同源于
+> OTS 而本项目自行重切 split，把对方测试集切进了训练集。反向亦然：不能拿本项目模型
+> 与 TCRLang 论文在该 test 上报告的数字比较。其 train（136 万）小于本项目 OTS
+> （210 万）且同源，预计不增序列覆盖。可用价值在 `tcrlang-weights.tar.gz`
+> （配对模型权重，可作 baseline）与 `OTS_CoherenceCode`（α/β V-gene / V-allele
+> coherence 校验函数 + 两个测试 pkl）。
+
+## AB/TCR canonical v2（2026-08-04）
+
+下一版免疫受体数据的权威执行记录为
+`/vepfs-mlp2/c20250601/251105016/project/dllm_test/IMMUNE_RECEPTOR_DATA_V2.md`，
+机器可读数据根为
+`/vepfs-mlp2/c20250601/251105016/project/dllm_test/data/immune_receptor_v2`。
+本轮只处理 antibody H/L、TCR alpha/beta、antibody-antigen 与
+TCR-peptide/pMHC；不包含 MINT/general-PPI、nanobody/VHH/VNAR 或无 specificity
+的 bulk TCR，也没有改变模型或启动训练。
+
+- `bioseq.v2` TCR union：922,479 records，SHA256
+  `41b74432ec71baafd9fd1600706cac774ceab0732dbf6e41ee32c9d07da52b0e`；
+  其中严格 split core 为 41,489。
+- `bioseq.v2` antibody union：470,949 records，SHA256
+  `3c7b5d679bdd98d7571e16b3821b1e918da7b92d3333838b136f58fed7cc42f0`；
+  antibody-antigen interaction core 为 308,267，含 property 后总 core 为
+  328,248。
+- canonical record 显式保留 sequence scope、observed/reconstructed、V(D)J/CDR/FR、
+  assay value/unit/censor/direction、negative type、target mapping confidence、
+  evidence tier、source row/hash、PMID/DOI、original split 与稳定 group ID。
+- 九套 receptor/peptide/pMHC/study、antibody/antigen/joint-hard、property split
+  均通过 disjoint audit；原始官方 split 只保留为 provenance。
+- exact/near benchmark quarantine、cluster-disjoint split、train-only TCR
+  negatives 与 immutable artifact manifests 已物化，当前
+  `technical_data_export_ready=true`。core export build 为
+  `ir2exp_f7a60484c7e3a20db6a2`，strict OAS/OTS pairing build 为
+  `ir2pair_6a1a5b62752caccd2cd5`，候选 recipe 为
+  `ir2recipe_1e3eac44551e88aedc6e`。
+技术产物的 active real-record 规模为：
+
+| plane | train | valid | test |
+|---|---:|---:|---:|
+| OAS strict H/L pairing | 1,468,754 | 15,295 | 14,800 |
+| OTS strict alpha/beta pairing | 1,445,804 | 14,732 | 14,741 |
+| antibody recognition | 146,998 | 8,167 | 8,166 |
+| TCR recognition | 3,986 | 222 | 221 |
+| antibody properties | 12,227 | 722 | 637 |
+| total | 3,077,769 | 39,138 | 38,565 |
+
+TCR recognition 另有 3,970 条 train-only synthetic negatives，未并入 real-record
+total；所有 export 的 residual benchmark cluster match 为 0。
+- `rights_review_complete=false`、`runtime_views_ready=false`、
+  `sampling_weights_frozen=false`，因此 `export_ready=false`、
+  `training_ready=false`、`training_started=false`。canonical JSONL 与旧 split 仍不能
+  直接作为训练输入；训练只允许从候选 recipe 引用的 immutable export 开始，并须先
+  关闭上述 gate。
+
+## 当前训练数据单一入口（2026-07-23）— 已被取代
+
+> 🔴 **2026-08-28：本节标题中的「当前」已失效。** 它描述的是 `bioseq_grammar_v1`
+> Arrow 配方与 7L step389500 lineage；现役训练入口是
+> `examples/llada/protein_pretrain_esmc.py` 直读 CSV 的七源 mix，见本文件顶部
+> 「当前训练语料实测快照（2026-08-28）」。本节保留为历史 lineage 事实，不得据此
+> 判断当前训练数据。
 
 当前 7L step389500 真正使用的 7 源配方、实际 Arrow 行数、runtime
 fixed/target 语义、source weight、重复采样强度、resume 数据流问题，以及相对
@@ -556,14 +953,15 @@ The immediate gap is data normalization: large clean OAS/OTS/nanobody and TCRdb2
 
 **train↔valid 去重（2026-07-09）**：整合训练提交前，用 `scripts/data/dedup/check_valid_in_train.py` 检查各源 `valid` 记录是否出现在 `train`（whole-record sorted-chain key）。8 源中仅 `tcr_piste` 命中 7 行（0.010% valid keys），经 `apply_validleak.py --promote` 从 train 删除；其余 7 源零重叠。`neutralization` 无 valid shard。工具与 blocklist 落 `data/dedup/reports/valid_in_train_<src>.json`、`data/dedup/blocklists/validleak_<src>.jsonl`。
 
-**SAbDab2 说明**：Zenodo 20083995 仅含 `splits.tar.gz`，解包后只有
-`ab_split.csv`（15,641 行，抗体相似度划分）+ 427 CIF，**无
-`abag_split.csv`**（抗原感知划分）。`ab_split.csv` 有抗原列
-（`agtypes`/`agresolvedseqs`，8,455 行名义上含 antigen）。严格要求 paired
-VH/VL、每个 antigen component 都是 `PROTEIN/PEPTIDE`、序列合法且每链 ≤1024 后，
-实际剩 3,980 rows、2,489 个唯一 `(VH,VL,antigen chains)`。原 train/test 中仍共享
-60 个完整 antigen tuple、78 个 antigen component sequence，所以下一版必须重新做
-antigen-aware group split。
+**SAbDab2 说明（2026-08-03 校正）**：早先“归档无 `abag_split.csv`”的判断来自
+一个不完整/损坏的本地下载，已作废。经官方 MD5
+`0dbb4cc499e9eb77f14008b232f2c38c` 验证的 Zenodo 20083995 完整
+`splits.tar.gz`（876,381,859 bytes）同时包含 `ab_split.csv`、
+`ab_split_sd.csv`、`abag_split.csv` 与 `abag_split_sd.csv`。v2 adapter 只读取
+paired VH/VL 的 `abag_split.csv`，排除 VHH/VNAR，并只接受 resolved
+protein/peptide antigen；得到 6,412 个 antigen-component records，其中 3,363 个
+single-polymer core、3,049 个 multi-component aux。官方 `ab_ag_split` 与 cluster
+只保留为 provenance；本轮另建 antibody/antigen/joint-hard disjoint split。
 
 **FLAb/AbRank 说明**：本地
 `/vepfs-mlp2/c20250601/251105016/project/dllm_test/data/ppi_task_raw/raw/flab/FLAb/data/binding/AbRank_dataset.csv.zip`

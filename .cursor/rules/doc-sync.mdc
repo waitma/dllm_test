@@ -16,6 +16,7 @@ alwaysApply: true
 | 模型架构 / 方法设计 / 方案决策 / 调研结论 | `/vepfs-mlp2/c20250601/251105016/project/dllm_test/BIOSEQ_MODEL_PLAN.md` |
 | 长期项目规则 / 路径约定 / 管线边界 | `/vepfs-mlp2/c20250601/251105016/project/dllm_test/PROJ_GUIDE.md` |
 | 数据格式 / 数据布局变化 | `/vepfs-mlp2/c20250601/251105016/project/dllm_test/DATA_FORMAT_AUDIT.md` |
+| 下游评测（任务协议 / 排行榜数字 / 范围 / baseline 出处） | 见 `/vepfs-mlp2/c20250601/251105016/project/dllm_test/.cursor/rules/downstream-doc-sync.mdc`（`alwaysApply`） |
 
 ## PROJECT_PROCESS.md 细则
 

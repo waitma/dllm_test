@@ -160,4 +160,6 @@ dmypy.json
 *.log
 *.err
 *.out
+/PPT/
+
 

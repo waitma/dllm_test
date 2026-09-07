@@ -23,6 +23,7 @@ from dllm.pipelines.qwen3_vl_arch.modeling_bioseq import (
     BioSeqDiffusionTransformerConfig,
     BioSeqEncoderDiffusionModel,
     BioSeqNoEncoderDiffusionModel,
+    apply_decoder_corruption_to_encoder,
 )
 from dllm.pipelines.qwen3_vl_arch.sampling_bioseq import (
     BioSeqGenerateConfig,
@@ -127,6 +128,52 @@ def test_encoder_generate_runs_with_per_chain_inputs() -> None:
         config=BioSeqGenerateConfig(max_iter=4, sampling_strategy="argmax"),
     )
     assert output_tokens.shape == batch["input_ids"].shape
+
+
+def test_encoder_never_sees_target_residues_during_decoding() -> None:
+    """Regression: the ESMC conditioning stream must not leak the reference.
+
+    ``apply_decoder_corruption_to_encoder`` re-exposes ``batch["encoder_input_ids"]``
+    (built by the collator from the *clean* record) wherever the mirrored mask is
+    unset. Mirroring only the still-masked positions therefore handed the decoder the
+    ground-truth residue at every position iterative decoding had already committed,
+    which turned mask-fill into copying. Inference must mirror the whole generation
+    mask for the entire trajectory.
+    """
+
+    tokenizer = GrammarTokenizer(Esm2SequenceTokenizer())
+    batch = _antibody_batch(tokenizer)
+    partial = resolve_partial_mask(batch, light_chain_generation_partial_mask(batch, tokenizer))
+    generation = build_generation_mask(batch, partial)
+    mask_id = tokenizer.mask_token_id
+
+    encoder_residue = batch["encoder_residue_mask"]
+    light_row = encoder_residue[0, 1]
+    reference_light = batch["encoder_input_ids"][0, 1][light_row]
+    target_positions = generation[0].nonzero(as_tuple=True)[0]
+    assert target_positions.numel() > 0
+
+    output_tokens = batch["input_ids"].clone().masked_fill(generation, mask_id)
+    filler = int(batch["input_ids"][0, target_positions[0]])
+
+    for committed in (0, target_positions.numel() // 2, target_positions.numel()):
+        tokens = output_tokens.clone()
+        if committed:
+            tokens[0, target_positions[:committed]] = filler
+        noised = apply_decoder_corruption_to_encoder(
+            batch=dict(batch, input_ids=tokens),
+            corruption_mask=generation,
+            mask_token_id=mask_id,
+        )
+        visible = noised[0, 1][light_row]
+        # Every generated light residue must read <mask> on the encoder side.
+        assert int((visible == mask_id).sum()) >= target_positions.numel(), (
+            f"encoder exposes reference residues at {committed} committed positions"
+        )
+        leaked = int(((visible == reference_light) & (visible != mask_id)).sum())
+        assert leaked <= reference_light.numel() - target_positions.numel(), (
+            f"encoder leaked {leaked} reference residues at {committed} committed positions"
+        )
 
 
 def test_cdr_partial_mask_targets_span() -> None:

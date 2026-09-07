@@ -1,6 +1,21 @@
 # Current Training Data Catalog
 
-审计日期：2026-07-23
+审计日期：2026-07-23；canonical v2 执行更新：2026-08-04
+
+> 🔴 **2026-08-28：标题里的 "Current" 已经不指现役训练。**
+> 本文件通篇描述 `data/bioseq_grammar_v1` 的 7 源 Arrow 配方（`oas, ots, nanobody,
+> tcr_piste, tcr_pmhc_fulllength, ppi, neutralization`，7L step389500 lineage）。
+> 现役训练走的是完全另一条线：
+> `/vepfs-mlp2/c20250601/251105016/project/dllm_test/examples/llada/protein_pretrain_esmc.py`
+> 直读 CSV 的七源 mix（`oas, ots, asd_antibody, trait, tcr_native, tcr_papers,
+> tcr_repertoire`），**不经过 `bioseq_grammar_v1`，也不经过 `immune_receptor_v2`**。
+> 两个 7 源配方只有 `oas`/`ots` 重合，其余五源互不相同，容易混淆。
+>
+> 现役语料的实测行数、残基占比、长度上限口径与新增源，见
+> `/vepfs-mlp2/c20250601/251105016/project/dllm_test/DATA_FORMAT_AUDIT.md`
+> 「当前训练语料实测快照（2026-08-28）」。去污染阈值与代价见
+> `/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/audit_2026_08_27/RETRAIN_PLAN.md`。
+> 本文件保留为 step389500 的 lineage 事实。
 
 项目根：
 `/vepfs-mlp2/c20250601/251105016/project/dllm_test`
@@ -8,6 +23,30 @@
 本文件只描述当前 7L checkpoint 实际使用的训练数据，以及下一版数据整理应解决的
 问题。历史数据资产、候选数据和下游数据分别列出，不能因为它们已经落盘就视为已经
 参与训练。
+
+## 2026-08-04 canonical v2 执行更新
+
+本文件第 1 节之后继续描述 step389500 的历史 7 源训练事实；它不能用来判断新数据
+是否已进入训练。下一版 AB/TCR 候选数据已 canonicalize 到
+`/vepfs-mlp2/c20250601/251105016/project/dllm_test/data/immune_receptor_v2`，
+完整权威报告为
+`/vepfs-mlp2/c20250601/251105016/project/dllm_test/IMMUNE_RECEPTOR_DATA_V2.md`。
+
+- TCR union 922,479，strict core 41,489；antibody union 470,949，
+  antibody-antigen interaction core 308,267；19,987 条 canonical property 中
+  19,981 条满足 export-core。
+- 九套 split 均通过 disjoint audit；源内 train/test 仅作 provenance。
+- benchmark exact/near quarantine、cluster-level decontamination、train-only
+  negatives、严格 OAS/OTS group resplit 与 immutable SHA256 manifests 已物化。
+  candidate recipe `ir2recipe_1e3eac44551e88aedc6e` 含 real train 3,077,769、
+  valid 39,138、test 38,565，另有 3,970 条 train-only TCR synthetic negatives。
+- 当前是 `canonicalized=true`、`split_ready=true`、
+  `technical_data_export_ready=true`，但因 SAbDab2/CATNAP rights、runtime views 与
+  sampling weights 尚未关闭，仍为 `export_ready=false`、`training_ready=false`、
+  `training_started=false`。不能直接把 canonical JSONL 接入现有 recipe，也不能声称
+  step389500 已经见过这些新增 Ab-Ag records。
+- 早先“SAbDab2 完整归档不含 `abag_split.csv`”是损坏下载导致的误判，已由官方
+  MD5 校验的 876,381,859-byte 归档纠正。
 
 ## 0. 下一版 active scope：免疫受体
 
@@ -43,18 +82,18 @@ neutralization。直接从它续训可以得到“后续只喂免疫受体数据
 
 | source | 本地审计结果 | 下一步状态 |
 |---|---|---|
-| OAS paired | active train 2,484,758；H/L 双链 | 保留为 antibody-pair core |
-| SAbDab2 `ab_split.csv` | 15,641 instances；严格要求 paired VH/VL、全部 antigen component 为 protein/peptide、合法序列且每链 ≤1024 后剩 3,980 rows / 2,489 个唯一 `(VH,VL,antigen chains)` | 首个结构型 Ab–Ag source；重做 antigen-aware split 后加入 |
-| FLAb/AbRank | 342,356 rows；76,515 rows 有合法 H/L/Ag 且适配当前 1024 单链上限；其中 75,483 rows 有 `fitness` | 先规范 affinity/IC50/censor，再做 Ab-cluster + Ag-cluster group split |
-| FLAb/Kothiwal | 709 assay rows，去重后 385 个唯一 H/L/Ag，10 个 antigen sequence | 作为小型多抗原 affinity 补充，不按 709 独立复读 |
+| OAS paired | source train 2,486,442；H/L 双链 | strict benchmark-clean export 1,498,849：1,468,754 / 15,295 / 14,800 |
+| SAbDab2 `abag_split.csv` | paired VH/VL、排除 VHH/VNAR 并过滤 resolved protein/peptide antigen 后为 6,412 component records；3,363 single-polymer core + 3,049 multi-component aux | 已进入 canonical v2 与共同 recognition decontamination；官方 split 仅作 provenance，rights review 仍待完成 |
+| FLAb/AbRank | 342,356 rows；76,515 rows 有合法 H/L/Ag 且适配当前 1024 单链上限；其中 75,483 rows 有 `fitness` | strict sequence-conditioned 子集已 canonicalize，并进入共同 receptor/antigen cluster export |
+| FLAb/Kothiwal | 709 assay rows，去重后 385 个唯一 H/L/Ag，10 个 antigen sequence | 已按 assay/value provenance canonicalize，并进入共同 cluster export |
 | 其他 FLAb binding | 多数只有固定 target 名称，未逐行保存 antigen sequence | 建立 versioned target-sequence map 后再考虑 |
 | CoV-AbDab | 当前表有 variant/target 名称但没有 antigen sequence，且正负字段可同时出现 | 不进入下一版主 mix |
 
-SAbDab2 的严格过滤输入为
-`/vepfs-mlp2/c20250601/251105016/project/dllm_test/data/sabdab2_ml/extracted/splits_final/ab_split.csv`。
-其官方 `ab_split` 只有 train/test，没有 antigen-aware split；严格子集仍有 60 个完整
-antigen tuple、78 个 antigen component sequence 同时出现在 train/test。因此现有
-split 只能作为原始标注，不能作为 unseen-antigen validation。
+SAbDab2 v2 adapter 的严格输入为官方完整归档中的 `abag_split.csv`，原始归档固定在
+`/vepfs-mlp2/c20250601/251105016/project/dllm_test/data/sabdab2_ml/raw/splits.tar.gz`。
+官方 `ab_ag_split`、`ab_cluster` 与 `agclusters` 全部保留为 provenance，但不会直接
+作为下一版 train/validation/test；v2 另生成 antibody-disjoint、antigen-disjoint 与
+joint-hard manifest。损坏旧下载以 `.invalid.5bc49f5d1e96` 留存，不得作为输入。
 
 AbRank 位于
 `/vepfs-mlp2/c20250601/251105016/project/dllm_test/data/ppi_task_raw/raw/flab/FLAb/data/binding/AbRank_dataset.csv.zip`。
@@ -66,7 +105,7 @@ TCR 侧：
 
 | source | 本地审计结果 | 下一步状态 |
 |---|---|---|
-| OTS paired | active train 2,085,414；α/β 双链 | 保留为 TCR-pair core |
+| OTS paired | source train 2,102,715；含少量非 α/β locus 组合 | strict α/β benchmark-clean export 1,475,277：1,445,804 / 14,732 / 14,741 |
 | PISTE | active train 221,020；同时有 CDR3β、peptide、HLA pseudosequence、正负标签 | 保留，但重做 group/unseen-epitope split |
 | full TCR-pMHC | active train 57,913；full α/β + peptide + MHC/B2M | 保留，但先按 `TCR_hash`/clonotype/donor/epitope 重建 split |
 | legacy `tcr` | train 145,510；其中 126,618 条有 β/αβ + epitope；全部为 positive | 从 VDJdb/MIRA/McPAS 原始字段重建，不直接复用信息丢失 Arrow |
@@ -158,7 +197,9 @@ runtime truncation。
 - 20% 是 nanobody 加名义 neutralization 的无条件受体去噪。
 
 只有 32% records 运行时带显式 partner+relation context，而且 relation 仍是 fixed
-input。当前 antibody-antigen sequence-conditioned records 为 0。
+input。当前 **step389500 checkpoint** 的 antibody-antigen sequence-conditioned
+records 为 0；canonical v2 虽已生成候选 Ab-Ag records，但尚未 export 或进入任何
+checkpoint。
 
 ### 2.1 去污染和精确重复
 
@@ -485,8 +526,8 @@ relation 仍然只是 fixed condition。若要学习 relation inference，仍需
 此外：
 
 - TCRdb2.0 原始 repertoire 约 18G，尚未转换为当前 semantic Arrow；
-- SAbDab2 antigen-aware shard 尚未落地；
-- 当前活跃 mix 没有真正的 antibody-antigen sequence pair。
+- SAbDab2 antigen-aware canonical JSONL 已落地，但尚未完成去污染训练 export；
+- 当前 step389500 活跃 mix 没有真正的 antibody-antigen sequence pair。
 
 ## 8. 目录与存储现状
 
@@ -539,7 +580,8 @@ grammar-v2。短期不应物理改名以免破坏 checkpoint/YAML 路径；长�
 - 单独控制 relation prediction、chain completion、joint denoising 的比例；
 - 让 validation 与训练目标一一对应。
 
-当前实现还不能执行这张表的全部 view：
+canonical v2 已完成数据 schema、adapter 与 split，但当前训练实现还不能执行这张表的
+全部 view：
 
 - `grammar_record_from_arrow(...)` 只恢复
   `chains/roles/task_type/source/split/relation/weight`，不恢复 `targets`；
@@ -552,14 +594,22 @@ renderer 支持 per-chain/per-region fixed mask、relation target，以及每条
 
 ## 10. 推荐执行顺序
 
+2026-08-04 状态：第 2--7 项的数据工作已经完成，并物化为 core build
+`ir2exp_f7a60484c7e3a20db6a2`、pairing build `ir2pair_6a1a5b62752caccd2cd5`
+与 candidate recipe `ir2recipe_1e3eac44551e88aedc6e`。所有输出 residual benchmark
+cluster match 为 0，且 source valid/holdout 未复用。第 8--11 项仍是后续 runtime/
+训练工作；在 rights、renderer/view 与 sampling gate 关闭前不能启动训练。
+
 1. 冻结当前数据快照，命名为 `step389500_7src_legacy`，记录每个 shard checksum。
-2. 用当前 antibody/TCR canonical benchmark roots 重建 downstream bank。
-3. 先报告 exact overlap，再跑 antibody/TCR 各自的 similarity decontamination。
-4. 从下一版 recipe 删除 nanobody、PPI/MINT 和当前 neutralization。
-5. 先构建 SAbDab2 strict Ab–Ag 与 AbRank strict sequence-conditioned adapters。
-6. 将 PISTE/full-TCR/VDJdb/MIRA/McPAS/TDC/TEIM 合并为保留 HLA/assay/provenance 的
-   canonical TCR specificity table，再重新划分。
-7. 重建保留 regions/genes/sequence-scope/group/provenance 的 semantic schema。
+2. 已完成：用当前 antibody/TCR canonical benchmark roots 重建 downstream bank。
+3. 已完成：报告 exact overlap，并完成 antibody/TCR/peptide/antigen similarity
+   decontamination。
+4. 已完成：candidate recipe 排除 nanobody、PPI/MINT、当前 neutralization 及无
+   specificity bulk TCR。
+5. 已完成：构建 SAbDab2 strict Ab–Ag 与 AbRank strict sequence-conditioned adapters。
+6. 已完成：将 PISTE/full-TCR/VDJdb/MIRA/McPAS/IEDB 等合并为保留
+   HLA/assay/provenance 的 canonical TCR specificity union，并重建 split/export。
+7. 已完成：重建保留 regions/genes/sequence-scope/group/provenance 的 semantic schema。
 8. 为四个 immune-receptor plane 增加显式 view sampler 和 relation-target renderer。
 9. 分开 short-CDR3 与 full-chain token buckets，启用可恢复 shuffle/data cursor。
 10. 建立固定、分源、分 view、分 seen/unseen-antigen 的 validation panel。

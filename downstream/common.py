@@ -197,7 +197,18 @@ def run_generate(
     batch = {"input_ids": input_ids, "chain_ids": chain_ids}
     if partial_masks is None:
         partial_masks = build_partial_mask(input_ids, tokenizer)
+    # Match AirGen-Dev/downstream/infill/zeroshot_cdr.py (bf16 autocast on CUDA).
     with torch.no_grad():
+        if input_ids.is_cuda:
+            with torch.amp.autocast("cuda", dtype=torch.bfloat16):
+                return model.generate(
+                    batch,
+                    max_iter=max_iter,
+                    temperature=temperature,
+                    sampling_strategy=sampling_strategy,
+                    partial_masks=partial_masks,
+                    cfg_scale=cfg_scale,
+                )
         return model.generate(
             batch,
             max_iter=max_iter,
