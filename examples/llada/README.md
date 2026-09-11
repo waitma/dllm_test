@@ -76,7 +76,13 @@ v3 任务 / eval 数字 / task id 账本在 [`PROJECT_PROCESS.md`](../../PROJECT
   爆的是**目录/租户配额**，不是文件系统满。
 - 一次 save 需要约 **9.0 GB 一次性余量**（`model.safetensors` 2.3G + `pytorch_model_fsdp.bin` 2.3G
   + `optimizer.bin` 4.5G），而 **top-k 剪枝在写完之后**，峰值 = 现有占用 + 一整个新 ckpt。
-- `RetryOptions: MaxRetryTimes: 50` 会把它变成循环，按剩余次数最多还能烧约 46 小时。
+- 当时的 4 连 Failed 是 **4 个不同 JobId 的独立提交**（`t-20260901033935-h55f4` /
+  `t-20260901230256-ns4q4` / `t-20260902000627-j4mqm` / `t-20260902010820-t6hq6`），
+  不是同一 JobId 被平台 `RetryOptions` 自动重试：每个 JobId 只有 1 个实例，相邻提交间隔
+  5～30 秒，与 `IntervalSeconds: 180` 不符。对照 `t-20260901235433-q76qw` 同样
+  `EnableRetry: true` 却停在 Failed。**配额不足仍会导致连续 Failed、净进度 0**。
+  证据见 [`PROJECT_PROCESS.md`](../../PROJECT_PROCESS.md) Active 表旁注与
+  [`PROTEIN_PRETRAIN_PROGRESS.md`](PROTEIN_PRETRAIN_PROGRESS.md) §6.4。
 - ✅ **已回收 389 GB：`output/` 1.2 T → 767 G**（2026-09-01 19:30Z）。删作废目录、剪两条已终态
   8B run 的 resume-only、5 处 `checkpoint-final` **改硬链接**、清 6 条 run 的账本外孤儿。
 - ⚠️ **但配额本身没修**：`TopKValLossCheckpointCallback` 仍在每次重启时重置账本、继续产孤儿，
@@ -225,6 +231,7 @@ cat output/_monitor/state.json             # 看当前追踪的 task id 与重�
 
 > `volc ml_task` **没有 update 子命令**，改 YAML 不会回写已提交的任务 —— 配置写错只能 cancel 重提。
 > 提交后用 `volc ml_task export -t <id> --config` 回读，确认平台侧真的记下了 `RetryOptions`。
+> `ml_task get` 不回显属正常：`RoleRestartPolicy`（角色级）与 `RetryOptions`（作业级）是两层。
 > 另外 volc 命令**不要走代理**（`env -u http_proxy -u https_proxy ...`）。
 
 ---

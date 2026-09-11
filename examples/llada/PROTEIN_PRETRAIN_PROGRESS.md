@@ -11,7 +11,8 @@
 - 下游数字权威表：[`RESULTS.md`](../../downstream/benchmark/RESULTS.md)
 - 多链关系对照臂设计：[`MULTI_CHAIN_RELATION.md`](MULTI_CHAIN_RELATION.md)
 
-**最近更新 2026-09-12**：v5 8-GPU diffusion 已提交（Queue）。账本：
+**最近更新 2026-09-12**：更正 §6.4 / §10：4 连 Failed 是 4 个不同 JobId 的独立提交，不是平台
+`RetryOptions` 自动重试。v5 8-GPU diffusion 已提交（Queue）。账本：
 [`PROJECT_PROCESS.md`](../../PROJECT_PROCESS.md) 同日条。v4 / v5 prepared 均已发布；
 行数权威：plan §4.2。v3 长跑账本仍见 §3.1；数字进 RESULTS，不在此复述。
 
@@ -395,7 +396,12 @@ TRAIT / TCR 样本带 peptide + MHC + TCRα + TCRβ，**链数可达 4–5**。E
 - **爆的是目录/租户配额，不是文件系统**：`df` 显示底层 FS 尚余 809T。**只看 `df` 会完全误判方向。**
 - **一次 save 需要约 9.0 GB 一次性余量**（`model.safetensors` 2.3G + `pytorch_model_fsdp.bin` 2.3G
   + `optimizer.bin` 4.5G），而 **top-k 剪枝发生在写完之后** —— 峰值需求是「现有占用 + 一整个新 ckpt」。
-- **`RetryOptions` 把它变成循环**：每轮「从上个 ckpt 续 → 跑 1000 步 → 同一处爆」耗 58 分钟。
+- **不是 `RetryOptions` 把它变成循环**：这 4 连是不同 JobId 的独立提交
+  （`t-20260901033935-h55f4` / `t-20260901230256-ns4q4` / `t-20260902000627-j4mqm` /
+  `t-20260902010820-t6hq6`）。每个 JobId 用 `ml_task instance list` 都只有 1 个实例；
+  相邻提交间隔 5～30 秒，与 `IntervalSeconds: 180` 不符。对照 `t-20260901235433-q76qw`
+  同样 `EnableRetry: true` 却停在 Failed、只有 1 个实例。每轮「从上个 ckpt 续 → 跑 1000 步
+  → 同一处爆」仍耗 58 分钟——**配额不足就会连续 Failed、净进度 0**，只是机制不能算到平台重试头上。
 - **后来存盘成功不代表修好了**：只是别的任务腾出了空间，配额仍贴在临界点。
 
 **新发现（未修）：top-k 账本在重启时重置 → 孤儿 checkpoint 永不被剪。**
@@ -459,6 +465,10 @@ resume-only（各 94 G）、5 处 `checkpoint-final/model.safetensors` **改硬�
 - `StopCustomTask` 权限曾对 Creator 为 `251105016` 的任务报未授权，次日同一账号又放行了，原因未知。
   **对存量任务先直接 `ml_task cancel` 试，不必默认走控制台。**
 - `ml_task export --config` **不导出 `Preemptible` 字段**，核对抢占只能用 `get --format`。
+- **`RoleRestartPolicy`（角色级）与 `RetryOptions`（作业级）是两层。** `ml_task get` 不回显
+  `RetryOptions` 属正常（`--helpformat` 可选字段列表里没有该字段）；判断是否被接受要用
+  `ml_task export --config`。v5 `t-20260912021346-5xq4s` 已实证平台接受了 YAML 里的
+  `RetryOptions`，并额外补了默认 `EnableReserveResourceOnRetry: false`。
 - CLI **无 update 子命令**，改 YAML 不回写已提交任务，只能 cancel 重提。
 - `Description` 上限 500 字符，写长了直接提交失败 —— YAML 里只留一行指针注释，细节写本文档。
 - ⚠️ **配置性失败（OOM / 参数错）后必须立刻 cancel 整条重试链**：`PolicySets: [Failed]` 分不清
@@ -763,7 +773,8 @@ python examples/llada/protein_pretrain_esmc.py --dry_run True --max_rows_per_sou
 - [ ] **修 `TopKValLossCheckpointCallback` 的账本重置**：启动时应从磁盘现存 checkpoint 重建 top-k，
       而不是只看本进程 `log_history`，否则每次重启都产孤儿、永不被剪。
 - [ ] **save 前做配额预检**：余量不足时降级为 weights-only，而不是让整个任务 `exit 1`
-      并被 `RetryOptions` 拖进 58 分钟一轮的循环。
+      后再被独立重提、再烧 58 分钟一轮（历史上那 4 连 Failed 是 4 个不同 JobId 的独立提交，
+      不是同一 JobId 被平台 `RetryOptions` 自动重试；见 §6.4）。
 - [x] 旧 `ImmuneCsvDataset` 动态 raw CSV loader 已删除；当前训练只消费 prepared dataset。若重建语料，使用 `/vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/data/preprocess_immune_dataset.py`，不要恢复训练期整表加载。
 
 **回填 RESULTS**
@@ -787,6 +798,7 @@ python examples/llada/protein_pretrain_esmc.py --dry_run True --max_rows_per_sou
 
 > 一行一条，细节在对应小节。不要在这里重复正文内容。
 
+- **2026-09-12** — 更正 §6.4 / §10：4 连 Failed 是 4 个不同 JobId 的独立提交，不是平台 `RetryOptions` 自动重试。
 - **2026-09-12** — 更正 §4.1：generated-only 8gpu_2m 是 4 卡 `checkpoint-42000` weights-only 热启动，不是 from scratch。
 - **2026-09-12** — 提交 v5 8-GPU diffusion（Queue）。账本 PROJECT_PROCESS 同日条。
 - **2026-09-12** — 表位源补全 + all-X 已在全量语料核验；v5 已发布。见 PROJECT_PROCESS 同日条与 plan §2.5/§2.6/§4.2。
