@@ -137,7 +137,7 @@ multinomial；`relation_aux_loss`；修 ESMC 条件流在迭代解码中泄漏�
 | Run | 目标 / loss 覆盖 | 步数目标 | 起点 | LR 调度 |
 |---|---|---|---|---|
 | `..._diffusion_allchains_immune_v3_8gpu_2m` | diffusion，**全链**（含抗原/MHC/peptide） | 2M | 4 卡 `checkpoint-33000` 的 **weights-only** | polynomial power=1，峰值 1e-4 → `lr_end=1e-5` |
-| `..._diffusion_immune_v3_8gpu_2m` | diffusion，仅生成链 | 2M | from scratch | 同上 |
+| `..._diffusion_immune_v3_8gpu_2m` | diffusion，仅生成链 | 2M | 4 卡 generated-only `checkpoint-42000` 的 **weights-only** | 同上 |
 | `..._bert_immune_v3_1m` | bert MLM 0.15，`--bert_all_chains True`（全残基） | 1M | 50k 的 `checkpoint-50000` 满包 resume | polynomial power=1，峰值 **4e-5** → 1e-5，warmup=0 |
 
 共同配置：`--decoder_init scratch` d=768/L=8/h=12 ≈ 270M、可训 ESMC-300M、`residue_cond_mode=add`、
@@ -155,6 +155,8 @@ eval/save 每 1000、`save_top_k=3`、FSDP 单节点 8 卡 `ml.pni2.28xlarge`。
 - `pick_latest_full`：要求 `optimizer.bin` + `pytorch_model_fsdp.bin` + `scheduler.pt` **三件齐全**才认，
   用于同 world size 的普通 `--resume_from_checkpoint`。
 - `pick_latest_weights`：只要有 `model.safetensors` 就认，用于跨 world size 的首次 init。
+
+generated-only `..._8gpu_2m` **同样不是 from scratch**：YAML 用 `--init_fusion_weights` 吃 4 卡 `checkpoint-42000` 的 `model.safetensors`，optimizer / polynomial 从 step 0 新建。`warmup_steps: 0` 只证明对已训 fusion 热启动安全，不是从零训可以不要 warmup 的证据；真从零的 v5 用 2000（PROJECT_PROCESS 2026-09-12 条）。该 run 的 train loss ~7.2（4 卡源点约 3.0）是新 optimizer / reduction 口径，不是发散；eval 一直在 0.75 一带（最好点 §3.1），不要和 4 卡 train loss 比。
 
 ### 4.2 v3 50k 双臂（已终态）
 
@@ -785,6 +787,7 @@ python examples/llada/protein_pretrain_esmc.py --dry_run True --max_rows_per_sou
 
 > 一行一条，细节在对应小节。不要在这里重复正文内容。
 
+- **2026-09-12** — 更正 §4.1：generated-only 8gpu_2m 是 4 卡 `checkpoint-42000` weights-only 热启动，不是 from scratch。
 - **2026-09-12** — 提交 v5 8-GPU diffusion（Queue）。账本 PROJECT_PROCESS 同日条。
 - **2026-09-12** — 表位源补全 + all-X 已在全量语料核验；v5 已发布。见 PROJECT_PROCESS 同日条与 plan §2.5/§2.6/§4.2。
 - **2026-09-11** — 无条件布局加固定 `<null>` 前缀（renderer 改动，预处理无需重跑）；wandb 切 `online`。细节见 plan §2.3.2。
