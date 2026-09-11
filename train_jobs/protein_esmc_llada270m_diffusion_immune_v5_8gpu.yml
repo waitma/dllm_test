@@ -1,13 +1,20 @@
 TaskName: "protein_esmc_llada270m_diffusion_immune_v5_8gpu"
 # 设计意图、语料实测、已知 caveat 见 examples/llada/PROTEIN_PRETRAIN_PROGRESS.md §4.2
-# 本文件 = v4 4 卡臂的「8 卡 + immune_v5 receptor-completion + 5 epoch」版。
+# 本文件 = v4 4 卡臂的「8 卡 + immune_v5 receptor-completion + 固定 200,000 optimizer steps」版。
 # 资源形照 v3 8 卡先例：1 节点 × ml.pni2.28xlarge，RoleReplicas 1，投 queue012
 # （c20250601 对本账号无 CreateCustomTask；同一 Vepfs 挂载在 queue012 上已跑通）。
 # global batch 256 = per_device 4 × ga 8 × 8 GPU，与 v4 的 4×8×4=128 逐步可比，只把卡数翻倍。
-# 5 epoch：7,626,885 train / 256 ≈ 29,792.5 步/epoch；HF 用 len(dataloader)//ga 得到
-# 29,792 步/epoch × 5 = 148,960 optimizer steps。必须显式 --max_steps -1，因为
-# protein_pretrain_esmc.TrainingArguments 把 max_steps 默认改成了 1000，省略会覆盖 epoch。
-Description: "270m diffusion v5 receptor-completion 八卡 queue012 gb256=4x8x8 5ep"
+# 固定 200,000 steps：7,626,885 train / 256 ≈ 29,792.5 步/epoch；HF 用 len(dataloader)//ga
+# 得到 29,792 步/epoch，故 200,000 / 29,792 ≈ 6.71 epochs。必须用固定步数而不是 epoch，因为
+# (a) cosine LR 对着声明的 horizon 退火，声明必须等于实际会跑的长度；(b) 将来若改成
+# 按 source 加权采样，"epoch" 不再有定义，步数口径向前兼容。
+# 只传 --max_steps 200000，不传 --num_train_epochs：本脚本 TrainingArguments 把
+# max_steps 默认改成了 1000，HF Trainer 规则是 max_steps > 0 时覆盖 num_train_epochs，
+# 所以 epoch 旗标会变成空操作。两旗标并存会看起来互相打架，故删掉 epoch，只留步数。
+# ActiveDeadlineSeconds 950400 = 11 天。8 卡 v3 实测 ~3.01 s/step，校正 full-split eval
+# 与 v5 序列变长后，20 万步中枢约 8.75 天、悲观约 10.0 天；11 天留余量。7 天不是平台上限
+# （v3 8gpu 2m 等任务已用 7776000 = 90 天并被接受跑过）。
+Description: "270m diffusion v5 receptor-completion 八卡 queue012 gb256=4x8x8 200ksteps ~6.71ep 11d"
 
 Storages:
   - Type: "Vepfs"
@@ -146,8 +153,7 @@ Entrypoint: |
           --per_device_train_batch_size 4 \
           --gradient_accumulation_steps 8 \
           --per_device_eval_batch_size 4 \
-          --num_train_epochs 5 \
-          --max_steps -1 \
+          --max_steps 200000 \
           --learning_rate 1e-4 \
           --lr_scheduler_type cosine \
           --warmup_steps 2000 \
@@ -175,7 +181,7 @@ TaskRoleSpecs:
   - RoleName: "worker"
     RoleReplicas: 1
     Flavor: "ml.pni2.28xlarge"
-ActiveDeadlineSeconds: 604800
+ActiveDeadlineSeconds: 950400
 DelayExitTimeSeconds: 0
 AccessType: "Private"
 Preemptible: false
