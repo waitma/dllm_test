@@ -8,7 +8,7 @@ Ablation switch ``residue_cond_mode ∈ {token, feature, add}``:
 
 Dry run (no 8B load):
     PYTHONPATH=. python examples/llada/protein_pretrain_esmc.py \\
-        --dry_run True --max_rows_per_source 8
+        --dry_run True --prepared_data_dir /absolute/path/to/prepared/immune_v3_heterotypic
 """
 
 from __future__ import annotations
@@ -19,6 +19,7 @@ import shutil
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 
 # Must precede huggingface_hub / transformers imports (constants are snapshotted at import).
 os.environ.setdefault("HF_HUB_OFFLINE", "1")
@@ -26,42 +27,21 @@ os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
 
 import torch
 import transformers
-from torch.utils.data import Dataset
+from torch.utils.data import ConcatDataset
 
 _ROOT = Path(__file__).resolve().parents[2]
 if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
 import dllm
-from dllm.pipelines.bioseq.datasets import (
-    ImmuneSourceSpec,
-    asd_antibody_benchmark_keys,
-    asd_antibody_row_to_record,
-    asd_nanobody_benchmark_keys,
-    asd_nanobody_row_to_record,
-    build_mixed_immune_dataset,
-    load_exclusion_keys,
-    oas_benchmark_keys,
-    oas_paired_row_to_record,
-    ots_exclusion_key,
-    ots_paired_row_to_record,
-    tcr_native_exclusion_key,
-    tcr_native_row_to_record,
-    tcr_repertoire_exclusion_key,
-    tcr_repertoire_row_to_record,
-    trait_benchmark_key,
-    trait_exclusion_key,
-    trait_row_to_record,
-    with_exclusion_filter,
-    with_exclusion_filter_multi,
-)
-from dllm.pipelines.qwen3_vl_arch.data import (
-    BioSeqChain,
-    BioSeqRecord,
+from dllm.pipelines.immune_llada.data import (
     GrammarBioSeqCollator,
     GrammarTokenizer,
     HuggingFaceEsmTokenizerAdapter,
+    load_prepared_dataset,
 )
+from dllm.pipelines.immune_llada.data.registry import parse_sources
+
 from examples.llada.protein_fusion_model import (
     RESIDUES,
     LLaDAEsmcFusion,
@@ -71,80 +51,6 @@ from examples.llada.protein_fusion_model import (
 )
 
 logger = dllm.utils.get_default_logger(__name__)
-
-OAS_DEFAULT_DIR = (
-    "/vepfs-mlp2/c20250601/251105016/project/dllm_test/data/oas_previous_clean/splits"
-)
-OTS_DEFAULT_DIR = (
-    "/vepfs-mlp2/c20250601/251105016/project/dllm_test/data/ots_paired_clean/final"
-)
-ASD_ANTIBODY_DEFAULT_DIR = (
-    "/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/asd/step6_final/antibody"
-)
-ASD_NANOBODY_DEFAULT_DIR = (
-    "/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/asd/step6_final/nanobody"
-)
-TRAIT_DEFAULT_DIR = (
-    "/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/trait/step4_final"
-)
-TCR_NATIVE_DEFAULT_DIR = (
-    "/vepfs-mlp2/c20250601/251105016/project/dllm_test/data/tcr_native/dataset"
-)
-# Training corpora of published TCR design/generation papers (TCRT5, TCRDiff,
-# GRATCR, TCR-epiDiff) plus the three TcrDesign-2026 epitope layers, normalized
-# to the unified tier schema by scripts/data/tcr_native/{ingest,finalize}_papers.py.
-# Separate from TCR_NATIVE_DEFAULT_DIR so the corpus the current checkpoints
-# trained on stays byte-identical.
-#
-# Points at v2. The v1 corpus (``data/tcr_papers/dataset``, 407,112 kept rows)
-# is still on disk and the two pre-v3 job configs pin it explicitly so their
-# checkpoints stay reproducible. The default moved because everything that does
-# *not* pass ``--tcr_papers_dir`` -- ad-hoc statistics, layout counts, leakage
-# audits -- was silently measuring v1 while v3 trains on v2, which made every
-# such number quietly wrong by 274k rows.
-TCR_PAPERS_DEFAULT_DIR = (
-    "/vepfs-mlp2/c20250601/251105016/project/dllm_test/data/tcr_papers_v2/dataset"
-)
-# Unlabeled single-chain CDR3b repertoire (TcrDesign-2026 pretrain/bCDR3), built
-# by scripts/data/tcr_native/build_repertoire.py. This is the only source that
-# renders as the ``tcr_single`` layout, which the T4 Setting-A unconditional
-# benchmark decodes with and which had zero training coverage before.
-TCR_REPERTOIRE_DEFAULT_DIR = (
-    "/vepfs-mlp2/c20250601/251105016/project/dllm_test/data/tcr_repertoire/dataset"
-)
-# replaces_trait exclusion-key blocklist: TRAIT/PISTE CDR3 rows superseded by
-# native full-length Fv. Applied statelessly to the TRAIT loader.
-REPLACES_TRAIT_BLOCKLIST = (
-    "/vepfs-mlp2/c20250601/251105016/project/dllm_test/data/tcr_native/dataset/replaces_trait_blocklist.txt"
-)
-# OTS benchmark decontamination: CDR3b cores that leak into the downstream
-# TCR-binding benchmark (exact + 0.80 cluster). Filtered statelessly from the
-# OTS loader. NOTE: this diverges the oas+ots base from the two already-running
-# BERT ablation jobs (which trained on leaked OTS); those jobs are left as-is.
-OTS_BENCHMARK_BLOCKLIST = (
-    "/vepfs-mlp2/c20250601/251105016/project/dllm_test/data/tcr_native/dataset/ots_benchmark_blocklist.txt"
-)
-# Antibody + TRAIT benchmark decontamination blocklists (stateless exclusion
-# keys) for the remaining fusion-mix sources. Antibody filters always apply.
-_DS_DIR = "/vepfs-mlp2/c20250601/251105016/project/dllm_test/data/tcr_native/dataset"
-OAS_BENCHMARK_BLOCKLIST = f"{_DS_DIR}/oas_benchmark_blocklist.txt"
-ASD_ANTIBODY_BENCHMARK_BLOCKLIST = f"{_DS_DIR}/asd_antibody_benchmark_blocklist.txt"
-ASD_NANOBODY_BENCHMARK_BLOCKLIST = f"{_DS_DIR}/asd_nanobody_benchmark_blocklist.txt"
-TRAIT_BENCHMARK_BLOCKLIST = f"{_DS_DIR}/trait_benchmark_blocklist.txt"
-# T4 epitope-conditioned-generation decontamination: (CDR3b-core|epitope) pairs
-# that are reference binders in the generation benchmark's answer key. The older
-# blocklists only protect the *binding* benchmarks, so before this filter existed
-# 29,431 of the 67,013 answer-key pairs (43.9%) sat inside the training mix.
-# Applied to every epitope-conditioned source (tcr_native, TRAIT, tcr_papers).
-T4_REFBINDER_BLOCKLIST = f"{_DS_DIR}/t4_refbinder_blocklist.txt"
-# T2-clustering + T3-representation evaluation-set decontamination:
-# (CDR3b-core|epitope) pairs from tcr_clustering/tcrs.csv and
-# tcr_representation_paper6/target_binders.csv, widened to edit distance <=1.
-# Neither set was ever in any decontamination bank, which is why the 2026-08-27
-# audit measured 89.3% / 67.7% effective pair leakage against them. Built by
-# scripts/data/tcr_native/build_t2t3_eval_blocklist.py --lev 1.
-# Applied to every epitope-conditioned source (tcr_native, TRAIT, tcr_papers).
-T2T3_EVAL_BLOCKLIST = f"{_DS_DIR}/t2t3_eval_blocklist.txt"
 
 
 # Defined locally (not imported from protein_pretrain) so this entry does not pull
@@ -166,266 +72,43 @@ class ModelArguments(dllm.utils.ModelArguments):
 
 @dataclass
 class DataArguments(dllm.utils.DataArguments):
+    # This is a semantic prepared dataset, not a raw source directory. Raw CSV/
+    # JSONL parsing and all rejecting filters happen in scripts/data preprocessing.
+    prepared_data_dir: str = "/vepfs-mlp2/c20250601/251105016/project/dllm_test/data/prepared/immune_v3_heterotypic"
     dataset_args: str = "oas+ots"
-    oas_dir: str = OAS_DEFAULT_DIR
-    ots_dir: str = OTS_DEFAULT_DIR
-    asd_antibody_dir: str = ASD_ANTIBODY_DEFAULT_DIR
-    asd_nanobody_dir: str = ASD_NANOBODY_DEFAULT_DIR
-    trait_dir: str = TRAIT_DEFAULT_DIR
-    tcr_native_dir: str = TCR_NATIVE_DEFAULT_DIR
-    tcr_papers_dir: str = TCR_PAPERS_DEFAULT_DIR
-    tcr_repertoire_dir: str = TCR_REPERTOIRE_DEFAULT_DIR
-    replaces_trait_blocklist: str = REPLACES_TRAIT_BLOCKLIST
-    t4_refbinder_blocklist: str = T4_REFBINDER_BLOCKLIST
-    t2t3_eval_blocklist: str = T2T3_EVAL_BLOCKLIST
-    ots_benchmark_blocklist: str = OTS_BENCHMARK_BLOCKLIST
-    oas_benchmark_blocklist: str = OAS_BENCHMARK_BLOCKLIST
-    asd_antibody_benchmark_blocklist: str = ASD_ANTIBODY_BENCHMARK_BLOCKLIST
-    asd_nanobody_benchmark_blocklist: str = ASD_NANOBODY_BENCHMARK_BLOCKLIST
-    trait_benchmark_blocklist: str = TRAIT_BENCHMARK_BLOCKLIST
+    # Deprecated compatibility flags accepted by older job YAMLs. They are never
+    # read: all source paths, blocklists, row caps, and sampling now belong to the
+    # offline preparation command and its manifest.
+    oas_dir: str | None = None
+    ots_dir: str | None = None
+    asd_antibody_dir: str | None = None
+    asd_nanobody_dir: str | None = None
+    trait_dir: str | None = None
+    tcr_native_dir: str | None = None
+    tcr_papers_dir: str | None = None
+    tcr_repertoire_dir: str | None = None
+    replaces_trait_blocklist: str | None = None
+    t4_refbinder_blocklist: str | None = None
+    t2t3_eval_blocklist: str | None = None
+    ots_benchmark_blocklist: str | None = None
+    oas_benchmark_blocklist: str | None = None
+    asd_antibody_benchmark_blocklist: str | None = None
+    asd_nanobody_benchmark_blocklist: str | None = None
+    trait_benchmark_blocklist: str | None = None
+    max_rows_per_source: int | None = None
+    max_eval_rows_per_source: int | None = None
+    subsample_seed: int | None = None
     train_split: str = "train"
     eval_split: str = "valid"
-    max_rows_per_source: int | None = None
-    # Separate (usually smaller) cap for the eval split so periodic validation
-    # during a long run stays cheap; None means "use the full valid split".
-    max_eval_rows_per_source: int | None = 2000
-    # Makes the row caps above a uniform random sample rather than a prefix.
-    # Required for correctness, not just variety: tcr_native/valid.csv is sorted
-    # by its `source` column, so the old prefix cap silently excluded
-    # minervina / tenx / covidvac from every eval_loss ever computed (see
-    # downstream/benchmark/audit_2026_08_27/RETRAIN_PLAN.md §3a). Set to None to
-    # restore the legacy prefix behaviour.
-    subsample_seed: int | None = 0
-    # Evaluate each source separately so it is visible which data regime
-    # checkpoint selection is actually driven by. The overall `eval_loss` used for
-    # top-k selection is then the row-weighted mean of the per-source losses.
+    # Select source subsets from the prepared manifest for mixed training or
+    # per-source evaluation. No runtime row cap or dynamic filtering is applied.
     eval_per_source: bool = True
-    # 1024 to match every train_jobs/*.yml. These previously defaulted to 512,
-    # so any helper script that did not pass the flags explicitly silently
-    # measured a *different* corpus: at 512 the antigen budget per ASD record is
-    # only ~268 aa, which rejects the 607 aa antigen shared by >50% of the rows.
-    # That is how RETRAIN_PLAN §7.8 came to report asd_antibody as 159,331 rows
-    # instead of the 276,412 the jobs actually train on.
     max_length: int = 1024
     esmc_path: str = "model_weights/esmc/ESMC-300M"
     max_protein_length: int = 1024
 
 
-def _record_chain_lengths_ok(
-    record: dict, max_protein_length: int, max_total_length: int
-) -> bool:
-    """True if every chain fits ``max_protein_length`` and the estimated rendered
-    length fits ``max_total_length``.
 
-    The grammar renderer *raises* (not skips) on any chain longer than
-    ``max_protein_length``, and the collator *raises* when the flat token stream
-    exceeds ``max_sequence_length`` — both would crash a training step. ASD
-    antigens run 200-1024 aa, so we drop over-long rows at CSV-read time instead.
-    The total estimate over-counts grammar tokens (``3*n_chains + 8``) so it never
-    lets through a row the collator would then reject.
-    """
-
-    chains = record.get("chains") or []
-    if max_protein_length and any(len(seq) > max_protein_length for seq in chains):
-        return False
-    if max_total_length:
-        approx = sum(len(seq) for seq in chains) + 3 * len(chains) + 8
-        if approx > max_total_length:
-            return False
-    return True
-
-
-def with_length_filter(row_to_record, max_protein_length: int, max_total_length: int):
-    """Wrap ``row_to_record`` to drop records whose chains exceed the length caps."""
-
-    if not max_protein_length and not max_total_length:
-        return row_to_record
-
-    def _wrapped(row: dict):
-        record = row_to_record(row)
-        if record is None:
-            return None
-        if not _record_chain_lengths_ok(record, max_protein_length, max_total_length):
-            return None
-        return record
-
-    return _wrapped
-
-
-def build_immune_specs(data_args: "DataArguments") -> list[ImmuneSourceSpec]:
-    """Build source specs from the ``+``-joined ``dataset_args`` token list.
-
-    Tokens: ``oas``, ``ots``, ``asd`` (== asd_antibody + asd_nanobody),
-    ``asd_antibody``, ``asd_nanobody``, ``trait``. Unknown tokens raise so
-    typos surface. ASD is antibody-antigen recognition (long antigen context);
-    TRAIT is TCR-pMHC recognition (peptide + optional HLA pseudo-sequence).
-    """
-
-    tokens = [t.strip() for t in str(data_args.dataset_args).split("+") if t.strip()]
-    if "asd" in tokens:
-        tokens = [t for t in tokens if t != "asd"] + ["asd_antibody", "asd_nanobody"]
-
-    # replaces_trait: when native full-length Fv is mixed in, drop the TRAIT/PISTE
-    # CDR3 rows it supersedes (stateless (CDR3b-core|epitope) exclusion keys).
-    trait_exclusions: set[str] = set()
-    if "trait" in tokens and "tcr_native" in tokens:
-        trait_exclusions = load_exclusion_keys(data_args.replaces_trait_blocklist)
-
-    # Benchmark decontamination (always applied, independent of other tokens):
-    # drop training rows whose sequences leak into a downstream TEST set.
-    #   TCR binding benchmark (NM2025 seen/unseen + public): OTS, TRAIT (+ native
-    #     already decontaminated at build time).
-    #   Antibody benchmarks (CDR-H3 0.70 / heavy+light 0.95): OAS, ASD ab/nb.
-    ots_exclusions: set[str] = load_exclusion_keys(data_args.ots_benchmark_blocklist)
-    oas_exclusions: set[str] = load_exclusion_keys(data_args.oas_benchmark_blocklist)
-    asd_ab_exclusions: set[str] = load_exclusion_keys(data_args.asd_antibody_benchmark_blocklist)
-    asd_nb_exclusions: set[str] = load_exclusion_keys(data_args.asd_nanobody_benchmark_blocklist)
-    trait_benchmark_exclusions: set[str] = load_exclusion_keys(data_args.trait_benchmark_blocklist)
-    # T4 generation answer key -- (CDR3b-core|epitope). TRAIT ships the full
-    # junction so it reuses trait_exclusion_key (which strips anchors); the
-    # unified tcr_native/tcr_papers schema already stores the core.
-    t4_exclusions: set[str] = load_exclusion_keys(data_args.t4_refbinder_blocklist)
-    # T2 clustering + T3 representation eval sets. Same (CDR3b-core|epitope) key
-    # space as t4, so it reuses the same two key functions.
-    t2t3_exclusions: set[str] = load_exclusion_keys(data_args.t2t3_eval_blocklist)
-
-    logger.info(
-        "Blocklist key counts: replaces_trait=%d trait_benchmark=%d ots=%d oas=%d "
-        "asd_ab=%d asd_nb=%d t4_refbinder=%d t2t3_eval=%d",
-        len(trait_exclusions),
-        len(trait_benchmark_exclusions),
-        len(ots_exclusions),
-        len(oas_exclusions),
-        len(asd_ab_exclusions),
-        len(asd_nb_exclusions),
-        len(t4_exclusions),
-        len(t2t3_exclusions),
-    )
-
-    # stack replaces_trait (superseded-by-native) + TCR binding decontam + T4
-    # generation decontam + T2/T3 eval decontam (all built once)
-    _trait_row_to_record = with_exclusion_filter(
-        with_exclusion_filter(
-            with_exclusion_filter(
-                with_exclusion_filter(
-                    trait_row_to_record, trait_exclusions, trait_exclusion_key
-                ),
-                trait_benchmark_exclusions,
-                trait_benchmark_key,
-            ),
-            t4_exclusions,
-            trait_exclusion_key,
-        ),
-        t2t3_exclusions,
-        trait_exclusion_key,
-    )
-    _tcr_native_row_to_record = with_exclusion_filter(
-        with_exclusion_filter(
-            tcr_native_row_to_record, t4_exclusions, tcr_native_exclusion_key
-        ),
-        t2t3_exclusions,
-        tcr_native_exclusion_key,
-    )
-    # Unlabeled repertoire has no epitope, so the (cdr3b_core|epitope) keys above
-    # can never match. Project them down to bare cores and add the already
-    # core-keyed OTS blocklist. Over-blocks by design: a benchmark CDR3b is
-    # dropped whichever epitope it was an answer for.
-    repertoire_core_exclusions: set[str] = (
-        {k.split("|", 1)[0] for k in t4_exclusions}
-        | {k.split("|", 1)[0] for k in t2t3_exclusions}
-        | ots_exclusions
-    )
-
-    builders = {
-        "oas": lambda: ImmuneSourceSpec(
-            "oas",
-            Path(data_args.oas_dir),
-            with_exclusion_filter_multi(oas_paired_row_to_record, oas_exclusions, oas_benchmark_keys),
-            "antibody",
-        ),
-        "ots": lambda: ImmuneSourceSpec(
-            "ots",
-            Path(data_args.ots_dir),
-            with_exclusion_filter(ots_paired_row_to_record, ots_exclusions, ots_exclusion_key),
-            "tcr",
-        ),
-        "asd_antibody": lambda: ImmuneSourceSpec(
-            "asd_antibody",
-            Path(data_args.asd_antibody_dir),
-            with_exclusion_filter_multi(
-                asd_antibody_row_to_record, asd_ab_exclusions, asd_antibody_benchmark_keys
-            ),
-            "antibody_antigen",
-        ),
-        "asd_nanobody": lambda: ImmuneSourceSpec(
-            "asd_nanobody",
-            Path(data_args.asd_nanobody_dir),
-            with_exclusion_filter_multi(
-                asd_nanobody_row_to_record, asd_nb_exclusions, asd_nanobody_benchmark_keys
-            ),
-            "nanobody_antigen",
-        ),
-        "trait": lambda: ImmuneSourceSpec(
-            "trait",
-            Path(data_args.trait_dir),
-            _trait_row_to_record,
-            "tcr_pmhc",
-        ),
-        "tcr_native": lambda: ImmuneSourceSpec(
-            "tcr_native",
-            Path(data_args.tcr_native_dir),
-            _tcr_native_row_to_record,
-            "tcr_pmhc",
-        ),
-        # Published TCR design/generation training corpora (TCRT5 / TCRDiff /
-        # GRATCR / TCR-epiDiff), already deduped against the live corpus and
-        # decontaminated against both the binding and the T4 generation
-        # benchmarks by finalize_papers.py. Same unified schema as tcr_native,
-        # so it reuses the same row_to_record.
-        "tcr_papers": lambda: ImmuneSourceSpec(
-            "tcr_papers",
-            Path(data_args.tcr_papers_dir),
-            _tcr_native_row_to_record,
-            "tcr_pmhc",
-        ),
-        # Unlabeled single-chain CDR3b repertoire -> the only source that renders
-        # as ``tcr_single``. Already decontaminated at build time against the OTS
-        # holdout/valid, T4, T2/T3 and binding-benchmark core sets; the load-time
-        # filter here is defence in depth for when those blocklists grow after
-        # the corpus was built.
-        "tcr_repertoire": lambda: ImmuneSourceSpec(
-            "tcr_repertoire",
-            Path(data_args.tcr_repertoire_dir),
-            with_exclusion_filter(
-                tcr_repertoire_row_to_record,
-                repertoire_core_exclusions,
-                tcr_repertoire_exclusion_key,
-            ),
-            "tcr",
-        ),
-    }
-    specs: list[ImmuneSourceSpec] = []
-    seen: set[str] = set()
-    for token in tokens:
-        if token not in builders:
-            raise ValueError(f"Unknown dataset token {token!r}; known: {sorted(builders)}")
-        if token in seen:
-            continue
-        seen.add(token)
-        specs.append(builders[token]())
-    if not specs:
-        raise ValueError(f"No dataset sources parsed from {data_args.dataset_args!r}")
-
-    # Drop over-long rows at load time so the renderer/collator never crash on a
-    # chain (e.g. long ASD antigens) that exceeds the caps. Stacks on top of the
-    # per-source benchmark/decontam filters already applied above.
-    max_protein_length = int(getattr(data_args, "max_protein_length", 0) or 0)
-    max_total_length = int(getattr(data_args, "max_length", 0) or 0)
-    for spec in specs:
-        spec.row_to_record = with_length_filter(
-            spec.row_to_record, max_protein_length, max_total_length
-        )
-    return specs
 
 
 @dataclass
@@ -525,53 +208,6 @@ class TrainingArguments(transformers.TrainingArguments):
     label_names: list[str] = field(default_factory=list)
     dataloader_num_workers: int = 0
 
-
-class ImmuneBioSeqDataset(Dataset):
-    """CSV immune rows -> BioSeqRecord with role mapping for GrammarBioSeqCollator."""
-
-    def __init__(self, base_ds) -> None:
-        self.base_ds = base_ds
-
-    def __len__(self) -> int:
-        return len(self.base_ds)
-
-    def _roles_for(self, rec: dict) -> list[BioSeqChain]:
-        # Records may carry explicit per-chain roles (ASD recognition plane:
-        # antigen + antibody/nanobody). Honor them verbatim.
-        roles = rec.get("roles")
-        if roles is not None:
-            return [BioSeqChain(seq, role) for seq, role in zip(rec["chains"], roles)]
-        task_type = rec["task_type"]
-        chains = rec["chains"]
-        if task_type == "antibody":
-            return [
-                BioSeqChain(chains[0], "antibody_heavy"),
-                BioSeqChain(chains[1], "antibody_light"),
-            ]
-        if task_type == "tcr":
-            return [
-                BioSeqChain(chains[0], "tcr_beta"),
-                BioSeqChain(chains[1], "tcr_alpha"),
-            ]
-        raise ValueError(f"Unsupported task_type: {task_type}")
-
-    def __getitem__(self, i: int, _retries: int = 0) -> BioSeqRecord:
-        try:
-            rec = self.base_ds[i]
-            labels = {"relation": rec["relation"]} if rec.get("relation") else {}
-            return BioSeqRecord(
-                chains=self._roles_for(rec),
-                task_type=rec["task_type"],
-                source=rec.get("source", ""),
-                labels=labels,
-            )
-        except Exception as exc:
-            if _retries >= max(len(self) - 1, 0):
-                raise RuntimeError(
-                    f"Failed to encode sample {i} after exhausting retries"
-                ) from exc
-            logger.warning("Skipping bad sample %d (%s); trying next", i, exc)
-            return self.__getitem__((i + 1) % len(self), _retries=_retries + 1)
 
 
 class FusionTrainer(transformers.Trainer):
@@ -919,7 +555,7 @@ def _decoder_mask_token_id(tok: transformers.PreTrainedTokenizer) -> int:
 
 def dry_run_check(
     tok: transformers.PreTrainedTokenizer,
-    dataset: ImmuneBioSeqDataset,
+    dataset: Any,
     collator: RemapCollator,
 ) -> None:
     seen: set[str] = set()
@@ -1000,20 +636,19 @@ def train() -> None:
         len(remap),
     )
 
-    # ----- Dataset / collator -----------------------------------------------------
-    specs = build_immune_specs(data_args)
-    max_rows = data_args.max_rows_per_source
-    if training_args.dry_run and max_rows is None:
-        max_rows = 8
-
-    base_train, train_counts, _ = build_mixed_immune_dataset(
-        specs,
-        split=data_args.train_split,
-        max_rows_per_source=max_rows,
-        sample_seed=data_args.subsample_seed if max_rows is not None else None,
-    )
-    logger.info("Train source counts: %s", train_counts)
-    train_ds = ImmuneBioSeqDataset(base_train)
+    # ----- Prepared semantic dataset / collator ----------------------------------
+    selected_sources = parse_sources(data_args.dataset_args)
+    train_parts = [
+        load_prepared_dataset(
+            data_args.prepared_data_dir,
+            split=data_args.train_split,
+            source=source,
+        )
+        for source in selected_sources
+    ]
+    train_counts = {source: len(part) for source, part in zip(selected_sources, train_parts)}
+    logger.info("Prepared train source counts: %s", train_counts)
+    train_ds = train_parts[0] if len(train_parts) == 1 else ConcatDataset(train_parts)
     base_collator = GrammarBioSeqCollator(
         tokenizer=gtok_esmc,
         max_sequence_length=data_args.max_length,
@@ -1154,28 +789,26 @@ def train() -> None:
         )
         del state
 
-    eval_rows = data_args.max_eval_rows_per_source
-    if training_args.dry_run and eval_rows is None:
-        eval_rows = 8
-    base_eval, eval_counts, eval_parts = build_mixed_immune_dataset(
-        specs,
-        split=data_args.eval_split,
-        max_rows_per_source=eval_rows,
-        sample_seed=data_args.subsample_seed if eval_rows is not None else None,
-    )
-    logger.info("Eval source counts: %s", eval_counts)
+    # Prepared validation shards are fixed during preprocessing. Evaluation is
+    # intentionally full-split: no runtime reservoir sampling or row filtering.
+    eval_parts = [
+        load_prepared_dataset(
+            data_args.prepared_data_dir,
+            split=data_args.eval_split,
+            source=source,
+        )
+        for source in selected_sources
+    ]
+    eval_counts = {source: len(part) for source, part in zip(selected_sources, eval_parts)}
+    logger.info("Prepared eval source counts: %s", eval_counts)
 
     # Per-source eval datasets make it visible which data regime drives checkpoint
-    # selection. Previously a single blended eval_loss hid that it was measured
-    # mostly on full-length paired data (69.9% of the eval rows) while that regime
-    # was only 33% of training -- and will be ~8% once tcr_papers is mixed in.
-    # HF logs one `eval_<source>_loss` per dict key; PerSourceEvalLossCallback then
-    # recombines them into the plain `eval_loss` the top-k selector ranks by, so
-    # nothing is evaluated twice.
+    # selection. Every dataset is already prepared; this branch only selects a
+    # manifest shard group and does not parse/filter/retry samples.
     eval_source_rows: dict[str, int] | None = None
     if data_args.eval_per_source and len(eval_parts) > 1:
-        eval_ds = {part.name: ImmuneBioSeqDataset(part) for part in eval_parts}
-        eval_source_rows = {part.name: len(part) for part in eval_parts}
+        eval_ds = {source: part for source, part in zip(selected_sources, eval_parts)}
+        eval_source_rows = {source: len(part) for source, part in zip(selected_sources, eval_parts)}
         total_eval = sum(eval_source_rows.values())
         logger.info(
             "Eval set composition (%d rows): %s",
@@ -1186,7 +819,7 @@ def train() -> None:
             ),
         )
     else:
-        eval_ds = ImmuneBioSeqDataset(base_eval)
+        eval_ds = eval_parts[0] if len(eval_parts) == 1 else ConcatDataset(eval_parts)
 
     training_args.remove_unused_columns = False
     training_args.label_names = []

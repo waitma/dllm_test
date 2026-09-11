@@ -10,7 +10,7 @@ import torch
 import torch.nn as nn
 import transformers
 
-from dllm.pipelines.qwen3_vl_arch.data import GRAMMAR_TOKENS, GrammarTokenizer
+from dllm.pipelines.immune_llada.data import GRAMMAR_TOKENS, GrammarTokenizer
 from dllm.pipelines.qwen3_vl_arch.modeling_bioseq import (
     BioSeqDiffusionOutput,
     BioSeqEncoderDiffusionModel,
