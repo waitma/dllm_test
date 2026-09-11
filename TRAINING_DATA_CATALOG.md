@@ -7,22 +7,20 @@
 > tcr_piste, tcr_pmhc_fulllength, ppi, neutralization`，7L step389500 lineage）。
 > 现役训练走的是完全另一条线：
 > `/vepfs-mlp2/c20250601/251105016/project/dllm_test/examples/llada/protein_pretrain_esmc.py`
-> 直读 CSV 的七源 mix（`oas, ots, asd_antibody, trait, tcr_native, tcr_papers,
-> tcr_repertoire`），**不经过 `bioseq_grammar_v1`，也不经过 `immune_receptor_v2`**。
+> 读 **prepared semantic JSONL**（v4 / v5 均已发布），**不经过 `bioseq_grammar_v1`，
+> 也不经过 `immune_receptor_v2`，也不再直读 CSV**。
 > 两个 7 源配方只有 `oas`/`ots` 重合，其余五源互不相同，容易混淆。
 >
-> 现役语料的实测行数、残基占比、长度上限口径与新增源，见
-> `/vepfs-mlp2/c20250601/251105016/project/dllm_test/DATA_FORMAT_AUDIT.md`
-> 「当前训练语料实测快照（2026-08-28）」。去污染阈值与代价见
-> `/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/audit_2026_08_27/RETRAIN_PLAN.md`。
-> 本文件保留为 step389500 的 lineage 事实。
+> 现役 prepared 入口：
+> `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/immune_llada/README.md`。
+> 布局：`DATA_FORMAT_AUDIT.md`。本文件保留为 step389500 的 lineage 事实。
 
 项目根：
 `/vepfs-mlp2/c20250601/251105016/project/dllm_test`
 
-本文件只描述当前 7L checkpoint 实际使用的训练数据，以及下一版数据整理应解决的
-问题。历史数据资产、候选数据和下游数据分别列出，不能因为它们已经落盘就视为已经
-参与训练。
+本文件只描述 **7L step389500 lineage** 当时使用的训练数据，以及当时下一版整理
+要解决的问题。不是现役 v4/v5 mix。历史数据资产、候选数据和下游数据分别列出，
+不能因为它们已经落盘就视为已经参与训练。
 
 ## 2026-08-04 canonical v2 执行更新
 

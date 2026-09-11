@@ -11,53 +11,15 @@
 
 ## Active foundation-training data boundary
 
-- The next BioSeq foundation-training recipe is immune-receptor-only:
-  antibody H/L, TCR α/β, antibody-antigen, and TCR-epitope/pMHC.
-- Do not add nanobody/VHH, MINT/STRING/general-PPI, antigen-free
-  neutralization rows, or specificity-free bulk TCR to that recipe.
-- MINT and nanobody benchmark/checkpoint artifacts may remain for historical
-  reproducibility, but they are not active training sources or release gates
-  for the immune-receptor recipe.
-- The canonical data authority for this boundary is
-  `/vepfs-mlp2/c20250601/251105016/project/dllm_test/TRAINING_DATA_CATALOG.md`;
-  data layout/schema facts must stay synchronized with
-  `/vepfs-mlp2/c20250601/251105016/project/dllm_test/DATA_FORMAT_AUDIT.md`.
-- The canonical AB/TCR v2 implementation and data root are
-  `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/bioseq/immune_receptor_v2`
-  and
-  `/vepfs-mlp2/c20250601/251105016/project/dllm_test/data/immune_receptor_v2`;
-  the detailed authority is
-  `/vepfs-mlp2/c20250601/251105016/project/dllm_test/IMMUNE_RECEPTOR_DATA_V2.md`.
-- Never train directly from the v2 `canonical/` or `splits/` trees while
-  `reports/summary.json::export_ready` is false. Training requires an immutable,
-  decontaminated export with its own SHA256/provenance manifest.
-- The only current candidate recipe authority is
-  `/vepfs-mlp2/c20250601/251105016/project/dllm_test/data/immune_receptor_v2/exports/ir2recipe_1e3eac44551e88aedc6e/recipe_manifest.json`.
-  It is technically complete but not training-approved: rights, runtime-view,
-  and sampling-weight gates remain false.
-- Pairing exports must start only from the original OAS/OTS train CSV and create
-  a new stable SHA256 group split; never reuse the old source valid/holdout.
-  One exact/near benchmark hit blocks the complete upstream pair group, and all
-  required chains are checked. Active OTS pairing is alpha/beta only.
-- Benchmark-neighbor clustering uses connected components and these frozen
-  minimum identity/coverage pairs: antibody CDR3 0.70/0.80, TCR CDR3 0.80/0.80,
-  receptor full/variable chain 0.95/0.80, peptide 0.80/0.90, and antigen
-  0.80/0.80. Threshold or bank changes require a new immutable build ID.
-- Source-released synthetic negatives, reconstructed full-chain evidence,
-  peptide-pool responses, name-only/proxy targets, and low-confidence records
-  remain outside the primary core. Synthetic specificity negatives may be
-  generated only from train positives, must be checked against all known
-  positives, and must never be emitted for validation/test.
-- Released source splits are provenance only. Do not majority-vote conflicts or
-  erase HLA, assay, censor, sequence-scope, evidence-tier, or source-row
-  distinctions during canonical merging.
-- CATNAP associated Env accessions are a separate exact-accession evidence tier,
-  not guaranteed assay-clone sequences. SAbDab2 structural Ab-Ag records must
-  come from paired VH/VL `abag_split.csv`; single-domain rows stay excluded.
-- Benchmark quarantine discovery must scan the actual antibody and TCR task data
-  roots, including `data/downstream/comp_chain`, converted SAbDab/SAb23 CDR,
-  humanization, FLAb task, and TCR benchmark roots. Scanning only
-  `downstream/benchmark/data/tcr_*` is invalid.
+- The only current immune training implementation is `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/immune_llada`; the formal entry is `/vepfs-mlp2/c20250601/251105016/project/dllm_test/examples/llada/protein_pretrain_esmc.py`.
+- The active data contract is raw source → adapter → `BioSeqRecord` → offline deterministic filters → prepared semantic JSONL/manifest → training-time grammar, padding, per-chain encoder reconstruction, and diffusion/MLM masking. No model-ready token cache is produced.
+- Current prepared roots: **v4** `data/prepared/immune_v4_beta_relation` (published) and **v5** `data/prepared/immune_v5_receptor_completion` (published). v3 / `immune_v3_heterotypic` remain on disk as live artifacts some checkpoints still point at; they are not the current training default. v4 headline counts live in `docs/PLAN_TCR_BETA_ONLY_RELATION_DIFFUSION.md` §4.1; v5 counts / v4 Δ live in §4.2. Operational how-to: `dllm/pipelines/immune_llada/README.md`. Layout: `DATA_FORMAT_AUDIT.md`.
+- Receptor completion is gated by `tcr_region_profile.completion_sources` (default `("tcr_repertoire",)`). Withholding a source from that list is what disables completion. Do not branch completion on the `sequence_scope` label — use actual `alpha_fv` / `beta_fv` / `cdr3a` / `cdr3b` contents. Do not infer junction vs core from the first/last character; use provenance. `add_tcr_region_lengths` must skip `synthetic_regions` (circular-profile guard). `sample_region_lengths` must sort support lengths numerically (`atomic_json_dump` uses `sort_keys=True`). Drops that need audit attribution must be named filters (e.g. `quality.blank_epitope`), not silent adapter `None`. Manifest `filter_names` contract (union of constructed filters, not `BLOCKLIST_NAMES` keys): `/vepfs-mlp2/c20250601/251105016/project/dllm_test/DATA_FORMAT_AUDIT.md`. Item-13 counter numbers (`downgraded_all_x_mhc` / partner completion): plan §4.2.
+- The active recipe remains immune-receptor-focused: antibody H/L, TCR α/β, antibody-antigen, and TCR-epitope/pMHC. Do not make deleted PPI/STRING/MINT training builders, nanobody/VHH, antigen-free neutralization, or specificity-free bulk TCR into current foundation-training inputs.
+- The old `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/data` alias tree, old `training` tree, old raw-CSV dataset implementation, and retired training entry points are deleted. Do not restore them or document them as current dependencies. The remaining `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/modeling_bioseq.py`, `sampling_bioseq.py`, and `relation_aux.py` are model-layer compatibility code used by the fusion model and selected diagnostics.
+- The former AB/TCR v2 canonical work under `/vepfs-mlp2/c20250601/251105016/project/dllm_test/data/immune_receptor_v2` and `/vepfs-mlp2/c20250601/251105016/project/dllm_test/IMMUNE_RECEPTOR_DATA_V2.md` remains a historical/candidate data artifact. It is not the current runtime training input while its export/training gates are false.
+- Historical audit snapshots under `/vepfs-mlp2/c20250601/251105016/project/dllm_test/refactor_baseline` and historical evidence under `/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/archive` must remain readable and must be labeled historical, not silently deleted or presented as executable current pipelines.
+- Data layout and schema facts must stay synchronized with `/vepfs-mlp2/c20250601/251105016/project/dllm_test/DATA_FORMAT_AUDIT.md` and the independent pipeline description at `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/immune_llada/README.md`.
 
 ## MINT benchmark rules
 
@@ -93,14 +55,13 @@
 
 ## Volc job layout
 
-- **Training YAMLs** live under `/vepfs-mlp2/c20250601/251105016/project/dllm_test/train_jobs/`. Only multi-GPU training / resume jobs belong here (e.g. `qwen3_vl_bioseq_grammar_v2_*_llada*.yml`).
-- **Eval YAMLs** live under `/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/`. All downstream / pairing / metrics Volc jobs go here (e.g. `eval_grammar_v2_*_downstream.yml`, `eval_grammar_v2_*_pairing_metrics.yml`). Do not place eval YAMLs in `train_jobs/`.
-- Submit commands:
+- **Training YAMLs** live under `/vepfs-mlp2/c20250601/251105016/project/dllm_test/train_jobs/`; only current immune-fusion training/resume jobs belong here. Old `grammar_v2` YAMLs are historical and must not be used to infer a runnable pipeline.
+- **Eval YAMLs** live under `/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/`; downstream, pairing, and metrics jobs belong here. The old grammar-v2 generators/wrappers/sweeps/retry jobs are retired and must not be regenerated.
+- Current local evaluation examples are the retained immune-fusion scripts under `/vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/downstream`: `run_immune_fusion_gen.sh`, `run_immune_fusion_pairing.sh`, `run_immune_fusion_repr.sh`, and `run_pairing_pll.sh`. They use the active fusion checkpoint line and the retained public implementations under `/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/grammar`.
+- Submit commands, when a current job is explicitly approved, use absolute YAML paths:
   - Training: `volc ml_task submit --conf /vepfs-mlp2/c20250601/251105016/project/dllm_test/train_jobs/<job>.yml`
   - Eval: `volc ml_task submit --conf /vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/<job>.yml`
-- Regenerate eval YAMLs:
-  - LLaDA downstream + pairing metrics: `bash /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/downstream/gen_eval_grammar_v2_llada_ymls.sh`
-  - cmp500k in-house decoder downstream: `bash /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/downstream/gen_eval_grammar_v2_cmp500k_ymls.sh`
+- Historical grammar-v2 checkpoints, wrappers, sweeps, and retry jobs remain only as provenance where archived; do not run them, regenerate them, or append their numbers to new headline tables. Do not alter external baseline protocols.
 
 ## Training batch sizing (Volc)
 
@@ -110,19 +71,13 @@
 
 ## BioSeq Pipeline Boundary
 
-- The BioSeq pipeline lives at `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/bioseq`.
-- The BioSeq foundation-model path lives at `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch`.
-- Training examples live at `/vepfs-mlp2/c20250601/251105016/project/dllm_test/examples/bioseq`.
-- Tests live at `/vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/tests/bioseq`.
-- BioSeq code must not import `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/core` or reuse old diffusion trainers.
-- The pipeline may stay inside the `dllm` namespace so that the current package layout still works.
-- Public docs should call this path `BioSeq foundation` or `BioSeq foundation-model`. Existing identifiers such as `qwen3_vl_arch`, `qwen3_vl_bioseq_*`, and `bioseq-qwen3-vl` are compatibility names for paths, task IDs, output directories, and historical runs.
-- BioSeq foundation training models must use the loader/grammar masks from `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/data` and compute diffusion loss only on `diffusion_loss_mask` / `diffusion_eligible_mask`.
-- BioSeq foundation training uses a single grammar path: `GrammarArrowSource` -> `WeightedMixtureDataset` -> `TaskHomogeneousBatchDataset(batch_size=N)` -> `DataLoader(batch_size=None)` -> `GrammarBioSeqCollator`. The legacy chain-concatenation collator/view-sampler has been removed. The active grammar token layout (grammar-v2) is documented in `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/GRAMMAR_V1.md`.
-- Encoder-conditioned BioSeq foundation training must mask the same corrupted target residues in `encoder_input_ids` before the encoder forward pass. Fixed context chains remain clean and visible. The encoder runs per chain/sequence (`encoder_input_ids [batch, max_chains, chain_len]`, flattened to `[batch * max_chains, chain_len]`); gathered features **replace** decoder residue embeddings (no projection by default). `--model-type encoder|esm2` forces `hidden_size` to the encoder latent dim; no-encoder ablations may pass `--align-hidden-size-to-encoder`. Backends: `--model-type encoder` (ESMC via `from_esmc`) or `--model-type esm2` (ESM2 via `from_hf_encoder`).
-- BioSeq foundation multi-node/multi-GPU training must use `/vepfs-mlp2/c20250601/251105016/project/dllm_test/examples/bioseq/train_qwen3_vl_bioseq_ddp.py` with `torchrun`.
-- Iterable BioSeq foundation data streams must be sharded by DDP rank plus DataLoader worker, not by `DistributedSampler`. Run DDP with `--num-workers 0`: each extra worker process re-shards the infinite weighted stream independently and can desync the first batch across ranks, causing NCCL collective timeouts.
-- The old lightweight generic BioSeq backend must not be used as the antibody/Ophiuchus-Ab implementation or as the BioSeq foundation-model implementation.
+- The active immune data pipeline is `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/immune_llada`; its formal training entry is `/vepfs-mlp2/c20250601/251105016/project/dllm_test/examples/llada/protein_pretrain_esmc.py`.
+- The active prepared-data path is `raw → adapter → BioSeqRecord → offline filter → prepared semantic JSONL → training-time grammar/padding/per-chain encoder reconstruction/masking`. The prepared loader still builds offsets and decodes semantic rows; it is not a zero-cost token cache.
+- The current model-layer compatibility code retained under `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch` is limited to `modeling_bioseq.py`, `sampling_bioseq.py`, and `relation_aux.py`. The deleted `data` alias tree, deleted `training` tree, deleted grammar document, and deleted legacy entry points must not be documented as active dependencies.
+- `examples/llada/protein_fusion_model.py` reuses the retained model-layer functions for diffusion/MLM corruption, encoder-state mirroring, and relation auxiliary loss. The current immune data grammar/collator lives under `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/immune_llada/data`.
+- Public downstream grammar remains active where the fusion scripts use it: `/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/grammar` retains the shared CDR, light-chain pairing, and TCR-generation implementations. Do not describe that directory as entirely deleted.
+- Retained typical downstream entry points are `/vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/downstream/run_immune_fusion_gen.sh`, `run_immune_fusion_pairing.sh`, `run_immune_fusion_repr.sh`, and `run_pairing_pll.sh`; external baseline protocols and artifacts remain unchanged.
+- Historical identifiers such as `qwen3_vl_arch`, `qwen3_vl_bioseq_*`, and `bioseq-qwen3-vl` may remain in old paths, task IDs, output directories, or archived records, but they are not current training instructions.
 
 ## Downstream Feature Extraction (post-LLaDA, mandatory)
 
@@ -131,8 +86,8 @@
   - Task modes: generative (e.g. CDR infilling, light-chain pairing, TCR generation) and predictive / embedding (e.g. binding classification, clustering, few-shot representation, PPI heads).
 - Rationale: ESMC-encoder-only features capture only the frozen backbone and do not reflect the LLaDA decoder training that defines our model. Encoder-only extraction understates our contribution.
 - Practical guidance:
-  - Generative tasks are post-LLaDA by construction (decoding runs the full grammar model = ESMC encoder + LLaDA decoder), e.g. `downstream/grammar/{cdr_infill,light_chain_pairing,tcr_generation}.py`.
-  - Predictive / embedding tasks must use the `GrammarEmbedder` single-sequence decoder path (post-LLaDA). Use the default decoder embedder spec `grammar:/abs/best.pt`; do **not** use `grammar:encoder:` or `bioseq:` (both take only the ESMC encoder末层) for headline numbers.
+  - Generative tasks are post-LLaDA by construction (decoding runs the full fusion model = ESMC encoder + LLaDA decoder), e.g. `/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/grammar/cdr_infill.py`, `light_chain_pairing.py`, and `tcr_generation.py`.
+  - Predictive / embedding tasks must use the post-LLaDA decoder path. Current fusion runners use the explicit `grammar:decoder:global:/absolute/path/to/checkpoint` specification; do **not** use encoder-only controls for headline numbers.
   - Encoder-only runs may be kept only as explicitly labeled controls (distinct tag), never as the primary reported result.
 
 ## External Baseline Protocol (original-only)
@@ -163,24 +118,24 @@ The environment variable `BIOSEQ_MODEL_WEIGHTS_ROOT` may override the root, but 
 
 `/c20250601/mj/model_weights/esm2/esm2_t48_15B_UR50D` is optional and is not part of the current default download set.
 
-Current ESMC environment note: local ESMC checkpoints declare `model_type="esmc"`, but `transformers==4.48.1` does not recognize that model type. Use `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/modeling_bioseq.py::BioSeqEncoderDiffusionModel.from_esmc` or `load_local_esmc_encoder`; those paths fall back to Biohub `esm==3.2.3` and load the local safetensors without relying on `AutoModel` alone. For ESMC tokenization, use `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/data/esm_encoding.py::HuggingFaceEsmTokenizerAdapter`, which falls back to local `tokenizer.json` when `AutoTokenizer` cannot import `ESMCTokenizer`.
+Current ESMC environment note: local ESMC checkpoints declare `model_type="esmc"`, but `transformers==4.48.1` does not recognize that model type. The retained model-layer loader is `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/modeling_bioseq.py::BioSeqEncoderDiffusionModel.from_esmc` / `load_local_esmc_encoder`; those paths fall back to Biohub `esm==3.2.3` and load local safetensors without relying on `AutoModel` alone. Active ESMC tokenization is under `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/immune_llada/data/esm_encoding.py`.
 
-Formal BioSeq foundation stage-1 training uses offline wandb by default. Keep run outputs, checkpoints, and wandb run files under absolute output paths such as `/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/qwen3_vl_bioseq_esmc300m_stage1`, `/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/qwen3_vl_bioseq_esmc600m_stage1`, and `/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/qwen3_vl_bioseq_no_encoder_stage1`. Do not use `/tmp` for ESMC training outputs or checkpoint tests because the root filesystem can be full and ESMC checkpoints are multi-GB.
+Historical BioSeq foundation stage-1 runs used offline wandb and output roots such as `/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/qwen3_vl_bioseq_esmc300m_stage1`, `/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/qwen3_vl_bioseq_esmc600m_stage1`, and `/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/qwen3_vl_bioseq_no_encoder_stage1`. Preserve those paths as provenance only; current training must use the approved immune-fusion entry and output configuration. Do not use `/tmp` for ESMC training outputs or checkpoint tests because the root filesystem can be full and ESMC checkpoints are multi-GB.
 
-## Data Layout
+## Historical PPI Data Layout（audit only; not current foundation training）
 
 - PPI and interaction task raw data root: `/vepfs-mlp2/c20250601/251105016/project/dllm_test/data/ppi_task_raw`.
 - PPI and interaction task processed outputs:
   - `/vepfs-mlp2/c20250601/251105016/project/dllm_test/data/ppi_task_raw/processed/interaction_sources_manifest.csv`
   - `/vepfs-mlp2/c20250601/251105016/project/dllm_test/data/ppi_task_raw/processed/interaction_records_summary.csv`
   - `/vepfs-mlp2/c20250601/251105016/project/dllm_test/data/ppi_task_raw/processed/interaction_records_unified.csv`
-- Rebuild command:
+- Historical rebuild command, retained for audit provenance only:
 
 ```bash
 python /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/build_ppi_interaction_csv.py
 ```
 
-- `interaction_records_unified.csv` is an audit/consolidation table. Training should use task-specific sharded `bioseq.v1` records rather than reading the 3GB CSV directly.
+- `interaction_records_unified.csv` is an audit/consolidation table. It is not a current training input; current foundation training uses prepared semantic records under `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/immune_llada/data`.
 
 ## Public epitope-conditioned CDR3β Track-A rules
 
@@ -191,8 +146,8 @@ python /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/build_ppi_inter
 - All comparable models use the same external exact/recovery/GIANA/Jaccard evaluator. GIANA is run per model-target with generated and reference sequences in the same pool and without V genes.
 - TCRT5 `rank` and `raw_score` must be based on cumulative transition log-likelihood, not the length-normalized Hugging Face beam score. Every TCRT5 rerun must refresh `tcrt5_paper_consistency.{csv,md}` and verify candidate-set, exact-hit, and RVR GIANA agreement with the author artifact/paper.
 - Do not compare the canonical all-14 TCRT5 exact-hit total directly with the paper's sparse-13 aggregate: the paper treats `RVRAYTYSK_HLA-A*03:01` as a separate deep-simulation experiment. Likewise, label the paper-native same-length identity recovery separately from Track A normalized-Levenshtein recovery.
-- The local BioSeq row is fixed to the 7-layer `step117000` checkpoint (`output/grammar_v2_esmc300m_integrated_llada_7l_step117000/best.pt`, SHA256 `e3d4c98ea84b4aa2280fe76ec5bf8a806de376699610e9a96960e66ceddb5c01`). It is an epitope-only adapter: MHC fields are retained for target identity but are not consumed. Reproduction requires seed `42`, batch size `100`, `32` iterations, temperature `1.0`, `gumbel_argmax`, and the canonical target order. Its `rank` is seeded emission order and `raw_score` must stay empty; never reinterpret either as model confidence. The focused report is `results/bioseq_step117000_report.md` under the canonical result root.
-- Retained BioSeq checkpoint diagnostics must use the same fixed protocol, derive the model label from the validated checkpoint manifest, and write under `outputs/tcr_beta_public_benchmark/checkpoint_comparison/<run_name>`. Never append a single-target or exploratory checkpoint run to the canonical all-14 tables. The completed step189000 RVR diagnostic is `checkpoint_comparison/bioseq_step189000_rvr_epitope_only/report.md`; because it contains one target, its cross-epitope Jaccard is undefined.
+- **RETIRED (2026-09-08): the `grammar_v2` BioSeq row is no longer reproducible.** All `grammar_v2_*` checkpoints were deleted during storage cleanup, so the 7-layer `step117000` pin (`output/grammar_v2_esmc300m_integrated_llada_7l_step117000/best.pt`, SHA256 `e3d4c98ea84b4aa2280fe76ec5bf8a806de376699610e9a96960e66ceddb5c01`) and the `step189000` RVR diagnostic now reference absent files. Its training corpus `data/bioseq_grammar_v1` was already gone, so the run cannot be retrained. Treat the recorded numbers as frozen historical artifacts: existing reports under `outputs/tcr_beta_public_benchmark/` and `checkpoint_comparison/bioseq_step*/` stay readable, but no `grammar_v2` row may be regenerated, re-scored, or added to a new table. Any future local BioSeq row must come from the `examples/llada` immune-fusion line. Retired provenance (top-k manifests, wandb summaries, deleted-file inventory) is archived at `/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/archive/grammar_v2_retired_20260908`.
+- Checkpoint diagnostics for the active line must use the same fixed protocol, derive the model label from the validated checkpoint manifest, and write under `outputs/tcr_beta_public_benchmark/checkpoint_comparison/<run_name>`. Never append a single-target or exploratory checkpoint run to the canonical all-14 tables.
 - Canonical outputs live at `/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/outputs/tcr_beta_public_benchmark/results`; every rerun must refresh `reproduction_status.md` and retain runtime provenance.
 - TcrDesign qualitative α output is `/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/outputs/tcr_beta_public_benchmark/results/tcrdesign_alpha_generations.csv`; the official-release audit is `tcrdesign_alpha_evaluation_audit.json` in the same directory. Until an official runnable evaluator is released, keep `Official alpha evaluation: unavailable` and `Included in quantitative benchmark: no`; do not invent alpha exact/recovery/pairing metrics or use TcrDesign-B as a common αβ evaluator.
 

@@ -17,6 +17,7 @@ checkpoint 不删除，但不能与本轮 AB/TCR-only 候选数据混称。
 
 这轮工作没有改变模型、renderer、checkpoint 或 runtime training config，也没有启动
 训练；只新增了引用 immutable 数据产物的 candidate recipe manifest。
+**不是**当前 v4/v5 LLaDA prepared mix（见 `dllm/pipelines/immune_llada/README.md`）。
 `canonicalized`、`split_ready`、`technical_data_export_ready` 和 `export_ready` 是
 不同状态；技术数据 gate 通过不代表权利与 runtime gate 已经允许训练。
 

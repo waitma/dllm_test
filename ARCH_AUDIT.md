@@ -5,7 +5,10 @@
 > to fix. Code refs: `dllm/pipelines/qwen3_vl_arch/modeling_bioseq.py`,
 > `.../data/grammar.py`, `.../training/trainer.py`.
 >
-> Last updated: 2026-07-09.
+> Last updated: 2026-09-12. Active grammar/masks live in
+> `dllm/pipelines/immune_llada/data/grammar.py`, not the deleted
+> `qwen3_vl_arch/data` tree. Receptor-completion / relation-target design:
+> `docs/PLAN_TCR_BETA_ONLY_RELATION_DIFFUSION.md`.
 
 ## Verdict: the active model matches the design
 
@@ -19,7 +22,9 @@ the integrated run. Design intent vs implementation:
 | `hidden_size` forced to encoder latent dim when replacing | ctor raises unless `d_model == encoder_hidden_size` (or projection on) | ✅ |
 | LLaDA bidirectional masked-diffusion denoiser (RoPE, no timestep) | `build_llada_backbone` sets `rope=True, alibi=False, is_causal=False`; timestep/pos args accepted but unused | ✅ |
 | Grammar-v2 token stream; entity roles via boundary tokens (no chain-role/task embeddings) | decoder has no role/task embeddings; roles are grammar tokens | ✅ |
-| Diffusion loss **only** on eligible target residues; fixed context (antigen/MHC/peptide/relation) excluded | `sample_bioseq_diffusion_noise` masks only `diffusion_loss_mask ∧ eligible ∧ residue_mask`; `compute_masked_cross_entropy` on `labels!=-100`; forbidden special-token logits suppressed | ✅ |
+| Diffusion loss on the generated block; fixed context (antigen/MHC/peptide, unsupervised relation) and synthetic padding excluded | `grammar.py` emits an explicit `diffusion_eligible_mask = not fixed and not synthetic`, which `sample_bioseq_diffusion_noise` **trusts as-is** — it is *not* intersected with `residue_mask` unless `require_residue=True` (the corruption call passes `False`). So the generated block's grammar skeleton (`<prots>`, `<tcr>`/`<ab>`/`<nb>`, `<protd>`) and supervised relation targets are corrupted **and** counted in the loss, alongside residues; `compute_masked_cross_entropy` on `labels!=-100` | ✅ |
+| Supervised `binding`/`nonbinding` relation is itself a denoising target; `unknown`/absent relation and pMHC presentation stay visible context | `relation_target_mask` drives it: target relation tokens get `is_fixed=False` and enter both corruption and loss; the MHC→peptide presentation `<binding>` and unsupervised relations keep `fixed_context_mask=1` | ✅ |
+| beta-only completion padding (`X`) never supervised | `synthetic_residue_mask` is subtracted from both `diffusion_loss_mask` and `diffusion_eligible_mask` in `grammar.py`, so synthetic `X` is neither corrupted nor scored | ✅ |
 | Trainable encoder with separate LR | YAML `--encoder-lr 2e-5` vs `--lr 1e-4`; encoder not frozen | ✅ |
 | `condition_norm` to rescale tiny ESMC condition into the residual stream | integrated YAML sets `--condition-norm` (LayerNorm on condition); matches the plan's ESMC-scale note | ✅ |
 | DDP shard by rank+worker, `num_workers=0/1` only | `mixture.py` shards by `rank*nw+worker`; `trainer.py` warns on nw>0; run uses nw=1 (keeps nw=0 shard identity) | ✅ |
@@ -32,16 +37,19 @@ consistent with the design. No architectural deviation found.
 
 ## Design↔implementation gaps (to fix — B line)
 
-### Gap 1 — TCR-pMHC negative labels are swallowed (`<binding>` hardcoded)
-`grammar.py` `GrammarRenderer.encode`, TCR branch: the relation token linking the
-pMHC context to the TCR receptor is `special("<binding>", is_fixed=True)`
-(lines ~436 and ~439) — it ignores `record.labels["relation"]`, so a PISTE
-`nonbinding` pair renders identical to a binder. `_relation_token` and the
-`<nonbinding>` vocab exist and are honored on the antibody-antigen branch (line
-~408), so this is a TCR-branch omission. Impact: the pMHC→TCR relation (a fixed
-conditioning token) carries no binding/nonbinding signal. **Fix = B1** (honor
-the record relation for the peptide→TCR link; keep MHC→peptide as presentation
-`<binding>`; default unlabeled pretraining pairs to binding for back-compat).
+### Gap 1 — resolved: TCR relation labels are honored and supervised
+`grammar.py` `GrammarRenderer.encode`, TCR branch, now derives
+`recognition_relation` from `record.labels["relation"]` (falling back to
+`<binding>` only when the label is absent, keeping unlabeled pretraining pairs
+byte-identical to the old behaviour). The MHC→peptide link stays presentation
+`<binding>` and fixed; the peptide→TCR recognition token carries the
+binding/nonbinding label and, when `relation_supervised` is set, becomes a
+diffusion target (`relation_target_mask=1`, corrupted and scored) rather than
+fixed context. A PISTE `nonbinding` pair therefore no longer renders identically
+to a binder. Covered by `scripts/tests/immune_llada/test_beta_only_relation.py`
+(`test_presentation_binding_stays_fixed_while_recognition_relation_is_target`,
+`test_supervised_binding_relation_is_a_diffusion_target`,
+`test_unknown_relation_is_unsupervised`).
 
 ### Gap 2 — TCR-pMHC is CDR3-only, no full-length + no MHC/B2M
 Current TCR sources are CDR3 fragments (or β-only), and PISTE ships a 34-aa HLA

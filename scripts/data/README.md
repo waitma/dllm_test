@@ -1,17 +1,28 @@
 # BioSeq Data Processing Pipelines
 
 Permanent scripts under `/vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/data/`.
-Split policies: `dllm/pipelines/qwen3_vl_arch/data/ppi_splits.py`.
+The deleted qwen data tree no longer owns split policies. Current prepared-data source and
+filter policy is implemented under
+`/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/immune_llada/data`; retained
+PPI/MINT benchmark policy is documented by its own downstream audit artifacts. It is not a current immune foundation-training builder.
 
-## 现役训练语料在哪里（2026-08-28）
+## Current immune LLaDA preparation boundary
 
-**本文件描述的 `bioseq_grammar_v1` / `immune_receptor_v2` 管线都不是现役训练输入。**
-现役唯一训练入口是
-`/vepfs-mlp2/c20250601/251105016/project/dllm_test/examples/llada/protein_pretrain_esmc.py`，
-它按 `--dataset_args` 的 `+` token 直读 CSV。七个 token 与其目录、实测行数、长度上限
-口径见
-`/vepfs-mlp2/c20250601/251105016/project/dllm_test/DATA_FORMAT_AUDIT.md`
-的「当前训练语料实测快照（2026-08-28）」。
+The only current data implementation is
+`/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/immune_llada/data`, used by the formal
+entry `/vepfs-mlp2/c20250601/251105016/project/dllm_test/examples/llada/protein_pretrain_esmc.py`.
+How to run and which prepared root is current:
+`/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/immune_llada/README.md`.
+Layout: `DATA_FORMAT_AUDIT.md`. v4 published counts: plan §4.1. v5 published
+counts: plan §4.2. v3 / `immune_v3_heterotypic` remain on disk.
+
+## Historical pre-refactor direct-CSV snapshot（2026-08-28；不可作为现役入口）
+
+The following commands and seven-source counts document the pre-refactor runtime that read raw
+CSV files. They remain as historical evidence only. Relative data names inside this historical
+section refer to paths below `/vepfs-mlp2/c20250601/251105016/project/dllm_test/data`; they are
+not current command recipes. The current entry reads prepared semantic records as described above;
+do not use this section to design a new job or restore the deleted raw-CSV loader.
 
 行数复核（不要转抄文档，直接跑）：
 
@@ -28,10 +39,9 @@ Split policies: `dllm/pipelines/qwen3_vl_arch/data/ppi_splits.py`.
 1. **不要为了对齐旧报告把上限降到 512**：`asd_antibody` 的抗原中位数 607 aa 卡在两个
    预算之间，512 会让该源读成 159,331 行而非真实的 276,412。
 2. **`tcr_papers_dir` 的默认值已于 2026-08-29 从 v1 改到 v2**，所以现在不传该参数量到的
-   就是 v3 口径。**但 2026-08-29 之前产出的任何统计都可能是 v1 口径**，读旧数字时要留意。
-   需要复现特定 job 时用尾随 `field=value` 覆盖。v3 当前合计 **7,794,375** 条
-   （2026-08-29 05:30 实测；此前的 7,626,737 / 7,637,419 是 `tcr_repertoire` 近重复搬迁
-   之前的口径）。
+   就是 v2 语料。**但 2026-08-29 之前产出的任何统计都可能是 v1 口径**，读旧数字时要留意。
+   需要复现特定 job 时用尾随 `field=value` 覆盖。直读 CSV 的历史合计见
+   `examples/llada/DATA_PIPELINE_README.md`；v4 prepared 行数见 plan §4.1。
 3. **单源计数 ≠ 该源在混合中的计数**。`replaces_trait` 抑制键只在超越源同时被请求时
    才装配，所以 `trait` 单跑与放进完整 mix 的行数不同。要得到与训练日志一致的分源数字，
    必须传该 job 的完整 token 列表。
@@ -64,10 +74,10 @@ Split policies: `dllm/pipelines/qwen3_vl_arch/data/ppi_splits.py`.
 
 要显式关闭某个 blocklist 只能传 `none`（`""` 会被 `load_exclusion_keys` 直接抛错）。
 
-### 布局分布必须蓄水池采样，不能取前缀（2026-08-29 修）
+### 历史布局分布审计：必须蓄水池采样，不能取前缀（2026-08-29 修）
 
 ```bash
-python scripts/count_grammar_layouts.py \
+python /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/count_grammar_layouts.py \
     --tokens oas+ots+asd_antibody+trait+tcr_native+tcr_papers+tcr_repertoire \
     --per-source 30000 --seed 0
 ```
@@ -92,14 +102,14 @@ bash /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/data/download_mis
 经实验室代理 `http://100.68.162.212:3128` 用 aria2c 断点续传，逐文件核对官方 MD5，
 已校验文件跳过，可安全重跑。落盘：
 
-- `data/tcr/vdjdb-2026-06-03.zip` — VDJdb 2026-06-03 release（盘上原先只有 2025-12-29）
-- `data/ots_tcrlang/raw/{TCRLang_Datasets,tcrlang-weights,OTS_CoherenceCode}.tar.gz`
+- `/vepfs-mlp2/c20250601/251105016/project/dllm_test/data/tcr/vdjdb-2026-06-03.zip` — VDJdb 2026-06-03 release（盘上原先只有 2025-12-29）
+- `/vepfs-mlp2/c20250601/251105016/project/dllm_test/data/ots_tcrlang/raw/{TCRLang_Datasets,tcrlang-weights,OTS_CoherenceCode}.tar.gz`
   — Zenodo 11208211（OTS/TCRLang，CC-BY-4.0）
 
 两者**均未接入任何训练配置**。TCRLang 的官方 test/eval 与本项目 OTS train 有
 98.2%/98.3% 精确配对重叠，不可作为 held-out benchmark；详见 `DATA_FORMAT_AUDIT.md`。
 
-## Active AB/TCR canonical pipeline (`bioseq.v2`)
+## Historical/candidate AB/TCR pipeline (`bioseq.v2`; not current runtime)
 
 The next immune-receptor recipe is limited to paired antibody H/L, paired TCR
 alpha/beta, antibody-antigen, and TCR-peptide/pMHC. MINT/general PPI,
@@ -159,7 +169,7 @@ build_bioseq_grammar_v1.py (oas, ots)     build_mint_string_splits.py (MMseqs2 c
                                             → bioseq_grammar_v1/ppi/
 ```
 
-## Step-by-step commands
+## Historical step-by-step commands（不可作为当前入口）
 
 ### Step 0 — Immune CSV (already on disk)
 
@@ -173,17 +183,17 @@ OAS / OTS final splits are immutable inputs (same role as external preprocessing
 ```bash
 python /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/data/build_ppi_unified_csv.py
 # subset rebuild:
-python .../scripts/build_ppi_interaction_csv.py --sources covabdab_neutralization
+python /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/build_ppi_interaction_csv.py --sources covabdab_neutralization
 ```
 
-Output: `data/ppi_task_raw/processed/interaction_records_unified.csv` with `grammar_relation`.
+Output: `/vepfs-mlp2/c20250601/251105016/project/dllm_test/data/ppi_task_raw/processed/interaction_records_unified.csv` with `grammar_relation` (historical audit artifact).
 
 ### Step 2 — STRING download
 
 ```bash
 bash /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/data/download_stringdb_assets.sh
 # optional functional channel subscores (~190GB):
-bash .../download_stringdb_assets.sh --with-detailed
+bash /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/data/download_stringdb_assets.sh --with-detailed
 ```
 
 Physical links for MINT are already present locally.
@@ -206,10 +216,10 @@ Policy: `mint_string_pretrain_v1` (~96M train / 250k valid, cluster-disjoint).
 
 ```bash
 python /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/data/build_mint_grammar_shards.py --split train
-python .../build_mint_grammar_shards.py --split valid
+python /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/data/build_mint_grammar_shards.py --split valid
 ```
 
-Output: `data/bioseq_grammar_v1/mint_ppi/{train,valid}/`
+Output: `/vepfs-mlp2/c20250601/251105016/project/dllm_test/data/bioseq_grammar_v1/mint_ppi/{train,valid}/` (historical artifact).
 
 ### Step 5 — Supervised shards (`<neutralization>`, etc.)
 
@@ -218,7 +228,7 @@ python /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/data/build_supe
   --sources covabdab_neutralization
 ```
 
-Output: `data/bioseq_grammar_v1/neutralization/train/`
+Output: `/vepfs-mlp2/c20250601/251105016/project/dllm_test/data/bioseq_grammar_v1/neutralization/train/` (historical artifact).
 
 Runtime grammar form (via `GrammarRenderer`): `<prots> <ab> HEAVY . LIGHT <protd>` with `<neutralization>` relation fixed in context-heavy layouts when neutralization shards are enabled.
 
@@ -234,6 +244,7 @@ python /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/data/build_stri
 ### Step 7 — Mixed grammar_v1 cache (OAS + OTS + TCR + PPI + neutralization)
 
 ```bash
+# Historical only; do not run to produce current training data.
 python /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/data/build_bioseq_grammar_v1.py \
   --sources oas,ots,tcr,ppi,neutralization \
   --splits train,valid \
@@ -247,12 +258,14 @@ For MINT-scale PPI pretraining, use `mint_ppi` shards separately (do not mix 96M
 ```bash
 python /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/data/audit_ppi_sources.py
 python /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/data/audit_training_data_scale.py \
-  --json-out data/ppi_task_raw/processed/training_data_audit.json
+  --json-out /vepfs-mlp2/c20250601/251105016/project/dllm_test/data/ppi_task_raw/processed/training_data_audit.json
 ```
 
-See also: `dllm/pipelines/qwen3_vl_arch/data/DATA_SCALE_AND_SPLITS.md`
+Historical reference only: the former qwen data documentation was deleted with the old alias
+layer. Use `/vepfs-mlp2/c20250601/251105016/project/dllm_test/DATA_FORMAT_AUDIT.md` for the
+current prepared semantic contract.
 
-## Script index
+## Historical script index（pre-refactor；不可作为现役入口）
 
 | Script | Purpose |
 |--------|---------|
@@ -272,7 +285,8 @@ See also: `dllm/pipelines/qwen3_vl_arch/data/DATA_SCALE_AND_SPLITS.md`
 ### 下游泄漏审计（训练前应跑）
 
 ```bash
-python scripts/data/dedup/audit_downstream_leakage.py   # 约 100 秒
+# Historical pre-refactor audit command; use only to inspect archived evidence.
+python /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/data/dedup/audit_downstream_leakage.py   # 约 100 秒
 ```
 
 输出 5 个 TCR 源 × 11 个下游测试集的矩阵。**结论行只统计 hard-requirement**：
@@ -295,7 +309,7 @@ HARD-REQUIREMENT hits = 0   -> PASS
 ### 残基字母表（训练前应跑）
 
 ```bash
-python scripts/data/assert_residue_alphabet.py                 # 七源 × train/valid/holdout
+python /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/data/assert_residue_alphabet.py                 # 历史七源 × train/valid/holdout
 ```
 
 发现 `.` / `-` / `|` 等 `RESIDUES` 之外的字符就 **exit 1**。
@@ -311,4 +325,7 @@ python scripts/data/assert_residue_alphabet.py                 # 七源 × train
 
 ## Split policy (never invent random splits)
 
-See `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/data/PPI_DATA.md`.
+For retained PPI/MINT benchmark provenance, use the absolute audit documents under
+`/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/mint_tasks` and
+`/vepfs-mlp2/c20250601/251105016/project/dllm_test/DATA_FORMAT_AUDIT.md`; the old qwen PPI
+markdown was deleted with that legacy alias layer.

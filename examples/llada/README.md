@@ -43,7 +43,7 @@ ESMC 条件融合预训练。历史工作线支持 `diffusion` 与 `bert` 两种
 | [`PROTEIN_PRETRAIN_PROGRESS.md`](PROTEIN_PRETRAIN_PROGRESS.md) | 蛋白训练线决策笔记本（Volc 账本权威在 [`PROJECT_PROCESS.md`](../../PROJECT_PROCESS.md)） |
 | [`MULTI_CHAIN_RELATION.md`](MULTI_CHAIN_RELATION.md) | 多链关系调研 + 分链 t / cognate 对照臂（**不要和 2M 混跑**） |
 | [`DATA_PIPELINE_README.md`](DATA_PIPELINE_README.md) | raw 语料去污事故（prepared 入口见 pipeline README） |
-| [`dllm/pipelines/immune_llada/README.md`](../../dllm/pipelines/immune_llada/README.md) | **当前 prepared 数据操作入口**（v4 已发布 / v5 进行中） |
+| [`dllm/pipelines/immune_llada/README.md`](../../dllm/pipelines/immune_llada/README.md) | **当前 prepared 数据操作入口**（v4 / v5 均已发布） |
 
 ### 当前训练任务与数据版本（2026-09-12）
 
@@ -55,8 +55,8 @@ ESMC 条件融合预训练。历史工作线支持 `diffusion` 与 `bert` 两种
 - 数据语义（补全、all-X、null 前缀、relation target）不要在此复述：
   [`dllm/pipelines/immune_llada/README.md`](../../dllm/pipelines/immune_llada/README.md)
   与 [`docs/PLAN_TCR_BETA_ONLY_RELATION_DIFFUSION.md`](../../docs/PLAN_TCR_BETA_ONLY_RELATION_DIFFUSION.md)。
-- **v5 进行中**：`configs/data/immune_v5_receptor_completion.yaml` →
-  `data/prepared/immune_v5_receptor_completion/`。**禁止估算最终行数。**
+- **v5 已发布**：`configs/data/immune_v5_receptor_completion.yaml` →
+  `data/prepared/immune_v5_receptor_completion/`。行数 / v4 对照：plan §4.2。
 - **wandb `online`**，节点不可达则自动回退 offline（egress 未在计算节点验证）。
 - 提交前：smoke/full preprocess、manifest/profile 审计、residue alphabet、corpus freshness。
 

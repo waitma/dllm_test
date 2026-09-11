@@ -1,5 +1,159 @@
 # Project Process
 
+> Last updated: 2026-09-12
+>
+> 本页保留历史任务账本；顶部最新条目描述当前代码清理和文档同步状态。除明确标注为“本轮已验证”的项目外，历史测试、吞吐和任务数字不能被解释为本轮验证通过。
+
+## 2026-09-12 filter_report item 13 计数 + manifest `filter_names`（代码已落地；v5 产物未重写）
+
+- 实现已提交 `95c04a96`。`filter_report.json` 现对每个 source 与 `totals` 写入
+  `downgraded_all_x_mhc` / `beta_only_completed` / `alpha_only_completed`
+  （kept-record transformation，与六个 first-failure drop 计数分开；
+  `dropped_all_x_epitope` 不重复，仍走 `quality.blank_epitope`）。
+  manifest `filter_names` 改为实际构造的 `RecordFilter` 之并集（不再是
+  `BLOCKLIST_NAMES` 配置键）。旧缺陷与新语义的权威登记：`DATA_FORMAT_AUDIT.md`。
+- **数字权威**：`docs/PLAN_TCR_BETA_ONLY_RELATION_DIFFUSION.md` §4.2
+  （post-hoc，从已发布 JSONL 推导；含朴素 MHC-strip 启发式会错约 10 倍的陷阱）。
+  v5 13G 未重跑，已发布 `filter_report` / manifest 仍是旧字段。不要在本页复述表。
+- 验证：套件 **198 passed / 5 既有失败**（`test_full_parity` ×3、
+  `test_profiling` autocast ×2）；v4 `tcr_repertoire` byte-equivalence 仍是
+  **0 mismatches**。
+- **仍未修、不要标完成**：(1) ingest `_drop_placeholder` 仍漏用在 `epitope` /
+  `mhc_pseudo`（重建 `tcr_papers_v2/dataset/` 会重新放进 all-X；**当前最重要
+  未修项**；权威：`examples/llada/DATA_PIPELINE_README.md` §6.0.1）；
+  (2) `tcr_papers` 记录 identity 的 `source` 仍是 `"tcr_native"`
+  （`metadata.dataset_source` 与 shard 名是对的）；(3) 已发布 v5 manifest /
+  `filter_report` 仍是旧字段，只有下次 preprocess 才会写出新键。
+- 未提交新的 Volc 训练任务。
+
+## 2026-09-12 表位源受体补全 + all-X 处置（v5 已全量核验）
+
+- 代码在 `dllm/pipelines/immune_llada/data/`（该目录从未纳入 git，不要用 commit 叙述）。
+  操作入口：`/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/immune_llada/README.md`。
+  布局：`DATA_FORMAT_AUDIT.md`。设计/风险：`docs/PLAN_TCR_BETA_ONLY_RELATION_DIFFUSION.md`。
+- §2.5 / §2.6 **已在全量语料落地并核验**。产物
+  `data/prepared/immune_v5_receptor_completion/`（13G）。逐源行数 / v4 对照 /
+  监督 token 份额 / 不变量 / item 13 计数的权威表：plan §4.2。headline train
+  **7,626,885**；唯一 drop 是 `quality.blank_epitope`（38,689 train + 411 valid，
+  全部 `tcr_papers`）。
+- 故意偏离计划：(a) 按实际 fv/CDR3 列分流，不按 `sequence_scope`（351 条
+  `tcr_native` 标 `fv` 却只有 `beta_fv`）；(b) all-X epitope 用命名 filter 而非
+  adapter `None`。§3.1 item 13 计数与 `filter_names` 硬编码缺陷：**同日稍后已修**
+  （见上方；数字 plan §4.2；已发布 v5 产物未重写）。
+- 验证：用 v4 冻结 profile 从 raw CSV 重生 3,000 条 `tcr_repertoire`，对盘上 shard
+  **0 mismatch**；当时套件 194 passed / 5 既有无关失败（随后补测至 **198**，见上方）；
+  v5 全量不变量见 plan §4.2。
+- 仍未修、不要标完成：ingest `_drop_placeholder` 漏用（重建 `tcr_papers_v2` 会重新放进
+  all-X）；`tcr_papers` 记录 identity 的 `source` 仍是 `"tcr_native"`。
+  （`filter_names` 代码已修，不要再列在未修里。）
+- 未提交新的 Volc 训练任务。v3 / `immune_v3_heterotypic` 仍在盘上，部分 checkpoint
+  与 eval YAML 仍指向它们。
+
+## 2026-09-11 旧 BioSeq 训练线清理后的文档同步（代码完成，验证待主 agent）
+
+- 已继续完成本轮允许范围内的实际文档清理：旧 7L/Arrow/直读 CSV 叙述已降级为历史证据，当前训练/数据/速度边界统一指向 immune LLaDA prepared semantic JSONL 线；未改 `downstream/grammar` 核心实现。
+- 已按当前工作树同步本轮允许范围内的八份文档：`/vepfs-mlp2/c20250601/251105016/project/dllm_test/BIOSEQ_MODEL_PLAN.md`、`/vepfs-mlp2/c20250601/251105016/project/dllm_test/PROJECT_PROCESS.md`、`/vepfs-mlp2/c20250601/251105016/project/dllm_test/PROJ_GUIDE.md`、`/vepfs-mlp2/c20250601/251105016/project/dllm_test/DATA_FORMAT_AUDIT.md`、`/vepfs-mlp2/c20250601/251105016/project/dllm_test/FUTURE_EXPERIMENTS.md`、`/vepfs-mlp2/c20250601/251105016/project/dllm_test/SPEED_ANALYSIS.md`、`/vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/data/README.md`、`/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/README.md`。
+- 当前代码事实按已完成清理记录：旧 `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/data` alias 整层和旧 `training` 已删除；`GRAMMAR_V1.md`、旧 BioSeq/llada 训练入口、`bioseq/datasets.py`、PPI/STRING/MINT builders、专属 tests/jobs 均已删除。`refactor_baseline` 审计快照及 `/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/archive` 历史证据保留。
+- 当前免疫数据实现唯一为 `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/immune_llada`，正式训练入口为 `/vepfs-mlp2/c20250601/251105016/project/dllm_test/examples/llada/protein_pretrain_esmc.py`；数据流为 raw → source adapter → `BioSeqRecord` → offline filter → prepared semantic JSONL → training-time grammar/padding/per-chain encoder reconstruction/masking。无 model-ready token cache。
+- 既有验收数字是 **v3_heterotypic** 口径（raw **8,671,293**，kept **7,997,971**），不是 v4/v5。v4 行数见 plan §4.1；v5 见 plan §4.2。
+- 本轮文档清理未重新运行全量 preprocessing、strict parity、真实 GPU/FSDP overlap、DataLoader 吞吐或模型回归；主 agent 待补验证位置：**[TODO: 主 agent 在本轮完成验证后补命令、退出码、耗时和 artifact 绝对路径]**。不得把“文档同步完成”写成“验证通过”。
+- 下游保留典型当前入口：`/vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/downstream/run_immune_fusion_gen.sh`、`run_immune_fusion_pairing.sh`、`run_immune_fusion_repr.sh`、`run_pairing_pll.sh`/`score_pairing_pll.py`，以及对应 benchmark。`/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/grammar` 仍被 fusion 使用，CDR、light pairing、TCR generation 的公共实现保留；本轮不改外部 baseline，也不在本文件重复另一 agent 负责的 downstream/eval README。
+
+## 2026-09-10 Immune LLaDA 旧训练 loader 清理完成
+
+- 已迁移 `/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/trait/scripts/validate_wiring.py`、`/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/asd/scripts/validate_wiring.py` 和 `/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/scripts/ab_cdr_leakage.py` 到 `immune_llada.data` 的 source adapter/record 工具；这些脚本仍可读取各自下游原始数据做离线验证，但不再依赖旧 immune dataset。
+- 已将 `/vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/tests/bioseq/test_dynamic_training.py` 中的旧 `ImmuneCsvDataset` 文件测试替换为 OAS/OTS/nanobody source adapter 的 canonical `BioSeqRecord` 测试。
+- 已删除退役入口 `/vepfs-mlp2/c20250601/251105016/project/dllm_test/examples/llada/protein_pretrain.py` 和旧实现 `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/bioseq/datasets.py`；`bioseq` 顶层不再导出 `ImmuneCsvDataset`、`ImmuneSourceSpec`、`build_mixed_immune_dataset`、`default_immune_specs`。
+- 本条旧记录中的 qwen data 兼容 alias、PPI/STRING/MINT 训练共享模块及其专属入口随后已清理删除；仅保留 `/vepfs-mlp2/c20250601/251105016/project/dllm_test/refactor_baseline` 审计快照、`/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/archive` 历史证据和明确列出的当前 model-layer/eval 公共实现。此处保留作为历史账本，不是当前依赖。
+
+## 2026-09-09 用户确认离线丢弃 51 条同类型 paired 数据
+
+- 已明确采用离线丢弃，不修正配对、不保留旧位置角色。`immune_llada/data/preprocessing/filters.py` 在 OAS/OTS 原有规则后增加 `quality.homotypic_pair`，仅按两条链角色相同判断，不按序列相同判断；不影响其他 source 的单链样本，不向训练时增加操作。新 manifest 记录该规则。
+- 新增/调整 offline filter、prepared loader 和 strict audit 回归；合并 **104 passed in 24.70s**。首次新增全过滤 fixture 的测试因报告省略零值 `prepared` 键而失败，已修正测试读取零值方式，未弱化实际差异检查。
+- 新数据已完成重建并通过策略验收：`data/prepared/immune_v3_heterotypic/`，7,997,971 kept / 673,322 filter drops；train 7,794,324、valid 203,647。旧 `immune_v3` 保留作回滚/对照；`protein_pretrain_esmc.py` 和 profiler 默认路径已切换到新目录。
+- 复验报告：`refactor_baseline/homotypic_drop_20260909/policy_acceptance.json`，仅 OAS train 38、OTS train 13 条按批准规则丢弃；strict audit 退出码 2 是预期历史差异，不是策略验收失败。
+- 其余必要收尾仍为 manifest freshness/version、旧 YAML/兼容参数清理、本地真实 GPU DataLoader 验收；详细说明与计划已同步。
+
+## 2026-09-09 Immune 数据重构验收：全量差异已定位，尚未全部通过
+
+- 新增独立历史实现的全量审计 `scripts/data/run_immune_full_parity.py`，固定 commit `7f6f2351702dc307f710bce7228a53eae391b26f`；不是兼容 alias 自比较，也不是仅比数量/集合。
+- 后台完整检查已结束（1,368.99 秒）：8,671,293 raw / 7,998,022 kept；过滤决策与计数无差异，新 canonical vs prepared 完整行多重集无差异。**严格旧/新语义 parity failed，退出码 2**：OAS 38 + OTS 13 条 role 差异，对应 102 个不同指纹。
+- 全部 51 条差异完成定向归因：原始标注为 H/H 或 β/β，旧 wrapper 按位置赋 H/L 或 β/α。38 条 OAS rendering 相同；**13 条 OTS 从 `tcr_pair` 变成 `tcr_single`，改变模型输入和 encoder masks**。不能用 reservoir 抽样的 0 mismatch 宣称全量 grammar 等价。未修改 prepared 数据，需确认离线处理或历史兼容策略。
+- 证据：`refactor_baseline/full_parity_20260909/report.json`、`refactor_baseline/full_parity_diagnosis_20260909/run/`。诊断的 `passed` 只表示已复现差异，不覆盖全量 parity 的失败结论。
+- 本地模型 profiler `scripts/debug/profile_immune_llada.py` 已实现，修正 BF16 autocast、核验 GPU UUID、全 tensor digest 和 artifact 命名。实际 GPU profiling 尚未运行：外部 compute PID 3074807 持续占用 A100，未干扰该进程；也没有启动正式 Volc 任务。
+- 合并相关回归 **94 passed in 35.59s**，含 41 项 profiler CPU 测试及 H/H、β/β 审计检测回归；六个新增/修改 Python 验收脚本与测试 AST 检查通过。测试通过不等于数据语义差异已解决。
+- 仍需收尾：完整 manifest freshness/version 契约、15 份 v3 YAML 和旧 DataArguments 兼容字段同步清理、本地 GPU 空闲后的真实 loader overlap 验证。prepared loader 仍需启动建索引、逐行 JSON decode，不能声称零数据成本。
+- 验收说明：`docs/IMMUNE_LLADA_DATA_ACCEPTANCE.md`；计划和 pipeline README 已同步。本轮审计/诊断后台进程均已结束，无模型 profiling 子进程运行。
+
+## 2026-09-09 Immune LLaDA 数据 pipeline 重构（全量验证）
+
+- 新建独立数据模块：`/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/immune_llada/`，新的免疫数据逻辑不放在 `qwen3_vl_arch` 目录下；使用说明见该目录 `README.md`。
+- 已完成 canonical `BioSeqRecord`、source registry、七个 source adapter、显式 filter API，以及流式 offline preprocessing CLI：`scripts/data/preprocess_immune_dataset.py`。
+- 全量 prepared 数据已生成到 `data/prepared/immune_v3/`：8,671,293 raw rows，7,998,022 kept，673,271 filter drops，0 schema drops，0 errors；train 7,794,375、valid 203,647，共 88 个 JSONL shards。
+- preprocessing 输出 semantic JSONL shards、`dataset_manifest.json`、`filter_report.json`、`validation_report.json` 和 `schema.json`；shard 和报告采用 atomic publish，`schema.json.token_cache=false`，未生成 model-ready token cache。
+- `examples/llada/protein_pretrain_esmc.py` 已切换为只读取 prepared manifest；训练期仍保留 grammar rendering、batch padding、per-chain encoder input 重建和 diffusion/MLM 随机逻辑。旧 raw CSV/filter/坏样本重试逻辑不再进入训练热路径。
+- 相关回归测试为 `40 passed in 4.84s`；compileall 通过；正式训练环境下全量 manifest dry-run 和 A100 1-step forward/backward/checkpoint save 均通过，loss=12.4375、grad_norm=30.625。
+- 已完成 prepared loader + required collator 的本地吞吐基线：workers=0 为 1367.76 samples/s，workers=1 为 721.62，workers=2 为 1337.44；正式 GPU/FSDP worker overlap 仍需单独测量，不能据此武断固定 worker 数。
+- parity baseline 已生成到 `refactor_baseline/immune_v3_baseline.json`，记录每个 split/source 的数量、首尾记录哈希和聚合 canonical record 哈希；新增 sampled adapter parity 报告 `refactor_baseline/immune_adapter_parity_train_5000.json` 与 `immune_adapter_parity_valid_5000.json`：train 35,000 行、valid 32,440 行全部匹配，无单边 drop、error 或 mismatch。该结果不替代全量 fingerprint/multiplicity parity；checkpoint restore smoke 已通过：full checkpoint `checkpoint-1` 成功恢复并继续到 `checkpoint-2`。没有启动正式 Volc 训练任务。
+- 详细计划：`/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/IMMUNE_LLADA_DATA_REFACTOR_PLAN.md`。
+
+## 2026-09-08 存储清理：退役 `grammar_v2` 旧训练线，回收 379G
+
+**背景**：`dllm_test/` 占 1.34TB，其中 `output/` 822G。审计发现 `output/` 里同时存着两条
+训练线的 checkpoint，而 run 名字里的 `llada` 有两种含义，容易误判为同一条线：
+
+| | `grammar_v2_*`（旧线，已删） | `protein_esmc_llada*`（当前线，保留） |
+|---|---|---|
+| 训练入口 | `examples/bioseq/train_qwen3_vl_bioseq_ddp.py` | `examples/llada/protein_pretrain_esmc.py` |
+| 保存代码 | `dllm/pipelines/qwen3_vl_arch/training/checkpointing.py` | `FusionTrainer(transformers.Trainer)` |
+| 落盘形态 | `step_NNNNNNN_val_X.XXXX.pt` / `best.pt` / `latest.pt` | `checkpoint-NNNNN/model.safetensors` |
+| 模型 | ESMC-300M/600M + 从零训的小 LLaDA decoder（hidden 512、7 或 28 层） | ESMC + LLaDA-8B / 270m fusion |
+| wandb project | `bioseq-qwen3-vl` | — |
+
+`grammar_v2_*_llada` 里的 `llada` 只是 `args.model_type="llada"`（decoder 架构），
+**与 `examples/llada` 训练脚本无关**。判据取自 `.pt` 内嵌 `args`
+（`grammar_data_dir=data/bioseq_grammar_v1`、`save_top_k=5`、`hidden_size=512`）
+与文件命名格式，二者精确对应 `qwen3_vl_arch/training/checkpointing.py`。
+
+**决策依据**：`downstream/benchmark/RESULTS.md` 的 VOID 横幅（2026-08-15 立、08-20 复核）
+已判定所有 `grammar_v2 / cmp500k / mint / integrated 7L` 数字作废，当前架构是
+`examples/llada` immune fusion；9-07 的 PPT 也只提 270M/8B。用户确认与主训练线无关者即可删。
+
+**已删除（合计 379G）**：
+
+| 路径 | 回收 |
+|---|---|
+| `output/grammar_v2_esmc600m_cmp500k_llada` | 86G |
+| `output/grammar_v2_esmc300m_mint_llada` | 67G |
+| `output/grammar_v2_esmc300m_cmp500k_llada` | 59G |
+| `output/grammar_v2_esmc300m_integrated_llada` | 50G |
+| `output/grammar_v2_esmc300m_integrated_llada_8src_pre_b1` | 42G |
+| `output/grammar_v2_esmc300m_integrated_llada_7l` + 10 个 `_stepNNNNNN` 快照目录 | 55G |
+| `tmp/smoke_llada_esmc300m_cfg`（同旧线的 smoke 产物，`latest.pt`+`final.pt`） | 17G |
+| `.models/bioseq/ophiuchus-ab-mixed/final.pt`（旧轻量 bioseq 后端自训权重，仅 `backbone_state_dict`，0 下游引用） | 3.1G |
+| `_feature_cache/ours_bioseq7l_step389500_frozen_globalmean_mlp` | 1.7G |
+| `output/grammar_v1_esmc300m`、`grammar_v2_*_killed_step988_*`（仅日志/wandb） | ~3M |
+
+结果：`output/` 822G → **465G**，`tmp/` → 空，`.models/` → 空，`dllm_test/` 1.34TB → **约 955G**。
+
+**留档**：`docs/archive/grammar_v2_retired_20260908/` —— 6 份 `topk_manifest.json`
+（含每个 retained step 的 `val_loss`）、2 份 `wandb-summary.json`、
+`deleted_file_inventory.tsv`（295 个文件的路径/字节数/mtime）。共 49K。
+
+**不可复现声明**：训练语料 `data/bioseq_grammar_v1` 早已不在盘上，故这批 run
+**删除前就已无法重训**。已记录的历史数字（`RESULTS.md` 历史节、
+`outputs/tcr_beta_public_benchmark/`、`checkpoint_comparison/bioseq_step*/`）
+保留可读，但不得再生成、再打分或写入新表。
+
+**遗留待办（未处理，需决策）**：
+- `paper/math_commands.tex` 与 `paper/sections/4_experiments.tex`（8-30 改过）仍把 headline
+  `\OursCkpt` 定义为 `grammar_v2_esmc300m_integrated_llada_7l` step 16,000，该 ckpt 现已不存在。
+  这与 `RESULTS.md` 的 VOID 横幅本就矛盾。论文若继续投，须整体改锚到 `examples/llada` 线
+  （8B BERT `checkpoint-43000` / 8B diffusion `checkpoint-45000` / 270m 系列）。
+- `PROJ_GUIDE.md` 中 `step117000` SHA256 钉子与 `gen_eval_grammar_v2_*` 生成器已就地标注
+  RETIRED；约 40 个 smoke / `run_paper6_*` 脚本的默认 `--embedder grammar:*` 路径仍指向已删文件，
+  未逐个清理（均为模块级 Path 常量，不触发 import 错误）。
+
 ## 2026-09-07 T4 / CDR 四个阶段改本地单卡跑（不再等 `queue012`）
 
 **操作**：用户决定被 cancel 的 T4 与 CDR 四个阶段本地跑。本机有**一张空闲 A100-80G**
@@ -506,13 +660,16 @@ eval + 前缀截断」时代。现在 `subsample_seed=0` 走 reservoir 抽样、
 
 > Only non-terminal jobs (`Initialized` / `Queue` / `Staging` / `Running` / `Killing`). Remove a row when the job reaches `Success`, `Failed`, or `Killed`.
 
-Last updated: 2026-09-01T19:20Z (UTC+8 09-02 03:20 — 回填 8 卡长跑三条；此前"表为空"已过期)
+Last updated: 2026-09-11T11:03Z (UTC+8)
 
 | Task ID | Job / TaskName | 队列 | 卡数 | max_steps | 状态 |
 |---|---|---|---:|---:|---|
-| **`t-20260902021013-bm79q`** | `protein_esmc_llada270m_diffusion_allchains_immune_v3_8gpu_2m` | `c20250601` 非抢占 | 8 | **2,000,000** | **Running** @step 17k |
-| `t-20260901235433-q76qw` | `protein_esmc_llada270m_bert_immune_v3_1m` | `queue012` 非抢占 | 8 | **1,000,000** | Queue |
-| `t-20260901032620-vvngv` | `protein_esmc_llada270m_diffusion_immune_v3_spot_2m` | `c20250601` **闲时** | 8 | 2,000,000 | Queue（看护循环在追） |
+| **`t-20260911190334-kpfsz`** | `eval-ophiuchus-ab-esm-head-epochs-long` | `c20250601` **闲时** | 1 | — | Queue |
+
+已从本表移除（2026-09-11 查询已终态）：`t-20260911085733-5b727`（`eval-ophiuchus-ab-esm-head-epochs`，**Success**）。
+
+已从本表移除（2026-09-11 探针评测终态）：`t-20260911054553-jb7v5`（`eval_ophiuchus_ab_official_probe`，**Success**）。
+已从本表移除（2026-09-11 查询已终态）：`t-20260902021013-bm79q`（Killed）、`t-20260901235433-q76qw`（Failed）、`t-20260901032620-vvngv`（Killed）。
 
 🔴 **`..._8gpu_2m` 前 4 条同名任务全部 `Failed`，根因是目录磁盘配额**（不是文件系统满，底层尚余 809T）：
 `t-20260901033935-h55f4` / `t-20260901230256-ns4q4` / `t-20260902000627-j4mqm` / `t-20260902010820-t6hq6`。
@@ -567,10 +724,11 @@ repr/gen，本不该记在训练表里）。
 
 ## Active Volc Evaluation Tasks
 
-Last updated: 2026-09-07T04:45Z (UTC+8 09-07 12:45 — 九条改投 queue012 非闲时重提；73000/69000 那批已终态移除)
+Last updated: 2026-09-11T11:03Z (UTC+8)
 
 | Task ID | Job / TaskName | 队列 | 卡数 | 覆盖 | 状态 |
 |---|---|---|---|---|---|
+| **`t-20260911190334-kpfsz`** | `eval-ophiuchus-ab-esm-head-epochs-long` | `c20250601` **闲时** | 1 | Table 5 ESM head 200→300 ep | Queue |
 | `t-20260907044259-qd52v` | `eval-v3-allchains-8gpu2m-151000-repr` | `queue012` **非闲时** | 1 | T1 / T2 / T3 | Queue |
 | `t-20260907044303-ks4x6` | `eval-v3-allchains-8gpu2m-151000-cdr` | `queue012` **非闲时** | 1 | AB CDR infill | Queue |
 | `t-20260907044307-btjxr` | `eval-v3-allchains-8gpu2m-151000-pairing` | `queue012` **非闲时** | 1 | AB light pairing | Queue |
@@ -1967,3 +2125,51 @@ H1 任意步数精确命中、H2 稳定高 0.5、H3 最好仍差 1.55 pp。**同
   `downstream/trait/README.md`、`downstream/benchmark/README.md`、
   `data/trait/README.md`（原写着 "not yet wired"，早已接线）、
   `data/tcr_repertoire/README.md`、`data/tcr_papers/EXPANSION_AUDIT_2026_08_28.md`。
+
+## 2026-09-11 提交 Ophiuchus-Ab 官方 ckpt 探针复现
+
+- submit `eval_ophiuchus_ab_official_probe`
+- YAML：`/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_ophiuchus_ab_official_probe.yml`
+- `task_id=t-20260911054553-jb7v5`，初始 `Queue` → 查询时已 `Staging`
+- 队列 `c20250601`，`Preemptible: true`，1×`ml.pni2.3xlarge`
+- 权重用本地官方副本 `dllm_test/model_weights/ophiuchus_ab/Ophiuchus-Ab/Ophiuchus-Ab.ckpt`（3.1G，与 `/c20250601/mj/model_weights/ophiuchus_ab/...` 同源）
+- 任务：Table 5 CurrAb、Fig 4 m396、Table 4 GDPa1；不进 headline
+
+## 2026-09-11 Ophiuchus-Ab 官方 ckpt 探针评测 Success
+
+- `task_id=t-20260911054553-jb7v5`（`eval_ophiuchus_ab_official_probe`）终态 **Success**（Start `2026-09-10T21:45:53Z`，End `2026-09-10T22:03:58Z`，elapsed 1085s）
+- YAML：`/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_ophiuchus_ab_official_probe.yml`
+- 队列 `c20250601`，`Preemptible: true`，1×`ml.pni2.3xlarge`
+- 产物：`/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/ophiuchus_ab/{specificity_hd_flu_cov,affinity_m396,developability_gdp_a1}_metrics.json`
+- Table 4 GDPa1 变换空间 Spearman 对齐论文四列：AC-SINS 0.511 / HIC 0.550 / PR_CHO 0.460 / Titer 0.359
+- Table 5 CurrAb 低于论文：Acc 0.6085 / F1 0.6068 / MCC 0.4139 vs `[P]` 0.6796 / 0.6790 / 0.5203
+- Fig 4 m396 0.5% train Spearman mean 0.930（论文是趋势图，本轮未跑 MINT/AbMAP）
+- **不进 headline**；Active 表已删该行
+
+## 2026-09-11 提交 Table 5 ESM head 50/100 epoch 闲时复训
+
+- submit `eval-ophiuchus-ab-esm-head-epochs`
+- YAML：`/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_ophiuchus_ab_esm_head_epochs.yml`
+- `task_id=t-20260911085733-5b727`，初始 `Queue`
+- 队列 `c20250601`，`Preemptible: true`，1×`ml.pni2.3xlarge`
+- 复用 `output/downstream_generation/ophiuchus_ab/specificity_embeddings.pt`；先 50 epoch 再 100 epoch
+- 产物目录：`output/downstream_generation/ophiuchus_ab/specificity_esm_ep{50,100}/`
+- 不覆盖 5-epoch `specificity_hd_flu_cov_metrics.json`；不进 headline
+
+## 2026-09-11 Table 5 ESM head 50/100 epoch 闲时复训 Success
+
+- `task_id=t-20260911085733-5b727`（`eval-ophiuchus-ab-esm-head-epochs`）终态 **Success**（Start `2026-09-11T00:57:34Z`，End `2026-09-11T01:06:17Z`，elapsed 523s）
+- YAML：`/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_ophiuchus_ab_esm_head_epochs.yml`
+- 队列 `c20250601`，`Preemptible: true`，1×`ml.pni2.3xlarge`
+- 末轮五折均值：50 epoch Acc 0.6651 / F1 0.6640 / MCC 0.4982；100 epoch Acc 0.6778 / F1 0.6768 / MCC 0.5171（论文 `[P]` 0.6796 / 0.6790 / 0.5203）
+- 100 epoch 曲线在 ~60 轮后 Acc 平台约 0.67–0.68，test CE 平台约 0.78；不进 headline
+- Active 表已删该行
+
+## 2026-09-11 提交 Table 5 ESM head 200/300 epoch 闲时加长
+
+- submit `eval-ophiuchus-ab-esm-head-epochs-long`
+- YAML：`/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_ophiuchus_ab_esm_head_epochs_long.yml`
+- `task_id=t-20260911190334-kpfsz`，初始 `Queue`
+- 队列 `c20250601`，`Preemptible: true`，1×`ml.pni2.3xlarge`
+- 复用 `specificity_embeddings.pt`；独立训 200 再训 300，不覆盖 ep50/ep100
+- 产物：`output/downstream_generation/ophiuchus_ab/specificity_esm_ep{200,300}/`；不进 headline

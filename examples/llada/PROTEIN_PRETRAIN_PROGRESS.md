@@ -1,17 +1,19 @@
 # LLaDA 蛋白预训练（OAS/OTS）项目进度
 
-> 本文档记录目标、决策、任务台账与结论。**详细度按价值分配**：跑过下游评测的实验保留完整口径与数字，
-> 早期／已终态的跑只留一行台账。每有实质进展在 §11 变更日志追加**一行**，细节写进对应小节，不要两处各写一遍。
+> 蛋白训练线的决策与结论笔记本。Volc 任务 / 实验进展的**权威账本**是
+> [`PROJECT_PROCESS.md`](../../PROJECT_PROCESS.md)；下游数字权威在
+> [`RESULTS.md`](../../downstream/benchmark/RESULTS.md)。本文不复述 prepared 布局。
 
 - 现役入口：[`protein_pretrain_esmc.py`](protein_pretrain_esmc.py)（ESMC 条件融合，正式跑）
 - 操作手册（怎么跑、怎么提交、resume 规则）：[`README.md`](README.md) §「蛋白预训练（本项目）」
-- 数据侧（数据源 / 去污 / 审计）：[`DATA_PIPELINE_README.md`](DATA_PIPELINE_README.md)
+- 数据操作入口：[`dllm/pipelines/immune_llada/README.md`](../../dllm/pipelines/immune_llada/README.md)
+- raw 去污事故：[`DATA_PIPELINE_README.md`](DATA_PIPELINE_README.md)
 - 下游数字权威表：[`RESULTS.md`](../../downstream/benchmark/RESULTS.md)
 - 多链关系对照臂设计：[`MULTI_CHAIN_RELATION.md`](MULTI_CHAIN_RELATION.md)
 
-**最近更新 2026-09-07**（平台与盘上双向核实）：三条长跑最好点的下游评测**已全部收口**
-（表征 + T4/CDR 本地跑完，两条 pairing 平台 Success），数字见 §5.1。全链 2M 已 **Killed** 于
-161000（eval 0.6277，同时是最好点），待决策是否续。仍在跑的只有 generated-only 2M 与 BERT 1M 两条。
+**最近更新 2026-09-12**：v4 / v5 prepared 均已发布；表位源补全 / all-X **已在全量
+语料核验**。行数权威：plan §4.2。见 §3 与 PROJECT_PROCESS 2026-09-12 条。
+v3 长跑账本仍见 §3.1；数字进 RESULTS，不在此复述。
 
 ---
 
@@ -19,10 +21,11 @@
 
 1. **实时更新进展**：有实质进展（改代码、跑通验证、发现问题、做决策）就同步本文档 —— 更新 §3 当前状态，
    并在 §11 追加一行。不要攒到最后补。
-2. **关键改动同步到 README**：本文档记**为什么**与**结论**；[`README.md`](README.md) 记**怎么操作**。
-   凡是改变「别人下次该怎么做」的东西（训练配置、队列、提交与 resume 规则、任务状态）必须同时更新 README；
-   数据侧改动更新 [`DATA_PIPELINE_README.md`](DATA_PIPELINE_README.md)。**只写本文档不算更新完。**
-   反之，纯过程性试错只留本文档，别把 README 灌成副本。
+2. **关键改动按 owner 同步**：任务/进展 → [`PROJECT_PROCESS.md`](../../PROJECT_PROCESS.md)；
+   训练怎么提交 → [`README.md`](README.md)；prepared 数据怎么跑 →
+   [`dllm/pipelines/immune_llada/README.md`](../../dllm/pipelines/immune_llada/README.md)；
+   raw 去污事故 → [`DATA_PIPELINE_README.md`](DATA_PIPELINE_README.md)。
+   本文只记训练线决策与结论，不要把 README 灌成副本。
 3. **子任务可直接用 grok 4.5**（`cursor-grok-4.5-high-fast`）：主控负责统筹、拆解与 review，
    不必为每个子任务重复征求许可。
 
@@ -79,7 +82,21 @@ multinomial；`relation_aux_loss`；修 ESMC 条件流在迭代解码中泄漏�
 
 ---
 
-## 3. 当前状态（2026-09-07 平台 + 盘上核实）
+## 3. 当前状态（2026-09-12）
+
+### v4 / v5 数据线（2026-09-12）
+
+布局与补全细节不要写在这里。入口：
+[`dllm/pipelines/immune_llada/README.md`](../../dllm/pipelines/immune_llada/README.md)；
+设计：[`docs/PLAN_TCR_BETA_ONLY_RELATION_DIFFUSION.md`](../../docs/PLAN_TCR_BETA_ONLY_RELATION_DIFFUSION.md)。
+
+- ✅ v4 `data/prepared/immune_v4_beta_relation` 已发布（plan §4.1）。
+- ✅ §2.5 / §2.6 已在全量语料落地并核验；v5 `immune_v5_receptor_completion` 已发布（plan §4.2）。
+- ✅ v4 `tcr_repertoire` 可从自身 manifest 重生（3,000 行 0 mismatch）；v5 同 shard byte-identical。
+- ⏳ 正式 v4/v5 训练尚未提交。
+- `immune_receptor_v2` 仍未通过 runtime/training gate。
+
+## 3.1 历史 v3 状态（2026-09-07 平台 + 盘上核实）
 
 **平台在跑**（数字取自各 run 的 `topk_val_manifest.json`，非日志转抄）
 
@@ -491,8 +508,7 @@ resume-only（各 94 G）、5 处 `checkpoint-final/model.safetensors` **改硬�
 
 - 总残基 **1,273,914,576**，生成链残基 **1,150,746,721**（90.3%）。
 - valid 合计 **203,647**；进 eval 的是六源各 2,000 + `trait` 1,393 = **13,393** 行。
-- **配比按记录等权，不是按残基**：`ImmuneSourceSpec.weight` 在 `__getitem__` 中被丢弃，
-  混合比例纯由磁盘行数决定。`tcr_repertoire` 占 27.3% 记录但只有 2.2% 残基，`asd_antibody` 反向。
+- **配比按记录等权，不是按残基**：source weight 已写入 prepared `BioSeqRecord`，但当前 collator/loss 尚未使用它，混合比例仍由 prepared manifest 中的行数决定。
 - **训练预算**：global 256 × 50,000 步 = 1280 万条 ≈ **1.64 epoch**（global 128 那档 ≈ 0.84 epoch）。
 - ⚠️ 搬迁让 train 超出当初刻意设的 2,000,000 上限 6.4%（判为可接受）。
   **若重跑 `build_repertoire.py`，该上限会把搬回来的行重新截掉，须重跑搬迁。**
@@ -503,12 +519,19 @@ resume-only（各 94 G）、5 处 `checkpoint-final/model.safetensors` **改硬�
 
 `gen%` = 该布局占全部待预测残基的比例（蓄水池采样实测）：
 
+> ⚠️ **下表行数/gen% 是 2026-08-29 口径，v4/v5 后未按布局重算**；布局语义已变（详见 §7.3）：
+> 三个无条件布局现在都带固定前缀 `<prots> <null> <protd> <unknown>`（全 `is_fixed`，不计 loss）；
+> `tcr_single` 已废弃，`tcr_repertoire` 统一渲染为 β→α 双链（约 92% token 是不算 loss 的 `X`）；
+> relation token 在 v4 是可训 target。v4 逐源行数见 plan §4.1；v5 行数与
+> `diffusion_loss_mask` 监督份额见 plan §4.2（口径不同；不要把历史 `gen%` 或误记的
+> 5.4% / 0.13% 当成 v4 监督份额）。
+
 | 布局 | 条件 → 生成 | 来源 | 记录% | **gen%** |
 |---|---|---|---:|---:|
-| `antibody_pair` | 无条件 → 抗体 H+L | `oas` | 31.9% | **49.64%** |
-| `tcr_pair` | 无条件 → TCR α+β 全长 | `ots` | 26.9% | **40.92%** |
+| `antibody_pair` | 固定 null 前缀 → 抗体 H+L | `oas` | 31.9% | **49.64%** |
+| `tcr_pair` | 固定 null 前缀 → TCR β+α 全长 | `ots` | 26.9% | **40.92%** |
 | `antigen_antibody` | 抗原 → 抗体 H+L | `asd_antibody` | 3.6% | **4.55%** |
-| `tcr_single` | 无条件 → 单链 CDR3β | `tcr_repertoire` | 27.3% | **2.90%** |
+| ~~`tcr_single`~~ → `tcr_pair` | 固定 null 前缀 → 真实 CDR3β + `X` 补全双链 | `tcr_repertoire` | 27.3% | **2.90%** |
 | `tcr_pmhc` | MHC+表位 → TCR | `trait`+`tcr_native`+`tcr_papers` | 8.6% | **1.78%** |
 | `tcr_peptide` | 仅表位 → TCR | 同上三源里无 MHC 的部分 | 1.8% | **0.20%** |
 
@@ -526,20 +549,25 @@ resume-only（各 94 G）、5 处 `checkpoint-final/model.safetensors` **改硬�
 
 ### 7.3 每个源渲染成什么样
 
-`*[...]` 是可训练目标位，`[...]` 是固定上下文。
-
 ```
-# 布局一 无标签配对生成（oas + ots），100% 可训练
-oas   <prots> <ab>  *[heavy ×128] <chainsep> *[light ×110] <protd>      242 tok / 242 可训
-ots   <prots> <tcr> *[alpha ×112] <chainsep> *[beta  ×114] <protd>      230 tok / 230 可训
+# 前缀约定（v4）：无条件布局在前面跟一段固定 null context，与条件布局形状对齐
+#   <prots> <null> <protd> <unknown>      四个 token 全固定，不算 loss、不加噪、不消耗 chain index
 
-# 布局二 识别型 = 固定上下文 + relation + 待生成受体
-asd   <prots> [antigen ×75] <protd> <binding> <prots> <ab> *[heavy ×118] <chainsep> *[light ×106] <protd>
-trait <prots> <pep> [epitope ×10] <protd> <binding> <prots> <tcr> *[cdr3a ×13] <chainsep> *[cdr3b ×14] <protd>
+# 布局一 无标签配对生成（oas + ots），残基位 100% 可训
+ oas  [<prots> <null> <protd> <unknown>] <prots> <ab>  *[heavy ×128] <chainsep> *[light ×110] <protd>
+ ots  [<prots> <null> <protd> <unknown>] <prots> <tcr> *[beta  ×114] <chainsep> *[alpha ×112] <protd>
 
-# 布局三 单链无条件（tcr_repertoire）—— 唯一的 tcr_single 布局
-rep   <prots> <tcr> *[AAAAASQETQY ×11] <protd>                           14 tok /  14 可训
+# 布局二 识别型 = 固定上下文 + relation（v4 起为可训 target）+ 待生成受体
+ asd   <prots> [antigen ×75] <protd> *<binding> <prots> <ab> *[heavy ×118] <chainsep> *[light ×106] <protd>
+ trait <prots> <pep> [epitope ×10] <protd> *<binding> <prots> <tcr> *[cdr3b ×14] <chainsep> *[cdr3a ×13] <protd>
+
+# 布局三 beta-only（tcr_repertoire）—— v4 起统一渲染成 alpha/beta 双链，不再是 tcr_single
+ rep  [<prots> <null> <protd> <unknown>] <prots> <tcr> *[CASSQETQYF ×13 真实 CDR3β + X 补全] <chainsep> [alpha 全 X] <protd>
+      → 约 8% token 算 loss，约 92% 是 synthetic X（不算 loss、不加噪，但吃满 attention）
 ```
+
+> `*[...]` / `*<...>` 是可训练目标位，`[...]` 是固定上下文。generated block 内的骨架 token
+> （`<prots>` / `<ab>`·`<tcr>` / `<protd>`）同样加噪并计 loss，图里为可读性未逐个标星号。
 
 > ⚠️ 上面是「各源首行」，对 `trait` / `tcr_papers` **不具代表性**（`trait` 首行恰好没有 MHC，
 > 但全量 95.2% 带 MHC 块）。布局的**分布**看 §7.2，别从样例推占比。
@@ -547,14 +575,18 @@ rep   <prots> <tcr> *[AAAAASQETQY ×11] <protd>                           14 tok
 其他口径事实：
 
 - `oas` 的 CSV 有 33 列，`row_to_record` **只取** `cleaned_h_sequence` / `cleaned_l_sequence` 两列。
-- 链顺序：抗体按位置 heavy→light；**TCR 按角色重排为 α→β**，而 OTS 的 record 里其实是 β 在前。
+- 链顺序：抗体按位置 heavy→light；**TCR 按角色重排为 β→α**（`grammar.py` 的 `receptor = [beta, alpha]`），
+  与 OTS record 里 β 在前一致。这一点不只是美观：`sample_chain_conditioned_timesteps` 和
+  `generated_heavy_light_masks` 都把**最小 chain id 当 heavy**，α 在前会让模型把 α 误当 heavy 链。
 - `tcr_native` 与 `tcr_papers` 用同一套统一 schema，故共用 `tcr_native_row_to_record`：
   优先全长 Fv，缺失则退回 CDR3 loop。
-- 词表侧：全语料只激活 42 个新 token 中的一小部分 —— 语法 token 实际只出现
-  `<prots> <protd> <ab> <tcr> <pep> <chainsep> <binding> <nonbinding>` 八个，残基只用 20 个标准氨基酸。
+- 词表侧：全语料只激活新 token 中的一小部分 —— 语法 token 实际出现
+  `<prots> <protd> <ab> <tcr> <pep> <chainsep> <binding> <nonbinding> <null> <unknown>` 十个
+  （`<null>`/`<unknown>` 自 v4 的无条件前缀起启用），残基除 20 个标准氨基酸外多一个 `X`
+  （beta-only 补全位，不算 loss）。
   **继承的 12.6 万 BPE 词表在本任务里基本是死重量。**
 - **单链 α 摄入不了，卡在 grammar 而非数据**：`GrammarTokenizer` 只有一个 `<tcr>`，没有 `<tcra>`/`<tcrb>`，
-  配对时靠 `[alpha, beta]` 位置编码身份，但 `len(receptor) == 1` 时 α 与 β 渲染成**完全相同的 token 序列**。
+  配对时靠 `[beta, alpha]` 位置编码身份，但 `len(receptor) == 1` 时 α 与 β 渲染成**完全相同的 token 序列**。
   硬塞会污染 T4 Setting-A 测的 β 分布。要摄入须扩词表 → 现有 checkpoint 不兼容，属建模决策，未做。
 
 ### 7.4 `asd_antibody` 为什么只剩 32.5%
@@ -728,7 +760,7 @@ python examples/llada/protein_pretrain_esmc.py --dry_run True --max_rows_per_sou
       而不是只看本进程 `log_history`，否则每次重启都产孤儿、永不被剪。
 - [ ] **save 前做配额预检**：余量不足时降级为 weights-only，而不是让整个任务 `exit 1`
       并被 `RetryOptions` 拖进 58 分钟一轮的循环。
-- [ ] `ImmuneCsvDataset` 会把整表读入内存（train.csv GB 级），更大规模需评估内存或改流式。
+- [x] 旧 `ImmuneCsvDataset` 动态 raw CSV loader 已删除；当前训练只消费 prepared dataset。若重建语料，使用 `/vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/data/preprocess_immune_dataset.py`，不要恢复训练期整表加载。
 
 **回填 RESULTS**
 
@@ -751,6 +783,9 @@ python examples/llada/protein_pretrain_esmc.py --dry_run True --max_rows_per_sou
 
 > 一行一条，细节在对应小节。不要在这里重复正文内容。
 
+- **2026-09-12** — 表位源补全 + all-X 已在全量语料核验；v5 已发布。见 PROJECT_PROCESS 同日条与 plan §2.5/§2.6/§4.2。
+- **2026-09-11** — 无条件布局加固定 `<null>` 前缀（renderer 改动，预处理无需重跑）；wandb 切 `online`。细节见 plan §2.3.2。
+- **2026-09-11** — v4 数据线完成流式 region profile、beta-only 双链补全、synthetic X loss exclusion、relation target diffusion；链顺序在渲染层统一为 **β→α**（`grammar.py` 的 `receptor = [beta, alpha]`），anchor 判定改 provenance 驱动，corpus 切到 `tcr_repertoire_junc80`。全量 preprocessing 跑完（raw 8,441,615 → kept 7,768,293，train 7,665,574 / valid 102,719），全量审计零不变量违规，`nonbinding` 负样本路径在真实数据上验通。正式训练尚未提交。见 `docs/PLAN_TCR_BETA_ONLY_RELATION_DIFFUSION.md`。
 - **2026-09-07** — 三条长跑最好点下游**全部收口**：表征三条 + T4/CDR 四条本机单卡跑完，
   两条 pairing 平台 Success（全链 151k IM **0.438** / generated-only 44k **0.399**）。见 §5.1。
 - **2026-09-07** — 九条下游作业在 `c20250601` 闲时排 4.9h 零起跑，改投 `queue012` 非闲时后仍 9/9 Queue；

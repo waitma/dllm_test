@@ -1,5 +1,7 @@
 # BioSeq Model Plan
 
+> **Current architecture boundary (2026-09-11):** The only current immune data implementation is `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/immune_llada`; the formal training entry is `/vepfs-mlp2/c20250601/251105016/project/dllm_test/examples/llada/protein_pretrain_esmc.py`. The active data flow is raw → adapter → `BioSeqRecord` → offline filter → prepared semantic JSONL → training-time grammar/padding/per-chain encoder reconstruction/masking, with no model-ready token cache. The deleted `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/data` alias tree, deleted `training` tree, deleted `GRAMMAR_V1.md`, and deleted legacy training/build/test/job files are historical deletion facts, not current dependencies. Retained model-layer files are `modeling_bioseq.py`, `sampling_bioseq.py`, and `relation_aux.py`; `downstream/grammar` remains active for fusion CDR/light-pairing/TCR-generation public implementations.
+
 ## Goal
 
 Build a diffusion-model-based immune-receptor foundation model in
@@ -21,21 +23,23 @@ paired TCR α/β, antibody-antigen recognition, and TCR-epitope/pMHC recognition
   clusters, donor/assay, continuous value/unit/censor, and source record
   provenance. Dataset rows with the same sequences but different HLA or assay
   are not interchangeable duplicates.
-- Training must expose explicit view targets: H→L/L→H, α→β/β→α,
-  antigen-conditioned receptor generation, pMHC-conditioned TCR generation,
-  and chains→relation. The current grammar renderer fixes every relation token
-  and the Arrow loader drops `targets`; those two code paths must be changed
-  before the new data recipe is considered implemented.
-- The authoritative source counts, strict SAbDab2/AbRank filters, TCR source
-  overlap audit, and initial 30/30/20/20 plane sampling recipe are in
-  `/vepfs-mlp2/c20250601/251105016/project/dllm_test/TRAINING_DATA_CATALOG.md`.
+- The current immune LLaDA runtime exposes the semantic record and mask contract through
+  `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/immune_llada/data`; target views
+  are represented by record metadata plus runtime grammar/mask construction, not by the deleted
+  Arrow loader. H→L/L→H, α→β/β→α, antigen-conditioned receptor generation, pMHC-conditioned
+  TCR generation, and chains→relation remain task/view goals to validate on the current line.
+- Historical 7L / `immune_receptor_v2` candidate counts remain in
+  `/vepfs-mlp2/c20250601/251105016/project/dllm_test/TRAINING_DATA_CATALOG.md` and
+  `IMMUNE_RECEPTOR_DATA_V2.md`. Current prepared v4/v5 counts are owned by
+  plan §4.1 / §4.2 — do not read the 7L catalog as the live mix.
 
 ## Canonical data execution（2026-08-04）
 
-- The AB/TCR-only `bioseq.v2` canonical layer is implemented under
+- Historical/candidate AB/TCR-only `bioseq.v2` artifacts were built under
   `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/bioseq/immune_receptor_v2`;
-  the reproducible build entry is
+  their historical build entry was
   `/vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/data/build_immune_receptor_v2.py`.
+  They are not the current runtime training input while their export/training gates remain false.
 - The frozen candidate unions contain 922,479 TCR records and 470,949 antibody
   records. The strict split populations are 41,489 TCR specificity records,
   308,267 antibody-antigen interactions, and 19,987 canonical antibody-property
@@ -68,9 +72,11 @@ paired TCR α/β, antibody-antigen recognition, and TCR-epitope/pMHC recognition
 
 ## Code Location
 
-- Main pipeline: `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/bioseq`
-- Examples: `/vepfs-mlp2/c20250601/251105016/project/dllm_test/examples/bioseq`
-- Tests: `/vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/tests/bioseq`
+- Current immune data pipeline: `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/immune_llada`
+- Current formal training entry: `/vepfs-mlp2/c20250601/251105016/project/dllm_test/examples/llada/protein_pretrain_esmc.py`
+- Current immune data tests: `/vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/tests/immune_llada`
+- Retained model-layer compatibility code: `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch`
+- Historical Ophiuchus/BioSeq code and tests under `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/bioseq` and `/vepfs-mlp2/c20250601/251105016/project/dllm_test/examples/bioseq` are not the current immune training entry.
 - Weight root: `/c20250601/mj/model_weights`
 
 ## MINT downstream boundary (2026-07-21)
@@ -91,6 +97,16 @@ paired TCR α/β, antibody-antigen recognition, and TCR-epitope/pMHC recognition
   SKEMPI 用冻结的 notebook complex-held-out 三折。该变化只属于 benchmark harness。
 - 数据构建和协议审计入口是
   `/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/mint_tasks/OFFICIAL_REBUILD_AUDIT.md`。
+
+## Immune LLaDA data / receptor-completion decisions（2026-09-12）
+
+- Current implementation: `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/immune_llada`; formal entry: `/vepfs-mlp2/c20250601/251105016/project/dllm_test/examples/llada/protein_pretrain_esmc.py`.
+- Current data flow is raw source reader → source adapter → canonical `BioSeqRecord` → offline deterministic filters → prepared semantic JSONL/manifest → training-time grammar rendering/collation → batch padding/tensor assembly → per-chain encoder input reconstruction → diffusion/MLM masking. No model-ready token cache is produced.
+- Receptor-completion / relation-diffusion **design and risk register** are owned by `/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/PLAN_TCR_BETA_ONLY_RELATION_DIFFUSION.md`. Layout fields: `DATA_FORMAT_AUDIT.md`. How to run: `dllm/pipelines/immune_llada/README.md`.
+- Method decisions that must not be “fixed” later: (1) complete epitope-conditioned single-chain rows because `GrammarTokenizer` has no `<tcra>`/`<tcrb>` and positional identity made 8,885 alpha-only rows indistinguishable from beta-only; (2) branch on actual fv/CDR3 columns, not `sequence_scope`; (3) drop all-X epitopes via a named filter, not a silent adapter `None`; (4) do not infer MHC from epitope co-occurrence; (5) accept synthetic-`X` attention cost as the price of a single α/β layout.
+- Prepared versions: v4 published; v5 published. Counts: plan §4.1 / §4.2. v3-era homotypic-pair acceptance remains in `docs/IMMUNE_LLADA_DATA_ACCEPTANCE.md` and is not the current default.
+- The old `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/data` alias tree and old `training` tree are deleted. Do not recommend those paths. `refactor_baseline` and `docs/archive` remain historical evidence.
+- The retained qwen-named directory is model-layer code only: `modeling_bioseq.py`, `sampling_bioseq.py`, and `relation_aux.py`. Active immune grammar/tokenizer/collator: `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/immune_llada/data`.
 
 ## Architecture
 
@@ -188,18 +204,18 @@ paired TCR α/β, antibody-antigen recognition, and TCR-epitope/pMHC recognition
 
 - Raw data layer: keep each source immutable under absolute raw roots such as `/vepfs-mlp2/c20250601/251105016/project/dllm_test/data/tcr_bulk_raw/tcrdb2_0`, `/vepfs-mlp2/c20250601/251105016/project/dllm_test/data/ots_paired_clean/final`, `/vepfs-mlp2/c20250601/251105016/project/dllm_test/data/tcr`, and `/vepfs-mlp2/c20250601/251105016/project/dllm_test/data/ppi`.
 - Manifest layer: every source should have a machine-readable manifest with source name, raw path, file checksum or byte validation, species, chain availability, paired/unpaired status, task labels, peptide/MHC availability, license/access terms, and split group. TCRdb2.0 already has manifests under `/vepfs-mlp2/c20250601/251105016/project/dllm_test/data/tcr_bulk_raw/tcrdb2_0/manifests`.
-- Adapter layer: source-specific readers normalize raw records into `bioseq.v1` JSONL through `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/bioseq/adapters.py` and `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/bioseq/tools/convert_data.py`.
-- Canonical data layer: all training rows should use `chains`, `task_type`, `source`, optional `chain_roles`, `targets`, `regions`, `labels`, and `metadata`. Bulk unpaired TCR rows from TCRdb2.0 should become single-chain or beta-chain records first, not multi-chain pseudo-pairs.
-- Mixture layer: `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/bioseq/datasets.py` should own sampling weights and caps. Paired immune-receptor sources, such as OAS heavy-light and OTS alpha-beta, should stay high-priority; bulk/unpaired TCR should be capped so it does not dominate multi-chain learning.
-- Collation/masking layer: collators should emit token tensors plus `diffusion_target_mask`, `fixed_context_mask`, chain ids, chain-internal positions, and outer chain indices. Diffusion corruption and loss must operate only on eligible target positions.
-- Model layer v1: the current no-encoder path should remain the exact Ophiuchus-Ab/MINT multichain stack under `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/bioseq/ophiuchus`, trained with diffusion loss through `/vepfs-mlp2/c20250601/251105016/project/dllm_test/examples/bioseq/train_bioseq_ddp.py`.
-- Model layer v2: the ESMC/ESM2 feature-conditioned path should extract features from the current diffusion state `x_t`, then let the BioSeq denoiser perform multi-chain denoising over the concatenated token stream. Fixed context chains, such as antigen in antibody-antigen generation, remain clean and do not receive direct reconstruction loss.
+- Adapter layer: current source adapters and offline preprocessing live under `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/immune_llada/data`; they normalize raw records into canonical `BioSeqRecord` rows before prepared semantic JSONL export. The former `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/bioseq/adapters.py` conversion path is historical.
+- Canonical data layer: current training rows use the `BioSeqRecord`/prepared semantic contract owned by `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/immune_llada/data`. Bulk unpaired TCR rows from TCRdb2.0 should become single-chain or beta-chain records first, not multi-chain pseudo-pairs.
+- Prepared-data layer: `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/immune_llada/data/dataset.py` reads the immutable prepared manifest and semantic JSONL shards. Source weighting, filtering, row conversion, and rejection decisions belong to offline preprocessing, not a deleted raw-CSV runtime dataset.
+- Collation/masking layer: `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/immune_llada/data/grammar.py` and `collator.py` emit token tensors plus `diffusion_target_mask`, `fixed_context_mask`, chain ids, chain-internal positions, and per-chain encoder tensors. Diffusion/MLM corruption and loss operate only on the selected eligible positions.
+- Retained compatibility model layer: the Ophiuchus-Ab/MINT multichain code under `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/bioseq/ophiuchus` remains historical/independent provenance, not the current immune training entry; the former `examples/bioseq/train_bioseq_ddp.py` entry point is retired and deleted.
+- Current model layer: the ESMC/ESM2 feature-conditioned fusion path extracts features from the current diffusion state `x_t`, then performs multi-chain denoising over the concatenated token stream. Fixed context chains, such as antigen in antibody-antigen generation, remain clean and do not receive direct reconstruction loss.
 - Checkpoint layer: training checkpoints should be written under absolute output roots, save `latest.pt` and `final.pt`, and preserve `backbone_state_dict`, optimizer state, step, epoch, and args for resume and downstream evaluation.
 - Evaluation layer: downstream evaluation should use `/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark` as the first integration point. The benchmark already accepts `--embedder bioseq:/abs/path/final.pt` through `/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/common/model_api.py`.
 
 ## Fast Downstream Validation Plan
 
-- Validation should run on every meaningful checkpoint, not only the final checkpoint. Minimal cadence: Ophiuchus-Ab init, early `latest.pt`, mid-training `latest.pt`, and `final.pt`.
+- Validation should run on every meaningful current immune-fusion checkpoint, not only the final checkpoint. Minimal cadence: initialization/smoke checkpoint, early checkpoint, mid-training checkpoint, and final checkpoint; record the actual absolute checkpoint paths in `/vepfs-mlp2/c20250601/251105016/project/dllm_test/PROJECT_PROCESS.md`.
 - Tier 0, pretraining sanity: held-out diffusion loss on small OAS/OTS/nanobody/TCRdb2.0 slices, amino-acid distribution checks, valid-token rate, duplicate/near-neighbor rate against train, and chain-length distribution drift. This is the fastest failure detector for bad adapters or masks.
 - Tier 1, embedding-only IRBench: run the existing benchmark with frozen embeddings and cheap heads. Priority commands are T1 TCR binding, T3 TCR representation, P1 PPI, and NbBench scalar tasks under `/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark`. This checks whether the trained backbone representation is useful without generation noise.
 - T1 comparison boundary: Ours may continue to use the frozen-head protocol on its designated training split, but external baseline rows must not be retrained. Their canonical source is official original checkpoint + official inference + `/vepfs-mlp2/c20250601/251105016/project/dllm_test/data/ntmethod_binding/original.zip`; unavailable official runs fall back to the labelled paper original-model value. This keeps the model-development protocol separate from external-baseline provenance.
@@ -213,7 +229,7 @@ paired TCR α/β, antibody-antigen recognition, and TCR-epitope/pMHC recognition
 
 ## Latest Task Roadmap
 
-- Priority 0: keep the exact Ophiuchus-Ab training and inference path working through `/vepfs-mlp2/c20250601/251105016/project/dllm_test/examples/bioseq/train_ab.py`, `/vepfs-mlp2/c20250601/251105016/project/dllm_test/examples/bioseq/sample_ab.py`, and `/vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/tests/bioseq`.
+- Priority 0: keep the current immune-fusion training path working through `/vepfs-mlp2/c20250601/251105016/project/dllm_test/examples/llada/protein_pretrain_esmc.py`, `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/immune_llada/data`, and the retained fusion/model-layer integration. The exact Ophiuchus-Ab path under `/vepfs-mlp2/c20250601/251105016/project/dllm_test/examples/bioseq` is historical/compatibility provenance, not a replacement current entry.
 - Priority 1 antibody binding task: add AbBiBench-style antibody-antigen affinity scoring and CDR design evaluation. Inputs should include heavy chain, light chain, antigen chain(s), optional complex structure, mutant region, and experimental binding score. Metrics should include Spearman/Pearson correlation for scoring, top-k enrichment for ranking, and external complex-quality oracle scores.
 - Priority 1 antibody developability task: add FLAb-style property prediction heads for expression, thermostability, immunogenicity, aggregation, polyreactivity, binding affinity, and pharmacokinetics. These heads are useful for filtering generated antibodies before structure oracle evaluation.
 - Priority 1 TCR-pMHC binding task: add IMMREP-style TCR specificity prediction with paired alpha-beta TCR chains, peptide, MHC allele/class, and unseen-pHLA splits. Metrics should prioritize AUPRC under strict negative sampling, with separate seen-epitope and unseen-epitope reports.
@@ -224,7 +240,7 @@ paired TCR α/β, antibody-antigen recognition, and TCR-epitope/pMHC recognition
 - Priority 2 general protein foundation evaluation: use PFMBench and ProteinBench as broad external evaluation suites rather than training targets; they are useful for deciding whether BioSeq is overfit to antibody/TCR/PPI tasks or remains a general sequence foundation model.
 - Priority 2 de novo binder design task: use ESMFold2, BindCraft-style filtering, and later Proteina-Complexa-style benchmarks as oracle/evaluation references for generated minibinders, antibody-derived formats, and PPI binders. Do not block the sequence foundation path on full structure generation.
 - Immediate schema implication: extend BioSeq examples beyond `chains` and `task_type` to allow optional `chain_roles`, `target_chain_indices`, `mutations`, `labels`, `assay_type`, `antigen_chains`, `mhc_allele`, `peptide`, `structure_path`, and `oracle_scores`.
-- Immediate code implication: add task adapters under `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/bioseq` before downloading any new large dataset; each adapter should normalize external datasets into the same JSONL schema.
+- Immediate code implication: add future task adapters under `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/immune_llada/data` before downloading any new large dataset; each adapter should normalize external datasets into the current prepared semantic-record contract.
 
 ## Data Schema
 
@@ -236,43 +252,40 @@ paired TCR α/β, antibody-antigen recognition, and TCR-epitope/pMHC recognition
 - Fine-grained generation must be represented by `generation_spec` or by a sampled training view. This view resolves to token-level `visible_mask`, `fixed_context_mask`, `diffusion_target_mask`, and `diffusion_loss_mask`.
 - `generation_spec` should support chain-level completion, region-level infilling, span-level infilling, inverse region infilling, and conditional receptor generation. Examples: heavy-to-light generation, antigen-to-antibody/nanobody generation, heavy+antigen-to-light generation, alpha+beta+MHC-to-peptide design, pMHC-to-alpha+beta design, FR-conditioned CDR infilling, single-CDR infilling, and CDR-conditioned FR generation.
 - `regions` should be keyed by string chain index and can store `FR1`, `CDR1`, `FR2`, `CDR2`, `FR3`, `CDR3`, and `FR4` for antibody/TCR CDR infilling.
-- Initial adapters live at `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/bioseq/adapters.py`.
-- Conversion CLI lives at `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/bioseq/tools/convert_data.py` and requires absolute input/output paths.
+- Current adapters, records, preparation, grammar, and collation live under `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/immune_llada/data`. The former BioSeq conversion modules are historical and are not current runtime dependencies.
 - Supported source types today: `oas`, `ots`, `nanobody`, and existing `processed` JSONL.
 - Full conversion of OAS/OTS/nanobody should not be run until output root, shard size, and train mixture weights are decided. Use `--limit` for small conversion checks.
 
-## PPI and Interaction Data
+## Historical PPI and Interaction Data（not a current foundation-training entry）
 
 - Raw interaction-task downloads live under `/vepfs-mlp2/c20250601/251105016/project/dllm_test/data/ppi_task_raw`.
 - The rebuild script is `/vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/build_ppi_interaction_csv.py`.
-- Current processed outputs:
+- Historical processed outputs retained for audit:
   - `/vepfs-mlp2/c20250601/251105016/project/dllm_test/data/ppi_task_raw/processed/interaction_sources_manifest.csv`
   - `/vepfs-mlp2/c20250601/251105016/project/dllm_test/data/ppi_task_raw/processed/interaction_records_summary.csv`
   - `/vepfs-mlp2/c20250601/251105016/project/dllm_test/data/ppi_task_raw/processed/interaction_records_unified.csv`
 - The unified records CSV is a row-level integration table, not the final training format. It has `6271559` records and is useful for auditing, filtering, and writing task-specific `bioseq.v1` shards.
 - Supported row-level sources in the current CSV: Figshare gold-standard PPI, HumanPPI LMDB, YeastPPI LMDB, SKEMPI, SWING MutInt, FLAb binding, TDC TCR-epitope, PISTE TCR-epitope-HLA, TEIM binding/interface metadata, oncoPPI spreadsheets, and CoV-AbDab neutralization.
-- STRING-DB v12.0 remains a separate large pretraining source. Its raw physical links and sequence dumps are too large for the current row-level CSV pass and should be handled by a streaming adapter or by reusing the existing processed PPI Arrow data under `/vepfs-mlp2/c20250601/251105016/project/dllm_test/data/ppi/string_model_org_90_90_split`.
+- STRING-DB v12.0 was a separate large pretraining source in the historical row-level CSV plan. Its raw physical links and sequence dumps were too large for that pass; any future use requires an approved adapter under the current prepared semantic-record contract, not the deleted PPI/Arrow training path.
 - PDBbind+ and the referenced bioRxiv SARS-CoV-2 binding supplement are blocked in this environment by login/subscription and HTTP 403, respectively. They should not be treated as available training sources until access is resolved.
-- Before training, convert the large unified CSV into sharded task-specific records. Recommended first shards: `ppi_binary`, `antibody_binding`, `tcr_epitope_hla`, `tcr_epitope_binding`, `mutational_ppi`, and `ppi_mutation_affinity`.
+- These CSV/builder notes are historical planning evidence only. The deleted PPI/STRING/MINT builders are not current training dependencies; future interaction work must first add an approved adapter and prepared semantic-record contract under `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/immune_llada/data`.
 
 ## Training Logic
 
 - The foundation-model objective should stay diffusion-only by default: corrupt eligible target residues at timestep `t`, predict the clean tokens, and compute denoising cross-entropy only on target/remasked positions.
 - Every training example should carry explicit masks: `diffusion_target_mask` for residues that may be noised/remasked and receive diffusion loss, and `fixed_context_mask` for residues that remain clean and visible as conditioning context.
-- Training should separate biological examples from target-mask construction. The stored example contains the full clean chains plus regions/metadata; the grammar-v2 renderer fixes type markers (`<ab>`/`<tcr>`/`<nb>`/`<pep>` inside `<prots>`), all relation tokens, and conditioning context objects (antigen / MHC / peptide), and creates token-level masks so all eligible generated tokens participate in the diffusion objective.
-- For the BioSeq foundation-model path, training-time data loading lives under `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/data`. It reads pre-built grammar Arrow shards (`data/bioseq_grammar_v1`, produced offline by `scripts/data/build_bioseq_grammar_v1.py`), emits canonical `BioSeqRecord` objects, and `GrammarBioSeqCollator` renders the grammar-v2 token stream plus per-chain encoder tensors (`encoder_input_ids [batch, max_chains, chain_len]`). The active grammar layout is documented in `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/GRAMMAR_V1.md`.
+- Training should separate biological examples from target-mask construction. The prepared semantic record contains the full clean chains plus regions/metadata; the current immune grammar fixes type markers, relation/context objects, and conditioning chains, then creates token-level masks so eligible generated tokens participate in the diffusion objective.
+- The current training-time data path lives under `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/immune_llada/data`. It reads prepared semantic JSONL shards, renders the current immune grammar, and builds per-chain encoder tensors (`encoder_input_ids [batch, max_chains, chain_len]`). The deleted qwen data alias and its historical Arrow path, plus `GRAMMAR_V1.md`, are not active documentation.
 - The BioSeq foundation model layer now starts at `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/modeling_bioseq.py`. It exposes `BioSeqNoEncoderDiffusionModel` for no-encoder training and `BioSeqEncoderDiffusionModel` for ESMC/ESM feature-conditioned training.
-- The first BioSeq foundation no-encoder stack is a dense bidirectional diffusion transformer with ESM-family token embeddings, chain-local residue position embeddings (`position_ids_inner`), outer chain-index embeddings (`position_ids_chain`), timestep embeddings, RMSNorm, and SwiGLU blocks. Grammar-v2 expresses entity roles through boundary tokens, so the decoder does not instantiate chain-role or task-type embeddings. It uses bidirectional self-attention for masked diffusion, not a causal/autoregressive language-model architecture. It is intentionally separate from the legacy `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/bioseq` lightweight backend.
+- The retained no-encoder model-layer design is a dense bidirectional diffusion transformer with ESM-family token embeddings, chain-local residue position embeddings (`position_ids_inner`), outer chain-index embeddings (`position_ids_chain`), timestep embeddings, RMSNorm, and SwiGLU blocks. The current immune grammar expresses entity roles through boundary/context tokens, so the decoder does not instantiate chain-role or task-type embeddings. It uses bidirectional self-attention for masked diffusion, not a causal/autoregressive language-model architecture. This model-layer design is separate from the deleted lightweight legacy backend.
 - `BioSeqNoEncoderDiffusionModel.compute_loss` samples timestep noise from `diffusion_loss_mask`, replaces corrupted target residues with `<mask>`, predicts clean residue ids, and computes denoising cross-entropy only on corrupted target positions.
 - `BioSeqEncoderDiffusionModel.compute_loss` uses the same diffusion objective and builds a per-chain ESMC/ESM `x_t` by applying the decoder corruption state to `encoder_input_ids`. ESMC/ESM returns token-level features for that diffusion state, and the downstream BioSeq denoiser performs joint multi-chain denoising over the concatenated decoder stream.
 - Local ESMC encoder loading is implemented through `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/modeling_bioseq.py::load_local_esmc_encoder`. Because `transformers==4.48.1` does not recognize `model_type="esmc"`, `BioSeqEncoderDiffusionModel.from_esmc(...)` tries `AutoModel.from_pretrained(...)` first and then falls back to Biohub `esm==3.2.3`, mapping local Hugging Face-style safetensor keys into native `esm.models.esmc.ESMC` keys.
 - ESM2 is also supported as the conditioning encoder via `--model-type esm2` / `BioSeqEncoderDiffusionModel.from_hf_encoder(...)`, which loads a local ESM2 snapshot under `/c20250601/mj/model_weights/esm2/*` through HF `EsmModel`. ESM2 hidden sizes: 8M=320, 35M=480, 150M=640, 650M=1280, 3B=2560.
-- BioSeq foundation training uses one grammar path: `GrammarArrowSource` -> `WeightedMixtureDataset` -> `TaskHomogeneousBatchDataset(batch_size=N)` -> `DataLoader(batch_size=None)` -> `GrammarBioSeqCollator`. Each physical microbatch is one task group (antibody, antibody-antigen, TCR, TCR-pMHC, PPI, ...) so the rendered grammar layout is uniform within a batch, and every non-fixed token resolves to a token-level diffusion target.
-- Multi-node/multi-GPU training for the BioSeq foundation-model path should use `/vepfs-mlp2/c20250601/251105016/project/dllm_test/examples/bioseq/train_qwen3_vl_bioseq_ddp.py` launched by `torchrun`. It supports ordinary single-process smoke runs, single-node multi-GPU, and multi-node multi-GPU through `RANK`, `WORLD_SIZE`, and `LOCAL_RANK`.
-- BioSeq foundation streaming data is DDP-sharded inside `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/data/mixture.py`: source iterators use `global_shard_index = rank * num_workers + worker_id` and `num_shards = world_size * num_workers`, so DDP ranks do not read identical iterable records by default. DDP runs must use `--num-workers 0`: with `>0`, each worker process re-shards the infinite weighted stream independently and can desync the first batch across ranks, which previously triggered NCCL collective timeouts in the `no_encoder` jobs.
-- The first cluster template for this path is `/vepfs-mlp2/c20250601/251105016/project/dllm_test/train_jobs/qwen3_vl_bioseq_16gpu_smoke.yml`. It runs the no-encoder qwen3_vl_arch model on 2 nodes x 8 GPUs as a smoke/throughput check.
-- Foundation pretraining keeps the objective simple: the grammar-v2 renderer fixes type markers, relation tokens, and antigen / peptide / MHC-HLA context objects, and treats target structure tokens (including `<prots>`, `.`, `<protd>`) and target residues as diffusion targets. Antigen-conditioned receptor blocks include `<ab>` or `<nb>` inside `<prots>` to distinguish antibody vs nanobody design. Conditional capabilities such as chain completion, antigen-conditioned receptor generation, peptide design, and FR/CDR infilling are expressed as inference-time partial-mask prompts over the same grammar, not as a separate runtime view sampler.
-- TCR grammar role resolution is role-first in `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/data/grammar.py`: an explicitly tagged single `tcr_alpha` or `tcr_beta` is never positionally paired with a peptide, antigen, or MHC context chain. The positional `[beta, alpha]` fallback is restricted to legacy context-free records with neither receptor role present. Consequently, a peptide-conditioned beta-only record renders the peptide exactly once followed by a one-chain `<tcr>` block and reports `grammar_name="tcr_peptide"`; the regression guard lives at `/vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/tests/bioseq/test_grammar_tcr_role_resolution.py`.
+- Current training uses the prepared-dataset loader and `GrammarBioSeqCollator` under `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/immune_llada/data`; batch assembly remains dynamic because grammar rendering, padding, encoder reconstruction, and diffusion/MLM masking depend on the current batch/state.
+- The formal training entry is `/vepfs-mlp2/c20250601/251105016/project/dllm_test/examples/llada/protein_pretrain_esmc.py`. Deleted DDP examples, deleted Arrow sources, and deleted qwen `training` modules are not runnable alternatives.
+- Foundation pretraining keeps the objective simple: the current immune grammar fixes type markers, relation tokens, and antigen / peptide / MHC-HLA context objects, and treats target structure tokens (including `<prots>`, `.`, `<protd>`) and target residues as diffusion targets. Antigen-conditioned receptor blocks include `<ab>` or `<nb>` inside `<prots>` to distinguish antibody vs nanobody design. Conditional capabilities such as chain completion, antigen-conditioned receptor generation, peptide design, and FR/CDR infilling are expressed as inference-time partial-mask prompts over the same current grammar, not as a separate deleted runtime view sampler.
+- TCR grammar role resolution is role-first in the active renderer at `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/immune_llada/data/grammar.py`: an explicitly tagged single `tcr_alpha` or `tcr_beta` is never positionally paired with a peptide, antigen, or MHC context chain. The regression coverage is retained under `/vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/tests/immune_llada`.
 - To reduce multi-task imbalance, source mixture weights and optional future task schedulers should control the task distribution. The default physical batch itself is intentionally mixed rather than task-homogeneous.
 - Fixed context chains, such as antigen in antibody-antigen generation, should not be remasked and should not receive direct diffusion loss. They still participate in attention or encoder conditioning, and gradients should flow through their encoder/connector parameters from the target-chain diffusion loss.
 - In the BioSeq foundation loader, `full_denoise` means denoising all eligible target chains, not every chain unconditionally. Explicit `metadata["targets"]` is honored when present, but antigen, peptide, MHC, and HLA-like chains are fixed context by default and do not receive diffusion loss.
@@ -285,11 +298,11 @@ paired TCR α/β, antibody-antigen recognition, and TCR-epitope/pMHC recognition
 - Encoder conditioning **replaces** decoder residue embeddings with gathered encoder features (`use_condition_projection=False` by default). `decoder.hidden_size` is forced to match encoder latent dim for `--model-type encoder|esm2`; no-encoder ablations can use `--align-hidden-size-to-encoder`.
 - The ESMC/ESM feature-conditioned path encodes each chain/sequence independently through ESMC on the current per-chain `x_t`. Implementation detail: `encoder_input_ids` has shape `[batch, max_chains, chain_len]`, is flattened to `[batch * max_chains, chain_len]` for a batched ESMC call, then reshaped to `[batch, max_chains, chain_len, hidden]`; residue features are gathered back to decoder token positions and replace residue embeddings before the multi-chain BioSeq denoiser runs.
 - The current local environment keeps `transformers==4.48.1` for compatibility with Biohub `esm==3.2.3`; ESMC loading must use `BioSeqEncoderDiffusionModel.from_esmc(...)` or `load_local_esmc_encoder(...)` rather than relying on `AutoModel` alone.
-- ESMC tokenizer loading must also handle the local `ESMCTokenizer` metadata without requiring a newer `transformers`: `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/data/esm_encoding.py` falls back to `tokenizers.Tokenizer.from_file(...)` on the local `tokenizer.json`.
+- ESMC tokenizer loading for the active fusion path is implemented at `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/immune_llada/data/esm_encoding.py`; do not refer to the deleted qwen `data/esm_encoding.py` alias.
 - Remask schedules, block-diffusion masks, and generation masks must operate on `diffusion_target_mask`, not on all non-pad tokens.
 - The grammar renderer guarantees at least one diffusion-eligible token per record (the non-fixed residues/structure/relation tokens), so `max_sequence_length` truncation cannot produce a zero-loss microbatch the way the old view sampler could.
-- Formal BioSeq foundation stage-1 training should run three comparable variants: `/vepfs-mlp2/c20250601/251105016/project/dllm_test/train_jobs/qwen3_vl_bioseq_esmc300m_stage1.yml`, `/vepfs-mlp2/c20250601/251105016/project/dllm_test/train_jobs/qwen3_vl_bioseq_esmc600m_stage1.yml`, and `/vepfs-mlp2/c20250601/251105016/project/dllm_test/train_jobs/qwen3_vl_bioseq_no_encoder_stage1.yml`. The first two fine-tune trainable ESMC encoders. The no-encoder baseline uses the same ESMC tokenizer/vocab 64 but does not instantiate or optimize ESMC encoder parameters.
-- Batch-size tuning should be driven by logged CUDA peak memory, not by guessed limits. Keep effective batch approximately fixed while changing per-GPU batch and gradient accumulation. The initial 8-GPU stage-1 settings are conservative: no-encoder `8 x grad_accum 2`, ESMC-300M `2 x grad_accum 8`, and ESMC-600M `1 x grad_accum 16`.
+- The current formal foundation-training entry is `/vepfs-mlp2/c20250601/251105016/project/dllm_test/examples/llada/protein_pretrain_esmc.py`. Historical `qwen3_vl_bioseq_*` YAML names and grammar-v2 runs may remain in audit records, but are not current submit instructions. Any new comparable ESMC/no-encoder experiment must be defined against the current immune-fusion line and recorded in `/vepfs-mlp2/c20250601/251105016/project/dllm_test/PROJECT_PROCESS.md` before submission.
+- Batch-size tuning should be driven by logged CUDA peak memory, not by guessed limits. Keep effective batch approximately fixed while changing per-GPU batch and gradient accumulation. The old 8-GPU stage-1 settings (`8 x grad_accum 2`, `2 x grad_accum 8`, and `1 x grad_accum 16`) are historical baselines only; current settings must be profiled on the immune-fusion line before submission.
 
 ## Generation Task Survey and View Priority
 
@@ -307,18 +320,18 @@ paired TCR α/β, antibody-antigen recognition, and TCR-epitope/pMHC recognition
 - `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/bioseq/ophiuchus/training.py` computes the heavy and light losses through `MultiChainOphiuchusAbModel.compute_loss`.
 - Next migration quality step: add parity checks against `/vepfs-mlp2/c20250601/251105016/project/airgen/AirGen-Dev/src/byprot/models/lm/dplm_multichain.py` for `construct_x_t`, `compute_loss`, and generation mask transitions. The MINT module files themselves already match AirGen byte-for-byte except generated `__pycache__`.
 - BioSeq training code must not import the old `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/core/trainers` implementation.
-- `/vepfs-mlp2/c20250601/251105016/project/dllm_test/examples/bioseq/train_ab.py` must expose only the exact Ophiuchus-Ab training path. It must not include the lightweight `bioseq` backend, synthetic default data, or the generic `transformers.Trainer` path.
+- Historical Ophiuchus-Ab compatibility code, when independently audited, must remain limited to the exact Ophiuchus-Ab path; it must not be treated as the current immune-fusion entry. The deleted/lightweight `bioseq` backend, synthetic default data, and generic `transformers.Trainer` path are not current alternatives.
 - Variable-length training (no fixed `(150, 128)` padding) uses `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/bioseq/ophiuchus/collator.py::MultiChainDynamicCollator`, which pads each batch to the longest chain-1/chain-2 sequence with the real `<pad>` id. This is correct because the mint ESM2 backbone derives its padding mask from `tokens.eq(<pad>)`, and `compute_loss` splits logits by per-slot length. `OphiuchusAbTrainingCollator` (fixed length) is kept for exact-length reproductions.
-- Multi-dataset training mixes OAS paired antibody, OTS paired TCR, and nanobody VHH through `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/bioseq/datasets.py` (`build_mixed_immune_dataset` / `default_immune_specs`). OAS heavy is oriented to slot 0, OTS beta to slot 0, and nanobody is single-chain (slot 1 uses a `[<cls>, <eos>]` placeholder).
-- Multi-node/multi-GPU training uses `/vepfs-mlp2/c20250601/251105016/project/dllm_test/examples/bioseq/train_bioseq_ddp.py` with `torchrun`. It wraps only the backbone (`MultiChainOphiuchusAbModel.net`) in `DistributedDataParallel`, auto-selects `nccl`+CUDA or `gloo`+CPU, and uses `DistributedSampler`. The diffusion wrapper itself holds no parameters, so a single synced backbone forward per step keeps DDP gradient reduction correct.
-- Verified end to end with both a single-process CPU smoke run and a 2-process `torchrun` (gloo) DDP smoke run loading all three datasets at variable length.
+- Multi-dataset prepared training uses `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/immune_llada/data/dataset.py`; source adapters and offline preprocessing use `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/immune_llada/data/sources.py`. OAS heavy is oriented to slot 0, OTS beta to slot 0, and prepared records preserve canonical chain roles.
+- Historical Ophiuchus-Ab DDP validation used the former `examples/bioseq/train_bioseq_ddp.py` entry point; that entry point is now retired and deleted. New immune ESMC + LLaDA training uses `examples/llada/protein_pretrain_esmc.py` and the prepared `immune_llada` loader.
+- Historical validation evidence included a single-process CPU smoke run and a 2-process `torchrun` (gloo) DDP smoke run loading all three datasets at variable length. This is not a fresh validation claim for the current documentation pass; current validation remains pending the main-agent TODO in `/vepfs-mlp2/c20250601/251105016/project/dllm_test/PROJECT_PROCESS.md`.
 - Initializing from generic ESM2 base weights is not part of the current antibody path. If it becomes necessary later, use the local ESM2 snapshots under `/c20250601/mj/model_weights/esm2` rather than adding a Hugging Face download dependency.
 
 ## Inference Logic
 
-- Antibody inference must use the exact Ophiuchus-Ab stack through `/vepfs-mlp2/c20250601/251105016/project/dllm_test/examples/bioseq/sample_ab.py` or aligned downstream scripts under `/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream`.
-- `/vepfs-mlp2/c20250601/251105016/project/dllm_test/examples/bioseq/sample_ab.py` loads `/c20250601/mj/model_weights/ophiuchus_ab/Ophiuchus-Ab/Ophiuchus-Ab.ckpt` through `MultiChainOphiuchusAbModel.from_checkpoint`.
-- `/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/common.py` is the shared inference layer for aligned downstream scripts; it loads `MultiChainOphiuchusAbModel`, applies AirGen-style chain padding, and calls `model.generate`.
+- The exact Ophiuchus-Ab inference path is retained as historical/independent compatibility provenance through `/vepfs-mlp2/c20250601/251105016/project/dllm_test/examples/bioseq/sample_ab.py` and aligned downstream scripts under `/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream`; it is not the current immune-fusion training entry.
+- `/vepfs-mlp2/c20250601/251105016/project/dllm_test/examples/bioseq/sample_ab.py` loads `/c20250601/mj/model_weights/ophiuchus_ab/Ophiuchus-Ab/Ophiuchus-Ab.ckpt` through `MultiChainOphiuchusAbModel.from_checkpoint` when that historical path is explicitly audited.
+- `/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/common.py` is the shared inference layer for those aligned historical scripts; the current fusion evaluation boundary is the retained scripts under `/vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/downstream` and public implementations under `/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/grammar`.
 - Heavy-to-light generation should fix the heavy chain and mask the light chain positions after any provided light-chain prompt. Empty light-chain input must still create masked light positions, not a fixed empty light chain.
 - Antibody inference must not use `NoEncoderBioDiffusionModel`, `BioSeqDiffusionTrainer`, or any lightweight generic BioSeq backend.
 

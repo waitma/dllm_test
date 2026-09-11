@@ -1,215 +1,219 @@
 # Data Format Audit
 
-Date: 2026-06-14
+Date: 2026-09-12
 
 Root: `/vepfs-mlp2/c20250601/251105016/project/dllm_test/data`
 
-## 当前训练语料实测快照（2026-08-28）
+How to run preprocess:
+[`dllm/pipelines/immune_llada/README.md`](dllm/pipelines/immune_llada/README.md).
+Design rationale / risk register:
+[`docs/PLAN_TCR_BETA_ONLY_RELATION_DIFFUSION.md`](docs/PLAN_TCR_BETA_ONLY_RELATION_DIFFUSION.md).
+Raw-corpus decontam accidents (PASS is not enough; `语料 ∩ benchmark`; key spaces):
+[`examples/llada/DATA_PIPELINE_README.md`](examples/llada/DATA_PIPELINE_README.md).
+Long-lived rules: [`PROJ_GUIDE.md`](PROJ_GUIDE.md).
 
-本节取代下方「当前训练数据单一入口（2026-07-23）」。那一节描述的是
-`data/bioseq_grammar_v1` 的 7 源 Arrow 配方（7L step389500 lineage），**与现在
-`examples/llada/protein_pretrain_esmc.py` 实际读取的语料无关**。当前唯一训练入口为：
+## Current immune LLaDA data contract（2026-09-12）
 
-`/vepfs-mlp2/c20250601/251105016/project/dllm_test/examples/llada/protein_pretrain_esmc.py`
+The only current immune data implementation is
+`/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/immune_llada` and the formal
+training entry is
+`/vepfs-mlp2/c20250601/251105016/project/dllm_test/examples/llada/protein_pretrain_esmc.py`.
+The runtime contract is:
 
-它按 `--dataset_args` 的 `+` token 列表直读 CSV，不经过 `bioseq_grammar_v1`，也不经过
-`data/immune_receptor_v2`（后者仍 `training_ready=false`）。
+```text
+raw source files
+  -> source adapter
+  -> canonical BioSeqRecord
+  -> offline deterministic filters
+  -> prepared semantic JSONL shards + manifest
+  -> training-time grammar rendering
+  -> padding/mask/tensor assembly
+  -> per-chain encoder input reconstruction
+  -> diffusion/MLM corruption and loss
+```
 
-### 七源实测（v3 mix，`max_length=max_protein_length=1024`，全部 blocklist 生效）
+Raw CSV/JSONL parsing, source conversion, receptor completion (when configured),
+blacklist/decontamination, deterministic validity and length rejection, and bad-row
+replacement are offline operations. The prepared loader builds byte-offset indexes and
+decodes semantic rows; it does not create or consume a model-ready token cache. Grammar
+encoding, padding, encoder reconstruction, and stochastic masking remain runtime
+operations.
 
-2026-08-29 05:30 由
-`/vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/count_immune_mix.py`
-实测，非文档转抄。**这是 valid 近重复搬迁全部落地后的口径。**
+Current prepared roots: **v4 published**, **v5 published**. v3 /
+`immune_v3_heterotypic` still exist on disk and some checkpoints/eval jobs still
+point at them; they are not the current training default. See the pipeline README
+version table. Counts: plan §4.1 (v4) / §4.2 (v5).
 
-| source | 目录 | 原始 | 保留 | 剔除 | 记录% | 残基% | 生成残基% | res/rec |
-|---|---|---:|---:|---:|---:|---:|---:|---:|
-| `oas` | `data/oas_previous_clean/splits` | 2,486,442 | 2,485,471 | 0.04% | 31.89% | 45.17% | 50.01% | 232 |
-| `tcr_repertoire` | `data/tcr_repertoire/dataset` | 2,128,750 | 2,128,750 | 0.00% | 27.31% | 2.19% | 2.42% | **13** |
-| `ots` | `data/ots_paired_clean/final` | 2,102,715 | 2,094,231 | 0.40% | 26.87% | 37.22% | 41.21% | 226 |
-| `tcr_papers` | `data/tcr_papers_v2/dataset` | 682,383 | 681,444 | 0.14% | 8.74% | 2.84% | 0.91% | 53 |
-| `asd_antibody` | `downstream/asd/step6_final/antibody` | 850,134 | 276,412 | **67.49%** | 3.55% | **11.35%** | 4.57% | **523** |
-| `tcr_native` | `data/tcr_native/dataset` | 143,391 | 96,552 | 32.67% | 1.24% | 1.06% | 0.82% | 140 |
-| `trait` | `downstream/trait/step4_final` | 69,251 | 31,515 | **54.49%** | 0.40% | 0.16% | 0.07% | 66 |
-| **合计** | | | **7,794,375** | | | | | |
+### Shared layout (v4 and v5)
 
-总残基 1,273,914,576，生成链残基 1,150,746,721。
+Seven-source mix: `oas+ots+asd_antibody+trait+tcr_native+tcr_papers+tcr_repertoire`.
+Before completing listed sources, the offline pipeline scans complete TCR rows from
+the selected `ots` / `tcr_native` / `tcr_papers` sources, applies the same
+adapter/filter policy, and stream-counts FR/CDR lengths. The frozen profile, seed,
+source policy, observation counts, fallback regions, digest, and (once written)
+`completion_sources` are recorded in `dataset_manifest.json`.
 
-相对 2026-08-28 11:50 那一版（合计 7,626,737）的两处变化，**成因不同，不要混为一谈**：
+Receptor completion (when a source is in `PreprocessConfig.completion_sources`):
 
-1. **valid 近重复搬迁**（本会话所做）把 eval 行移入 train，抬高了三个源的 raw：
-   `tcr_repertoire` 1,971,794→2,128,750（**+7.96%**）、`tcr_papers` 668,331→682,383、
-   `trait` 67,842→69,251。`tcr_repertoire` 保留数 = raw（剔 0），说明搬进 train 的
-   156,956 行没有任何 blocklist 命中——它们本来就在同一个去污染过的 pool 里。
-2. **`trait_benchmark` blocklist 被并发会话重建**（文件 mtime 2026-08-28 17:25:35Z，
-   862 → **59,212** 键），使 `trait` 的剔除率从 48.60% 升到 54.49%、保留数从 34,872 掉到
-   31,515。**这不是搬迁造成的**：搬迁只增加 raw。`trait` 是加载期过滤，所以无需重建语料
-   即自动跟上新 blocklist。
+- Chains are assembled **beta-first**. A real full-length Fv is kept verbatim with
+  no invented region annotation; only missing/fragmentary chains are synthesized.
+- Missing regions are `X` at profile-sampled lengths. Synthetic `X` is visible
+  input but excluded from diffusion eligibility and loss (`synthetic_residue_mask`).
+  The original CDR3β core remains the decontamination/benchmark identifier.
+- Junction vs core is decided from provenance (`fv_source` / `provenance` /
+  `schema_version`), **never** from the first/last character: an anchor-free core
+  can legitimately begin with `C`. `trait` is IMGT junction form (`C...F/W`,
+  anchors peeled into FR3/FR4); `tcr_native` / `tcr_papers` are anchor-free core.
+- Branching is on the actual `alpha_fv` / `beta_fv` / `cdr3a` / `cdr3b` column
+  contents, **not** the `sequence_scope` label (351-row `tcr_native` counterexample
+  and the grammar-ambiguity rationale: plan §2.5). Full-length Fv exists only in
+  `tcr_native`; `tcr_papers` is CDR3-scope.
+- Default `completion_sources` is `("tcr_repertoire",)`. Withholding a source
+  from the list is what disables completion for it.
 
-> ⚠️ `tcr_repertoire` 的 train 现在是 **2,128,750**，超过了当初刻意设的 **200 万** token
-> 预算上限（见 `data/tcr_repertoire/README.md`「为什么 train 截到 200 万」）。超出 6.4%，
-> 残基占比从 2.04% 升到 2.19%，判断为可接受，未回切。若日后重建该语料，注意 2,000,000
-> 这个上限会把搬迁回来的行重新截掉。
+all-X placeholders (upstream Zenodo 14545852 / TcrDesign: `'X'` means missing):
 
-v2 mix 与 v3 只差 `tcr_papers` 一个目录：指 v1 的 `data/tcr_papers/dataset` 时
-raw 408,037 / kept 407,112，合计 **7,366,444** 条，总残基 1,258,656,430，
-生成链残基 1,144,047,600。
+- all-X **epitope** rows are dropped by the named offline filter
+  `quality.blank_epitope` (applies to `trait` / `tcr_native` / `tcr_papers`) so
+  the drop count lands in `filter_report.json`. Not a silent adapter `None`.
+- all-X **MHC** chains are stripped; the record degrades to the `tcr_peptide`
+  layout. `task_type` is derived from whether the MHC chain survived.
 
-按监督类型（当前口径）：无标签配对（`oas`+`ots`）58.76%，无标签单链 CDR3β
-（`tcr_repertoire`）27.31% → **无标签合计 86.07%**；有标签 TCR 识别
-（`trait`+`tcr_native`+`tcr_papers`）**10.39%**；抗体-抗原（`asd_antibody`）**3.55%**。
+Circular-profile guard: `add_tcr_region_lengths` skips regions listed in a
+chain's `synthetic_regions` metadata. The profile's learning sources are
+`['ots','tcr_native','tcr_papers']`; once those sources can themselves be
+completed, an unguarded profile would learn its own synthesized lengths.
 
-#### 按 grammar 布局的 loss 预算（2026-08-29 蓄水池采样实测）
+`profiles.py::sample_region_lengths` sorts support lengths **numerically**.
+`atomic_json_dump` writes the manifest with `sort_keys=True`, so a reloaded
+profile iterates lexicographically (`'10'` before `'2'`). Weights were always
+looked up by length (the distribution was correct); a given seed drew different
+lengths, so a published dataset could not be regenerated from its own manifest.
+Only regions whose support spans single and double digits are affected (CDR3);
+framework regions are all two-digit and coincidentally escaped.
 
-上表是**按源**的，但一个源可以产出多种布局，所以它答不了"模型在学哪些任务"。
-按布局看（`gen%` = 占全部待预测残基）：
+Relation / grammar (unchanged vs v4): only explicit `binding` / `nonbinding`
+labels are relation targets. For pMHC, MHC→peptide presentation `<binding>` is
+fixed; peptide→TCR recognition is the supervised target. Generated-block
+skeleton tokens (`<prots>`, type marker, `<protd>`) are eligible with the
+relation target. Unconditional layouts emit a fixed null-context prefix
+`<prots> <null> <protd> <unknown>` at render time (not stored in JSONL).
+Audited 2026-09-12: that prefix already applies to exactly the unconditional
+layouts (`antibody_pair` / `tcr_pair` / `tcr_single` / `nanobody`) and not to
+conditioned ones; `grammar.py` unchanged. Open item: unused `single_entity`
+fallback has no prefix.
 
-| 布局 | 条件 → 生成 | 来源 | 保留行数 | 记录% | **gen%** |
-|---|---|---|---:|---:|---:|
-| `antibody_pair` | 无条件 → 抗体 H+L | `oas` | 2,485,471 | 31.9% | **49.64%** |
-| `tcr_pair` | 无条件 → TCR α+β 全长 | `ots` | 2,094,231 | 26.9% | **40.92%** |
-| `antigen_antibody` | 抗原 → 抗体 H+L | `asd_antibody` | 276,412 | 3.6% | **4.55%** |
-| `tcr_single` | 无条件 → 单链 CDR3β | `tcr_repertoire` | 2,128,750 | 27.3% | **2.90%** |
-| `tcr_pmhc` | MHC+表位 → TCR | `trait`+`tcr_native`+`tcr_papers` | 671,678 | 8.6% | **1.78%** |
-| `tcr_peptide` | 仅表位 → TCR | 同上三源里无 MHC 的部分 | 137,833 | 1.8% | **0.20%** |
+### v4 published counts
 
-三源到布局的实测拆分（全量扫描）：`trait` 95.2% pmhc / 4.8% peptide、
-`tcr_native` 99.9% / 0.1%、`tcr_papers` 80.3% / 19.7%。
+Root: `data/prepared/immune_v4_beta_relation` from
+`configs/data/immune_v4_beta_relation.yaml` (completion = `tcr_repertoire` only).
+Authoritative per-source table: plan §4.1. Headline: train **7,665,574** /
+valid **102,719**; raw 8,441,615 → kept 7,768,293. Formal v4 job:
+`train_jobs/protein_esmc_llada270m_diffusion_immune_v4_4gpu.yml`.
 
-三个无条件/抗体布局吃掉 **95.1%** 的 loss 预算，表位条件生成合计仅 **1.98%**。
-根因是残基数量级（232 vs 13–31）而非行数，**加数据改不动这个比例**。
+v4 `tcr_repertoire` is byte-reproducible from its own manifest after the
+numeric-sort fix: 3,000 raw-CSV rows vs the on-disk shard, **0 mismatches**.
 
-> 🔴 **2026-08-29 前所有布局占比数字都是错的。** `count_grammar_layouts.py` 当时读满
-> `--per-source` 就 `break`，取的是**前缀**。`tcr_papers_v2` 是 7 个论文语料首尾拼接的，
-> 前 3 万行 **100% 是 `tcr_peptide`**，全量却是 80.3% `tcr_pmhc` —— 547,274 条被归错，
-> `tcr_pmhc` 低估约 4 倍（旧值 8.10%/2.47%，实为 1.8%/8.6%）。已改蓄水池采样 + `--seed`，
-> 新数字与独立全量扫描一致（671,678 vs 673,686）。
-> **规则：源内不同质时任何抽样都必须随机抽，并与一次全量扫描对齐过。**
+### v5 published
 
-#### 剔除率在 train 与 valid 上不对称（2026-08-29 实测）
+Root: `data/prepared/immune_v5_receptor_completion` from
+`configs/data/immune_v5_receptor_completion.yaml`
+(`completion_sources: [trait, tcr_native, tcr_papers, tcr_repertoire]`).
+Authoritative per-source table, v4 Δ, supervised-token shares, max rendered
+tokens, profile digest, and invariants: plan §4.2. Headline: train
+**7,626,885** / valid **102,308** (13G; valid is the sum of the seven audited
+source rows). Do not copy that table here.
 
-上表的「剔除%」只是 **train** 的。同一份 blocklist 换到 valid 上差别很大：
+### Manifest `filter_names` and `filter_report` counters (2026-09-12)
 
-| 源 | train 剔除 | valid 剔除 |
-|---|---:|---:|
-| `asd_antibody` | **67.5%** | **5.0%**（47,230 → 44,866） |
-| `tcr_native` | 32.7% | 12.2%（4,390 → 3,855） |
-| `trait` | 54.5% | 54.3%（3,050 → 1,393） |
+Code is fixed (`95c04a96`). **Published v5 artifacts were not rewritten** — a
+future preprocess writes the new fields. Do not read "code fixed" as "the
+13G v5 manifest / `filter_report` already carry them".
 
-`trait` 对称，另两个不对称。后果是 **ASD 的 valid loss 不适合做模型选择** ——
-valid 保留了大量被从 train 剥掉的 Kong 相似簇。详见
-`downstream/asd/README.md` 与 `examples/llada/DATA_PIPELINE_README.md` §6.4。
+**`filter_names` was actively wrong, not merely incomplete.** The field was
+hardcoded to `BLOCKLIST_NAMES` plus an optional `quality.homotypic_pair` —
+i.e. the list of blocklist **config keys**, not the filters that ran. It
+therefore omitted `quality.blank_epitope`, both budget filters
+(`budget.max_protein_length`, `budget.max_length`), and
+`decontam.repertoire_core_projection`, and it **listed
+`asd_nanobody_benchmark`, a source that was never processed**. Manifest
+filter provenance was wrong, not just missing one name.
 
-<details>
-<summary>到达当前口径的三步（历史，展开看）</summary>
+**New semantics:** dataset-level `filter_names` is the **union**, in
+first-seen order, of the `RecordFilter` names that `build_filters` actually
+constructed for the processed sources. Filters remain per-source
+(`quality.blank_epitope` exists only for `trait` / `tcr_native` /
+`tcr_papers`), so the union must **not** be read as "every source ran every
+name"; each `filter_report.json` source entry also carries its own
+`filter_names`. Disabled/empty blocklists never become filters and are
+omitted; a filter that ran and dropped zero rows is still listed.
 
-| 时点（UTC） | 合计 | 变动原因 |
-|---|---:|---|
-| 08-28 11:50 | 7,626,737 | 首次七源实测基线 |
-| 08-29 01:45 | 7,637,419 | `trait_benchmark` blocklist 862→59,212 键（`trait` 34,872→31,515）；TRAIT 与 `tcr_papers_v2` 语料被重建（`tcr_papers` 667,405→681,444） |
-| 08-29 05:30 | **7,794,375** | **`tcr_repertoire` valid 近重复搬迁**（train 1,971,794→2,128,750） |
-| 08-31 | **7,794,375（行数不变）** | `tcr_papers_v2/train.csv` 第 3046 行 `cdr3b` 剥空位 `ASSKVAARVP-TLKLS`→`ASSKVAARVPTLKLS`；全量 21 个 split 仅此一格。见该目录 README「残基字母表」 |
+The union v5 *would* have had (published v5 manifest was not rewritten):
+`decontam.oas_benchmark`, `budget.max_protein_length`, `budget.max_length`,
+`quality.homotypic_pair`, `decontam.ots_benchmark`,
+`decontam.asd_antibody_benchmark`, `dedup.replaces_trait`,
+`decontam.trait_benchmark`, `decontam.t4_refbinder`, `decontam.t2t3_eval`,
+`quality.blank_epitope`, `decontam.repertoire_core_projection`.
 
-**第三步的成因曾被误记为「语料被并行会话重建」，实为 `move_near_dup_eval_rows.py --apply`
-把 valid/holdout 中与 train Lev≤1 的行移入 train**：`build_repertoire.py` 未重跑、
-blocklist 未变动，这也是 `assert_corpus_fresh.py` 依然通过的原因。并发会话的泄漏审计在
-新语料上给出 `HARD-REQUIREMENT hits = 0 -> PASS`（本源对 11 个基准全 0），与
-`count_immune_mix.py` 测得的 kept=raw、剔 0 一致。
+**Plan §3.1 item 13 counters are implemented.** `filter_report.json` now
+carries, per source and in `totals`, three kept-record transformation
+counters — `downgraded_all_x_mhc`, `beta_only_completed`,
+`alpha_only_completed` — distinct from the six first-failure drop counters
+(`count_immune_drops.py` still compares the original six keys).
+`dropped_all_x_epitope` is not duplicated; it stays the
+`quality.blank_epitope` filter attribution. **Authoritative post-hoc v5
+numbers, including the naive-vs-correct `downgraded_all_x_mhc` caveat
+(do not recount MHC-strip with a peptide-without-MHC heuristic): plan §4.2.**
+The published v5 `filter_report.json` does not contain these keys.
 
-</details>
+### Still open (do not mark done)
 
-> 🔴 **不要用 `data/tcr_repertoire/dataset/build_report.json::split_counts` 查行数。**
-> 它记的是构建期的 1,971,794 / 201,504 / 201,170，而近重复搬迁只改 CSV、不重写该报告。
-> 行数以 CSV 与 `data/tcr_native/dataset/near_dup_eval_move_report.json` 为准；
-> `build_report.json` 仍是**去污染**口径的权威来源（`PASS` / `decontam_mode` /
-> `blocklist_provenance`）。
+- `tcr_papers` records still carry `source: "tcr_native"` in record identity
+  (pre-existing). `metadata.dataset_source` and the shard name are correctly
+  `tcr_papers`.
+- The published v5 `dataset_manifest.json` / `filter_report.json` still have
+  the old `filter_names` and no item-13 counters.
 
-> ~~⚠️ **`tcr_papers` 的默认目录是 v1，不是 v2。**~~
-> **已于 2026-08-29 修正：`TCR_PAPERS_DEFAULT_DIR` 现指向
-> `data/tcr_papers_v2/dataset`。** 不传 `--tcr_papers_dir` 的脚本现在量到的就是
-> v3 口径。改默认的原因正是本条警告描述的坑：所有临时统计、布局计数、泄漏审计
-> 都在静默地量 v1，而 v3 训的是 v2，两者差 274k 行。
->
-> 三个 job 配置都显式传目录，不受影响：`bert_immune` / `diffusion_immune`
-> 钉 v1（保已跑 checkpoint 可复现），`diffusion_immune_v3` 钉 v2。
-> `count_immune_mix.py` 仍支持尾随 `field=value` 覆盖，用于反过来复现 v1：
->
-> ```bash
-> python scripts/count_immune_mix.py train \
->   "oas+ots+asd_antibody+trait+tcr_native+tcr_papers+tcr_repertoire" \
->   tcr_papers_dir=/vepfs-mlp2/c20250601/251105016/project/dllm_test/data/tcr_papers_v2/dataset
-> ```
+The ingest root cause (`ingest_papers.py` `_drop_placeholder` not applied to
+`epitope` / `mhc_pseudo`) is owned by
+[`examples/llada/DATA_PIPELINE_README.md`](examples/llada/DATA_PIPELINE_README.md)
+§6.0.1 and remains **the single most important unfixed item**. Rebuilding
+`tcr_papers_v2/dataset/` would re-admit all-X rows.
 
-> ⚠️ **`tcr_repertoire` 于 2026-08-28 11:50 被重建过，本表已是重建后的口径。**
-> 重建把 `t4_refbinder` blocklist 从 61,136 core 刷新到 62,893（并集 123,135 →
-> 124,176），train 从 1,971,136 变为 **1,971,794**。**引用本源规模前请先看
-> `data/tcr_repertoire/dataset/build_report.json` 的当前内容**，该语料近期在变。
+The former `qwen3_vl_arch/data` alias tree, old `training` tree, `GRAMMAR_V1.md`, old dataset
+implementation, and retired builders/tests/jobs are deleted. `refactor_baseline` and
+`docs/archive` remain historical evidence and are not current runtime inputs.
 
-### 语料新鲜度：`PASS: true` 不是充分证据
+## Historical pre-refactor notes（不可作为当前入口）
 
-同日发现的事故：构建报告的 `PASS` 只表示「对**构建时那份** blocklist 干净」。
-blocklist 是活文件会被重建，语料不会自动跟着重建，于是**过期语料与干净语料在报告上
-完全同形**。`tcr_repertoire` 09:04 建库、其 T4 黑名单 09:52 被重建（67,013 → 68,846
-键），语料未重跑而 `PASS` 仍为 true，实测 3 个 T4 参考 binder 留在 train 中。
+The old direct-CSV seven-source mix (2026-08-29, after near-dup moves) kept
+**7,794,375** train rows. Those counts are **not** v4/v5 prepared counts.
+v4 published counts: plan §4.1. Decontam accidents, key spaces, and the
+prefix-sampling / `语料 ∩ benchmark` / `PASS: true` rules:
+[`examples/llada/DATA_PIPELINE_README.md`](examples/llada/DATA_PIPELINE_README.md).
 
-结构性修复（已生效）：
+Still-true format pitfalls (do not drop):
 
-- `build_repertoire.py` / `finalize_papers.py` 的报告新增
-  **`blocklist_provenance`**：每个依赖 blocklist 的 path + mtime + 内容 sha1。
-- 新增 `scripts/data/tcr_native/assert_corpus_fresh.py`：校验 `PASS` **并且**逐个比对
-  blocklist 活文件 hash；无 provenance 的语料报 UNVERIFIED 而非静默放过。
-- `train_jobs/protein_esmc_llada270m_diffusion_immune_v3.yml` 启动前调用该脚本
-  （原来是只看 `PASS` 的内联断言）。
+- **Do not use** `data/tcr_repertoire/dataset/build_report.json::split_counts`
+  for row counts. Near-dup relocation rewrote CSVs, not that report. Counts
+  come from the CSV + `data/tcr_native/dataset/near_dup_eval_move_report.json`.
+  `build_report.json` remains the **decontam** authority (`PASS` /
+  `decontam_mode` / `blocklist_provenance`).
+- **`TCR_PAPERS_DEFAULT_DIR` points at `data/tcr_papers_v2/dataset`**
+  (fixed 2026-08-29). Pre-fix stats may silently have measured v1 (−274k rows).
+- **ASD valid loss is not a model-selection signal**: same blocklist, train
+  drop 67.5% vs valid drop 5.0%. Detail: DATA_PIPELINE_README §6.4.
+- **Layout shares must be reservoir-sampled**, never a prefix.
+  `tcr_papers_v2` is seven corpora concatenated; the first 30k rows are 100%
+  `tcr_peptide`, the full set is 80.3% `tcr_pmhc`.
+- Record share ≠ residue share. `ImmuneSourceSpec.weight` was historically
+  discarded at load; mixture was disk-row-count. Prepared `BioSeqRecord`
+  now stores source weight; whether loss reads it is a separate modelling
+  decision (plan / DATA_PIPELINE_README §6.3).
 
-**规则：任何 blocklist 重建后，依赖它的语料必须重跑并重新校验。** 事故全过程见
-`data/tcr_papers/EXPANSION_AUDIT_2026_08_28.md` §3.8。
-
-补一半（2026-08-29）：**断言只能*发现*脱节，*挡住*后果的是加载期过滤。**
-`tcr_repertoire` 原先没有加载期过滤（注释写"构建期已去污、无表位可作键，故不叠"），
-所以那 3 条落在磁盘上就等于会进训练。已在 `build_immune_specs` 补上
-`repertoire_core_exclusions`（`t4` ∪ `t2t3` **投影成裸 core** ∪ `ots_benchmark`——
-本源无表位，配对键永远匹配不上，故必须投影；这是故意过挡）。
-实测那 3 条现在全部被挡下。**双层不是冗余，它是唯一能兜住"黑名单重建了但语料没跟着
-重建"的机制。**
-
-### 黑名单自己也可能不是充分证据：`语料 ∩ benchmark` 的交集写法
-
-同一类问题的第三个面，2026-08-29 发现。前两节问的是"报告绿了能不能信"，
-这节问的是"黑名单本身够不够"。
-
-`decontam_extra.py::decontaminate_trait` 原本先扫**语料**收集 CDR3β core，
-再与 benchmark 求交集，把交集写成黑名单。于是黑名单是 `语料 ∩ benchmark`，
-**只对构建时那份语料完备**——语料一重建，新增行的 core 从没进过候选集，
-黑名单**结构上不可能**挡住它们。实测那 862 个键只覆盖 hard-requirement
-保护集的 **4.2%**（277 / 6,570）：
-
-| 基准 | 保护 core | 被旧黑名单覆盖 | 覆盖率 |
-|---|---:|---:|---:|
-| `NM2025_seen` | 4,254 | 36 | 0.8% |
-| `NM2025_unseen` | 1,091 | 70 | 6.4% |
-| `public_trackA` | 1,306 | 172 | 13.2% |
-
-**也就是说 TRAIT 此前 0 命中是运气，不是过滤起了作用。** 17:16 UTC 那次语料重建
-加了 600 行，其中 4 行直接落在保护 core 上（`ASSVGGISPLH`、`ASSYGGPEQF` →
-`NM2025_unseen`；`ASSVGTGYEQY`、`ASSVGRNTEAF` → `public_trackA`，全是无表位的裸
-CDR3b 行）。等 mtime 稳定 40 秒后复核确认是真泄漏，不是读到半写文件。
-
-修复：改为 `簇级交集 ∪ binding_benchmark ∪ full_bank` = **59,212 键**（原 862）。
-这不是新发明——`build_repertoire.py` / `finalize_papers.py` 早就直接用
-`binding_benchmark | full_bank` 做与语料无关的精确黑名单，`decontaminate_trait`
-是唯一的例外。簇级那一半仍只能语料派生（近重复是语料的属性而非 benchmark 的属性），
-限制已写进 docstring。代价 trait 保留行 **−11.2%**；附带 T2/T3 四列
-从 162/2,332/287/208 全部归零。原文件备份 `*.pre_union_bak`。
-
-**规则：精确黑名单必须 benchmark 派生，不能写成 `语料 ∩ benchmark`。**
-前者对任何语料都完备，后者只对一份快照完备。
-
-验证工具：`scripts/data/dedup/audit_downstream_leakage.py`（5 源 × 11 基准矩阵，
-把每行推过该源真实的 `row_to_record` 后再比对）。当前
-**`HARD-REQUIREMENT hits = 0 -> PASS`**。读矩阵注意：非零格子不等于泄漏，
-只有上表三个基准按裸 core 保护，其余按 `(core|epitope)` 配对键保护，
-投影成裸 core 会按构造过报（`tcr_papers_v2` 约 7.7 万裸 core 命中 T4，
-配对层命中为 **0**）。详见
-[`examples/llada/DATA_PIPELINE_README.md`](examples/llada/DATA_PIPELINE_README.md) §3。
+Decontam accidents (`PASS` ≠ freshness; exact blocklists must be benchmark-derived,
+never `语料 ∩ benchmark`; dual-layer load-time filter) are owned by
+[`examples/llada/DATA_PIPELINE_README.md`](examples/llada/DATA_PIPELINE_README.md) §5.
 
 ### valid/train 近重复：`split_disjoint_PASS` 也不是充分证据
 
@@ -301,9 +305,8 @@ eval 分源各截 `max_eval_rows_per_source=2000` 行，实测 eval 构成是**�
   单链 CDR3β。读 40,308,610 行，池 40,257,598，train 上限截到 2,000,000、簇级去污染
   再剔 28,206 后为 **1,971,794**（valid 201,504 / holdout 201,170）。
   `build_report.json` 记录 `decontam_mode=exact+cluster_0.80_0.80`，blocklist 并集
-  124,176 核心，`residual_blocked_in_train=0`，三 split 互斥。**唯一渲染为
-  `tcr_single` 布局的源**，T4 Setting-A 无条件生成 benchmark 用该布局解码，此前训练
-  覆盖为 0。详见 `data/tcr_repertoire/README.md`。
+  124,176 核心，`residual_blocked_in_train=0`，三 split 互斥。当时是唯一渲染为
+  `tcr_single` 的源（v4 起该源已补成双链）。详见 `data/tcr_repertoire/README.md`。
 - **`data/tcr_papers_v2/dataset`** — v1 四源（`tcrt5` 295,316 / `tcrdiff` 100,590 /
   `gratcr_tep` 17,768 / `epidiff` 2,484）加 TcrDesign-2026 三层（`tcrdesign26_beta`
   98,536 / `tcrdesign26_paired` 18,383 / `tcrdesign26_pmhc` 163,843）；以上为
@@ -348,121 +351,28 @@ train heavy 4,624,002 / light 4,585,975（其 "heavy" 指 β、"light" 指 α）
 > （配对模型权重，可作 baseline）与 `OTS_CoherenceCode`（α/β V-gene / V-allele
 > coherence 校验函数 + 两个测试 pkl）。
 
-## AB/TCR canonical v2（2026-08-04）
+## AB/TCR canonical v2（2026-08-04；不是现役训练输入）
 
-下一版免疫受体数据的权威执行记录为
-`/vepfs-mlp2/c20250601/251105016/project/dllm_test/IMMUNE_RECEPTOR_DATA_V2.md`，
-机器可读数据根为
-`/vepfs-mlp2/c20250601/251105016/project/dllm_test/data/immune_receptor_v2`。
-本轮只处理 antibody H/L、TCR alpha/beta、antibody-antigen 与
-TCR-peptide/pMHC；不包含 MINT/general-PPI、nanobody/VHH/VNAR 或无 specificity
-的 bulk TCR，也没有改变模型或启动训练。
-
-- `bioseq.v2` TCR union：922,479 records，SHA256
-  `41b74432ec71baafd9fd1600706cac774ceab0732dbf6e41ee32c9d07da52b0e`；
-  其中严格 split core 为 41,489。
-- `bioseq.v2` antibody union：470,949 records，SHA256
-  `3c7b5d679bdd98d7571e16b3821b1e918da7b92d3333838b136f58fed7cc42f0`；
-  antibody-antigen interaction core 为 308,267，含 property 后总 core 为
-  328,248。
-- canonical record 显式保留 sequence scope、observed/reconstructed、V(D)J/CDR/FR、
-  assay value/unit/censor/direction、negative type、target mapping confidence、
-  evidence tier、source row/hash、PMID/DOI、original split 与稳定 group ID。
-- 九套 receptor/peptide/pMHC/study、antibody/antigen/joint-hard、property split
-  均通过 disjoint audit；原始官方 split 只保留为 provenance。
-- exact/near benchmark quarantine、cluster-disjoint split、train-only TCR
-  negatives 与 immutable artifact manifests 已物化，当前
-  `technical_data_export_ready=true`。core export build 为
-  `ir2exp_f7a60484c7e3a20db6a2`，strict OAS/OTS pairing build 为
-  `ir2pair_6a1a5b62752caccd2cd5`，候选 recipe 为
-  `ir2recipe_1e3eac44551e88aedc6e`。
-技术产物的 active real-record 规模为：
-
-| plane | train | valid | test |
-|---|---:|---:|---:|
-| OAS strict H/L pairing | 1,468,754 | 15,295 | 14,800 |
-| OTS strict alpha/beta pairing | 1,445,804 | 14,732 | 14,741 |
-| antibody recognition | 146,998 | 8,167 | 8,166 |
-| TCR recognition | 3,986 | 222 | 221 |
-| antibody properties | 12,227 | 722 | 637 |
-| total | 3,077,769 | 39,138 | 38,565 |
-
-TCR recognition 另有 3,970 条 train-only synthetic negatives，未并入 real-record
-total；所有 export 的 residual benchmark cluster match 为 0。
-- `rights_review_complete=false`、`runtime_views_ready=false`、
-  `sampling_weights_frozen=false`，因此 `export_ready=false`、
-  `training_ready=false`、`training_started=false`。canonical JSONL 与旧 split 仍不能
-  直接作为训练输入；训练只允许从候选 recipe 引用的 immutable export 开始，并须先
-  关闭上述 gate。
+Authoritative record: [`IMMUNE_RECEPTOR_DATA_V2.md`](IMMUNE_RECEPTOR_DATA_V2.md).
+`export_ready=false` / `training_ready=false`. Do not treat `data/immune_receptor_v2`
+as the current LLaDA prepared mix.
 
 ## 当前训练数据单一入口（2026-07-23）— 已被取代
 
-> 🔴 **2026-08-28：本节标题中的「当前」已失效。** 它描述的是 `bioseq_grammar_v1`
-> Arrow 配方与 7L step389500 lineage；现役训练入口是
-> `examples/llada/protein_pretrain_esmc.py` 直读 CSV 的七源 mix，见本文件顶部
-> 「当前训练语料实测快照（2026-08-28）」。本节保留为历史 lineage 事实，不得据此
-> 判断当前训练数据。
+Historical 7L / `bioseq_grammar_v1` Arrow lineage is owned by
+[`TRAINING_DATA_CATALOG.md`](TRAINING_DATA_CATALOG.md). It is not the current
+prepared semantic JSONL mix. Do not restore a raw-CSV training loader.
 
-当前 7L step389500 真正使用的 7 源配方、实际 Arrow 行数、runtime
-fixed/target 语义、source weight、重复采样强度、resume 数据流问题，以及相对
-2026-07-21 canonical benchmark 的新去污染复核，统一见：
-
-`/vepfs-mlp2/c20250601/251105016/project/dllm_test/TRAINING_DATA_CATALOG.md`
-
-当前活跃 train 精确总数为 16,044,966；活跃源为
-`oas,ots,nanobody,tcr_piste,tcr_pmhc_fulllength,ppi,neutralization`。
-`tcr,mint_ppi,mint_actions` 虽已落盘，但没有进入该 checkpoint 的 recipe。
-
-下一版 active training scope 已收敛为四类：
-`antibody H/L`、`TCR α/β`、`antibody-antigen`、`TCR-epitope/pMHC`。
-nanobody/VHH、MINT/STRING/general-PPI、当前无 antigen sequence 的
-`neutralization`，以及无 specificity 的 bulk TCR 不进入下一版 recipe。旧 7 源
-checkpoint 只作为 lineage 事实保留，不能与下一版目标配方混称。
-
-重要口径更新：现有 downstream decontamination bank 生成于 2026-07-08，早于
-2026-07-21 固定的 MINT official、NM2025 official 和 Public TCR Track-A
-artifact。它不能继续作为“当前全部 benchmark 已去污染”的充分证据。当前 exact
-复核已发现 Public Track-A 1,306 个唯一参考 CDR3β 中有 395 个命中活跃 TCR
-训练源，MINT Gold test 与活跃 PPI 有 498 个 exact pair overlap；下一版训练前
-必须重建并版本化 bank。
+The 2026-07-08 downstream decontam bank predates the 2026-07-21 MINT official /
+NM2025 / Track-A artifacts and is not proof that the current prepared mix is
+clean. Current decontam rules live in
+[`examples/llada/DATA_PIPELINE_README.md`](examples/llada/DATA_PIPELINE_README.md).
 
 ## MINT 五任务官方 notebook 数据（2026-07-21）
 
-当前 MINT benchmark 的唯一数据根是
-`/vepfs-mlp2/c20250601/251105016/project/dllm_test/data/downstream/mint_official`。
-总 manifest 状态为 `validated`，固定 MINT commit 为
-`06694b7606e2d00b76ec58daf5c7aecdaf7cd283`。旧根
-`/vepfs-mlp2/c20250601/251105016/project/dllm_test/data/downstream/mint`
-是历史本地处理数据，不能与本次结果混用。
-
-| 目录 | schema | 行数 |
-|---|---|---:|
-| `ppi/Intra1_seqs.csv` | `seq1,seq2,labels` | 163,192（train） |
-| `ppi/Intra0_seqs.csv` | `seq1,seq2,labels` | 59,260（validation） |
-| `ppi/Intra2_seqs.csv` | `seq1,seq2,labels` | 52,048（test） |
-| `human-ppi/processed_data_{train,validation,test}.csv` | index, `sequence_1,sequence_2,target` | 26,319 / 234 / 180 |
-| `yeast-ppi/processed_data_{train,validation,test}.csv` | index, `sequence_1,sequence_2,target` | 4,945 / 95 / 394 |
-| `mutational-ppi/processed_data.csv` | index, `seq1,seq2,seq1_mut,seq2_mut,target` | 3,406 |
-| `SKEMPI_v2/processed_data.csv` | index, four sequence columns, `target,complex,split_0..2` | 6,706 |
-
-每个任务目录都包含 `manifest.json`、`execution_metadata.json` 和 `execution.log`；
-manifest 记录原始输入绝对路径和 SHA256、notebook 路径和 SHA256、运行环境版本、输出
-SHA256 与校验统计。完整的来源和论文差异解释见
-`/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/mint_tasks/OFFICIAL_REBUILD_AUDIT.md`。
-
-两个未公开论文 fold 的任务另有本地固定评测协议：
-
-| 任务 | 本地 split artifact | 协议 | 防泄漏单元 |
-|---|---|---|---|
-| MutationalPPI | `/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/mint_tasks/protocols/mutationalppi_pair_group10.csv` | `mutppi_pair_group10_sgkf_seed0_v1`；3,406 行、1,490 个 canonical unordered WT pair group、10 folds | 同一 WT pair group 不跨 fold；sidecar SHA256 `c7ec1c3621757fc2e08fed9f72531a42056a25808767de1ad394435827597296` |
-| SKEMPI | `SKEMPI_v2/processed_data.csv` 的 `split_0..2` | `skempi_notebook_complex3_mt19937_v1`；6,706 行、343 complexes、3 folds | complex 不跨同一 outer fold 的 train/test，且三个 test complex 集互斥 |
-
-这两项只定义 `[L]` 本地可重复评测，不能称为论文未公开 fold。新重跑 cache 还必须带
-`localfixed-v1-l2048`，其含义是 run-level 最高 cap=2048；每条 metrics 记录实际
-`max_sequence_tokens`。ESM-1b 因 absolute-position config
-`max_position_embeddings=1026` 使用 1024；ProGen2-Large 因 config `n_positions=1024`
-和固定 causal mask 也使用 1024；其余六个模型使用 2048。WT 与 mutant 的每条链
-使用相同左侧窗口，避免未突变 partner 因随机裁剪产生伪差分。
+Downstream-owned. Canonical root and protocol:
+`/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/mint_tasks/OFFICIAL_REBUILD_AUDIT.md`
+and `data/downstream/mint_official`. Do not restate task schemas or row counts here.
 
 ## High-Level Inventory
 
@@ -806,31 +716,12 @@ Preferred optional fields:
 chain_roles, targets, split, labels, regions, metadata, schema_version
 ```
 
-`/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/bioseq/datasets.py` currently streams only three clean CSV corpora for Ophiuchus-style training:
-
-- OAS paired antibody
-- OTS paired TCR
-- nanobody/VHH
-
-It normalizes rows into a minimal training record:
-
-```python
-{"chains": [...], "task_type": "...", "source": "...", "weight": ...}
-```
-
-`/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/bioseq/data.py` collates multi-chain examples into:
-
-```text
-input_ids, labels, chain_ids, attention_mask, loss_mask, task_type_ids
-```
-
-The current collator does not yet emit:
-
-- `position_ids` split into inner residue position and outer chain index
-- explicit `target_chain_mask`
-- fixed-context mask for antigen/MHC/context chains
-- BioSeq foundation complex header token ids
-- `chain_role_ids`
+The old raw-CSV dataset and generic collator described in this historical section were deleted.
+The current semantic record contract is implemented by
+`/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/immune_llada/data/records.py`,
+with prepared loading in `dataset.py`, grammar/tokenization in `grammar.py` and `esm_encoding.py`,
+and batch assembly in `collator.py`. The current training model receives semantic records only
+after offline preparation; no raw source dataset is imported at runtime.
 
 ## Implication for Adapting Qwen
 
@@ -901,7 +792,7 @@ The view sampler should support at least these target constructions:
 
 ## Encoder Tokenizer Boundary
 
-The BioSeq foundation loader under `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/data` should keep the canonical biological record independent from any one encoder tokenizer. Tokenization is a collator/encoder concern.
+The active immune loader under `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/immune_llada/data` keeps canonical biological records independent from the ESMC/decoder tokenizer. Tokenization remains a collator/encoder concern. The retained model-layer utilities under `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch` do not imply that its deleted `data` tree still exists.
 
 Local tokenizer verification:
 
@@ -915,7 +806,7 @@ Implementation rule:
 - Use the encoder's own local Hugging Face tokenizer when an ESMC encoder is active.
 - Do not infer multi-chain interaction capability from the `|` token alone. The ESMC/ESMFold2 paper places explicit multi-chain complex modeling in ESMFold2, where each chain is encoded independently by frozen ESMC 6B and then fused through downstream pair/folding/diffusion modules.
 
-The immediate gap is data normalization: large clean OAS/OTS/nanobody and TCRdb2.0 should be converted into the same `bioseq.v1` format before building a BioSeq foundation architecture around them.
+The current normalization boundary is already the prepared `BioSeqRecord`/semantic JSONL contract. Future source additions must implement an offline adapter and manifest under `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/immune_llada`; they must not reintroduce a raw-CSV runtime loader or the deleted qwen data alias.
 
 ---
 
@@ -992,68 +883,16 @@ assay、donor 和 source provenance，不能按无 HLA pair 多数投票。
 
 **统计**（`build_stats.json`）：human MHCI 解析 134,526 → 配对可拼 79,040 → thimble OK 78,740 → **下游 CDR3β 去重去掉 15,324** → 唯一 59,093 → train **57,913** / valid 590 / holdout 590。
 
-**shard**：`data/bioseq_grammar_v1/tcr_pmhc_fulllength/{train,valid}`（`build_bioseq_grammar_v1.py --sources tcr_pmhc_fulllength`，新增 `iter_tcr_pmhc_fulllength` reader 保留 roles + relation）。渲染验证：五实体骨架正确、2× `<binding>`、589 扩散目标 token（仅 α/β 残基，pMHC 固定上下文）、valid/train/holdout 整记录 0 重叠。
+**历史 shard**：`data/bioseq_grammar_v1/tcr_pmhc_fulllength/{train,valid}`（旧 `build_bioseq_grammar_v1.py --sources tcr_pmhc_fulllength`，新增 `iter_tcr_pmhc_fulllength` reader 保留 roles + relation）。其渲染验证数字仅为历史证据，不属于当前 prepared semantic JSONL 训练线。
 
 **待办（B4）**：并入整合 manifest + 权重后重训。数据布局/方法同步见 `ARCH_AUDIT.md`、`FUTURE_EXPERIMENTS.md` D1。
 
 ---
 
-## T1 original-model 结果来源 schema（2026-07-21）
+## Downstream format schemas (not owned here)
 
-Canonical external-baseline 表位于 `/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/outputs/tcr_binding_nm2025/summary_original_baselines.csv`，一行对应一个 Nature Methods 2025 Supplementary Table 4 original model。关键字段：
+T1 / Track-A / TCRT5 output schemas and paper-correspondence rules are owned by
+`downstream/benchmark/` (`RESULTS.md`, `README.md`, task docs, and
+`outputs/tcrt5_full_eval/TCRT5_FULL_EVAL_REPORT.md`). Do not copy headline
+numbers or protocol tables into this file.
 
-- `selected_source` / `evidence_type`：`official_code_rerun`、`paper_reported` 或 `unavailable`。
-- `result_label`：本地完整复现为“本地复现：官方 checkpoint + 官方推理代码 + original.zip”；论文 fallback 必须精确写“论文值，未本地复现”。
-- `reproduced_locally`, `retrained`, `checkpoint_paths`, `checkpoint_available`, `checkpoint_aliases_verified`, `official_runner_available`, `local_metadata_status`：记录推理时实际打开的全部模型 artifact；只有带 `embedded_original_protocol`、路径与 catalog 逐项一致且 runtime copy 与 bundle alias 哈希一致的产物可进入本地选择，旧的无 metadata 产物视为 `not_complete`。
-- `test_artifact` / `test_artifact_sha256`：固定 `/vepfs-mlp2/c20250601/251105016/project/dllm_test/data/ntmethod_binding/original.zip` 及 sha256 `906e84ebd4b071d7cb9eec04294f6bfaeb7f967dad0008fd3a758910afef13d9`。
-- `test_manifest`：固定 `/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/data/tcr_binding_nm2025/original_test_manifest.json`；每个本地 `metrics.json` 的 `normalized_test` / `normalized_test_sha256` 必须与该 manifest 对应，证明实际评分 CSV 由当前 `original.zip` 展开而来。
-- `seen_*` / `unseen_*` 是最终选中值；`local_*` 与 `paper_*` 保留两套原始来源供 audit，禁止把两套值无标记混合。
-- `fallback_reason`, `citation`, `source_location` 记录不可运行原因和论文位置。论文未报告的格（当前 SETE unseen）保持空值。
-
-每个新官方 rerun 的 `metrics.json` 还必须包含 `baseline_protocol`，其中 `train_csv_loaded=false`、`retrained=false`、实际 `wrapper` / `variant_tag`、runtime `checkpoint_paths` 和 original.zip checksum。wrapper 未披露路径、路径与 catalog 不一致或缺少任一 artifact 时均判失败；失败写入同一模型 track 下的 `original_run_status.json`，不生成伪 `predictions.csv`。
-
-## T1 retrained artifact 数据与输出 schema（2026-07-21）
-
-- 原始数据固定为 `/vepfs-mlp2/c20250601/251105016/project/dllm_test/data/ppi_task_raw/raw/nat_methods_tcr_benchmark/retrain.zip`，MD5 `5cf77befd7a07e0cb359540f050fb7b4`；权重固定为同目录 `Retraining_model.zip`，MD5 `aa6ea6c175738675692848d036c2244c`。校验缓存为 `retrained_artifact_integrity.json`，但缓存仅在 size/mtime/expected MD5 三者稳定时可复用。
-- CDR3β-only member 以乱码不可依赖的父目录 + 稳定后缀解析：fold seen test=`_only_seen/<neg>/<fold>_1_1test.csv`；seen independent=`_only_seen/<neg>/1_1_1independent_test.csv`；unseen independent=`_only_unseen/<neg>/1_1_1independent_test.csv`；TCR-H fold preprocessing train=`_only_seen/<neg>/<fold>_1_1train.csv`。必需列均为 `Epitope,CDR3B,Affinity`。
-- 输出根为 `/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/outputs/tcr_binding_nm2025_retrained/<tag>/cdr3b/AS/fold_<N>/<eval_set>/`。`predictions.csv` 固定列 `peptide,cdr3b,label,score`；`metrics.json` 保存 `n_input,n_scored,n_unscored_by_official_protocol`、precrec AUPRC、sklearn AP diagnostic，以及 archive/nested archive/checkpoint/test/train（若有）SHA256。
-- 每模型五折汇总位于 `<tag>/cdr3b/AS/summary.json`；跨模型来源表为根目录 `comparison_AS.csv`/`.json`。comparison 不覆盖本地值，而是同时保留 `local_*`,`paper_*`,`delta_*`,`local_matches_paper_4dp`,`selected_source`,`selected_result_label`。当前 8 模型×3 eval sets=24 行，其中 6 行满足 AUROC/AUPRC 双指标四位小数一致。
-- `train_csv_loaded` 通常为 false；TCR-H 是唯一当前例外，值为 true 且 `train_csv_use=inference_time_feature_selection_only`,`training_performed=false`。其 feature cache 必须绑定 train SHA 与 NumPy/Pandas/peptides/sklearn/SciPy 版本，且保留列数必须等于 checkpoint `n_features_in_=130`。
-- 默认要求 `n_scored==n_input`。只有 spec 明确声明官方 drop-remainder 时可少行；当前仅 ERGO-AE 为 batch 50 截尾（unseen `3150/3162`），metadata 必须写差额。ERGO-lstm 虽同属 ERGO，但官方 LSTM batching 保留 partial batch，不得误套截尾规则。
-- Ours frozen-head runner 固定为 `/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/tcr_binding/run_retrained_ours.py`。五个 official AS train 行数依次为 `150634/150832/151008/151150/151264`；seen test 为 `30670/30660/30384/30282/30268`，共享 seen-independent=`5882`，共享 unseen-independent=`3162`。所有 fold/split 的 `(Epitope,CDR3B)` 并集为 `462883`，按字典序固定行号并以 SHA256 `24f7de5f97346de0962ced427f7cbd8d0e293211b14219f00462f48dae22283c` 绑定 frozen-feature mmap。
-- 每一 fold 的 official train 内 `(Epitope,CDR3B)` 都是唯一且无标签冲突。对该 fold 的三套 test，`shared_unique_clonotypes=0`、`shared_unique_exact_pairs=0`；unseen-independent 另有 `shared_unique_epitopes=0`。因此之前旧本地构造 `train.csv` 对 unseen 出现的 `1 epitope / 41 clonotypes / 30 exact pairs` 不属于本次 official fold-train 协议，也不能带入本次微调。逐 fold 真值写入 `<ours-tag>/cdr3b/AS/protocol_audit.json`。
-- Ours feature cache 位于 `outputs/tcr_binding_nm2025_retrained/_feature_cache/<tag>/AS/`：`pairs.csv` 保存行号，`features.npy` 为 `462883 × 960 float32`，`feature_manifest.json` 绑定 checkpoint/data/pair SHA、`post_llada_final_hidden_state` 与 `global_mean_over_all_joint_record_residue_tokens`；中断时由 `features.partial.npy + feature_state.json::next_index` 恢复。每 fold 的 `head.pt` 同时保存 train-only mean/std、MLP state、fold seed、train member SHA 和 checkpoint SHA。
-- Ours 五折完成后在 `<ours-tag>/cdr3b/AS/` 生成两张长表：`ranking_local_release_AS.csv` 是相同 release 数据上的主要排名；`ranking_paper_reference_AS.csv` 是 Ours 本地值与论文 baseline 值的 mixed-source 辅助排名，字段 `mixed_source=true`。ERGO-AE 的官方 batch-50 tail-drop 在三套 eval 的主要排名 `n_note` 中均显式标注：seen-test 按 fold 为 `30650/30670,30650/30660,30350/30384,30250/30282,30250/30268`，seen-independent=`5850/5882`，unseen-independent=`3150/3162`。
-- 同目录的 `comparison_with_ours_local_release_AS.{csv,md}` 与 `comparison_with_ours_paper_reference_AS.{csv,md}` 是便于直接查看的 9-row 宽表：每个模型一行，每个 eval×metric 保存 numeric `mean,std_sample,rank`；CSV 另保留逐 split `n_note`、`result_source`、`comparison_scope` 与 `mixed_source`。baseline 保持 catalog 顺序，Ours 始终置于最后一行。
-- 当前 seen-only 展示另物化为 `comparison_with_ours_seen_test_local_release_AS.{csv,md}` 与 `comparison_with_ours_seen_independent_local_release_AS.{csv,md}`。两者均不含 unseen 列；8 个 baseline 按 `auprc_mean` 降序（再以 AUROC/method 稳定破同分），Ours 不参与展示排序并强制为第 9 行。CSV 固定列含 `display_order,display_rule,tag,method,auroc_mean,auroc_std_sample,auroc_rank,auprc_mean,auprc_std_sample,auprc_rank,result_source,n_note`。
-
-## Public CDR3β Track-A format audit（2026-07-21）
-
-- Canonical prepared data root: `/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/data/tcr_beta_public_benchmark`.
-- `targets.csv` has one row per pMHC with `target_id,source_target_id,peptide,mhc_allele,mhc_pseudosequence,n_references,reference_source,dataset,year`; `references.csv` has one target-specific `cdr3b_reference` per row.
-- Source references come only from `benchmark_data_w_preds.csv::reference_translations`. `tcrt5_translations`, `gratcr_translations`, `er_translations`, and greedy prediction columns are explicitly excluded. Audited cardinality is 14 targets / 1,312 distinct references; RVR has 895.
-- Canonical generation columns are `model,target_id,peptide,mhc_allele,rank,cdr3b,raw_score`; provenance columns are `generation_mode,source,run_id`. Final `generations.csv` has 56,000 rows, 56 model-target blocks, exactly 1,000 ranks per block. `raw_score` is model-specific provenance: for TCRT5 it is cumulative generated-token transition log-likelihood and determines the paper-compatible rank; for BioSeq it is empty because the sampler exposes no candidate score, and BioSeq rank is seeded emission order. Neither value may be interpreted as a common score across models. BioSeq rows use `run_id=full14x1000_step117000_seed42_iter32` and `source=local_bioseq_checkpoint_runtime`.
-- Canonical result root: `/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/outputs/tcr_beta_public_benchmark/results`, containing `generations.csv`, `per_target_metrics.csv`, `summary_metrics.csv`, `cross_epitope_jaccard.csv`, `reproduction_status.md`, `tcrt5_paper_consistency.csv`, `tcrt5_paper_consistency.md`, BioSeq-focused `bioseq_step117000_report.md`, `bioseq_step117000_generations.csv`, `bioseq_step117000_per_target_metrics.csv`, `bioseq_step117000_top_recoveries.csv`, `bioseq_step117000_giana_hits.csv`, and per-block GIANA inputs/outputs/logs. `generations.pre_tcrt5_paper_rank.csv` is the immutable pre-correction backup whose TCRT5 scores used length-normalized beam values.
-- Raw candidate strings are preserved apart from whitespace/case normalization. No anchor repair is permitted; absent rows remain missing candidates in the requested denominator.
-- TcrDesign qualitative paired output is `/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/outputs/tcr_beta_public_benchmark/results/tcrdesign_alpha_generations.csv` with required columns `target_id,epitope,generated_cdr3b,generated_cdr3a,beta_rank,alpha_rank,raw_beta_score,raw_alpha_score` and provenance columns `mhc_allele,generation_mode,source,run_id`.
-- The completed paired file has 140,000 rows: 14 targets × 1,000 generated-beta ranks × 10 alpha ranks. Every `(target_id,beta_rank,generated_cdr3b)` maps back exactly to a `model=TcrDesign,generation_mode=de_novo` row in canonical `generations.csv`; 0 conditions are missing or mismatched. Every beta condition has contiguous `alpha_rank=1..10`.
-- `raw_alpha_score` is empty because the official beam-search caller does not return scores. Empty is distinct from zero and must not be imputed. The file contains no reference-alpha columns and is not a quantitative alpha benchmark.
-- `/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/outputs/tcr_beta_public_benchmark/results/tcrdesign_alpha_evaluation_audit.json` records `alpha_generation_available=true`, `official_alpha_evaluation_available=false`, `included_in_quantitative_benchmark=false`, and the audited official code/input paths.
-
-## BioSeq step189000 single-target diagnostic format（2026-07-22）
-
-- Output root: `/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/outputs/tcr_beta_public_benchmark/checkpoint_comparison/bioseq_step189000_rvr_epitope_only`. This root is intentionally outside canonical `results/`.
-- `generations.csv` contains exactly 1,000 rows and one `(model,target_id)` block: `model=BioSeq-7L-step189000`, `target_id=RVRAYTYSK_HLA-A*03:01`, contiguous ranks `1..1000`, `generation_mode=de_novo_epitope_conditioned`, `source=local_bioseq_checkpoint_runtime`, and `run_id=rvr1000_step189000_seed42_iter32_epitope_only`. `raw_score` is empty by design.
-- The raw candidate schema and evaluator are identical to canonical Track A. The focused additions are `top_recoveries.csv`, `invalid_generations.csv`, `rvr_comparison.csv`, and `report.md`; the standard `per_target_metrics.csv`, `summary_metrics.csv`, GIANA files, status, and reproduction report are retained.
-- There are 998 legal raw candidates and two illegal candidates; no repair is applied. Since this artifact contains one target, `cross_epitope_jaccard.csv` has no target pair and no defined mean. The separately reported step117000-vs-step189000 Jaccard compares checkpoint candidate sets for the same target and is not a cross-epitope metric.
-
-## TCRT5 full-eval output format（2026-07-23）
-
-- Root: `/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/outputs/tcrt5_full_eval`. Top-level files are `/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/outputs/tcrt5_full_eval/TCRT5_FULL_EVAL_REPORT.md`, `/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/outputs/tcrt5_full_eval/paper_correspondence.csv`, and the persistent 95,871-sequence `/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/outputs/tcrt5_full_eval/pgen_cache.csv`.
-- Author main root `/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/outputs/tcrt5_full_eval/author_release/main_top20_k100` contains: `per_target` 240 rows, `summary` 12, `jaccard` 2,280, `positional_entropy` 5,868, `kmer_jsd` 2,640, `length_distribution` 1,776, `polyspecificity_per_target` 240, `polyspecificity_summary` 12, `crosscheck` 11, `paper_main_comparison` 84, `pgen` 42, `pgen_aggregation_sensitivity` 8, and `olga_protocol_audit` 8.
-- Author sparse root `/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/outputs/tcrt5_full_eval/author_release/sparse13_plus_rvr_k1000` contains: `per_target` 56 rows, `summary` 4, `jaccard` 364, `positional_entropy` 1,053, `kmer_jsd` 616, `length_distribution` 468, `polyspecificity_per_target` 56, and `polyspecificity_summary` 4.
-- Current root `/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/outputs/tcrt5_full_eval/current_track_a` contains: `per_target` 56 rows, `summary` 4, `jaccard` 364, `positional_entropy` 1,114, `kmer_jsd` 616, `length_distribution` 579, `polyspecificity_per_target` 56, `polyspecificity_summary` 4, and `pgen` 60.
-- Manifests are `/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/outputs/tcrt5_full_eval/author_release/main_top20_k100/manifest.json`, `/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/outputs/tcrt5_full_eval/author_release/sparse13_plus_rvr_k1000/manifest.json`, and `/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/outputs/tcrt5_full_eval/current_track_a/manifest.json`. Each records protocol, UTC creation time, absolute source paths, source existence, Pgen status, and every table's absolute path/row count/columns. CSV names are the dictionary keys plus `.csv`.
-- `per_target.csv` retains `model,target_id,protocol,k_requested,n_generated,n_unique_generated,n_references`, core P/R/F1/edit/recovery/Char-BLEU fields, rank evidence, exact ranks and cutoff-specific occurrence/unique/Hit@K fields. Empty ranks remain null; semicolon-separated exact ranks are 1-based.
-- `summary.csv` separates `map_prefix` from `map_hit_rank_diagnostic`, and includes `map_rank_is_paper_compatible` plus `map_evidence`. The legacy-named `map_prefix_ordered_proxy` remains for paper-release comparison, but must be interpreted through the evidence columns.
-- Entropy columns specify `gap_inclusive` versus `residue_only` and `_nats`; k-mer rows specify `k` and `js_divergence_nats`. Jaccard stores both similarity and dissimilarity. Pgen tables state population, counts, positive fraction and positive log10 moments; sensitivity rows additionally state aggregation population and log10 window.

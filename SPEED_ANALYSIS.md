@@ -1,92 +1,127 @@
-# Training Speed Analysis (integrated LLaDA line)
+# Training Speed Analysis（current immune LLaDA line）
 
-> Profile of the integrated ESMC-300M + LLaDA run and a ranked list of speed
-> levers. Evidence is from real run logs (`output/grammar_v2_*/logs/*rank0.log`)
-> and the prior profiling in `PROJECT_PROCESS.md` (2026-07-05 / 07-08 speed
-> sections). Method decisions mirror `.cursor/rules/volc-batch-sizing.mdc`.
+> This document separates the current prepared-data speed boundary from historical
+> `grammar_v2` measurements. Historical numbers are retained as evidence only and
+> must not be read as a current validation result.
 >
-> Last updated: 2026-07-09.
+> Last updated: 2026-09-12. v5 `immune_v5_receptor_completion` is published
+> (counts: plan §4.2). Epitope-source rows grow per-row tokens; the CPU loader
+> table below is **not** a v5 measurement (v5 DataLoader / GPU throughput
+> unmeasured).
 
-## Current config (integrated)
-`train_jobs/qwen3_vl_bioseq_grammar_v2_esmc300m_integrated_llada.yml`:
-ESMC-300M encoder (trainable, `--encoder-lr 2e-5`) + LLaDA decoder 28L/16H/3840,
-`--batch-size 4 --grad-accum 2` on 2×8 = 16 GPU → global batch 128;
-`--num-workers 1`, `--gradient-checkpointing`, `--qk-norm`, `--condition-norm`,
-`--bf16`, `--find-unused-parameters`, `--max-sequence-length 2112`.
+## Current speed boundary
 
-## Measured baseline (from real logs)
-ESMC-300M + LLaDA, 8-GPU cmp500k run (same backbone), nw=1
-(`output/grammar_v2_esmc300m_cmp500k_llada/logs/train_20260708_055104_rank0.log`):
+The current training entry is:
 
-| Signal | Value | Note |
-|---|---|---|
-| throughput | ~34–40 samples/s | 8 GPU, gb128, bs4 ga4 |
-| `wait_s` (data load) | 0.43–0.66 / microstep | after nw0→nw1/2 fix (was ~1.03 at nw0) |
-| `backward_s` | ~0.41 / microstep | includes DDP all-reduce on sync microsteps |
-| `mem_peak` | 46.0 GB / 79.2 GB | **~33 GB headroom** at bs4 |
-| corrupt_rate | ~0.50 | as designed (t~U(eps,1)) |
+`/vepfs-mlp2/c20250601/251105016/project/dllm_test/examples/llada/protein_pretrain_esmc.py`
 
-Two speedups already deployed (`PROJECT_PROCESS.md`): (1) `no_sync()` on
-non-boundary grad-accum microsteps (saves (ga−1)/ga of gradient all-reduce,
-math-identical); (2) `num_workers` + `persistent_workers` + `prefetch_factor=4`
-to overlap the CPU-heavy `GrammarBioSeqCollator` with GPU compute.
+The active data implementation is:
 
-## Ranked levers
+`/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/immune_llada/data`
 
-### 1. ESMC flash-attention (low risk, high benefit) — gated on flash_attn + parity
-The `--encoder-use-flash-attn` flag already exists and flows into
-`BioSeqLLaDAEncoderDiffusionModel.from_esmc(use_flash_attn=...)`. Training runs
-ESMC via the **`input_ids`** path (`encode_chain_tokens` →
-`self.encoder(input_ids=..., attention_mask=...)`), which is flash-compatible
-(the guard that rejects flash only triggers on the `inputs_embeds`/
-`diffusion_state` path, which training does not use). The encoder forward is a
-large slice of `forward_s`, so this is the cheapest real win.
+The measured path to profile is:
 
-**Status (B3)**: `load_local_esmc_encoder` now **guards** the flag — if
-`flash_attn` is not importable it warns and falls back to non-flash SDPA, so the
-flag is a safe no-op. `flash_attn` is **not** installed in the local
-`protenix_abtcr` env (prebuilt wheel download over the proxy is prohibitively
-slow), so the bf16 parity check
-(`scripts/tests/bioseq/check_esmc_flash_parity.py`) currently SKIPs. **To turn it
-on for real**: install `flash_attn` in the training image
-(`airgen:v1`, torch 2.8 / cu12 / py312 → wheel
-`flash_attn-*+cu12torch2.8cxx11abiTRUE-cp312`), run the parity check until it
-prints `PARITY OK`, then add `--encoder-use-flash-attn` to the retrain YAML. The
-guard means adding the flag before the package exists will not crash training —
-it simply won't speed anything up.
+```text
+prepared semantic JSONL + manifest
+  -> prepared loader / byte-offset decode
+  -> current immune grammar rendering
+  -> batch padding and tensor assembly
+  -> per-chain ESMC input reconstruction
+  -> diffusion/MLM masking
+  -> GPU forward/backward
+```
 
-### 2. Token-based dynamic batching (medium effort, high benefit) — P2, never done
-`max_sequence_length=2112` but most records (single/paired receptors) are far
-shorter, so fixed `batch_size=4` wastes compute/memory on padding. Pack each
-microbatch to a **token budget** instead of a fixed sample count (still
-task-homogeneous per the grammar loader). Expected: higher effective tokens/s at
-equal memory. Touches `dllm/pipelines/qwen3_vl_arch/data/{mixture,datamodule}.py`;
-must preserve DDP shard identity (num_workers issue).
+This line does not consume the deleted qwen `data` alias, deleted `training` modules, raw-CSV
+runtime loader, infinite weighted Arrow stream, or model-ready token cache. The retained
+`/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/modeling_bioseq.py`
+and related model-layer files may still provide encoder/model primitives, but they do not define
+the current data-loader speed boundary.
 
-### 3. Micro-batch fill (medium risk) — profile before changing
-46/79 GB leaves headroom, but raising bs at fixed gb128 means bs8 ga1
-(16 GPU). Historically bs8 OOM'd on the 300M cmp500k run at a *shorter* seq
-length, and here seq=2112 + gradient-checkpointing pushes long-sequence batches
-higher. Rule: profile a short run on the target flavor, keep `mem_peak` ≤~85%
-(≈67 GB) before committing. Likely safe target: bs6 (needs gb rework) or keep bs4
-and instead spend the headroom on lever 2.
+## Existing CPU prepared-loader baseline
 
-### 4. Selective gradient checkpointing (medium) 
-GC is **required** (OOM without it — verified). But it need not wrap every
-module: checkpointing only the LLaDA decoder blocks (leaving the ESMC encoder
-un-checkpointed, or vice versa) can recover compute while staying within memory.
-Needs a per-tower GC flag; validate peak memory.
+The following values are prior prepared-loader measurements and are included for planning only:
 
-### 5. Do NOT push num_workers>1 under DDP
-The infinite weighted Arrow stream is sharded per worker; `num_workers>1`
-re-shards independently and can desync the first batch across ranks → NCCL
-timeout (`trainer.py` warns; `nw=1` keeps shard identity of `nw=0`). Keep nw=1.
-`find_unused_parameters=True` is kept (heterogeneous task batches); disabling it
-was tried and abandoned (DDP crash risk), profiling showed no measurable gain.
+| `num_workers` | throughput |
+|---:|---:|
+| 0 | **1367.76 samples/s** |
+| 1 | **721.62 samples/s** |
+| 2 | **1337.44 samples/s** |
+
+These values are not a fresh run in this documentation pass. They do not establish the best
+setting for GPU training, DDP, FSDP, or the current target hardware. In particular, do not infer
+that `num_workers=1` or `num_workers=2` is universally correct from this table.
+
+## Historical grammar-v2 evidence
+
+Earlier integrated ESMC + LLaDA logs under historical `output/grammar_v2_*` runs reported roughly
+34–40 samples/s on 8 GPUs, with `wait_s` around 0.43–0.66 seconds per microstep after the old
+worker/prefetch changes and a recorded peak near 46.0 GB on a 79.2 GB GPU. Those logs belong to
+the deleted grammar-v2/Arrow training line. They remain useful only as historical context for
+where CPU loading and encoder forward cost appeared, not as a reproducible current baseline.
+
+The historical line also recorded two old optimizations: gradient all-reduce suppression on
+non-boundary accumulation steps and worker prefetch overlap. These should be re-measured against
+the current prepared loader before being described as deployed current behavior.
+
+## Ranked current profiling plan
+
+### 1. Profile the prepared loader and GPU overlap first
+
+Run a short, representative profile using the current formal entry and current prepared-data
+configuration. Record, with absolute artifact paths:
+
+- prepared-loader startup/index-build time and steady-state samples/s;
+- JSON decode, grammar rendering, padding, encoder reconstruction, and masking time;
+- host-to-device wait time and GPU forward/backward time;
+- peak CUDA memory, effective tokens/s, and batch shape/length distribution;
+- DDP/FSDP rank synchronization and first-batch identity where applicable.
+
+The profile must distinguish index construction from steady-state iteration. The prepared loader
+still decodes semantic rows and performs runtime construction; it is not a zero-cost cache.
+
+### 2. Gate worker/prefetch choices on the profile
+
+Compare `num_workers=0`, `1`, and only then higher values on the target environment. Also compare
+persistent workers and prefetch settings only when they are supported by the active loader. Do not
+hard-code the historical `nw=1` rule: the old Arrow worker-sharding rationale does not establish
+an equivalent invariant for the current prepared semantic loader.
+
+For every candidate, verify that all ranks receive compatible batch shapes/tasks and that no
+worker-specific ordering or shard identity causes DDP divergence. Select the setting by measured
+GPU overlap and end-to-end samples/tokens per second, not CPU-only throughput alone.
+
+### 3. Profile length-aware batching before increasing model batch size
+
+The current grammar and per-chain encoder reconstruction make padding and sequence length a major
+cost. Prefer length buckets or a token-budget batch policy if the active collator can preserve
+record/task semantics and deterministic distributed sampling. First measure padding waste and
+maximum encoder length; then compare fixed sample count with token-budget batches.
+
+Every change must be short-run profiled on the target GPU. Keep effective global batch comparable
+when comparing encoder variants, and record peak memory before committing a new batch size.
+
+### 4. Measure gradient accumulation and checkpointing separately
+
+Retain gradient accumulation or non-boundary synchronization changes only after checking their
+actual communication and wall-clock effect on the current Trainer/DDP/FSDP path. Likewise, compare
+whole-model and selective activation checkpointing with the current fusion architecture. Report
+peak memory and tokens/s together; a faster microstep that reduces feasible batch size may be a
+regression at the global-batch level.
+
+### 5. Treat flash attention as environment-gated
+
+The retained model layer exposes the ESMC flash-attention option, but the option is not evidence
+that flash attention is installed or enabled in the current environment. If the package is
+available, run numerical/parity checks and a short throughput comparison against the non-flash
+path. If it is unavailable, the fallback must remain the documented behavior; do not report a
+speedup or claim that the current baseline uses flash attention.
 
 ## Recommendation
-Implement lever 1 (flash-attn, = B3) with the integrated retrain (B4); it is
-low-risk and reduces the dominant encoder forward cost. Schedule lever 2
-(token-based batching) as the next structural improvement; treat levers 3–4 as
-profile-gated tuning. Every batch-size change must be preceded by a short
-`mem_peak` profile per the batch-sizing rule.
+
+The next speed action is a profile of the current prepared loader plus GPU overlap on the formal
+`protein_pretrain_esmc.py` line. Use the result to choose workers, prefetch, length bucketing,
+token budget, batch size, and checkpointing. Do not reuse deleted qwen data/training modules or
+fix a worker count from historical Arrow measurements. The main agent must append the actual
+command, exit code, elapsed time, and absolute profile artifact to
+`/vepfs-mlp2/c20250601/251105016/project/dllm_test/PROJECT_PROCESS.md`; this documentation update
+does not claim that the latest speed or full-model validation passed.

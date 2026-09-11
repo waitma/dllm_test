@@ -15,12 +15,13 @@
 >
 > | Fact | Owner (do not restate here) |
 > |---|---|
-> | Prepared layout / completion / all-X / profile fields | [`DATA_FORMAT_AUDIT.md`](../../../DATA_FORMAT_AUDIT.md) |
+> | Prepared layout / completion / all-X / profile fields / `filter_names` contract / known warts | [`DATA_FORMAT_AUDIT.md`](../../../DATA_FORMAT_AUDIT.md) |
 > | Design rationale and risk register | [`docs/PLAN_TCR_BETA_ONLY_RELATION_DIFFUSION.md`](../../../docs/PLAN_TCR_BETA_ONLY_RELATION_DIFFUSION.md) |
 > | Experiment / preprocess progress | [`PROJECT_PROCESS.md`](../../../PROJECT_PROCESS.md) |
 > | Long-lived rules | [`PROJ_GUIDE.md`](../../../PROJ_GUIDE.md) |
 > | Raw-corpus decontam accidents | [`examples/llada/DATA_PIPELINE_README.md`](../../../examples/llada/DATA_PIPELINE_README.md) |
 > | v4 published row counts | plan §4.1 (same PLAN file) |
+> | v5 published counts / v4 Δ / supervised-token shares / invariants / post-hoc item-13 counters | plan §4.2 (same PLAN file) |
 
 `dllm/pipelines/immune_llada/` is workspace-local (never added to git, not
 gitignored). Do not describe this tree's history in git terms.
@@ -30,21 +31,12 @@ gitignored). Do not describe this tree's history in git terms.
 | Root | Config | Status |
 |---|---|---|
 | `data/prepared/immune_v4_beta_relation` | `configs/data/immune_v4_beta_relation.yaml` | **Current published.** Completion default: `tcr_repertoire` only. |
-| `data/prepared/immune_v5_receptor_completion` | `configs/data/immune_v5_receptor_completion.yaml` | **进行中.** `completion_sources: [trait, tcr_native, tcr_papers, tcr_repertoire]`. Dataset-level manifest is not published yet — **do not invent final row counts, sizes, or token shares.** |
+| `data/prepared/immune_v5_receptor_completion` | `configs/data/immune_v5_receptor_completion.yaml` | **Published.** `completion_sources: [trait, tcr_native, tcr_papers, tcr_repertoire]`. 13G. Authoritative counts / v4 Δ / supervised-token shares / invariants: [plan §4.2](../../../docs/PLAN_TCR_BETA_ONLY_RELATION_DIFFUSION.md). |
 | `data/prepared/immune_v3/` and `immune_v3_heterotypic/` | `configs/data/immune_v3.yaml` | Live on-disk artifacts. Some v3 checkpoints and eval YAMLs still point here. **Not** a current training default. |
 
-Qualitative expectation for v5 (not an audit number): total rows drop by roughly
-39k (all-X epitope drops via `quality.blank_epitope`); the three epitope sources
-grow per-row because each completed record gains a full synthetic chain plus
-`synthetic_residue_mask`.
-
-**v5 final audit numbers — placeholder (fill only from the published manifest):**
-
-| split | records | notes |
-|---|---:|---|
-| train | *待 v5 manifest* | |
-| valid | *待 v5 manifest* | |
-| dropped `quality.blank_epitope` | *待 `filter_report.json`* | named filter; not a silent adapter `None` |
+v5 headline (do not copy the per-source table here): train **7,626,885**;
+the only drops vs v4 are `quality.blank_epitope` (38,689 train + 411 valid,
+all `tcr_papers`). Full table: plan §4.2.
 
 ## Boundary
 
@@ -63,7 +55,9 @@ raw CSV/JSONL
 Preprocessing performs every operation that can reject a row: source schema
 conversion, receptor completion (when the source is in `completion_sources`),
 invalid-sequence handling, benchmark/decontamination blocklists, and
-protein/grammar length budgets. A rejected row is counted in `filter_report.json`.
+protein/grammar length budgets. A rejected row is counted in `filter_report.json`
+(first-failure drop). Kept-record MHC-strip and partner-completion
+transformations are counted there too — see Prepared output.
 The prepared loader does not parse raw columns, reapply filters, retry, replace,
 or silently skip rows. It still scans the prepared JSONL shards once at dataset
 construction to build byte-offset indexes, then decodes and validates one semantic
@@ -101,6 +95,30 @@ file and atomically renamed after completion. The manifest records
 `completion_sources` (once a run that knows the field finishes) so a prepared
 record's layout is reconstructable.
 
+`filter_report.json` records, per source and in `totals`:
+
+- the original six first-failure drop / schema counters (`raw_rows`,
+  `converted_rows`, `kept_rows`, `dropped_schema`, `dropped_filters`,
+  `errors`, plus `filter_reasons`) — these are what `count_immune_drops.py`
+  reads;
+- three **kept-record transformation** counters, distinct from those drops:
+  `downgraded_all_x_mhc`, `beta_only_completed`, `alpha_only_completed`.
+  `dropped_all_x_epitope` is **not** duplicated; it stays the
+  `quality.blank_epitope` filter attribution.
+
+Dataset-level `dataset_manifest.json` `filter_names` is the union, in
+first-seen order, of the `RecordFilter` names `build_filters` actually
+constructed. Per-source lists live on each `filter_report` entry. Full
+contract (including the old hardcoded-`BLOCKLIST_NAMES` defect):
+[`DATA_FORMAT_AUDIT.md`](../../../DATA_FORMAT_AUDIT.md).
+
+The **published v5** `filter_report.json` / `dataset_manifest.json` still
+have the old `filter_names` and **no** transformation counters (v5 was not
+re-run). Authoritative post-hoc v5 numbers, including the naive-vs-correct
+`downgraded_all_x_mhc` caveat: [plan §4.2](../../../docs/PLAN_TCR_BETA_ONLY_RELATION_DIFFUSION.md).
+A future preprocess writes the fields natively. Do not recount MHC-strip
+from prepared JSONL with a peptide-without-MHC heuristic.
+
 ## Latest pipeline changes (2026-09-12)
 
 Code lives under `dllm/pipelines/immune_llada/data/`. Layout facts and the
@@ -130,7 +148,7 @@ Short operational summary:
    `sort_keys=True`).
 6. **Verification:** 3,000 `tcr_repertoire` rows regenerated from the raw CSV
    against the v4-frozen profile vs the on-disk shard: **0 mismatches**. Suite:
-   **194 passed, 5 failed** (the 5 are pre-existing: `test_full_parity` ×3,
+   **198 passed, 5 failed** (the 5 are pre-existing: `test_full_parity` ×3,
    `test_profiling` autocast ×2). New tests:
    `scripts/tests/immune_llada/test_receptor_completion.py`,
    `test_null_context_prefix.py`.
@@ -140,11 +158,19 @@ Short operational summary:
    `tcr_repertoire`) and not to conditioned layouts. 2,240 prepared rows, 0 gaps;
    `grammar.py` unchanged. Open item: unused `single_entity` fallback has no
    prefix and no current source reaches it.
+8. **`filter_report` audit counters** (`downgraded_all_x_mhc`,
+   `beta_only_completed`, `alpha_only_completed`) now land per source and in
+   `totals`. Numbers: [plan §4.2](../../../docs/PLAN_TCR_BETA_ONLY_RELATION_DIFFUSION.md)
+   (post-hoc; published v5 report does not have the keys).
+9. **Manifest `filter_names`** is the union of constructed `RecordFilter`
+   names, not `BLOCKLIST_NAMES` config keys. Contract:
+   [`DATA_FORMAT_AUDIT.md`](../../../DATA_FORMAT_AUDIT.md). Published v5
+   manifest still has the old list.
 
 ## Configuration and command
 
 Use `configs/data/immune_v4_beta_relation.yaml` to reproduce the published v4
-root, or `configs/data/immune_v5_receptor_completion.yaml` for the in-progress
+root, or `configs/data/immune_v5_receptor_completion.yaml` for the published
 completion mix. Paths in production configs should be absolute.
 
 ```bash
