@@ -4,7 +4,14 @@
 >
 > This directory owns the **operational** data path for the ESMC-conditioned
 > LLaDA immune model (how to preprocess, what the prepared contract is, which
-> prepared roots are current). It is independent of `qwen3_vl_arch`.
+> prepared roots are current).
+>
+> The runtime pipeline under this directory does not import `qwen3_vl_arch` —
+> but the **test suite does**: `scripts/tests/immune_llada/test_beta_only_relation.py`
+> imports `resolve_partial_mask` from `dllm.pipelines.qwen3_vl_arch.sampling_bioseq`.
+> `qwen3_vl_arch` currently has a large uncommitted deletion set; if that cleanup
+> is finished without first relocating `resolve_partial_mask`, that test breaks.
+> Do not read "operationally independent" as "safe to delete".
 >
 > | Fact | Owner (do not restate here) |
 > |---|---|
