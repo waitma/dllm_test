@@ -14,7 +14,7 @@ TaskName: "protein_esmc_llada270m_diffusion_immune_v5_8gpu"
 # ActiveDeadlineSeconds 950400 = 11 天。8 卡 v3 实测 ~3.01 s/step，校正 full-split eval
 # 与 v5 序列变长后，20 万步中枢约 8.75 天、悲观约 10.0 天；11 天留余量。7 天不是平台上限
 # （v3 8gpu 2m 等任务已用 7776000 = 90 天并被接受跑过）。
-Description: "270m diffusion v5 receptor-completion 八卡 queue012 gb256=4x8x8 200ksteps ~6.71ep 11d"
+Description: "270m diffusion v5 receptor-completion 八卡"
 
 Storages:
   - Type: "Vepfs"
