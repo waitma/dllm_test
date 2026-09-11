@@ -1,0 +1,86 @@
+# Immune semantic dataset v5: receptor completion for epitope-conditioned TCR sources.
+#
+# Copied from immune_v4_beta_relation.yaml. Every source/blocklist/budget path is
+# identical. The only functional change is tcr_region_profile.completion_sources.
+#
+# What changed versus v4 and why
+# ------------------------------
+# v4 completed only tcr_repertoire: a bare CDR3β core was expanded into a
+# full-length two-chain (β+α) receptor by sampling per-region lengths from the
+# learned profile and padding with X. The epitope-conditioned sources (trait,
+# tcr_native, tcr_papers) also carry bare CDR3 loops but were left as
+# CDR3-only / single-chain records. That had two consequences:
+#   1. Bare CDR3 loops never received the same FR/CDR scaffolding as repertoire.
+#   2. Alpha-only rows rendered identically to beta-only rows (the grammar has
+#      no <tcra>/<tcrb> marker), so lone α sequences were learned as β.
+# v5 applies the same completion to trait / tcr_native / tcr_papers /
+# tcr_repertoire. Every completed record is a two-chain block (beta first);
+# missing partner chains are all-X and carry no diffusion loss.
+#
+# Two related cleanups of upstream placeholders, also gated on these sources:
+#   - all-X epitope rows ("epitope unknown") are dropped by quality.blank_epitope
+#   - all-X MHC chains ("allele unknown") are stripped, degrading the record to
+#     the tcr_peptide layout so the model is not conditioned on a fake allele
+#
+# trait CDR3s are full IMGT junctions (C...F/W) and are peeled into FR3/FR4;
+# tcr_native / tcr_papers store anchor-free cores and are passed through.
+# A real full-length Fv on tcr_native is kept verbatim.
+schema_version: immune_llada.semantic.v1
+splits: [train, valid]
+
+sources:
+  oas:
+    path: /vepfs-mlp2/c20250601/251105016/project/dllm_test/data/oas_previous_clean/splits
+    weight: 1.0
+    splits: [train, valid]
+  ots:
+    path: /vepfs-mlp2/c20250601/251105016/project/dllm_test/data/ots_paired_clean/final
+    weight: 1.0
+  asd_antibody:
+    path: /vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/asd/step6_final/antibody
+    weight: 1.0
+  trait:
+    path: /vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/trait/step4_final
+    weight: 1.0
+  tcr_native:
+    path: /vepfs-mlp2/c20250601/251105016/project/dllm_test/data/tcr_native/dataset
+    weight: 1.0
+  tcr_papers:
+    path: /vepfs-mlp2/c20250601/251105016/project/dllm_test/data/tcr_papers_v2/dataset
+    weight: 1.0
+  tcr_repertoire:
+    # junc80 build: stores the FULL IMGT junction (C...F/W) and tags rows
+    # fv_source=tcrdesign2026_cdr3_junc80, which is how the adapter decides to peel
+    # the C/F anchors into FR3/FR4. Do NOT point this at data/tcr_repertoire: that
+    # older build stores anchor-free cores and the two are not interchangeable.
+    path: /vepfs-mlp2/c20250601/251105016/project/dllm_test/data/tcr_repertoire_junc80/dataset
+    weight: 1.0
+
+# Use none/off/disabled/- only when intentionally disabling a filter.
+blocklists:
+  replaces_trait: /vepfs-mlp2/c20250601/251105016/project/dllm_test/data/tcr_native/dataset/replaces_trait_blocklist.txt
+  trait_benchmark: /vepfs-mlp2/c20250601/251105016/project/dllm_test/data/tcr_native/dataset/trait_benchmark_blocklist.txt
+  ots_benchmark: /vepfs-mlp2/c20250601/251105016/project/dllm_test/data/tcr_native/dataset/ots_benchmark_blocklist.txt
+  oas_benchmark: /vepfs-mlp2/c20250601/251105016/project/dllm_test/data/tcr_native/dataset/oas_benchmark_blocklist.txt
+  asd_antibody_benchmark: /vepfs-mlp2/c20250601/251105016/project/dllm_test/data/tcr_native/dataset/asd_antibody_benchmark_blocklist.txt
+  asd_nanobody_benchmark: /vepfs-mlp2/c20250601/251105016/project/dllm_test/data/tcr_native/dataset/asd_nanobody_benchmark_blocklist.txt
+  t4_refbinder: /vepfs-mlp2/c20250601/251105016/project/dllm_test/data/tcr_native/dataset/t4_refbinder_blocklist.txt
+  t2t3_eval: /vepfs-mlp2/c20250601/251105016/project/dllm_test/data/tcr_native/dataset/t2t3_eval_blocklist.txt
+
+budget:
+  max_protein_length: 1024
+  max_length: 1024
+
+output:
+  shard_size: 100000
+
+# The preprocessing pipeline learns this profile from current complete TCR rows
+# (OTS/native/papers) before completing the sources listed below. The resulting
+# profile, digest, and completion_sources are frozen into dataset_manifest.json.
+# Withholding a source from this list is what disables completion for it.
+# Default (v4) is [tcr_repertoire] only; v5 widens it to the epitope-conditioned
+# CDR3-loop sources as well.
+tcr_region_profile:
+  seed: 42
+  source_policy: current_complete_tcr_rows
+  completion_sources: [trait, tcr_native, tcr_papers, tcr_repertoire]

@@ -1,0 +1,893 @@
+"""Grammar-v2 BioSeq serialization and collation.
+
+Training still reads semantic records from ``bioseq_grammar_v1`` Arrow shards;
+``GrammarRenderer`` applies the v2 token layout at encode time.
+
+Build the Arrow cache with::
+
+    python scripts/data/build_bioseq_grammar_v1.py --splits train,valid
+
+Inspect one encoded batch with::
+
+    python -c "from dllm.pipelines.immune_llada.data import GrammarTokenizer; print(GrammarTokenizer().vocab_size)"
+"""
+
+from __future__ import annotations
+
+import random
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any, Iterator
+
+import torch
+from torch.utils.data import IterableDataset
+
+from .esm_encoding import Esm2SequenceTokenizer, EsmTokenizerProtocol
+from .sharding import distributed_worker_shard
+from .records import BioSeqChain, BioSeqRecord, DEFAULT_MAX_PROTEIN_LENGTH, TASK_TYPE_TO_ID, record_within_max_protein_length
+
+# v2 structure tokens (no <fixs>/<fixd>/<generate>/<prote>/<pairs>).
+# Multi-chain objects use repeated <prots>...<protd> blocks; peptide uses <pep>.
+GRAMMAR_STRUCTURE_TOKENS = (
+    "<ab>",
+    "<tcr>",
+    "<nb>",
+    "<pep>",
+    "<prots>",
+    "<protd>",
+)
+GRAMMAR_RELATIONS = (
+    "binding",
+    "activation",
+    "inhibition",
+    "catalysis",
+    "reaction",
+    "expression",
+    "ptmod",
+    "neutralization",
+    "nonbinding",
+    "unknown",
+)
+
+GRAMMAR_RELATION_TOKENS = tuple(f"<{relation}>" for relation in GRAMMAR_RELATIONS)
+# Type marker for the empty "no conditioning context" block that unconditional
+# records (antibody_pair / tcr_pair / tcr_single / nanobody) carry so their
+# layout matches conditioned ones slot-for-slot.
+#
+# Appended AFTER the relation tokens on purpose: grammar ids are
+# ``base_vocab_size + enumerate(GRAMMAR_TOKENS)``, so inserting this into
+# GRAMMAR_STRUCTURE_TOKENS would shift <binding> from 39 to 40 and move every
+# relation id with it, invalidating v3 checkpoints and any persisted id.
+GRAMMAR_NULL_CONTEXT_TOKEN = "<null>"
+GRAMMAR_TOKENS = (
+    GRAMMAR_STRUCTURE_TOKENS + GRAMMAR_RELATION_TOKENS + (GRAMMAR_NULL_CONTEXT_TOKEN,)
+)
+GRAMMAR_TYPE_MARKERS = frozenset({"<ab>", "<tcr>", "<nb>", "<pep>"})
+
+TOKEN_CLASS_PAD = 0
+TOKEN_CLASS_RESIDUE = 1
+TOKEN_CLASS_STRUCTURE = 2
+TOKEN_CLASS_RELATION = 3
+TOKEN_CLASS_NAMES = {
+    TOKEN_CLASS_RESIDUE: "residue",
+    TOKEN_CLASS_STRUCTURE: "structure",
+    TOKEN_CLASS_RELATION: "relation",
+}
+
+DEFAULT_GRAMMAR_DATA_DIR = Path(
+    "/vepfs-mlp2/c20250601/251105016/project/dllm_test/data/bioseq_grammar_v1"
+)
+
+# Process-local cache: load_from_disk is very slow on multi-million-row grammar shards.
+_GRAMMAR_ARROW_DATASET_CACHE: dict[str, object] = {}
+
+
+def _cached_grammar_arrow_dataset(path: Path):
+    key = str(path.resolve())
+    cached = _GRAMMAR_ARROW_DATASET_CACHE.get(key)
+    if cached is not None:
+        return cached
+    try:
+        from datasets import load_from_disk
+    except ImportError as exc:
+        raise ImportError("GrammarArrowSource requires the `datasets` package") from exc
+    cached = load_from_disk(key)
+    _GRAMMAR_ARROW_DATASET_CACHE[key] = cached
+    return cached
+
+
+class GrammarTokenizer:
+    """Append grammar tokens to an ESM-family residue vocabulary."""
+
+    def __init__(self, base_tokenizer: EsmTokenizerProtocol | None = None) -> None:
+        self.base_tokenizer = base_tokenizer or Esm2SequenceTokenizer()
+        self.base_vocab_size = int(getattr(self.base_tokenizer, "vocab_size"))
+        self.token_to_id = {
+            token: self.base_vocab_size + index for index, token in enumerate(GRAMMAR_TOKENS)
+        }
+        self.id_to_token = {token_id: token for token, token_id in self.token_to_id.items()}
+        self.pad_token_id = int(self.base_tokenizer.pad_token_id)
+        self.mask_token_id = int(self.base_tokenizer.mask_token_id)
+        self.cls_token_id = int(self.base_tokenizer.cls_token_id)
+        self.eos_token_id = int(self.base_tokenizer.eos_token_id)
+
+    @property
+    def vocab_size(self) -> int:
+        return self.base_vocab_size + len(GRAMMAR_TOKENS)
+
+    def special_id(self, token: str) -> int:
+        try:
+            return self.token_to_id[token]
+        except KeyError as exc:
+            raise KeyError(f"Unknown grammar token: {token}") from exc
+
+    def encode_residues(self, sequence: str) -> list[int]:
+        token_ids, residue_mask = self.base_tokenizer.encode_chain(sequence)
+        return [int(token_id) for token_id, is_residue in zip(token_ids, residue_mask) if is_residue]
+
+    def token(self, token_id: int) -> str:
+        if int(token_id) in self.id_to_token:
+            return self.id_to_token[int(token_id)]
+        base_id_to_token = getattr(self.base_tokenizer, "id_to_token", {})
+        return str(base_id_to_token.get(int(token_id), f"<base:{int(token_id)}>"))
+
+    def decode_tokens(self, token_ids: list[int]) -> list[str]:
+        return [self.token(token_id) for token_id in token_ids if int(token_id) != self.pad_token_id]
+
+    def chain_separator_id(self) -> int:
+        """Base-vocabulary id for the literal ``.`` chain separator."""
+
+        base = self.base_tokenizer
+        if hasattr(base, "token_id"):
+            return int(base.token_id("."))
+        token_to_id = getattr(base, "token_to_id", None)
+        if isinstance(token_to_id, dict) and "." in token_to_id:
+            return int(token_to_id["."])
+        inner = getattr(base, "tokenizer", None)
+        if inner is not None and hasattr(inner, "token_to_id"):
+            token_id = inner.token_to_id(".")
+            if token_id is not None:
+                return int(token_id)
+        raise AttributeError("Base tokenizer must expose '.' for chain separation")
+
+
+def _relation_token(relation: str | None) -> str:
+    raw = str(relation or "").strip().lower().replace(" ", "_").replace("-", "_")
+    if not raw:
+        normalized = "unknown"
+    elif raw in {"unknown_relation", "unk", "unknown"}:
+        normalized = "unknown"
+    elif raw in GRAMMAR_RELATIONS:
+        normalized = raw
+    else:
+        normalized = "unknown"
+    return f"<{normalized}>"
+
+
+def _first_chain(record: BioSeqRecord, roles: set[str]) -> BioSeqChain | None:
+    return next((chain for chain in record.chains if chain.role.lower() in roles), None)
+
+
+def _record_seed(record: BioSeqRecord) -> int:
+    payload = (
+        record.source,
+        record.task_type,
+        tuple((chain.role, chain.sequence) for chain in record.chains),
+    )
+    return hash(payload) & 0xFFFFFFFF
+
+
+def _grammar_position_ids(
+    input_ids: list[int],
+    classes: list[int],
+    tokenizer: GrammarTokenizer,
+) -> tuple[list[int], list[int]]:
+    """Assign per-residue chain index and within-chain position for decoder embeddings."""
+
+    position_ids_chain: list[int] = []
+    position_ids_inner: list[int] = []
+    chain_index = 0
+    inner_index = 0
+    in_protein_block = False
+    block_has_residues = False
+    separator_id = tokenizer.chain_separator_id()
+
+    for token_id, class_id in zip(input_ids, classes):
+        token = tokenizer.token(token_id)
+        if class_id == TOKEN_CLASS_RESIDUE:
+            position_ids_chain.append(chain_index)
+            position_ids_inner.append(inner_index)
+            inner_index += 1
+            block_has_residues = True
+            continue
+
+        position_ids_chain.append(-1)
+        position_ids_inner.append(-1)
+        if token == "<prots>":
+            in_protein_block = True
+            inner_index = 0
+            block_has_residues = False
+        elif token == "<protd>":
+            in_protein_block = False
+            # A residue-free block (the fixed <null> context prefix) must NOT
+            # consume a logical chain index. Otherwise position_ids_chain shifts
+            # by one on every unconditional record, and downstream eval code that
+            # addresses chains positionally -- residue_positions_by_chain,
+            # tcr_generation_partial_mask(target_chain_indices=0), nbbench chain0
+            # -- silently targets the wrong chain instead of failing loudly.
+            if block_has_residues:
+                chain_index += 1
+            inner_index = 0
+        elif in_protein_block and int(token_id) == separator_id:
+            chain_index += 1
+            inner_index = 0
+
+    return position_ids_chain, position_ids_inner
+
+
+def _build_per_chain_encoder_inputs(
+    input_ids: list[int],
+    classes: list[int],
+    position_ids_chain: list[int],
+    position_ids_inner: list[int],
+    tokenizer: GrammarTokenizer,
+) -> tuple[list[list[int]], list[list[int]], list[int], list[int]]:
+    """Build per-chain ``<cls> seq <eos>`` encoder streams and decoder ``chain_ids``."""
+
+    residue_groups: dict[int, list[tuple[int, int]]] = {}
+    for index, (class_id, chain_id, inner_id, token_id) in enumerate(
+        zip(classes, position_ids_chain, position_ids_inner, input_ids)
+    ):
+        if class_id != TOKEN_CLASS_RESIDUE or chain_id < 0 or inner_id < 0:
+            continue
+        residue_groups.setdefault(chain_id, []).append((inner_id, token_id))
+
+    sorted_chain_ids = sorted(residue_groups)
+    encoder_chains: list[list[int]] = []
+    encoder_residue_masks: list[list[int]] = []
+    logical_to_encoder: dict[int, int] = {}
+
+    for encoder_index, logical_id in enumerate(sorted_chain_ids):
+        residue_tokens = [token_id for _, token_id in sorted(residue_groups[logical_id], key=lambda item: item[0])]
+        encoded_ids, encoded_mask = _encode_chain_from_residue_ids(residue_tokens, tokenizer)
+        encoder_chains.append([int(token_id) for token_id in encoded_ids])
+        encoder_residue_masks.append([int(value) for value in encoded_mask])
+        logical_to_encoder[logical_id] = encoder_index
+
+    decoder_chain_ids = [-1] * len(input_ids)
+    decoder_inner_ids = [-1] * len(input_ids)
+    for index, (class_id, chain_id, inner_id) in enumerate(
+        zip(classes, position_ids_chain, position_ids_inner)
+    ):
+        if class_id != TOKEN_CLASS_RESIDUE or chain_id < 0:
+            continue
+        encoder_chain = logical_to_encoder.get(chain_id)
+        if encoder_chain is None:
+            continue
+        decoder_chain_ids[index] = encoder_chain
+        decoder_inner_ids[index] = inner_id
+
+    return encoder_chains, encoder_residue_masks, decoder_chain_ids, decoder_inner_ids
+
+
+def _base_residue_token(token_id: int, tokenizer: GrammarTokenizer) -> str | None:
+    """Map a decoder residue id back to a single amino-acid character."""
+
+    if int(token_id) in tokenizer.id_to_token:
+        return None
+    base = tokenizer.base_tokenizer
+    id_to_token = getattr(base, "id_to_token", None)
+    if isinstance(id_to_token, dict):
+        token = id_to_token.get(int(token_id))
+    elif hasattr(base, "token_from_id"):
+        token = base.token_from_id(int(token_id))
+    elif hasattr(base, "tokenizer") and hasattr(base.tokenizer, "id_to_token"):
+        token = getattr(base.tokenizer, "id_to_token", {}).get(int(token_id))
+    else:
+        token = None
+    if token is None and hasattr(base, "tokenizer") and hasattr(base.tokenizer, "id_to_token"):
+        vocab = base.tokenizer.get_vocab() if hasattr(base.tokenizer, "get_vocab") else {}
+        if vocab:
+            reverse = {value: key for key, value in vocab.items()}
+            token = reverse.get(int(token_id))
+    if token is None:
+        return "X"
+    token = str(token)
+    if token.startswith("<"):
+        return None
+    return token
+
+
+def _residue_ids_to_sequence(residue_ids: list[int], tokenizer: GrammarTokenizer) -> str:
+    pieces: list[str] = []
+    for token_id in residue_ids:
+        token = _base_residue_token(token_id, tokenizer)
+        if token is not None:
+            pieces.append(token)
+    return "".join(pieces)
+
+
+def _encode_chain_from_residue_ids(
+    residue_ids: list[int],
+    tokenizer: GrammarTokenizer,
+) -> tuple[list[int], list[int]]:
+    """Wrap decoder residue ids as ``<cls> residues <eos>`` for the encoder.
+
+    Decoder residue positions already carry base-vocabulary ids from
+    ``GrammarTokenizer.encode_residues``. Re-encoding through an amino-acid
+    string requires ``id_to_token`` on the base tokenizer; local ESMC snapshots
+    loaded via ``TokenizersEsmTokenizer`` do not expose that map, which silently
+    turned every chain into ``X`` before this helper existed.
+    """
+
+    base = tokenizer.base_tokenizer
+    residue_token_ids = [int(token_id) for token_id in residue_ids]
+    encoded_ids = [int(base.cls_token_id)] + residue_token_ids + [int(base.eos_token_id)]
+    encoded_mask = [0] + [1] * len(residue_token_ids) + [0]
+    return encoded_ids, encoded_mask
+
+
+@dataclass
+class GrammarRenderer:
+    """Render a BioSeqRecord into the flat grammar-v2 token stream."""
+
+    tokenizer: GrammarTokenizer
+    ppi_max_protein_length: int = 1024
+    rng: random.Random | None = None
+
+    def encode(self, record: BioSeqRecord) -> dict[str, Any]:
+        if self.ppi_max_protein_length > 0 and not record_within_max_protein_length(
+            record, self.ppi_max_protein_length
+        ):
+            raise ValueError(
+                f"Record from {record.source} has a chain longer than "
+                f"{self.ppi_max_protein_length} aa; filter at loader stage instead of cropping"
+            )
+        ids: list[int] = []
+        fixed: list[int] = []
+        classes: list[int] = []
+        synthetic_residue: list[int] = []
+        relation_target: list[int] = []
+        separator_id = self.tokenizer.chain_separator_id()
+
+        def special(token: str, is_fixed: bool = False, relation_target_token: bool = False) -> None:
+            ids.append(self.tokenizer.special_id(token))
+            fixed.append(int(is_fixed))
+            classes.append(
+                TOKEN_CLASS_RELATION if token in GRAMMAR_RELATION_TOKENS else TOKEN_CLASS_STRUCTURE
+            )
+            synthetic_residue.append(0)
+            relation_target.append(int(relation_target_token))
+
+        def literal(token_id: int, is_fixed: bool = False) -> None:
+            ids.append(int(token_id))
+            fixed.append(int(is_fixed))
+            classes.append(TOKEN_CLASS_STRUCTURE)
+            synthetic_residue.append(0)
+            relation_target.append(0)
+
+        def sequence(
+            sequence_value: str,
+            is_fixed: bool = False,
+            cap: int | None = None,
+            synthetic_mask: list[int] | None = None,
+        ) -> None:
+            normalized = sequence_value[:cap] if cap is not None else sequence_value
+            residue_ids = self.tokenizer.encode_residues(normalized)
+            ids.extend(residue_ids)
+            fixed.extend([int(is_fixed)] * len(residue_ids))
+            classes.extend([TOKEN_CLASS_RESIDUE] * len(residue_ids))
+            if synthetic_mask is None:
+                synthetic_residue.extend([0] * len(residue_ids))
+            else:
+                synthetic_residue.extend([int(value) for value in synthetic_mask[: len(residue_ids)]])
+            relation_target.extend([0] * len(residue_ids))
+
+        def append_protein_block(
+            chains: list[BioSeqChain],
+            *,
+            type_marker: str | None = None,
+            is_fixed: bool = False,
+            type_marker_fixed: bool | None = None,
+            cap: int | None = None,
+        ) -> None:
+            if not chains:
+                raise ValueError("Protein block requires at least one chain")
+            special("<prots>", is_fixed=is_fixed)
+            if type_marker is not None:
+                marker_fixed = type_marker_fixed if type_marker_fixed is not None else is_fixed
+                special(type_marker, is_fixed=marker_fixed)
+            for chain_index, chain in enumerate(chains):
+                if chain_index > 0:
+                    literal(separator_id, is_fixed=is_fixed)
+                sequence(
+                    chain.sequence,
+                    is_fixed=is_fixed,
+                    cap=cap,
+                    synthetic_mask=chain.metadata.get("synthetic_residue_mask"),
+                )
+            special("<protd>", is_fixed=is_fixed)
+
+        def append_peptide_block(chain: BioSeqChain, *, is_fixed: bool) -> None:
+            append_protein_block(
+                [chain],
+                type_marker="<pep>",
+                is_fixed=is_fixed,
+                type_marker_fixed=True,
+            )
+
+        def append_null_context_prefix() -> None:
+            """Emit the fixed no-context prefix ``<prots> <null> <protd> <unknown>``.
+
+            Conditioned records open with a context block plus a relation token;
+            unconditional ones used to jump straight to their own ``<prots>``, so
+            "prefix absent" was itself a cue for "no conditioning". Giving both the
+            same slot layout leaves block *content* as the only difference, which is
+            what makes classifier-free-style two-pass decoding (real context vs
+            ``<null>``) possible at inference.
+
+            All four tokens are fixed: no diffusion loss, no corruption, attention
+            only. ``<unknown>`` is deliberately the relation, so it is never a
+            supervised relation target. The block carries no residues, so
+            ``_grammar_position_ids`` does not let it consume a chain index.
+            """
+
+            special("<prots>", is_fixed=True)
+            special(GRAMMAR_NULL_CONTEXT_TOKEN, is_fixed=True)
+            special("<protd>", is_fixed=True)
+            special("<unknown>", is_fixed=True)
+
+        relation_value = record.labels.get("relation") or record.metadata.get("relation")
+        relation = _relation_token(relation_value)
+        relation_target_enabled = bool(record.metadata.get("relation_supervised")) and relation in {"<binding>", "<nonbinding>"}
+        roles = {chain.role.lower() for chain in record.chains}
+        grammar_name = "generic"
+
+        if record.task_type == "ppi" or {"protein_a", "protein_b"} <= roles:
+            protein_a = _first_chain(record, {"protein_a", "other"}) or record.chains[0]
+            protein_b = _first_chain(record, {"protein_b"}) or record.chains[1]
+            append_protein_block([protein_a], is_fixed=True)
+            special(relation, is_fixed=not relation_target_enabled, relation_target_token=relation_target_enabled)
+            append_protein_block([protein_b], is_fixed=False)
+            grammar_name = "ppi_conditional"
+        else:
+            mhc_chains = [chain for chain in record.chains if chain.role.lower() in {"mhc", "pmhc", "hla"}]
+            antigen = _first_chain(record, {"antigen"})
+            peptide = _first_chain(record, {"peptide", "epitope"})
+            heavy = _first_chain(record, {"antibody_heavy", "nanobody_vhh"})
+            light = _first_chain(record, {"antibody_light"})
+            alpha = _first_chain(record, {"tcr_alpha"})
+            beta = _first_chain(record, {"tcr_beta"})
+
+            if record.task_type == "antibody" and len(record.chains) >= 2:
+                heavy, light = record.chains[0], record.chains[1]
+            # Legacy context-free TCR pairs may lack explicit chain roles and use
+            # positional [beta, alpha] order.  Never apply that fallback when a
+            # receptor role or a peptide/antigen/MHC context is already explicit:
+            # doing so would turn [peptide, tcr_beta] into [alpha=tcr_beta,
+            # beta=peptide] and duplicate the peptide inside the TCR block.
+            if (
+                record.task_type == "tcr"
+                and len(record.chains) >= 2
+                and alpha is None
+                and beta is None
+                and peptide is None
+                and antigen is None
+                and not mhc_chains
+            ):
+                alpha, beta = record.chains[1], record.chains[0]
+
+            if record.task_type in {
+                "antibody_antigen",
+                "nanobody_antigen",
+                "antibody_neutralization",
+            } and antigen is not None:
+                append_protein_block([antigen], is_fixed=True)
+                special(relation, is_fixed=not relation_target_enabled, relation_target_token=relation_target_enabled)
+                ab_chains = [chain for chain in (heavy, light) if chain is not None]
+                if record.task_type == "nanobody_antigen" or (
+                    light is None and "nanobody_vhh" in roles
+                ):
+                    receptor_type = "<nb>"
+                    grammar_name = "antigen_nanobody"
+                else:
+                    receptor_type = "<ab>"
+                    grammar_name = "antigen_antibody"
+                append_protein_block(
+                    ab_chains if ab_chains else record.chains,
+                    type_marker=receptor_type,
+                    is_fixed=False,
+                )
+            elif record.task_type in {"nanobody"} or (
+                heavy is not None and light is None and "nanobody_vhh" in roles and antigen is None
+            ):
+                append_null_context_prefix()
+                append_protein_block(
+                    [heavy or record.chains[0]],
+                    type_marker="<nb>",
+                    is_fixed=False,
+                )
+                grammar_name = "nanobody"
+            elif alpha is not None or beta is not None or record.task_type.startswith("tcr"):
+                tcr_peptide = peptide or antigen
+                # The pMHC<->TCR recognition token carries the binding/nonbinding
+                # label (e.g. PISTE negatives). Honor record.labels["relation"];
+                # unlabeled pretraining pMHC-TCR pairs default to <binding> so this
+                # is byte-identical to the old hardcoded behaviour when unset.
+                recognition_relation = (
+                    relation if relation in {"<binding>", "<nonbinding>"} else "<binding>"
+                )
+                has_tcr_peptide = tcr_peptide is not None
+                if mhc_chains:
+                    append_protein_block(mhc_chains, is_fixed=True)
+                    # MHC->peptide is presentation (always <binding>); MHC->TCR with
+                    # no peptide carries the recognition label instead.
+                    special(
+                        "<binding>" if has_tcr_peptide else recognition_relation,
+                        is_fixed=has_tcr_peptide or not relation_target_enabled,
+                        relation_target_token=(not has_tcr_peptide) and relation_target_enabled,
+                    )
+                if has_tcr_peptide:
+                    append_peptide_block(tcr_peptide, is_fixed=True)
+                    special(
+                        recognition_relation,
+                        is_fixed=not relation_target_enabled,
+                        relation_target_token=relation_target_enabled,
+                    )
+                # Beta first, mirroring antibody heavy-before-light: downstream
+                # sample_chain_conditioned_timesteps / generated_heavy_light_masks
+                # treat the smallest generated chain id as the heavy-analog chain,
+                # so beta must encode before alpha.
+                receptor = [chain for chain in (beta, alpha) if chain is not None]
+                if not mhc_chains and not has_tcr_peptide:
+                    append_null_context_prefix()
+                if len(receptor) == 1:
+                    append_protein_block(
+                        receptor,
+                        type_marker="<tcr>",
+                        is_fixed=False,
+                    )
+                    grammar_name = "tcr_pmhc" if mhc_chains else (
+                        "tcr_peptide" if tcr_peptide is not None else "tcr_single"
+                    )
+                else:
+                    append_protein_block(
+                        receptor,
+                        type_marker="<tcr>",
+                        is_fixed=False,
+                    )
+                    grammar_name = "tcr_pmhc" if mhc_chains else (
+                        "tcr_peptide" if tcr_peptide is not None else "tcr_pair"
+                    )
+            elif record.task_type == "antibody" or (heavy is not None and light is not None):
+                ab_chains = [chain for chain in (heavy, light) if chain is not None]
+                append_null_context_prefix()
+                append_protein_block(
+                    ab_chains if ab_chains else record.chains,
+                    type_marker="<ab>",
+                    is_fixed=False,
+                )
+                grammar_name = "antibody_pair"
+            elif record.task_type == "tcr":
+                append_null_context_prefix()
+                append_protein_block(
+                    record.chains,
+                    type_marker="<tcr>",
+                    is_fixed=False,
+                )
+                grammar_name = "tcr_pair"
+            else:
+                append_protein_block(record.chains, is_fixed=False)
+                grammar_name = "single_entity"
+
+        if not ids:
+            raise ValueError(f"Grammar renderer produced an empty record for {record.source}")
+        diffusion_mask = [int(not is_fixed) and not synthetic for is_fixed, synthetic in zip(fixed, synthetic_residue)]
+        eligible_mask = [int(not is_fixed) and not synthetic for is_fixed, synthetic in zip(fixed, synthetic_residue)]
+        position_ids_chain, position_ids_inner = _grammar_position_ids(ids, classes, self.tokenizer)
+        return {
+            "input_ids": ids,
+            "fixed_context_mask": fixed,
+            "diffusion_loss_mask": diffusion_mask,
+            "diffusion_eligible_mask": eligible_mask,
+            "synthetic_residue_mask": synthetic_residue,
+            "relation_target_mask": relation_target,
+            "token_class_ids": classes,
+            "position_ids_chain": position_ids_chain,
+            "position_ids_inner": position_ids_inner,
+            "task_type": record.task_type,
+            "source": record.source,
+            "grammar_name": grammar_name,
+            "weight": float(record.weight),
+        }
+
+
+def grammar_record_from_arrow(row: dict[str, Any]) -> BioSeqRecord:
+    chains = [
+        BioSeqChain(sequence=sequence, role=role)
+        for sequence, role in zip(row["chains"], row["roles"])
+    ]
+    return BioSeqRecord(
+        chains=chains,
+        task_type=str(row["task_type"]),
+        source=str(row["source"]),
+        split=str(row.get("split") or "") or None,
+        labels={"relation": row.get("relation", "unknown")},
+        weight=float(row.get("weight", 1.0)),
+    )
+
+
+@dataclass(frozen=True)
+class GrammarArrowSourceConfig:
+    name: str
+    path: Path = DEFAULT_GRAMMAR_DATA_DIR
+    split: str = "train"
+    weight: float = 1.0
+    max_records: int | None = None
+    # Streaming shuffle window over each shard. 0/1 disables it and keeps the
+    # exact stored-order stream. The Arrow shards are written unshuffled (see
+    # scripts/data/build_bioseq_grammar_v1.py), and WeightedMixtureDataset only
+    # randomizes *which source* emits next, so without this the samples inside a
+    # single task-homogeneous batch stay adjacent in stored (often clustered)
+    # order. The buffer reorders within a window while keeping reads sequential.
+    shuffle_buffer_size: int = 0
+    shuffle_seed: int = 0
+
+
+def _streaming_shuffle(
+    records: Iterator[BioSeqRecord],
+    buffer_size: int,
+    rng: random.Random,
+) -> Iterator[BioSeqRecord]:
+    """Reservoir-style streaming shuffle (TF ``dataset.shuffle`` semantics).
+
+    Reads ``records`` sequentially into a fixed-size window and, once full,
+    yields a random buffered element in place of each incoming one. This is
+    *count preserving*: every input record is emitted exactly once, so per-shard
+    counts (and therefore DDP batch counts) are identical to the un-shuffled
+    stream. Reads stay sequential, so Arrow mmap locality is preserved.
+    """
+
+    if buffer_size <= 1:
+        yield from records
+        return
+    buffer: list[BioSeqRecord] = []
+    for record in records:
+        if len(buffer) < buffer_size:
+            buffer.append(record)
+            continue
+        swap = rng.randrange(buffer_size)
+        yield buffer[swap]
+        buffer[swap] = record
+    rng.shuffle(buffer)
+    yield from buffer
+
+
+class GrammarArrowSource(IterableDataset):
+    """Stream semantic grammar records from preprocessed Hugging Face Arrow shards."""
+
+    def __init__(self, config: GrammarArrowSourceConfig) -> None:
+        super().__init__()
+        self.config = config
+        self.path = config.path / config.name / config.split
+        if not self.path.exists():
+            raise FileNotFoundError(
+                f"Grammar Arrow source not found: {self.path}. "
+                "Run scripts/data/build_bioseq_grammar_v1.py first."
+            )
+        # Each fresh iterator is a new pass over the shard. WeightedMixtureDataset
+        # re-opens exhausted sources (small corpora loop many times per run), so
+        # bumping this per call reshuffles every pass instead of repeating one order.
+        self._shuffle_pass = 0
+
+    def _raw_records(self, shard_index: int, num_shards: int) -> Iterator[BioSeqRecord]:
+        dataset = _cached_grammar_arrow_dataset(self.path)
+        dataset = dataset.shard(num_shards=num_shards, index=shard_index, contiguous=True)
+        kept = 0
+        for row in dataset:
+            row = dict(row)
+            record = grammar_record_from_arrow(row)
+            if self.config.weight != 1.0:
+                record = BioSeqRecord(
+                    chains=record.chains,
+                    task_type=record.task_type,
+                    source=record.source,
+                    split=record.split,
+                    metadata=record.metadata,
+                    labels=record.labels,
+                    weight=self.config.weight,
+                )
+            yield record
+            kept += 1
+            if self.config.max_records is not None and kept >= self.config.max_records:
+                break
+
+    def iter_records(self, shard_index: int = 0, num_shards: int = 1) -> Iterator[BioSeqRecord]:
+        raw = self._raw_records(shard_index, num_shards)
+        buffer_size = int(self.config.shuffle_buffer_size)
+        if buffer_size <= 1:
+            yield from raw
+            return
+        pass_index = self._shuffle_pass
+        self._shuffle_pass += 1
+        # Compose an int seed (never a tuple: random.seed rejects tuples). Int
+        # seeds are deterministic across processes, unlike str hashing under
+        # PYTHONHASHSEED, so every rank reproduces its own order on resume.
+        seed_int = (
+            (int(self.config.shuffle_seed) * 1_000_003 + int(shard_index)) * 1_000_003
+            + int(pass_index)
+        ) & 0x7FFFFFFF
+        yield from _streaming_shuffle(raw, buffer_size, random.Random(seed_int))
+
+    def __iter__(self) -> Iterator[BioSeqRecord]:
+        shard_index, num_shards = distributed_worker_shard()
+        yield from self.iter_records(shard_index=shard_index, num_shards=num_shards)
+
+
+@dataclass
+class GrammarBioSeqCollator:
+    """Pad grammar records and build per-chain encoder inputs for ESMC/ESM2."""
+
+    tokenizer: GrammarTokenizer
+    max_sequence_length: int = 2112
+    max_protein_length: int = DEFAULT_MAX_PROTEIN_LENGTH
+    task_type_to_id: dict[str, int] = field(default_factory=lambda: dict(TASK_TYPE_TO_ID))
+
+    def __post_init__(self) -> None:
+        self.renderer = GrammarRenderer(self.tokenizer, ppi_max_protein_length=self.max_protein_length)
+
+    def __call__(self, records: list[BioSeqRecord | dict[str, Any]]) -> dict[str, Any]:
+        rows = [
+            record if isinstance(record, dict) and "input_ids" in record else self.renderer.encode(record)
+            for record in records
+        ]
+        lengths = [len(row["input_ids"]) for row in rows]
+        if max(lengths) > self.max_sequence_length:
+            raise ValueError(
+                f"Grammar record length {max(lengths)} exceeds max_sequence_length "
+                f"{self.max_sequence_length}; records are never grammar-truncated"
+            )
+        max_len = max(lengths)
+        pad_id = self.tokenizer.pad_token_id
+        batch: dict[str, list[list[int]]] = {
+            key: []
+            for key in (
+                "input_ids",
+                "labels",
+                "attention_mask",
+                "fixed_context_mask",
+                "diffusion_loss_mask",
+                "diffusion_eligible_mask",
+                "residue_mask",
+                "structure_token_mask",
+                "relation_token_mask",
+                "relation_target_mask",
+                "synthetic_residue_mask",
+                "token_class_ids",
+                "position_ids_inner",
+                "position_ids_chain",
+                "chain_ids",
+            )
+        }
+        encoder_ids: list[list[list[int]]] = []
+        encoder_attention: list[list[list[int]]] = []
+        encoder_residue: list[list[list[int]]] = []
+        encoder_chain_mask: list[list[int]] = []
+
+        for row in rows:
+            input_ids = list(row["input_ids"])
+            classes = list(row["token_class_ids"])
+            attention = [1] * len(input_ids)
+            pad_len = max_len - len(input_ids)
+            position_ids_chain = list(row["position_ids_chain"])
+            position_ids_inner = list(row["position_ids_inner"])
+            chain_enc, chain_residue_masks, decoder_chain_ids, decoder_inner_ids = _build_per_chain_encoder_inputs(
+                input_ids,
+                classes,
+                position_ids_chain,
+                position_ids_inner,
+                self.tokenizer,
+            )
+
+            batch["input_ids"].append(input_ids + [pad_id] * pad_len)
+            batch["labels"].append(input_ids + [-100] * pad_len)
+            batch["attention_mask"].append(attention + [0] * pad_len)
+            batch["fixed_context_mask"].append(list(row["fixed_context_mask"]) + [0] * pad_len)
+            batch["diffusion_loss_mask"].append(list(row["diffusion_loss_mask"]) + [0] * pad_len)
+            batch["diffusion_eligible_mask"].append(list(row["diffusion_eligible_mask"]) + [0] * pad_len)
+            batch["residue_mask"].append(
+                [int(value == TOKEN_CLASS_RESIDUE) for value in classes] + [0] * pad_len
+            )
+            batch["structure_token_mask"].append(
+                [int(value == TOKEN_CLASS_STRUCTURE) for value in classes] + [0] * pad_len
+            )
+            batch["relation_token_mask"].append(
+                [int(value == TOKEN_CLASS_RELATION) for value in classes] + [0] * pad_len
+            )
+            batch["relation_target_mask"].append(
+                list(row.get("relation_target_mask", [0] * len(input_ids))) + [0] * pad_len
+            )
+            batch["synthetic_residue_mask"].append(
+                list(row.get("synthetic_residue_mask", [0] * len(input_ids))) + [0] * pad_len
+            )
+            batch["token_class_ids"].append(classes + [TOKEN_CLASS_PAD] * pad_len)
+            batch["position_ids_inner"].append(decoder_inner_ids + [-1] * pad_len)
+            batch["position_ids_chain"].append(position_ids_chain + [-1] * pad_len)
+            batch["chain_ids"].append(decoder_chain_ids + [-1] * pad_len)
+
+            max_chain_len = max((len(chain) for chain in chain_enc), default=2)
+            padded_chains = [chain + [pad_id] * (max_chain_len - len(chain)) for chain in chain_enc]
+            padded_masks = [mask + [0] * (max_chain_len - len(mask)) for mask in chain_residue_masks]
+            if not padded_chains:
+                padded_chains = [[self.tokenizer.cls_token_id, self.tokenizer.eos_token_id]]
+                padded_masks = [[0, 0]]
+            encoder_ids.append(padded_chains)
+            encoder_attention.append([[1 if token_id != pad_id else 0 for token_id in chain] for chain in padded_chains])
+            encoder_residue.append(padded_masks)
+            encoder_chain_mask.append([1] * len(padded_chains))
+
+        max_chains = max(len(chains) for chains in encoder_ids)
+        max_chain_len = max(len(chain) for chains in encoder_ids for chain in chains)
+        padded_encoder_ids: list[list[list[int]]] = []
+        padded_encoder_attention: list[list[list[int]]] = []
+        padded_encoder_residue: list[list[list[int]]] = []
+        padded_encoder_chain_mask: list[list[int]] = []
+        # Padding chain rows (added so every record has ``max_chains`` rows) must NOT
+        # be all-pad: an all-zero attention row makes the encoder softmax over -inf
+        # (NaN) and breaks ESM2 token-dropout (division by attention_mask.sum()==0).
+        # Use a minimal valid ``<cls><eos>`` stream instead; ``encoder_chain_mask`` /
+        # ``encoder_residue_mask`` stay 0 so the row contributes no decoder condition.
+        empty_chain = [self.tokenizer.cls_token_id, self.tokenizer.eos_token_id] + [pad_id] * (max_chain_len - 2)
+        empty_attn = [1, 1] + [0] * (max_chain_len - 2)
+        for chains, masks, residue_masks, chain_mask in zip(
+            encoder_ids, encoder_attention, encoder_residue, encoder_chain_mask
+        ):
+            num_pad_chains = max_chains - len(chains)
+            padded_chains = chains + [list(empty_chain) for _ in range(num_pad_chains)]
+            padded_attn = masks + [list(empty_attn) for _ in range(num_pad_chains)]
+            padded_res = residue_masks + [[0] * max_chain_len for _ in range(num_pad_chains)]
+            for chain_index, chain in enumerate(padded_chains):
+                if len(chain) < max_chain_len:
+                    padded_chains[chain_index] = chain + [pad_id] * (max_chain_len - len(chain))
+                    padded_attn[chain_index] = padded_attn[chain_index] + [0] * (
+                        max_chain_len - len(padded_attn[chain_index])
+                    )
+                    padded_res[chain_index] = padded_res[chain_index] + [0] * (
+                        max_chain_len - len(padded_res[chain_index])
+                    )
+            padded_encoder_ids.append(padded_chains)
+            padded_encoder_attention.append(padded_attn)
+            padded_encoder_residue.append(padded_res)
+            padded_encoder_chain_mask.append(chain_mask + [0] * (max_chains - len(chain_mask)))
+
+        result = {key: torch.tensor(value, dtype=torch.long) for key, value in batch.items()}
+        for key in (
+            "attention_mask",
+            "fixed_context_mask",
+            "diffusion_loss_mask",
+            "diffusion_eligible_mask",
+            "residue_mask",
+            "structure_token_mask",
+            "relation_token_mask",
+            "relation_target_mask",
+            "synthetic_residue_mask",
+        ):
+            result[key] = result[key].bool()
+        result["task_type_ids"] = torch.tensor(
+            [self.task_type_to_id.get(row["task_type"], self.task_type_to_id["generic"]) for row in rows],
+            dtype=torch.long,
+        )
+        result["encoder_input_ids"] = torch.tensor(padded_encoder_ids, dtype=torch.long)
+        result["encoder_attention_mask"] = torch.tensor(padded_encoder_attention, dtype=torch.bool)
+        result["encoder_residue_mask"] = torch.tensor(padded_encoder_residue, dtype=torch.bool)
+        result["encoder_chain_mask"] = torch.tensor(padded_encoder_chain_mask, dtype=torch.bool)
+        result["grammar_names"] = [str(row["grammar_name"]) for row in rows]
+        result["view_names"] = ["grammar_v2"] * len(rows)
+        result["task_groups"] = [str(row["task_type"]) for row in rows]
+        result["task_types"] = [str(row["task_type"]) for row in rows]
+        result["sources"] = [str(row["source"]) for row in rows]
+        result["weights"] = torch.tensor(
+            [float(row.get("weight", 1.0)) for row in rows],
+            dtype=torch.float32,
+        ).unsqueeze(-1)
+        return result
