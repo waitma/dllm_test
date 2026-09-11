@@ -3,10 +3,19 @@
 Call ``load_blocklists`` on configuration paths, then build a source-specific
 list with ``build_filters``.  ``filter_reason`` returns the first matching,
 group-prefixed filter name.
+
+Manifest ``filter_names`` is the **union**, across processed sources, of the
+``RecordFilter`` names that ``build_filters`` actually constructed. Filters are
+per-source (``quality.blank_epitope`` exists only for ``trait`` / ``tcr_native``
+/ ``tcr_papers``), so a dataset-level list cannot be read as "every source ran
+every name". A filter that was evaluated and dropped zero rows is still listed;
+a disabled or empty blocklist never becomes a ``RecordFilter`` and is omitted.
+The field is those constructed names, not the ``BLOCKLIST_NAMES`` config keys.
 """
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Mapping, Sequence
@@ -161,4 +170,30 @@ def filter_reason(record: BioSeqRecord, filters: Sequence[RecordFilter]) -> str 
     return None
 
 
-__all__ = ["BLOCKLIST_NAMES", "DISABLED_BLOCKLIST_SENTINELS", "RecordFilter", "build_filters", "filter_reason", "load_blocklists"]
+def constructed_filter_names(filters: Sequence[RecordFilter]) -> list[str]:
+    """Names of filters that will be evaluated, in evaluation order."""
+    return [filter_.name for filter_ in filters]
+
+
+def union_filter_names(per_source: Iterable[Sequence[str]]) -> list[str]:
+    """Dataset-level union of per-source constructed filter names.
+
+    First-seen order follows ``per_source`` (typically the processed-source
+    order). See the module docstring for why this is a union rather than a
+    per-source map.
+    """
+    names: list[str] = []
+    seen: set[str] = set()
+    for group in per_source:
+        for name in group:
+            if name not in seen:
+                seen.add(name)
+                names.append(name)
+    return names
+
+
+__all__ = [
+    "BLOCKLIST_NAMES", "DISABLED_BLOCKLIST_SENTINELS", "RecordFilter",
+    "build_filters", "constructed_filter_names", "filter_reason", "load_blocklists",
+    "union_filter_names",
+]

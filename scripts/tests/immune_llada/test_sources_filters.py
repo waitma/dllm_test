@@ -9,7 +9,13 @@ import pytest
 from dllm.pipelines.immune_llada.data.records import BioSeqRecord
 from dllm.pipelines.immune_llada.data.registry import DEFAULT_SOURCES, SOURCE_REGISTRY, SourceSpec, parse_sources, source_split_path
 from dllm.pipelines.immune_llada.data.sources import row_to_record
-from dllm.pipelines.immune_llada.data.preprocessing.filters import BLOCKLIST_NAMES, build_filters, filter_reason, load_blocklists
+from dllm.pipelines.immune_llada.data.preprocessing.filters import (
+    BLOCKLIST_NAMES,
+    build_filters,
+    filter_reason,
+    load_blocklists,
+    union_filter_names,
+)
 
 
 def _pair() -> dict[str, str]:
@@ -103,6 +109,19 @@ def test_homotypic_filter_preserves_valid_pairs_and_single_chain_sources():
         record = row_to_record(source, row)
         assert record is not None
         assert filter_reason(record, build_filters(source, [source], blocklists, 0, 0)) is None
+
+
+def test_union_filter_names_includes_source_specific_filters() -> None:
+    blocklists = {name: set() for name in BLOCKLIST_NAMES}
+    oas = [item.name for item in build_filters("oas", ["oas", "trait"], blocklists, 1024, 1024)]
+    trait = [item.name for item in build_filters("trait", ["oas", "trait"], blocklists, 1024, 1024)]
+    assert "quality.blank_epitope" in trait
+    assert "quality.blank_epitope" not in oas
+    assert "quality.homotypic_pair" in oas
+    names = union_filter_names([oas, trait])
+    assert "quality.blank_epitope" in names
+    assert "quality.homotypic_pair" in names
+    assert names == oas + [name for name in trait if name not in oas]
 
 
 def test_blocklist_paths_fail_loudly_and_disabled_values_work(tmp_path: Path) -> None:

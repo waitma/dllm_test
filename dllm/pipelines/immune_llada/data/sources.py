@@ -7,7 +7,7 @@ sequences return ``None``; unknown non-empty recognition relations raise.
 from __future__ import annotations
 
 import re
-from typing import Any
+from typing import Any, Mapping
 
 from .records import (
     BioSeqChain,
@@ -159,6 +159,65 @@ def _is_placeholder_sequence(sequence: str) -> bool:
     residue alphabet check cannot catch them because ``X`` is a legal residue.
     """
     return bool(sequence) and set(sequence) == {"X"}
+
+
+def is_fully_synthesized_chain(chain: BioSeqChain) -> bool:
+    """True when this chain was synthesized outright (no observed residues).
+
+    Completed chains carry ``receptor_completion`` or ``beta_only_completion``
+    plus ``synthetic_regions`` and a ``synthetic_residue_mask``. A fully
+    synthesized partner — the missing chain on an alpha-only or beta-only row —
+    has an all-1 mask. A CDR3-scaffolded chain has 0s on the observed loop (and
+    any peeled anchors) and is not counted here.
+    """
+    metadata = chain.metadata
+    if not (metadata.get("receptor_completion") or metadata.get("beta_only_completion")):
+        return False
+    if not metadata.get("synthetic_regions"):
+        return False
+    mask = metadata.get("synthetic_residue_mask")
+    return isinstance(mask, list) and bool(mask) and all(int(flag) == 1 for flag in mask)
+
+
+def partner_completion_flags(record: BioSeqRecord) -> tuple[bool, bool]:
+    """Return ``(beta_only_completed, alpha_only_completed)`` for a kept record.
+
+    ``beta_only_completed`` means a fully synthesized alpha was added (the
+    observed chain was beta). ``alpha_only_completed`` means a fully
+    synthesized beta was added. A row with both CDR3s or both Fvs has neither.
+    """
+    beta_only = False
+    alpha_only = False
+    for chain in record.chains:
+        if not is_fully_synthesized_chain(chain):
+            continue
+        if chain.role == "tcr_alpha":
+            beta_only = True
+        elif chain.role == "tcr_beta":
+            alpha_only = True
+    return beta_only, alpha_only
+
+
+def row_stripped_placeholder_mhc(row: Mapping[str, Any], record: BioSeqRecord) -> bool:
+    """True when the raw row carried an all-``X`` MHC that was then stripped.
+
+    Empty ``mhc_seq`` is not a downgrade — there was never an allele to drop.
+    The live ``downgraded_all_x_mhc`` counter uses this check. Prepared JSONL
+    cannot recover the raw MHC, so a post-hoc recount has to use
+    ``is_downgraded_mhc_layout`` and may include never-had-MHC rows.
+    """
+    mhc = normalize_sequence(row.get("mhc_seq"))
+    return _is_placeholder_sequence(mhc) and "mhc" not in record.chain_roles
+
+
+def is_downgraded_mhc_layout(record: BioSeqRecord) -> bool:
+    """Prepared-row stand-in for ``downgraded_all_x_mhc``.
+
+    A ``tcr_pmhc``-eligible peptide with no MHC chain. This is what can be
+    recovered from published JSONL without the raw CSV.
+    """
+    roles = record.chain_roles
+    return "peptide" in roles and "mhc" not in roles
 
 
 def complete_tcr_chain(
@@ -580,6 +639,9 @@ def tcr_repertoire_row_to_record(row: dict[str, Any], split: str | None = None, 
 __all__ = [
     "COMPLETION_SOURCES", "asd_antibody_row_to_record", "asd_nanobody_row_to_record",
     "canonical_recognition_relation", "complete_tcr_chain",
-    "nanobody_row_to_record", "oas_row_to_record", "ots_row_to_record", "row_to_record", "tcr_native_row_to_record",
-    "tcr_papers_row_to_record", "tcr_repertoire_row_to_record", "trait_row_to_record",
+    "is_downgraded_mhc_layout", "is_fully_synthesized_chain",
+    "nanobody_row_to_record", "oas_row_to_record", "ots_row_to_record",
+    "partner_completion_flags", "row_stripped_placeholder_mhc", "row_to_record",
+    "tcr_native_row_to_record", "tcr_papers_row_to_record",
+    "tcr_repertoire_row_to_record", "trait_row_to_record",
 ]

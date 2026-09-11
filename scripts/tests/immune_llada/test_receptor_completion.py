@@ -23,7 +23,12 @@ from dllm.pipelines.immune_llada.data.profiles import (
     fallback_region_profile,
     sample_region_lengths,
 )
-from dllm.pipelines.immune_llada.data.sources import row_to_record
+from dllm.pipelines.immune_llada.data.sources import (
+    is_downgraded_mhc_layout,
+    partner_completion_flags,
+    row_stripped_placeholder_mhc,
+    row_to_record,
+)
 
 _PROFILE = fallback_region_profile()
 _REGIONS = ("FR1", "CDR1", "FR2", "CDR2", "FR3", "CDR3", "FR4")
@@ -166,6 +171,29 @@ def test_all_x_epitope_is_dropped_by_an_attributed_filter(source: str) -> None:
     real = _record(source, {"epitope_seq": "GILGFVFTL", "mhc_seq": "Y" * 34, "cdr3b": "ASSQETQY", "relation": "nonbinding"})
     assert filter_reason(blank, filters) == "quality.blank_epitope"
     assert filter_reason(real, filters) is None
+
+
+def test_partner_completion_and_mhc_strip_are_detectable_on_the_record() -> None:
+    beta_only = _record("tcr_papers", {"epitope_seq": "GILGFVFTL", "cdr3b": "ASSQETQY", "relation": "binding"})
+    alpha_only = _record("tcr_papers", {"epitope_seq": "GILGFVFTL", "cdr3a": "AVGMNYGGSQ", "relation": "binding"})
+    both = _record("tcr_papers", {
+        "epitope_seq": "GILGFVFTL", "cdr3a": "AVGMNY", "cdr3b": "ASSQETQY", "relation": "binding",
+    })
+    assert partner_completion_flags(beta_only) == (True, False)
+    assert partner_completion_flags(alpha_only) == (False, True)
+    assert partner_completion_flags(both) == (False, False)
+
+    stripped_row = {"epitope_seq": "GILGFVFTL", "mhc_seq": "X" * 34, "cdr3b": "ASSQETQY", "relation": "binding"}
+    stripped = _record("tcr_papers", stripped_row)
+    assert row_stripped_placeholder_mhc(stripped_row, stripped)
+    assert is_downgraded_mhc_layout(stripped)
+
+    empty_mhc_row = {"epitope_seq": "GILGFVFTL", "cdr3b": "ASSQETQY", "relation": "binding"}
+    empty_mhc = _record("tcr_papers", empty_mhc_row)
+    assert not row_stripped_placeholder_mhc(empty_mhc_row, empty_mhc)
+    # Prepared JSONL cannot see the raw MHC, so the layout heuristic over-counts
+    # never-had-MHC rows relative to the live strip counter.
+    assert is_downgraded_mhc_layout(empty_mhc)
 
 
 def test_blank_epitope_filter_does_not_touch_unrelated_sources() -> None:

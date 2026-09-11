@@ -8,11 +8,20 @@ Only semantic records are written. Grammar tokenization, padding, encoder input
 reconstruction, and diffusion corruption remain in the training collator.
 """
 
-from .filters import BLOCKLIST_NAMES, RecordFilter, build_filters, filter_reason, load_blocklists
+from .filters import (
+    BLOCKLIST_NAMES,
+    RecordFilter,
+    build_filters,
+    constructed_filter_names,
+    filter_reason,
+    load_blocklists,
+    union_filter_names,
+)
 from .pipeline import PreprocessConfig, preprocess_dataset
 from .validators import SCHEMA_VERSION
 
 __all__ = [
     "BLOCKLIST_NAMES", "PreprocessConfig", "RecordFilter", "SCHEMA_VERSION",
-    "build_filters", "filter_reason", "load_blocklists", "preprocess_dataset",
+    "build_filters", "constructed_filter_names", "filter_reason",
+    "load_blocklists", "preprocess_dataset", "union_filter_names",
 ]

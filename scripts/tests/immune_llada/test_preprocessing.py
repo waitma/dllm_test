@@ -16,7 +16,10 @@ from dllm.pipelines.immune_llada.data.preprocessing.pipeline import (
     preprocess_dataset,
 )
 from dllm.pipelines.immune_llada.data.preprocessing.validators import SCHEMA_VERSION
-from dllm.pipelines.immune_llada.data.preprocessing.filters import BLOCKLIST_NAMES
+from dllm.pipelines.immune_llada.data.preprocessing.filters import (
+    BLOCKLIST_NAMES,
+    union_filter_names,
+)
 
 
 def _write_csv(path: Path, rows: list[dict[str, str]]) -> None:
@@ -54,6 +57,7 @@ def test_csv_jsonl_to_prepared_loader_and_collator(tmp_path: Path) -> None:
     assert result["report"]["totals"] == {
         "raw_rows": 3, "converted_rows": 2, "kept_rows": 2,
         "dropped_schema": 1, "dropped_filters": 0, "errors": 0,
+        "downgraded_all_x_mhc": 0, "beta_only_completed": 0, "alpha_only_completed": 0,
     }
     assert len(result["splits"]["train"]["shards"]) == 2
     assert (tmp_path / "prepared" / "dataset_manifest.json").is_file()
@@ -142,6 +146,70 @@ def test_overwrite_preflights_inputs_before_deleting_output(tmp_path: Path) -> N
     with pytest.raises(FileNotFoundError):
         preprocess_dataset(config, output, splits=["train"], overwrite=True)
     assert sentinel.read_text(encoding="utf-8") == "keep"
+
+
+def test_filter_names_is_union_of_filters_that_actually_ran(tmp_path: Path) -> None:
+    """Manifest filter_names is the union of constructed filters, not blocklist keys.
+
+    quality.blank_epitope is source-specific (trait / tcr_native / tcr_papers).
+    It must appear when trait ran, even though oas never constructed it, and
+    must be listed even if a given filter dropped zero rows of some other kind.
+    """
+    _write_csv(tmp_path / "oas.csv", [
+        {"cleaned_chain1_seq": "AAAA", "cleaned_chain2_seq": "BBBB", "chain1_anarci_type": "L", "chain2_anarci_type": "H"},
+        {"cleaned_chain1_seq": "AAAA", "cleaned_chain2_seq": "CCCC", "chain1_anarci_type": "H", "chain2_anarci_type": "H"},
+    ])
+    with (tmp_path / "trait.jsonl").open("w", encoding="utf-8") as handle:
+        handle.write(json.dumps({"epitope_seq": "AAAA", "cdr3b": "CASSQF", "relation": "binding"}) + "\n")
+        handle.write(json.dumps({"epitope_seq": "XXXX", "cdr3b": "CASSRF", "relation": "binding"}) + "\n")
+    output = tmp_path / "prepared"
+    result = preprocess_dataset(_config(tmp_path), output, splits=["train"])
+    manifest = json.loads((output / "dataset_manifest.json").read_text())
+    names = manifest["filter_names"]
+    by_source = {item["source"]: item["filter_names"] for item in result["report"]["splits"]}
+
+    assert "replaces_trait" not in names
+    assert "trait_benchmark" not in names
+    assert "quality.blank_epitope" in names
+    assert "quality.blank_epitope" in by_source["trait"]
+    assert "quality.blank_epitope" not in by_source["oas"]
+    assert "quality.homotypic_pair" in names
+    assert "quality.homotypic_pair" in by_source["oas"]
+    assert names == union_filter_names(item["filter_names"] for item in result["report"]["splits"])
+    for item in result["report"]["splits"]:
+        for reason in item["filter_reasons"]:
+            assert reason in names
+            assert reason in item["filter_names"]
+    assert result["report"]["splits"][1]["filter_reasons"]["quality.blank_epitope"] == 1
+
+
+def test_audit_counters_land_in_filter_report(tmp_path: Path) -> None:
+    path = tmp_path / "papers.jsonl"
+    path.write_text("\n".join(json.dumps(row) for row in [
+        {"epitope_seq": "GILGFVFTL", "mhc_seq": "X" * 34, "cdr3b": "ASSQETQY", "relation": "binding"},
+        {"epitope_seq": "GILGFVFTL", "mhc_seq": "Y" * 34, "cdr3a": "AVGMNYGGSQ", "relation": "binding"},
+        {"epitope_seq": "GILGFVFTL", "mhc_seq": "Y" * 34, "cdr3a": "AVGMNY", "cdr3b": "ASSQETQY", "relation": "binding"},
+        {"epitope_seq": "X" * 21, "mhc_seq": "X" * 34, "cdr3b": "ASSQETQY", "relation": "nonbinding"},
+    ]) + "\n", encoding="utf-8")
+    output = tmp_path / "prepared"
+    result = preprocess_dataset({
+        "sources": {"tcr_papers": str(path)},
+        "blocklists": dict.fromkeys(BLOCKLIST_NAMES, "off"),
+        "tcr_region_profile": {"completion_sources": ["tcr_papers"]},
+    }, output, splits=["train"])
+    papers = result["report"]["splits"][0]
+    assert papers["kept_rows"] == 3
+    assert papers["filter_reasons"] == {"quality.blank_epitope": 1}
+    # The blank-epitope drop also had all-X MHC; only kept rows are counted.
+    assert papers["downgraded_all_x_mhc"] == 1
+    assert papers["beta_only_completed"] == 1
+    assert papers["alpha_only_completed"] == 1
+    assert result["report"]["totals"]["downgraded_all_x_mhc"] == 1
+    assert result["report"]["totals"]["beta_only_completed"] == 1
+    assert result["report"]["totals"]["alpha_only_completed"] == 1
+    published = json.loads((output / "filter_report.json").read_text())
+    assert published["totals"]["downgraded_all_x_mhc"] == 1
+    assert published["splits"][0]["beta_only_completed"] == 1
 
 
 def test_prepared_loader_fails_on_corrupt_row(tmp_path: Path) -> None:

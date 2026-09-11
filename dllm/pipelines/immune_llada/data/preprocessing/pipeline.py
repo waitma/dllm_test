@@ -22,11 +22,16 @@ from pathlib import Path
 from typing import Any
 
 from ..registry import SourceSpec, parse_sources, source_spec, source_split_path
-from ..sources import COMPLETION_SOURCES, row_to_record
+from ..sources import (
+    COMPLETION_SOURCES,
+    partner_completion_flags,
+    row_stripped_placeholder_mhc,
+    row_to_record,
+)
 
 from ..profiles import add_tcr_region_lengths, empty_tcr_region_lengths, fallback_region_profile, finalize_region_profile, profile_digest, profile_summary
-from .filters import BLOCKLIST_NAMES, build_filters, filter_reason, load_blocklists
-from .reports import add_filter_drop, new_source_stats, totals
+from .filters import BLOCKLIST_NAMES, build_filters, constructed_filter_names, filter_reason, load_blocklists, union_filter_names
+from .reports import add_filter_drop, audit_totals, new_source_stats, totals
 from .validators import SCHEMA_VERSION, add_schema_version, validate_prepared_row
 from .writers import JsonlShardWriter, atomic_json_dump
 
@@ -195,6 +200,7 @@ def _process_source(
         raise FileNotFoundError(f"Raw immune source not found: {path}")
     stats = new_source_stats(spec.name, split, str(path))
     filters = build_filters(spec.name, mix, blocklists, config.max_protein_length, config.max_length)
+    stats["filter_names"] = constructed_filter_names(filters)
     writer = None if dry_run else JsonlShardWriter(output_dir / split, split, spec.name, config.shard_size)
     # Withholding the profile is what disables completion for a source, so only
     # configured sources receive it.
@@ -223,6 +229,13 @@ def _process_source(
             prepared = add_schema_version(record.to_dict())
             validate_prepared_row(prepared)
             stats["kept_rows"] += 1
+            # Transformations on kept records, not first-failure drops.
+            # dropped_all_x_epitope is already ``quality.blank_epitope``.
+            if row_stripped_placeholder_mhc(row, record):
+                stats["downgraded_all_x_mhc"] += 1
+            beta_only, alpha_only = partner_completion_flags(record)
+            stats["beta_only_completed"] += int(beta_only)
+            stats["alpha_only_completed"] += int(alpha_only)
             if writer is not None:
                 writer.write(prepared)
         if writer is not None:
@@ -375,7 +388,7 @@ def preprocess_dataset(
         "schema_version": SCHEMA_VERSION,
         "dry_run": dry_run,
         "splits": all_stats,
-        "totals": totals(all_stats),
+        "totals": {**totals(all_stats), **audit_totals(all_stats)},
     }
     if not dry_run:
         manifest = {
@@ -384,7 +397,9 @@ def preprocess_dataset(
             "created_at": datetime.now(timezone.utc).isoformat(),
             "sources": source_names,
             "splits": manifest_splits,
-            "filter_names": list(BLOCKLIST_NAMES) + (["quality.homotypic_pair"] if {"oas", "ots"} & set(source_names) else []),
+            # Union of filters that were actually constructed for the processed
+            # sources. Per-source lists live on each filter_report entry.
+            "filter_names": union_filter_names(item["filter_names"] for item in all_stats),
             "budget": {"max_protein_length": config.max_protein_length, "max_length": config.max_length},
             "shard_size": config.shard_size,
             "tcr_region_profile": ({
