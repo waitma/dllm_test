@@ -11,10 +11,10 @@
 - 下游数字权威表：[`RESULTS.md`](../../downstream/benchmark/RESULTS.md)
 - 多链关系对照臂设计：[`MULTI_CHAIN_RELATION.md`](MULTI_CHAIN_RELATION.md)
 
-**最近更新 2026-09-12**：更正 §6.4 / §10：4 连 Failed 是 4 个不同 JobId 的独立提交，不是平台
-`RetryOptions` 自动重试。v5 8-GPU diffusion 已提交（Queue）。账本：
-[`PROJECT_PROCESS.md`](../../PROJECT_PROCESS.md) 同日条。v4 / v5 prepared 均已发布；
-行数权威：plan §4.2。v3 长跑账本仍见 §3.1；数字进 RESULTS，不在此复述。
+**最近更新 2026-09-12**：v5 开跑前核算——`--save_top_k 3` / `--eval_steps 1000` /
+`ActiveDeadlineSeconds 950400` 三者不动。步时/eval/配额数字见 §6.3 / §6.4 / §6.7 与
+[`SPEED_ANALYSIS.md`](../../SPEED_ANALYSIS.md)。离线 binding 评估脚本见 §5.6。
+v5 8-GPU diffusion 仍 Queue。账本：[`PROJECT_PROCESS.md`](../../PROJECT_PROCESS.md) 同日条。
 
 ---
 
@@ -65,6 +65,7 @@
 | `scripts/data/assert_residue_alphabet.py` | 语料残基字母表 gate（§6.8） |
 | `scripts/monitor_spot_tasks*` | 闲时任务看护循环（§6.6） |
 | `scripts/downstream/score_pairing_pll.py` | OAS holdout `p(L\|H) − p(L)` |
+| `scripts/downstream/score_binding_relation.py` | 离线 binding 关系 token 评估（§5.6）；不碰训练路径 |
 
 **改过的既有文件**：`dllm/pipelines/bioseq/datasets.py`（八个 `*_row_to_record`、`with_exclusion_filter{,_multi}`、
 `load_exclusion_keys` fail-fast）、`dllm/pipelines/qwen3_vl_arch/{modeling,sampling}_bioseq.py`（分链 t 改 per-row
@@ -97,6 +98,9 @@ multinomial；`relation_aux_loss`；修 ESMC 条件流在迭代解码中泄漏�
 - ✅ v5 8-GPU diffusion 已提交（Queue）。task id / YAML / 取消 / 可复现 commit：
   [`PROJECT_PROCESS.md`](../../PROJECT_PROCESS.md) 2026-09-12 条。v4 4 卡臂仍未提交。
   YAML 头部写「见本文 §4.2」是从 v4 YAML 抄来的；§4.2 仍是 v3 50k，不是本 run。
+  **2026-09-12 开跑前核算：三个 flag 不动**（`--save_top_k 3` / `--eval_steps 1000` /
+  `ActiveDeadlineSeconds 950400`），未 cancel、未重提交。步时 / eval / 配额 / deadline
+  见 §6.3 / §6.4 / §6.7；底稿 `_jobmon/DECISION_NUMBERS.md`（仓库外）。
 - `immune_receptor_v2` 仍未通过 runtime/training gate。
 
 ## 3.1 历史 v3 状态（2026-09-07 平台 + 盘上核实）
@@ -124,7 +128,8 @@ multinomial；`relation_aux_loss`；修 ESMC 条件流在迭代解码中泄漏�
 - 下游评测：**无在排 / 在跑任务**。三条最好点已全部收口（§5.1）。
 - 看护循环在跑（PID 3777252，已连续 5.8 天），`TARGETS` 只含 `..._diffusion_immune_v3_spot_2m`
   且已放 STOP 哨兵，**不会重提任何评测任务**。
-- `output/` 已涨回约 **820 G**（09-01 回收后是 767 G）。配额缺陷未修，见 §6.4。
+- `output/` 09-01 回收后 767 G，中途涨回约 **820 G**；2026-09-12 快照约 **466 GB**。
+  配额缺陷未修，见 §6.4。
 - 多链关系对照臂：代码与 YAML 就绪，**作业未提交**（§4.4）。
 
 ---
@@ -350,6 +355,32 @@ T3 deep k=200 **0.711** / broad k=100 **0.645**；probe-AUROC **0.807**。
 ⚠️ **本地跑与平台同名作业会写同一个产物前缀** `output/downstream_generation/<tag>`。
 本地跑之前必须确认平台上同名作业已终态，否则闲时任务一旦抢到资源就会覆盖本地产物。
 
+### 5.6 离线 binding 关系 token 评估（2026-09-12）
+
+脚本：[`scripts/downstream/score_binding_relation.py`](../../scripts/downstream/score_binding_relation.py)
+（commit `0b31896`）。从任意 fusion checkpoint 打分，**不碰训练路径**。
+
+- 只对 `relation_target_mask==1` 打分。**不能用 `relation_token_mask`**：后者包含
+  MHC→peptide 呈递 `<binding>`（固定上下文）和 OAS/OTS null 前缀 `<unknown>`。
+- teacher-forced：只把目标位置换成 decoder mask token，其余保持干净。金标留在输入里
+  会被 MDM 直接抄，指标虚高。
+- 示例：
+
+  ```bash
+  python scripts/downstream/score_binding_relation.py \
+    --checkpoint <ckpt> \
+    --prepared-data-dir data/prepared/immune_v5_receptor_completion \
+    --max-records 400 --device cuda
+  ```
+
+- 管线自检：v3 `checkpoint-42000`（未学过 relation target）400 条得 acc=0 /
+  AUROC≈0.50 / NLL≈28，且 400 条 argmax 全落到同一非金标 token（id `126375`）——预期。
+- 全量 valid 正负极不均衡：asd **39866/5000**、tcr_papers **4602/2323**、
+  tcr_native **3848/7**、trait **540/853**。accuracy 基本无意义；`tcr_native` 仅 7 条
+  nonbinding，该源 AUROC 永远是噪声。
+- `tcr_papers` 记录里 `record.source` 仍写作 `tcr_native`，脚本靠 **shard 名**分层；
+  **底层字段错误仍未修**。
+
 ---
 
 ## 6. 工程规则（踩坑换来的硬约束）
@@ -386,14 +417,38 @@ TRAIT / TCR 样本带 peptide + MHC + TCRα + TCRβ，**链数可达 4–5**。E
 ### 6.3 global batch 加倍走 `ga`，不走 `per_device`
 
 梯度累积不改变任何一次 forward/backward 的张量形状，显存画像与 `per_device 4` 完全相同，
-而 `per_device 4` 已被跑满 42k 步实证过。**零风险。** 代价是墙钟按比例变长。
+而 `per_device 4` 已被跑满 42k 步实证过。**零风险（指 OOM，不是墙钟）。**
+
+**不能拿一次运行的 s/it 直接外推到另一个 `per_device` / `ga` 配置。** 必须先核对
+`training_args.bin` 里的三个因子（`per_device × ga × world_size`）。microbatch 放大是
+**次线性**的：`t(batch4)/t(batch2) ≈ 1.29`，不是 2.0。
+
+| 配置 | JobId / 出处 | bin 实配 | tqdm |
+|---|---|---|---|
+| 历史 v3 8 卡 | `t-20260901033935-h55f4`、`t-20260904014842-qgjbg` | `per_device=2`、`ga=16`、`world_size=8`、`max_length=1024`，全局 **256** | **2.94–2.95 s/it** |
+| v3 4 卡（与 v5 同单卡负载） | `..._v3_4gpu` / `checkpoint-42000/training_args.bin` | `per_device=4`、`ga=8`、`world_size=4` | **1.51–1.91 s/it** |
+| 本次 v5 8 卡（尚未起跑） | `t-20260912021346-5xq4s` | `per_device=4`、`ga=8`、8 卡，全局同为 **256** | 外推 **1.6–2.5 s/it**（中枢约 2.2）→ 训练 **4.0–5.8 天** |
+
+v5 相对上述 v3 8 卡约为 **0.65×** 步时（`0.5 × 1.29`：累积步数减半 × microbatch 次线性变慢）。
+吞吐数字的权威展开：[`SPEED_ANALYSIS.md`](../../SPEED_ANALYSIS.md)。
+
+**训练期 eval 也必须按源分别算，不能用单源速率外推全量。**
+`..._v3_8gpu_2m/checkpoint-105000` 的 `eval_oas_runtime=4.4792` 对应每源 2000 行 → OAS 约
+**446.5 samples/sec**，本身就是 8 卡，不用再做卡数归一。同一次 run 里 `asd_antibody` 只有约
+**114 samples/sec**（约 3.9× 慢），且占 v5 valid 的 44%。按源外推：v5 全量 valid **102,308**
+行，单次全量 eval 约 **8.7 分钟**；`--eval_steps 1000` × 200 次合计约 **29 小时 ≈ 1.21 天**。
 
 ### 6.4 🔴 磁盘配额：仍是未修的结构性风险
 
 曾因 `Disk quota exceeded (os error 122)` **同一处 4 连 Failed**，每次都死在 step 17000 的
 `save_model`，**净进度 0、约 3 小时 8 卡白烧**。
 
-- **爆的是目录/租户配额，不是文件系统**：`df` 显示底层 FS 尚余 809T。**只看 `df` 会完全误判方向。**
+- **爆的是目录/租户配额，不是文件系统，也不是 inode**：`t-20260901033935-h55f4` 在 step 17000
+  写 `model.safetensors` 时报 `Disk quota exceeded (os error 122)`，无 inode 字样；
+  `df -i` inode 仅 5%。09-01 撞墙当日 `df` 尚余 809T；2026-09-12 `df` 仍有 702T。
+  **`df` 不反映租户配额。** 配额上限查不到（`quota` / `lfs` / `mmlsquota` 本机都不存在）。
+  **判断磁盘风险要用「上次撞墙水位」**：当时 `output/` 约 **1.2 TB**；2026-09-12
+  `output/` 约 **466 GB**，距该水位约 734 GB。
 - **一次 save 需要约 9.0 GB 一次性余量**（`model.safetensors` 2.3G + `pytorch_model_fsdp.bin` 2.3G
   + `optimizer.bin` 4.5G），而 **top-k 剪枝发生在写完之后** —— 峰值需求是「现有占用 + 一整个新 ckpt」。
 - **不是 `RetryOptions` 把它变成循环**：这 4 连是不同 JobId 的独立提交
@@ -417,7 +472,15 @@ resume-only（各 94 G）、5 处 `checkpoint-final/model.safetensors` **改硬�
 > 刻意保留不能碰：`..._allchains_..._4gpu/checkpoint-33000`（2M 权重来源）、
 > `..._bert_immune_v3/checkpoint-50000` 满包（1M resume 来源）。
 >
-> 🔴 **回收只是把窄门往后推，不是修好了。** `output/` 已涨回约 820 G。两项待做见 §10。
+> 🔴 **回收只是把窄门往后推，不是修好了。** 中途曾涨回约 820 G；2026-09-12 快照 `output/`
+> 约 **466 GB**。两项待做见 §10。
+>
+> **slim 语义（2026-09-12 核实）**：`--slim_checkpoints True` 只作用于「被保留下来、
+> 但不是 latest」的目录；**latest 满包永不 slim**。实测 slim 后 **2.3 GB**
+> （2,423,849,254 B）、latest 满包 **9.1 GB**（9,667,566,831 B）。三种策略总占用：
+> `save_top_k=3` 稳态 **13.5–16 GB**（峰值约 25 GB）；`save_top_k=10` 约 **32 GB**；
+> `save_top_k=0`（全留 200 个）约 **467 GB** → 会把 `output/` 推到约 933 GB，贴着
+> 1.2 TB 死亡水位。v5 因此保持 `save_top_k=3`。
 
 ### 6.5 checkpoint 挑选必须验「三件套」
 
@@ -465,6 +528,10 @@ resume-only（各 94 G）、5 处 `checkpoint-final/model.safetensors` **改硬�
 - `StopCustomTask` 权限曾对 Creator 为 `251105016` 的任务报未授权，次日同一账号又放行了，原因未知。
   **对存量任务先直接 `ml_task cancel` 试，不必默认走控制台。**
 - `ml_task export --config` **不导出 `Preemptible` 字段**，核对抢占只能用 `get --format`。
+- **`ActiveDeadlineSeconds` 是 MaxRuntime，从 Launch 起算，不含排队。**
+  证据：`t-20260904014842-qgjbg` 排队 22.8 小时，tqdm 累计墙钟 88 小时对齐 Launch→End，
+  不是 Create→End。`ml_task` 的 `Start` / `Elapsed` 含排队，不要当 deadline 时钟。
+  v5 `950400`（11 天）对照预期总墙钟 5.2–7.0 天，余量充足；超时线约 **4.15 s/it**。
 - **`RoleRestartPolicy`（角色级）与 `RetryOptions`（作业级）是两层。** `ml_task get` 不回显
   `RetryOptions` 属正常（`--helpformat` 可选字段列表里没有该字段）；判断是否被接受要用
   `ml_task export --config`。v5 `t-20260912021346-5xq4s` 已实证平台接受了 YAML 里的
@@ -768,7 +835,8 @@ python examples/llada/protein_pretrain_esmc.py --dry_run True --max_rows_per_sou
 
 **工程缺陷（未修）**
 
-- [ ] 🔴 **磁盘配额本身未修**（§6.4）。`output/` 已从回收后的 767 G 涨回约 **820 G**，
+- [ ] 🔴 **磁盘配额本身未修**（§6.4）。09-01 回收后 767 G，中途涨回约 820 G；
+      2026-09-12 快照 `output/` 约 **466 GB**（距上次 1.2 TB 撞墙水位约 734 GB）。
       8 卡长跑每 1000 步仍要过一次约 9.0 GB 的一次性余量窄门。
 - [ ] **修 `TopKValLossCheckpointCallback` 的账本重置**：启动时应从磁盘现存 checkpoint 重建 top-k，
       而不是只看本进程 `log_history`，否则每次重启都产孤儿、永不被剪。
@@ -798,6 +866,7 @@ python examples/llada/protein_pretrain_esmc.py --dry_run True --max_rows_per_sou
 
 > 一行一条，细节在对应小节。不要在这里重复正文内容。
 
+- **2026-09-12** — v5 开跑前核算：三个 flag 不动。步时/eval/配额/deadline 见 §6.3 / §6.4 / §6.7；离线 binding 脚本见 §5.6。
 - **2026-09-12** — 更正 §6.4 / §10：4 连 Failed 是 4 个不同 JobId 的独立提交，不是平台 `RetryOptions` 自动重试。
 - **2026-09-12** — 更正 §4.1：generated-only 8gpu_2m 是 4 卡 `checkpoint-42000` weights-only 热启动，不是 from scratch。
 - **2026-09-12** — 提交 v5 8-GPU diffusion（Queue）。账本 PROJECT_PROCESS 同日条。

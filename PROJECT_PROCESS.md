@@ -1,6 +1,6 @@
 # Project Process
 
-> Last updated: 2026-09-11T19:03Z
+> Last updated: 2026-09-11T19:31Z
 >
 > 本页保留历史任务账本；顶部最新条目描述当前代码清理和文档同步状态。除明确标注为“本轮已验证”的项目外，历史测试、吞吐和任务数字不能被解释为本轮验证通过。
 
@@ -17,7 +17,16 @@
 - **可复现 commit**：`b356b28`（新增 YAML）→ `8006151`（固定 200k step / 11 天 deadline）→ `6c753c8`（作业实际执行的 `examples/llada/protein_pretrain_esmc.py` 与 `protein_fusion_model.py`；此 commit 之前会跑到未提交工作区代码）
 - **配置**：权威在 YAML 头部注释与 Entrypoint。固定 `--max_steps 200000`（不传 `--num_train_epochs`）、global batch 256 = `per_device 4 × ga 8 × 8 GPU`、cosine `1e-4` / warmup 2000 / `max_grad_norm 1.0`、`ActiveDeadlineSeconds 950400`、eval/save 每 1000、`save_top_k 3`、`slim_checkpoints True`。
 - **数据**：`data/prepared/immune_v5_receptor_completion`。行数 / 监督份额 / 不变量：plan §4.2。受体补全设计：plan §2.5 / §2.6。
-- **墙钟估计**：YAML 头部（由 v3 8 卡实测校正后的规划值，不是 v5 实测）。v5 GPU 吞吐仍未测：`SPEED_ANALYSIS.md`。
+- **墙钟估计（2026-09-12 开跑前核算，v5 作业本身尚未起跑）**：权威数字与推导见
+  `SPEED_ANALYSIS.md` 与 [`PROTEIN_PRETRAIN_PROGRESS.md`](examples/llada/PROTEIN_PRETRAIN_PROGRESS.md) §6.3 / §6.4 / §6.7。
+  核算底稿（仓库外）：`/vepfs-mlp2/c20250601/251105016/project/_jobmon/DECISION_NUMBERS.md`。
+  **最终决定：`--save_top_k 3`、`--eval_steps 1000`、`ActiveDeadlineSeconds 950400` 三者均保持不动，未 cancel、未重提交。**
+- **开跑前核算（可复用教训）**：
+  - **步时**：不能拿一次运行的 s/it 直接外推到另一个 `per_device` / `ga` 配置，必须先核对 `training_args.bin` 的三个因子（`per_device × ga × world_size`）。历史 v3 8 卡 `t-20260901033935-h55f4` / `t-20260904014842-qgjbg` 实测 **2.94–2.95 s/it**，bin 里是 `per_device=2`、`ga=16`、`world_size=8`、`max_length=1024`，全局 batch **256**。v5 同为全局 256，切法是 `per_device=4 × ga=8 × 8`。microbatch 放大次线性：`t(batch4)/t(batch2) ≈ 1.29`，故 v5 每步墙钟约为该 v3 的 **0.65×**。主证据：`..._v3_4gpu`（`per_device 4 × ga 8 × 4` 卡，单卡负载与 v5 相同）tqdm **1.51–1.91 s/it**。外推 v5 **1.6–2.5 s/it**（中枢约 2.2），训练 **4.0–5.8 天**。
+  - **eval**：`eval_oas_runtime=4.4792` → OAS 约 **446.5 samples/sec**，来自 `..._v3_8gpu_2m/checkpoint-105000`，本身就是 8 卡，不用再做卡数归一。**不能用单源速率外推全量**：同一次 8 卡 run 里 `asd_antibody` 只有约 **114 samples/sec**（约 3.9× 慢），且占 v5 valid 的 44%。按源分别外推：v5 全量 valid **102,308** 行，单次全量 eval 约 **8.7 分钟**；`--eval_steps 1000` × 200 次合计约 **29 小时 ≈ 1.21 天**。
+  - **checkpoint / slim**：`--slim_checkpoints True` 只作用于「被保留下来、但不是 latest」的目录；**latest 满包永不 slim**。实测 slim 后 **2.3 GB**（2,423,849,254 B）、latest 满包 **9.1 GB**（9,667,566,831 B）。`save_top_k=3` 稳态 **13.5–16 GB**（峰值约 25 GB）；`save_top_k=10` 约 **32 GB**；`save_top_k=0`（全留 200 个）约 **467 GB**。
+  - **配额**：上次死因是容量配额，不是 inode（`t-20260901033935-h55f4` 在 step 17000 写 `model.safetensors` 时报 `Disk quota exceeded (os error 122)`，无 inode 字样；`df -i` inode 仅 5%）。配额上限查不到（`quota` / `lfs` / `mmlsquota` 本机都不存在）；`df` 今日仍有 702T，**`df` 不反映租户配额**。判断磁盘风险要用「上次撞墙水位」：当时 `output/` 约 **1.2 TB**；2026-09-12 `output/` 约 **466 GB**，距该水位约 734 GB。因此 `save_top_k=0` 再吃 467 GB → 约 933 GB、贴着死亡水位；`save_top_k=3` 只加 16–25 GB。
+  - **`ActiveDeadlineSeconds`**：平台字段语义是 **MaxRuntime**，**从 Launch 起算，不含排队**。证据：`t-20260904014842-qgjbg` 排队 22.8 小时，其 tqdm 累计墙钟 88 小时对齐的是 Launch→End，不是 Create→End。本次 `950400`（11 天）对照预期总墙钟 5.2–7.0 天，余量充足；超时线在约 **4.15 s/it**。
 - **读结果时注意**（本条新登记）：
   - `--max_eval_rows_per_source 2000` 在当前代码只是未消费的 CLI 字段，每次 eval 跑完整 valid（行数：plan §4.2；本 run 约 200 次满 eval）。
   - wandb 回退机制：`examples/llada/README.md`。历史 44 个 run 目录全是 `offline-run-*`、0 个 online、只有 5 个曾 `wandb sync`；计算节点探测 `api.wandb.ai` 失败则会 offline，盘上 `${OUTPUT_DIR}/wandb` 仍在 VePFS。
