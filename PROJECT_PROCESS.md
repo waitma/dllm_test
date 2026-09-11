@@ -1,6 +1,6 @@
 # Project Process
 
-> Last updated: 2026-09-11T18:22Z
+> Last updated: 2026-09-11T19:03Z
 >
 > 本页保留历史任务账本；顶部最新条目描述当前代码清理和文档同步状态。除明确标注为“本轮已验证”的项目外，历史测试、吞吐和任务数字不能被解释为本轮验证通过。
 
@@ -21,7 +21,8 @@
 - **读结果时注意**（本条新登记）：
   - `--max_eval_rows_per_source 2000` 在当前代码只是未消费的 CLI 字段，每次 eval 跑完整 valid（行数：plan §4.2；本 run 约 200 次满 eval）。
   - wandb 回退机制：`examples/llada/README.md`。历史 44 个 run 目录全是 `offline-run-*`、0 个 online、只有 5 个曾 `wandb sync`；计算节点探测 `api.wandb.ai` 失败则会 offline，盘上 `${OUTPUT_DIR}/wandb` 仍在 VePFS。
-  - YAML 写了 `RetryOptions`（`EnableRetry` / `MaxRetryTimes: 5` / `PolicySets: [Failed]`），但 `ml_task get --format json` 与 `ml_task export` 都没回显这些字段，**无法确认平台已接受**。手动重提时 entrypoint 的 `RESUME_ARG` 仍会从最新 checkpoint 续。语义见 `examples/llada/README.md`。
+  - YAML 写了 `RetryOptions`（`EnableRetry` / `MaxRetryTimes: 5` / `IntervalSeconds: 180` / `PolicySets: [Failed]`）。已用 `ml_task export --task t-20260912021346-5xq4s --config` 实证平台接受了这段配置：导出文件第 64-70 行逐字包含上述字段，并额外补了默认 `EnableReserveResourceOnRetry: false`（证据：`/vepfs-mlp2/c20250601/251105016/project/_jobmon/t-20260912021346-5xq4s.yaml` 与 `_jobmon/retry_evidence/`）。手动重提时 entrypoint 的 `RESUME_ARG` 仍会从最新 checkpoint 续。语义见 `examples/llada/README.md`。
+  - **`RoleRestartPolicy`（角色级）与 `RetryOptions`（作业级）是两层。** `ml_task get` 不回显 `RetryOptions` 属正常（`--helpformat` 可选字段列表里没有该字段）；`TaskRoleSpecs` 下的 `RoleRestartPolicy: "Never"` / `RoleRestartMaxRetryCount: 0` 是角色/Pod 级重启，和作业级 `RetryOptions` 不构成矛盾。判断平台是否接受了 `RetryOptions`，要用 `ml_task export --config`，不要用 `ml_task get`。
   - `save_top_k` 看合计 `eval_loss`。valid 里 `asd_antibody` 占比远高于 train（plan §4.2 逐源表），抗体–抗原会主导选模，TCR–epitope 不是主信号。checkpoint 保留另有调查；这里只登记构成错配与担心，不给修法。
 
 ## 2026-09-12 filter_report item 13 计数 + manifest `filter_names`（代码已落地；v5 产物未重写）
@@ -368,8 +369,8 @@ LR 调度三样都变了）：`..._diffusion_allchains_immune_v3_8gpu_2m`（Runn
 **根因**：`safetensors_rust.SafetensorError: Error while serializing: I/O error:
 Disk quota exceeded (os error 122)`，崩在 `Trainer._save → safetensors.torch.save_file`，
 **不在训练步**。首跑 14h07m 从 step 0 跑到 17000 后在存盘时爆，留下 132 MiB 半截
-`model.safetensors`；随后 3 次重试各 58 分钟，「从 16000 续 → 跑满 1000 步 → 同一处再爆」，
-**约 3 小时 8 卡非抢占资源换到 0 步净进度**。`RetryOptions: MaxRetryTimes: 50` 会一直循环下去。
+`model.safetensors`；随后又有 3 条同名新任务各 58 分钟，「从 16000 续 → 跑满 1000 步 → 同一处再爆」，
+**约 3 小时 8 卡非抢占资源换到 0 步净进度**。这 4 条是不同 JobId 的独立提交，不是同一 JobId 被平台 `RetryOptions` 自动重试（每个 JobId 只有 1 个实例，提交间隔 5～30 秒，与 `IntervalSeconds: 180` 不符；JobId 与实例证据见下方 Active 表旁注）。
 
 ⚠️ **别看 `df` 下结论。** 底层 `fs_vepfs-cnbj2c98dea54433` 3.1P 已用 2.3P、**尚余 809T** ——
 爆的是**目录/租户配额**。一次 save 需要约 **9.0 GB 一次性余量**（`model.safetensors` 2.3G +
@@ -694,6 +695,7 @@ Last updated: 2026-09-11T18:22Z
 
 🔴 **`..._8gpu_2m` 前 4 条同名任务全部 `Failed`，根因是目录磁盘配额**（不是文件系统满，底层尚余 809T）：
 `t-20260901033935-h55f4` / `t-20260901230256-ns4q4` / `t-20260902000627-j4mqm` / `t-20260902010820-t6hq6`。
+这是 **4 次独立提交（4 个不同 JobId）**，不是平台按 `RetryOptions` 自动重试：每个 JobId 用 `ml_task instance list` 都只有 1 个实例（`…-worker-0`），没有带重试序号的第二实例，也没有第二轮 `LaunchTime`；相邻 JobId「上一条 End → 下一条提交」间隔 5～30 秒（h55f4 End `15:02:42Z` → ns4q4 提交 `15:02:56Z` 为 +14s；ns4q4 → j4mqm 约 +29s；j4mqm → t6hq6 约 +5s），与 YAML 的 `IntervalSeconds: 180` 不符。若是平台按配置重试，应表现为「同一 JobId、新实例、间隔 ≥180s」。同配 `EnableRetry: true, MaxRetryTimes: 5` 的 `t-20260901235433-q76qw` 也停在 Failed、instance 只有 1 条。看护脚本不是这 4 连的来源（`scripts/llada_train_watchdog_jobs.json` 只有已 paused 的 grammar 任务；`scripts/monitor_spot_tasks.py` 只盯 `…_v3_spot_2m`）。配额不足仍会导致连续 Failed——教训保留，只是这 4 个新 JobId 不能算平台重试。
 每轮「从 `checkpoint-16000` 续 → 跑满 1000 步 → 在 step 17000 的 `save_model` 上
 `Disk quota exceeded (os error 122)`」耗 58 分钟，**净进度 0**。已终态故不列入本表。
 经过、可回收量盘点与分级方案见
