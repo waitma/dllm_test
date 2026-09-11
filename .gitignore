@@ -151,6 +151,8 @@ dmypy.json
 /baseline_models/
 *.ckpt 
 *.pt 
+*.bin
+*.safetensors
 *.pickle
 *.json
 *.yaml
@@ -160,6 +162,19 @@ dmypy.json
 *.log
 *.err
 *.out
+*.tmp
 /PPT/
+
+# Weights / third-party checkouts dumped at repo root.
+# base_model/Qwen3-VL is already a tracked gitlink; this only blocks new dumps.
+/base_model/
+
+# Trainer checkpoint directories that land outside /output/.
+checkpoint-*/
+
+# Job launch dirs and local eval/parity artifacts (not source).
+/train_jobs/
+/eval_jobs/
+/refactor_baseline/
 
 
