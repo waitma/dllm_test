@@ -18,7 +18,7 @@ Resources and examples for training (finetuning & pretraining) and evaluating di
 
 <!-- ## Setup
 > [!IMPORTANT]  
-> **Slurm users:** Update `scripts/train.slurm.sh` and `mkdir .logs`: see [(optional) Slurm setup](/README.md#optional-slurm-setup) for details.
+> **Slurm users:** Update `scripts/train.slurm.sh` and `mkdir .logs`: see [(optional) Slurm setup](../../README.md#optional-slurm-setup) for details.
 >
 > **MoE checkpoints:** For models like [`LLaDA-MoE-7B-A1B-Base`](https://huggingface.co/inclusionAI/LLaDA-MoE-7B-A1B-Base), set `"model_type"` to `"lladamoe"` in the checkpoint’s `config.json`:
 > ```diff
@@ -31,21 +31,41 @@ Resources and examples for training (finetuning & pretraining) and evaluating di
 ## 蛋白预训练（本项目）
 
 在**不改动 LLaDA 训练主干**的前提下，让 LLaDA 在 OAS（抗体）/ OTS（TCR）等七源免疫序列上做
-ESMC 条件融合预训练，支持 `diffusion`（扩散加噪）与 `bert`（固定比例 MLM）两种目标。
+ESMC 条件融合预训练。历史工作线支持 `diffusion` 与 `bert` 两种目标；**本轮 v4 只提交一个正式
+`diffusion` 版本**，不把 BERT、all-chain 或 relation auxiliary 对照臂列为正式目标。
 
 | 文件 | 作用 |
 |---|---|
 | [`protein_pretrain_esmc.py`](protein_pretrain_esmc.py) | **现役正式入口**：ESMC 条件融合 + 七源语料 + diffusion/bert 双目标 |
 | [`protein_fusion_model.py`](protein_fusion_model.py) | `LLaDAEsmcFusion` 模型、两种加噪、`RemapCollator`、词表扩展与重映射 |
-| [`protein_pretrain.py`](protein_pretrain.py) | 早期无 ESMC 入口，保留作对照 |
+| `protein_pretrain.py` | **已删除**（2026-09-10）；不要恢复。现役入口是上一行 |
 | [`load_fusion_checkpoint.py`](load_fusion_checkpoint.py) | 从 FSDP checkpoint 还原融合模型（下游评测用） |
-| [`PROTEIN_PRETRAIN_PROGRESS.md`](PROTEIN_PRETRAIN_PROGRESS.md) | **进度 / 决策 / 验证的权威记录**，任何实质改动先记这里 |
+| [`PROTEIN_PRETRAIN_PROGRESS.md`](PROTEIN_PRETRAIN_PROGRESS.md) | 蛋白训练线决策笔记本（Volc 账本权威在 [`PROJECT_PROCESS.md`](../../PROJECT_PROCESS.md)） |
 | [`MULTI_CHAIN_RELATION.md`](MULTI_CHAIN_RELATION.md) | 多链关系调研 + 分链 t / cognate 对照臂（**不要和 2M 混跑**） |
-| [`DATA_PIPELINE_README.md`](DATA_PIPELINE_README.md) | 数据源、去污、审计运行手册 |
+| [`DATA_PIPELINE_README.md`](DATA_PIPELINE_README.md) | raw 语料去污事故（prepared 入口见 pipeline README） |
+| [`dllm/pipelines/immune_llada/README.md`](../../dllm/pipelines/immune_llada/README.md) | **当前 prepared 数据操作入口**（v4 已发布 / v5 进行中） |
 
-### 当前训练任务（2026-09-01 19:20Z）
+### 当前训练任务与数据版本（2026-09-12）
 
-🔴 **头号阻塞：目录磁盘配额。** 现役 `..._8gpu_2m` 已因
+**v4 正式训练入口（仅一个 diffusion 版本，尚未提交）**：
+
+- 配置：[`train_jobs/protein_esmc_llada270m_diffusion_immune_v4_4gpu.yml`](../../train_jobs/protein_esmc_llada270m_diffusion_immune_v4_4gpu.yml)
+- prepared data：`data/prepared/immune_v4_beta_relation`
+- output：`output/protein_esmc_llada270m_diffusion_immune_v4_4gpu`
+- 数据语义（补全、all-X、null 前缀、relation target）不要在此复述：
+  [`dllm/pipelines/immune_llada/README.md`](../../dllm/pipelines/immune_llada/README.md)
+  与 [`docs/PLAN_TCR_BETA_ONLY_RELATION_DIFFUSION.md`](../../docs/PLAN_TCR_BETA_ONLY_RELATION_DIFFUSION.md)。
+- **v5 进行中**：`configs/data/immune_v5_receptor_completion.yaml` →
+  `data/prepared/immune_v5_receptor_completion/`。**禁止估算最终行数。**
+- **wandb `online`**，节点不可达则自动回退 offline（egress 未在计算节点验证）。
+- 提交前：smoke/full preprocess、manifest/profile 审计、residue alphabet、corpus freshness。
+
+v3 任务 / eval 数字 / task id 账本在 [`PROJECT_PROCESS.md`](../../PROJECT_PROCESS.md)
+与 [`RESULTS.md`](../../downstream/benchmark/RESULTS.md)，下面只留仍会踩坑的操作规则。
+
+### 仍有效的操作陷阱（v3 任务账本见 PROJECT_PROCESS）
+
+🔴 **目录磁盘配额（v3 长跑踩过，v4 提交前仍有效）。** 当时的 `..._8gpu_2m` 已因
 `safetensors_rust.SafetensorError: ... Disk quota exceeded (os error 122)`
 在 **step 17000 的 `save_model` 上 4 连 Failed** —— 每轮「从 16000 续 → 跑满 1000 步 → 同一处爆」
 耗 58 分钟，**净进度 0**，约 3 小时 8 卡非抢占资源白烧。第 5 次（`t-20260902021013-bm79q`）
@@ -68,253 +88,26 @@ ESMC 条件融合预训练，支持 `diffusion`（扩散加噪）与 `bert`（�
   两条路径都仍然有效（`eval_jobs` 引用前者 8 处、`train_jobs` 引用后者 2 处），但
   **改其中一个就是改另一个**，不要原地覆写。
 
-**新一轮：8 卡长跑（步数拉长一个数量级）。** 50k 短跑已收口出数，现役配置全部
-**global 256 + polynomial power=1**，与 50k 那批**不可混排**（目标函数、batch、LR 调度三样都变了）：
+v3 长跑 / 50k 短跑 / 下游 task id 与 headline 数字的权威位置：
+[`PROJECT_PROCESS.md`](../../PROJECT_PROCESS.md)、
+[`PROTEIN_PRETRAIN_PROGRESS.md`](PROTEIN_PRETRAIN_PROGRESS.md) §3.1、
+[`RESULTS.md`](../../downstream/benchmark/RESULTS.md)。
+不要把过期 Running/Queue 表抄回本 README。
 
-| Job | Task ID | 队列 | 卡数 | max_steps | 状态 |
-|---|---|---|---|---:|---|
-| `protein_esmc_llada270m_diffusion_allchains_immune_v3_8gpu_2m` | **`t-20260902021013-bm79q`** | `c20250601` | 8 | **2,000,000** | **Running** @26k（weights-only 自 4 卡 33000；前 4 条配额 Failed） |
-| `protein_esmc_llada270m_bert_immune_v3_1m` | **`t-20260902110050-zb7dr`** | `queue012` | 8 | **1,000,000** | Queue，**从头训**（global **256** = 2 × ga 16 × 8；polynomial `4e-5→1e-5`，warmup 2000。不加载 50k。前几条已 cancel/Failed） |
-| `protein_esmc_llada270m_diffusion_immune_v3_spot_2m` | `t-20260901032620-vvngv` | `c20250601` 闲时 | 8 | 2,000,000 | Queue（看护循环在追） |
-| `protein_esmc_llada270m_diffusion_allchains_immune_v3_4gpu_2m` | `t-20260901032611-npf27` | — | 4 | — | **Killed**（换成 8 卡版） |
-
-⚠️ **2M 步在 2.95 s/it 下是 1,640 小时 ≈ 68 天**独占 8 卡（进度条自印 `1644:30:32`）。
-`ActiveDeadlineSeconds: 7776000`（90 天）放得下，但这个步数目标是否按 68 天规划的**待确认**。
-
-⚠️ **`..._8gpu_2m` 首跑只能加载权重、不能满包续**：源是 4 卡 FSDP pack，
-`optimizer.bin` / `pytorch_model_fsdp.bin` 不能跨 world size，所以走
-`--init_fusion_weights <4卡 ckpt>/model.safetensors`，optimizer 与 polynomial 从 step 0 新建。
-entrypoint 因此有两个挑选函数、**语义不同不要合并**：`pick_latest_full` 要求
-`optimizer.bin`+`pytorch_model_fsdp.bin`+`scheduler.pt` **三件齐全**（本目录已有 8 卡 pack 时的
-普通 resume），`pick_latest_weights` 只认 `model.safetensors`（跨 world size 的首次 init）。
-✅ 三件套判据这次救了一命 —— 它正确跳过了只剩 132 MiB 半截 `model.safetensors` 的
-`checkpoint-17000`、回退到完整的 16000，**没有重演 §4.2.6 的「从坏 ckpt 反复续跑」死循环**。
-**改 checkpoint 挑选逻辑时必须保留这个判据。**
+⚠️ **跨 world size 只能 weights-only init**：4 卡 FSDP pack 的 `optimizer.bin` /
+`pytorch_model_fsdp.bin` 不能直接给 8 卡续。entrypoint 两个挑选函数语义不同、不要合并：
+`pick_latest_full` 要求三件套齐全，`pick_latest_weights` 只认 `model.safetensors`。
+三件套判据必须保留（曾正确跳过半截 `checkpoint-17000`）。
 
 ### 多链关系对照臂（YAML 已就位，未提交）
 
-pairing ImmunoMatch 贴地板（≈0.353 vs 错配 0.333）是因为现役只学 joint 重建。
-对照实验**新开 OUTPUT_DIR**，不要焊进 `..._8gpu_2m`。详见
-[`MULTI_CHAIN_RELATION.md`](MULTI_CHAIN_RELATION.md) 与
-[`PROTEIN_PRETRAIN_PROGRESS.md`](PROTEIN_PRETRAIN_PROGRESS.md) §4.9。
+不要焊进现役 2M `OUTPUT_DIR`。设计见 [`MULTI_CHAIN_RELATION.md`](MULTI_CHAIN_RELATION.md)。
+**不要**和 2M / all-chains / BERT 并排 `eval_loss`。提交前先看配额（一次 save ≈ 9 GB）。
 
-| Job | 旋钮 | 状态 |
-|---|---|---|
-| `protein_esmc_llada270m_diffusion_chainratio_immune_v3_4gpu` | generated-only + 分链 t `0.5/0.15/0.15/0.1/0.1` | YAML 已写，**未提交** |
-| `protein_esmc_llada270m_diffusion_chainratio_cognate_immune_v3_4gpu` | 同上 + `--relation_aux cognate` | YAML 已写，**未提交** |
-
-- 配方对齐 v3 **4 卡 generated-only 50k / global 128**，from scratch。
-- Headline：生成 pairing **ImmunoMatch** + `scripts/downstream/score_pairing_pll.py` 的 `p(L\|H)−p(L)`。
-- **不要**和 2M / all-chains / BERT 并排 `eval_loss`。
-- 提交前先看配额（一次 save ≈ 9 GB）。命令见 `MULTI_CHAIN_RELATION.md` §4.3。
-
----
-
-以下是已收口的 v3 双臂 50k 短跑（七源语料，bert vs diffusion，两臂数据参数逐字节一致，唯一差异是目标函数）：
-
-| Job | Task ID | 队列 | 卡数 | 抢占 | global batch | 状态 |
-|---|---|---|---|---|---|---|
-| `protein_esmc_llada270m_diffusion_immune_v3` | `t-20260829031748-96vjf` | `queue012` | 8 | 否 | 128 | **Failed**；last 42000，无 final |
-| `protein_esmc_llada270m_bert_immune_v3` | `t-20260829031757-2qnjn` | `queue012` | 8 | 否 | 128 | **Success** @50000；best val 48000 |
-| `protein_esmc_llada270m_bert_immune_v3_1m` | **`t-20260902110050-zb7dr`** | `queue012` | 8 | 否 | **256** | Queue；**从头**训到 1M，polynomial `4e-5→1e-5`，warmup 2000 |
-| `protein_esmc_llada270m_diffusion_immune_v3_spot` | `t-20260829135424-zxdjg` | `c20250601` | 8 | **是（闲时）** | 128 | Running |
-| `protein_esmc_llada270m_bert_immune_v3_spot` | `t-20260830095121-lx6kp` | `c20250601` | 8 | **是（闲时）** | 128 | Running（看护循环重提过） |
-| `protein_esmc_llada270m_diffusion_immune_v3_4gpu` | **`t-20260830152319-r5w9k`** | `c20250601` | **4** | 否 | 128 | 🔴 **卡在 42000/50000**（headline eval **0.7548 @42000**；top-k：39000 / 41000 / 42000）— 续跑崩在 step ~42782，见下 |
-| `protein_esmc_llada270m_diffusion_allchains_immune_v3_4gpu` | **`t-20260830135521-zf5rr`** | `c20250601` | **4** | 否 | **256** | **Running**（见 §4.2.4 / §4.2.5） |
-| `protein_esmc_llada270m_bert_immune_v3_4gpu` | **`t-20260830135524-qq7n5`** | `c20250601` | **4** | 否 | **256** | **Running**（2026-08-30 新建，见 §4.2.5） |
-
-### 下游评测（v3 diffusion）
-
-已收口的是两条 **generated-only / global 128** diffusion 的 headline ckpt（全套 T1/T2/T3 + AB CDR + pairing + T4）。
-**BERT 只评表征（T1/T2/T3），不跑 CDR / pairing / T4。**
-
-**现役（2026-09-07 13:25 CST）：三条长跑各自最好 val 点在评，T4 + CDR 已出数。** 全链
-**`checkpoint-151000`**（eval **0.6326**）全套；generated-only 8 卡 2M
-**`checkpoint-44000`**（eval **0.7520**）全套；BERT 1M **`checkpoint-105000`**
-（eval **0.4263**）**只评表征**。三条训练不打断。组 D / 组 C / BERT 1M
-**`eval_loss` 不可比**，下游也不要混排。
-
-**关键结果（2026-09-07，T4 + CDR，本地单卡跑；数字权威在
-[RESULTS.md](../../downstream/benchmark/RESULTS.md) §0.4 / §0.5 / §0.8 组 D）**
-
-| 结论 | 依据 |
-|---|---|
-| **长跑到 151k 没改善 T4，反而微降** | common-6 d_edit：26k **8.58** → 121k **8.78** → 151k **8.80**；仍远差于旧 270m 6.99 与不看表位的 OLGA 6.34 |
-| **CDR 小幅上行，但在噪声内** | SAbDab 旧快照 H3：26k 41.68 → 151k **41.92**（+0.24）；同臂 18k→26k 的 H2 波动就有 +0.41 |
-| **全链 vs generated-only 打平，`--diffusion_all_chains` 无可见收益** | 151k − 44k：SAbDab H1/H2/H3 +0.28/+0.45/+0.13，SAb23H2 互有胜负，T4 则**落后 0.19** |
-
-⚠️ **两条 pairing 还没跑**（`t-20260907044307-btjxr` / `t-20260907044321-ht8b6` 仍在
-`queue012` 排队），而 pairing 是 headline 指标 —— **上面三条只覆盖 T4 与 CDR，本轮尚未收口。**
-BERT 1M 105000 的表征作业已 cancel、未跑。
-
-> **为什么这四个阶段是本地跑的。** `queue012` 单卡是最挤的档位（非终态 758 条里单卡
-> 607 排队 / 106 Running，多卡排队仅 27 条），九条排 41 分钟零起跑。按实测中位耗时
-> **T4 12min < CDR 16min < repr 28min ≪ pairing 165min**，保留 pairing 在队列、
-> 其余七条 cancel，四个 T4/CDR 阶段拿本机 A100-80G 串行跑完（56 分钟，4/4 exit 0）。
-> env 直接激活 eval YAML 里指定的
-> `/vepfs-mlp2/c20250601/251105016/conda/envs/protenix_abtcr`，`CDR_MAX_ITER=2`、
-> batch `4 8` 与平台 entrypoint 逐行一致，**与平台跑同口径**。
-> Runner：`output/_local_runs/run_local_t4_cdr.sh`（日志 `local_run.log`，耗时 `status.tsv`）。
-> **本地跑单卡评测是排不上队时的正当退路**，产物路径与平台跑完全相同。
-
-| Run | Headline ckpt | eval_loss | tag |
-|---|---|---:|---|
-| 8 卡 `..._immune_v3` | `output/protein_esmc_llada270m_diffusion_immune_v3/checkpoint-27000` | 0.7676 | `ours_fusion_v3_diff_27000` |
-| 4 卡 `..._immune_v3_4gpu` | `output/protein_esmc_llada270m_diffusion_immune_v3_4gpu/checkpoint-42000` | 0.7548 | `ours_fusion_v3_4gpu_diff_42000` |
-| 4 卡 `..._allchains_..._4gpu` | `output/protein_esmc_llada270m_diffusion_allchains_immune_v3_4gpu/checkpoint-33000` | **0.6866** | `ours_fusion_v3_allchains_33000` |
-| 8 卡 `..._allchains_..._8gpu_2m` | `output/protein_esmc_llada270m_diffusion_allchains_immune_v3_8gpu_2m/checkpoint-18000` | **0.7044** | `ours_fusion_v3_allchains_8gpu2m_18000` |
-| 8 卡 `..._allchains_..._8gpu_2m` | `output/protein_esmc_llada270m_diffusion_allchains_immune_v3_8gpu_2m/checkpoint-26000` | **0.6902** | `ours_fusion_v3_allchains_8gpu2m_26000` |
-| 8 卡 `..._allchains_..._8gpu_2m` | `output/protein_esmc_llada270m_diffusion_allchains_immune_v3_8gpu_2m/checkpoint-69000` | **0.6577** | `ours_fusion_v3_allchains_8gpu2m_69000` |
-| 8 卡 `..._allchains_..._8gpu_2m` | `output/protein_esmc_llada270m_diffusion_allchains_immune_v3_8gpu_2m/checkpoint-73000` | **0.6535** | `ours_fusion_v3_allchains_8gpu2m_73000` |
-| 8 卡 `..._allchains_..._8gpu_2m` | `output/protein_esmc_llada270m_diffusion_allchains_immune_v3_8gpu_2m/eval_snapshot_121000` | **0.6416** | `ours_fusion_v3_allchains_8gpu2m_121000` |
-| 8 卡 `..._allchains_..._8gpu_2m` | `output/protein_esmc_llada270m_diffusion_allchains_immune_v3_8gpu_2m/eval_snapshot_137000` | **0.6332** | `ours_fusion_v3_allchains_8gpu2m_137000` |
-| 8 卡 `..._allchains_..._8gpu_2m` | `output/protein_esmc_llada270m_diffusion_allchains_immune_v3_8gpu_2m/eval_snapshot_151000` | **0.6326** | `ours_fusion_v3_allchains_8gpu2m_151000` |
-| 8 卡 `..._immune_v3_8gpu_2m`（generated-only） | `output/protein_esmc_llada270m_diffusion_immune_v3_8gpu_2m/eval_snapshot_44000` | **0.7520** | `ours_fusion_v3_genonly_8gpu2m_44000` |
-| 8 卡 `..._bert_immune_v3_1m` | `output/protein_esmc_llada270m_bert_immune_v3_1m/eval_snapshot_105000` | **0.4263** | `ours_fusion_v3_bert_1m_105000` |
-
-- 表征入口：`scripts/downstream/run_immune_fusion_repr.sh <ckpt> <tag> 16`（读出 `grammar:decoder:global:<ckpt>`）。
-- 生成入口：`scripts/downstream/run_immune_fusion_gen.sh <ckpt> <tag> 4 8`（`GEN_STAGES=cdr|pairing|t4`）。
-  解码步数：CDR `CDR_MAX_ITER=2`、pairing `PAIR_MAX_ITER=124` 可用 env 覆盖；**T4 在该脚本里写死 32**。
-  要扫 T4 步数用 `scripts/downstream/sweep_immune_fusion_t4_maxiter.sh <ckpt> <tag> "8 32 64 128" 8`
-  （产物带 iter 标签，不与上面的默认 32 产物冲突）。
-- 作业 YAML：generated-only 用 `eval_jobs/eval_v3_{8gpu_27000,4gpu_42000}_{repr,cdr,pairing,t4}.yml`；
-  全链用 `eval_jobs/eval_v3_allchains_{33000,8gpu2m_18000,8gpu2m_26000,8gpu2m_69000,8gpu2m_73000,8gpu2m_121000,8gpu2m_137000,8gpu2m_151000}_{repr,cdr,pairing,t4}.yml`；
-  generated-only 8 卡 2M 用 `eval_jobs/eval_v3_genonly_8gpu2m_44000_{repr,cdr,pairing,t4}.yml`；
-  BERT 50k 只提交 `eval_jobs/eval_v3_bert_final_repr.yml`；1M 用 `eval_jobs/eval_v3_bert_1m_{34000,105000}_repr.yml`。
-- 提交：`bash scripts/volc-no-proxy.sh ml_task submit --conf eval_jobs/<yml>`。
-  🔴 **2026-09-07 起下游单卡一律投 `queue012` + `Preemptible: false`**：本账号对 `c20250601`
-  （`q-20260121145036-6fztt`）**已无 `CreateCustomTask` 权限**（09-07 中午实测），往那个队列提交直接被 IAM 拒。
-  `StopCustomTask` 当时也被拒，但 **09-07 07:20 CST 同一账号再试，`c20250601` 上 creator 为 `251105016`
-  的九条闲时任务全部 `cancel success`** —— 存量任务要停先直接 `ml_task cancel` 试，不必默认走控制台；
-  `CreateCustomTask` 是否也恢复未测。本轮三最好点九条已按此改投（见下表新 ID）。
-  69000 / 73000 / 121000 全套 / 137000 表征那几批是**历史**的 `c20250601` 闲时提交，更早的全链 8 条是非抢占。
-  BERT 表征**不交 CDR / pairing / T4**。
-  BERT 50k tag `ours_fusion_v3_bert_final`，ckpt 为 `output/protein_esmc_llada270m_bert_immune_v3/checkpoint-final`。
-  BERT 1M 当前最好点 tag `ours_fusion_v3_bert_1m_105000`，快照 `output/protein_esmc_llada270m_bert_immune_v3_1m/eval_snapshot_105000/`。
-  已产出的 BERT CDR/T4 数字**不进 RESULTS、不当 headline**。
-- 任务 ID 账本：闲时首提 `output/downstream_generation/eval_v3_bestval_151000_44000_105000_20260906_task_ids.tsv`；
-  `queue012` 非闲时重提 `output/downstream_generation/eval_v3_bestval_queue012_nonpreempt_20260907_task_ids.tsv`。
-- 数字进 [`downstream/benchmark/RESULTS.md`](../../downstream/benchmark/RESULTS.md) §0.1–§0.6 与 **§0.8**，按 tag 检索。本表不抄排行榜。作业结束后本表只补 Success + RESULTS 锚点。
-
-| Job | Task ID | 覆盖 | 状态 |
-|---|---|---|---|
-| `eval-v3-8gpu-27000-repr` | `t-20260831005742-fbc4r` | T1 / T2 / T3 | Success → [RESULTS §0.1–§0.3](../../downstream/benchmark/RESULTS.md) |
-| `eval-v3-8gpu-27000-cdr` | `t-20260831005745-6tmwn` | AB CDR infill | Success → [§0.5](../../downstream/benchmark/RESULTS.md) |
-| `eval-v3-8gpu-27000-pairing` | `t-20260831005749-qpgjw` | AB light pairing | Success → [§0.6](../../downstream/benchmark/RESULTS.md) |
-| `eval-v3-8gpu-27000-t4` | `t-20260831005752-27hv7` | T4 generation | Success → [§0.4](../../downstream/benchmark/RESULTS.md) |
-| `eval-v3-4gpu-42000-repr` | `t-20260831005755-59vjd` | T1 / T2 / T3 | Success → [§0.1–§0.3](../../downstream/benchmark/RESULTS.md) |
-| `eval-v3-4gpu-42000-cdr` | `t-20260831005759-qfwq4` | AB CDR infill | Success → [§0.5](../../downstream/benchmark/RESULTS.md) |
-| `eval-v3-4gpu-42000-pairing` | `t-20260901011610-tb4hh`（首次 `t-20260831005803-xvl6m` Failed） | AB light pairing | 重提 |
-| `eval-v3-4gpu-42000-t4` | `t-20260901011614-5wzjc`（首次 `t-20260831005807-spgtc` Failed） | T4 generation | Success → [§0.4](../../downstream/benchmark/RESULTS.md) |
-| `eval-v3-bert-final-repr` | `t-20260901113303-kqd4h` | T1 / T2 / T3 **only** | Success |
-| `eval-v3-bert-1m-34000-repr` | `t-20260904104944-mdr7x` | T1 / T2 / T3 **only** | 闲时已提交 |
-| `eval-v3-bert-final-cdr` | `t-20260901113306-p6c46` | 误提，已 Success | **不作数** |
-| `eval-v3-bert-final-pairing` | `t-20260901113309-p7cp9` | 误提 | **已 cancel** |
-| `eval-v3-bert-final-t4` | `t-20260901113312-zmxm9` | 误提，已 Success | **不作数** |
-| `eval-v3-allchains-33000-repr` | `t-20260902044100-wnkdb` | T1 / T2 / T3 | Success → [§0.1–§0.3](../../downstream/benchmark/RESULTS.md) |
-| `eval-v3-allchains-33000-cdr` | `t-20260902044104-29sqz` | AB CDR infill | Success → [§0.5](../../downstream/benchmark/RESULTS.md) |
-| `eval-v3-allchains-33000-pairing` | `t-20260902044108-ddnrw` | AB light pairing | Success → [§0.6](../../downstream/benchmark/RESULTS.md) |
-| `eval-v3-allchains-33000-t4` | `t-20260902044113-xxnp7` | T4 generation | Success → [§0.4](../../downstream/benchmark/RESULTS.md) |
-| `eval-v3-allchains-8gpu2m-18000-repr` | `t-20260902044117-vh48s` | T1 / T2 / T3 | Success → [§0.1–§0.3](../../downstream/benchmark/RESULTS.md) |
-| `eval-v3-allchains-8gpu2m-18000-cdr` | `t-20260902044121-q2rt5` | AB CDR infill | Success → [§0.5](../../downstream/benchmark/RESULTS.md) |
-| `eval-v3-allchains-8gpu2m-18000-pairing` | `t-20260902044126-mw2s6` | AB light pairing | Success → [§0.6](../../downstream/benchmark/RESULTS.md) |
-| `eval-v3-allchains-8gpu2m-18000-t4` | `t-20260902044130-zx5vk` | T4 generation | Success → [§0.4](../../downstream/benchmark/RESULTS.md) |
-| `eval-v3-allchains-8gpu2m-26000-repr` | `t-20260902104333-87ccm` | T1 / T2 / T3 | Success → [§0.1–§0.3](../../downstream/benchmark/RESULTS.md) |
-| `eval-v3-allchains-8gpu2m-26000-cdr` | `t-20260902104338-7ptgf` | AB CDR infill | Success → [§0.5](../../downstream/benchmark/RESULTS.md) |
-| `eval-v3-allchains-8gpu2m-26000-pairing` | `t-20260902104342-68qz8` | AB light pairing | Success → [§0.6](../../downstream/benchmark/RESULTS.md) |
-| `eval-v3-allchains-8gpu2m-26000-t4` | `t-20260902104346-882r9` | T4 generation | Success → [§0.4](../../downstream/benchmark/RESULTS.md) |
-| `eval-v3-allchains-8gpu2m-69000-repr` | `t-20260904013714-4w8nk` | T1 / T2 / T3 | Success（数字待回填） |
-| `eval-v3-allchains-8gpu2m-69000-cdr` | `t-20260904013717-rhmzz` | AB CDR infill | Success（数字待回填） |
-| `eval-v3-allchains-8gpu2m-69000-pairing` | `t-20260904013720-nprjc` | AB light pairing | Success（数字待回填） |
-| `eval-v3-allchains-8gpu2m-69000-t4` | `t-20260904104404-t6j7v`（前次 `t-20260904013725-7zcvf` Killed） | T4 generation | 闲时补提 |
-| `eval-v3-allchains-8gpu2m-73000-repr` | `t-20260904104145-77cfr` | T1 / T2 / T3 | 闲时已提交 |
-| `eval-v3-allchains-8gpu2m-73000-cdr` | `t-20260904104148-6x5m9` | AB CDR infill | 闲时已提交 |
-| `eval-v3-allchains-8gpu2m-73000-pairing` | `t-20260904104152-pxjd4` | AB light pairing | 闲时已提交 |
-| `eval-v3-allchains-8gpu2m-73000-t4` | `t-20260904104155-tctxm` | T4 generation | 闲时已提交 |
-| `eval-v3-allchains-8gpu2m-121000-repr` | `t-20260905191346-rbt8z` | T1 / T2 / T3 | **Success** |
-| `eval-v3-allchains-8gpu2m-121000-cdr` | `t-20260906125811-fdrvj` | AB CDR infill | 闲时已提交 |
-| `eval-v3-allchains-8gpu2m-121000-pairing` | `t-20260906125815-q8h8b` | AB light pairing | 闲时已提交 |
-| `eval-v3-allchains-8gpu2m-121000-t4` | `t-20260906125820-db5bd` | T4 generation | 闲时已提交 |
-| `eval-v3-allchains-8gpu2m-137000-repr` | `t-20260906125806-xkg7q` | T1 / T2 / T3 | 闲时已提交 |
-| `eval-v3-allchains-8gpu2m-144000-repr` | `t-20260906132412-tklfb` | T1 / T2 / T3 | 闲时已提交 |
-| `eval-v3-allchains-8gpu2m-121000-t4-itersweep` | `t-20260906132835-xnnlf` | T4 `max_iter` 8/32/64/128 | 闲时已提交 |
-| `eval-v3-allchains-8gpu2m-151000-pairing` | **`t-20260907044307-btjxr`**（旧闲时 `t-20260906233451-fjzmm` 09-07 已 cancel → Killed） | AB light pairing | **`queue012` 非闲时，Queue（保留）** |
-| `eval-v3-genonly-8gpu2m-44000-pairing` | **`t-20260907044321-ht8b6`**（旧闲时 `t-20260906233508-svn2t` 09-07 已 cancel → Killed） | AB light pairing | **`queue012` 非闲时，Queue（保留）** |
-| `eval-v3-allchains-8gpu2m-151000-repr` | `t-20260907044259-qd52v` | T1 / T2 / T3 | 09-07 已 cancel（让位 pairing） |
-| `eval-v3-allchains-8gpu2m-151000-cdr` | `t-20260907044303-ks4x6` | AB CDR infill | 09-07 已 cancel（让位 pairing） |
-| `eval-v3-allchains-8gpu2m-151000-t4` | `t-20260907044310-wlm9h` | T4 generation | 09-07 已 cancel（让位 pairing） |
-| `eval-v3-genonly-8gpu2m-44000-repr` | `t-20260907044314-mtzn9` | T1 / T2 / T3 | 09-07 已 cancel（让位 pairing） |
-| `eval-v3-genonly-8gpu2m-44000-cdr` | `t-20260907044317-kfhk2` | AB CDR infill | 09-07 已 cancel（让位 pairing） |
-| `eval-v3-genonly-8gpu2m-44000-t4` | `t-20260907044324-tcmhs` | T4 generation | 09-07 已 cancel（让位 pairing） |
-| `eval-v3-bert-1m-105000-repr` | `t-20260907044328-wwfjn` | T1 / T2 / T3 **only** | 09-07 已 cancel（让位 pairing） |
-
-> **2026-09-07 只留 pairing**：`queue012` 单卡是最挤的档位（607 条同规格排队 / 106 Running），
-> 九条排 41 分钟零起跑。按实测中位耗时 **T4 12min < CDR 16min < repr 28min ≪ pairing 165min**，
-> pairing 是关键路径，其余七条 cancel 让位（cancel 时均仍 `Queue`，无中断损失）。
-> 七条 ckpt / tag 未变，要补做直接用原 YAML 重提。
->
-> **2026-09-07 07:20 CST：`c20250601` 上旧闲时九条（`t-20260906233442-d2gzt` … `t-20260906233517-9x8kq`
-> 及补提的 `t-20260907001930-qtf2s`）已全部 `ml_task cancel` 成 `Killed`**，cancel 时全部仍 `Queue`、
-> 从未起跑。双跑覆盖 `output/downstream_generation/<tag>_*` 的风险解除。平台上我们只剩上面两条
-> `queue012` pairing 与两条 8 卡训练在非终态。详见 PROGRESS §4.2.11。
-
-跨任务总表：[RESULTS §0.8](../../downstream/benchmark/RESULTS.md) **组 D**。33000 / 18000 / 26000 已收口。
-本轮三最好点数字待回填。**不与组 C（generated-only 50k）混排**；generated-only 8 卡 2M 也是另一组。
-账本：`output/downstream_generation/eval_v3_bestval_151000_44000_105000_20260906_task_ids.tsv`。
-
-对照规则（写进任何结论前先看）：
-
-1. 两条 v3 同配方、同 global 128，**可以互比**；8 卡评的是 27k、4 卡是 42k，差距首先是进度，不是卡数。
-2. 与 RESULTS 里旧 270m diffusion@42000 **不可并排**——旧条是六源、去污前。
-3. T4 跨模型只认 `bioseq_unseen_common`（6 个 pMHC）；Char-BLEU 不跨解码器比。
-
-🔴 **batch 口径分两组，跨组比 loss 无意义**：前五条是 global **128**（8 卡 per_device 2 × ga 8；
-4 卡 per_device 4 × ga 8），后两条是 global **256**（per_device 4 × **ga 16** × 4 卡）。
-128 那档 50000 步 ≈ 0.84 epoch，256 那档 ≈ 1.64 epoch（墙钟约 50 h）。组内可比、跨组不可比。
-
-⚠️ **加倍只能走 `ga`，不能走 `per_device`。** `per_device 8` 实测在真实七源混合上 step 2 就
-OOM（`76.29 GiB is allocated`），而只喂 `asd_antibody` 的本机探测预测才 43 GiB —— 低估 33 GiB，
-因为 ASD 样本只有 2 条链，而 TRAIT / TCR 样本带 peptide + MHC + TCRα + TCRβ 共 4-5 条，
-ESMC 编码器的激活是按 `per_device × 链数 × 链长` 走的，且它**不被 FSDP 分片、也没有
-activation checkpointing**。`ga` 不改变张量形状，显存画像与已跑满 42k 步的 `per_device 4`
-完全相同，所以是零风险路径。定容细节与复现方法见
-[`PROTEIN_PRETRAIN_PROGRESS.md`](PROTEIN_PRETRAIN_PROGRESS.md) §4.2.5。
-
-✅ **空位符阻塞已修（2026-08-31）**：七源 × train/valid/holdout 共 21 个文件、约 880 万行，
-非法残基字符（`.` / `-` / `|`）只出现 **1 格**——`tcr_papers_v2/train.csv` 第 3046 行
-`cdr3b` 已从 `ASSKVAARVP-TLKLS` 改成 `ASSKVAARVPTLKLS`（行数不变，4 卡从
-`checkpoint-42000` 续跑不会移位）。`assert_residue_alphabet.py` 现默认扫全部 21 个文件，
-exit 0。4 卡 diffusion 可以 resume 了，见
-[`PROTEIN_PRETRAIN_PROGRESS.md`](PROTEIN_PRETRAIN_PROGRESS.md) §4.2.6。
-
-提交前的语料 gate 现在有两个，建议都跑：
-
-```bash
-python scripts/data/tcr_native/assert_corpus_fresh.py \
-    data/tcr_papers_v2/dataset/finalize_report.json \
-    data/tcr_repertoire/dataset/build_report.json   # 去污新鲜度
-python scripts/data/assert_residue_alphabet.py       # 残基字母表，发现坏行 exit 1
-```
-
-⚠️ **`eval_loss` 不可跨口径比大小**（三层切割线：目标函数、loss 覆盖范围、batch），
-BERT 的 0.60 不代表比 diffusion 的 0.75 好。各条实时数字与解释见
-[`PROTEIN_PRETRAIN_PROGRESS.md`](PROTEIN_PRETRAIN_PROGRESS.md) §4.2.0。
-
-⚠️ **配置性失败后要立刻 cancel 重试链**：`RetryOptions: PolicySets: [Failed]` 分不清节点故障
-和参数错，OOM 那条 bert 被自动重提成同名任务 `t-20260830135809-zq7pg`（仍是 per_device 8），
-与正确任务共用同一 `OUTPUT_DIR`，已手动 cancel。
-
-`OUTPUT_DIR` 互不重叠，并跑不会互相破坏，只浪费配额 ——
-**同一臂哪条先出 checkpoint 就 cancel 其余的**，别让多条都跑到 50k。
-当前 `queue012` 的 8 卡 diffusion 正在重跑 4 卡那条已完成 84% 的同一臂（只是不占
-`c20250601` 配额），是最该先 cancel 的一条。
-超参、语料实测与设计意图见 [`PROTEIN_PRETRAIN_PROGRESS.md`](PROTEIN_PRETRAIN_PROGRESS.md) §4.2。
-
-`..._diffusion_allchains_...` 那条是 **`--diffusion_all_chains True`** 的变体：**没有任何链是
-fixed 的**，抗原 / MHC / peptide 也被加噪并计入 diffusion loss（generated-only 的镜像，对应
-BERT 那边的 `--bert_all_chains`）。它与 `..._diffusion_immune_v3_4gpu` 除该开关、batch、
-`OUTPUT_DIR`、`run_name` 外逐字一致（`diff` 核过）。
-**首跑必须 from scratch** —— 目标函数和 batch 口径都变了，旧 checkpoint 不可续。
+⚠️ **`eval_loss` 不可跨口径比**（目标函数 / loss 覆盖 / batch）。BERT 的 0.60 不代表
+比 diffusion 的 0.75 好。加倍 batch 只能走 `ga`，不能走 `per_device`（`per_device 8`
+在真实七源上 step 2 OOM）。空位符 `.`/`-`/`|` 会杀死 DataLoader rank；提交前跑
+`assert_residue_alphabet.py`。细节见 PROTEIN_PRETRAIN_PROGRESS。
 
 ### 提交训练任务
 
@@ -477,7 +270,7 @@ examples/llada
 
 ## Training
 
-> Read [Useful tips for training](/README.md#useful-tips-for-training) and [(optional) Slurm setup](/README.md#optional-slurm-setup) before training.
+> Read [Useful tips for training](../../README.md#useful-tips-for-training) and [(optional) Slurm setup](../../README.md#optional-slurm-setup) before training.
 >
 > **MoE checkpoints:** For models like [`LLaDA-MoE-7B-A1B-Base`](https://huggingface.co/inclusionAI/LLaDA-MoE-7B-A1B-Base), set `"model_type"` to `"lladamoe"` in the checkpoint’s `config.json`:
 <!-- > ```diff
@@ -608,7 +401,7 @@ python examples/llada/chat.py --model_name_or_path "GSAI-ML/LLaDA-8B-Instruct"
 ```
 
 ## Evaluation
-> Read [(optional) Evaluation setup](/README.md#optional-evaluation-setup) before running evaluation. 
+> Read [(optional) Evaluation setup](../../README.md#optional-evaluation-setup) before running evaluation. 
 
 For example, to evaluate [LLaDA-8B-Instruct](https://huggingface.co/GSAI-ML/LLaDA-8B-Instruct) on [gsm8k](https://huggingface.co/datasets/openai/gsm8k) using 4 GPUs, run:
 ```shell
