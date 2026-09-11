@@ -1,0 +1,57 @@
+# Template for the offline immune semantic dataset.
+# Replace every source and blocklist path with the production absolute path.
+schema_version: immune_llada.semantic.v1
+splits: [train, valid]
+
+sources:
+  oas:
+    path: /vepfs-mlp2/c20250601/251105016/project/dllm_test/data/oas_previous_clean/splits
+    weight: 1.0
+    splits: [train, valid]
+  ots:
+    path: /vepfs-mlp2/c20250601/251105016/project/dllm_test/data/ots_paired_clean/final
+    weight: 1.0
+  asd_antibody:
+    path: /vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/asd/step6_final/antibody
+    weight: 1.0
+  trait:
+    path: /vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/trait/step4_final
+    weight: 1.0
+  tcr_native:
+    path: /vepfs-mlp2/c20250601/251105016/project/dllm_test/data/tcr_native/dataset
+    weight: 1.0
+  tcr_papers:
+    path: /vepfs-mlp2/c20250601/251105016/project/dllm_test/data/tcr_papers_v2/dataset
+    weight: 1.0
+  tcr_repertoire:
+    # junc80 build: stores the FULL IMGT junction (C...F/W) and tags rows
+    # fv_source=tcrdesign2026_cdr3_junc80, which is how the adapter decides to peel
+    # the C/F anchors into FR3/FR4. Do NOT point this at data/tcr_repertoire: that
+    # older build stores anchor-free cores and the two are not interchangeable.
+    path: /vepfs-mlp2/c20250601/251105016/project/dllm_test/data/tcr_repertoire_junc80/dataset
+    weight: 1.0
+
+# Use none/off/disabled/- only when intentionally disabling a filter.
+blocklists:
+  replaces_trait: /vepfs-mlp2/c20250601/251105016/project/dllm_test/data/tcr_native/dataset/replaces_trait_blocklist.txt
+  trait_benchmark: /vepfs-mlp2/c20250601/251105016/project/dllm_test/data/tcr_native/dataset/trait_benchmark_blocklist.txt
+  ots_benchmark: /vepfs-mlp2/c20250601/251105016/project/dllm_test/data/tcr_native/dataset/ots_benchmark_blocklist.txt
+  oas_benchmark: /vepfs-mlp2/c20250601/251105016/project/dllm_test/data/tcr_native/dataset/oas_benchmark_blocklist.txt
+  asd_antibody_benchmark: /vepfs-mlp2/c20250601/251105016/project/dllm_test/data/tcr_native/dataset/asd_antibody_benchmark_blocklist.txt
+  asd_nanobody_benchmark: /vepfs-mlp2/c20250601/251105016/project/dllm_test/data/tcr_native/dataset/asd_nanobody_benchmark_blocklist.txt
+  t4_refbinder: /vepfs-mlp2/c20250601/251105016/project/dllm_test/data/tcr_native/dataset/t4_refbinder_blocklist.txt
+  t2t3_eval: /vepfs-mlp2/c20250601/251105016/project/dllm_test/data/tcr_native/dataset/t2t3_eval_blocklist.txt
+
+budget:
+  max_protein_length: 1024
+  max_length: 1024
+
+output:
+  shard_size: 100000
+
+# The preprocessing pipeline learns this profile from current complete TCR rows
+# (OTS/native/papers) before completing tcr_repertoire beta-only rows. The
+# resulting profile and digest are frozen into dataset_manifest.json.
+tcr_region_profile:
+  seed: 42
+  source_policy: current_complete_tcr_rows
