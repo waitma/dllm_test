@@ -1,8 +1,28 @@
 # Project Process
 
-> Last updated: 2026-09-12
+> Last updated: 2026-09-11T18:22Z
 >
 > 本页保留历史任务账本；顶部最新条目描述当前代码清理和文档同步状态。除明确标注为“本轮已验证”的项目外，历史测试、吞吐和任务数字不能被解释为本轮验证通过。
+
+## 2026-09-12 Submitted v5 8-GPU immune diffusion
+
+- **操作**：submit（from scratch；独立 `OUTPUT_DIR`，不接 v3 / v4 / 2M checkpoint）
+- **task_id**：`t-20260912021346-5xq4s`
+- **任务名**：`protein_esmc_llada270m_diffusion_immune_v5_8gpu`
+- **YAML**：`/vepfs-mlp2/c20250601/251105016/project/dllm_test/train_jobs/protein_esmc_llada270m_diffusion_immune_v5_8gpu.yml`
+- **提交时刻**：`2026-09-11T18:13:46Z`（2026-09-12 02:13:46 UTC+8）
+- **初始状态**：`Queue`，队列 `queue012`（`q-20260524172355-rnqtf`），1×8 卡 `ml.pni2.28xlarge`
+- **Preemptible**：false
+- **取消**：`bash scripts/volc-no-proxy.sh ml_task cancel -i t-20260912021346-5xq4s`
+- **可复现 commit**：`b356b28`（新增 YAML）→ `8006151`（固定 200k step / 11 天 deadline）→ `6c753c8`（作业实际执行的 `examples/llada/protein_pretrain_esmc.py` 与 `protein_fusion_model.py`；此 commit 之前会跑到未提交工作区代码）
+- **配置**：权威在 YAML 头部注释与 Entrypoint。固定 `--max_steps 200000`（不传 `--num_train_epochs`）、global batch 256 = `per_device 4 × ga 8 × 8 GPU`、cosine `1e-4` / warmup 2000 / `max_grad_norm 1.0`、`ActiveDeadlineSeconds 950400`、eval/save 每 1000、`save_top_k 3`、`slim_checkpoints True`。
+- **数据**：`data/prepared/immune_v5_receptor_completion`。行数 / 监督份额 / 不变量：plan §4.2。受体补全设计：plan §2.5 / §2.6。
+- **墙钟估计**：YAML 头部（由 v3 8 卡实测校正后的规划值，不是 v5 实测）。v5 GPU 吞吐仍未测：`SPEED_ANALYSIS.md`。
+- **读结果时注意**（本条新登记）：
+  - `--max_eval_rows_per_source 2000` 在当前代码只是未消费的 CLI 字段，每次 eval 跑完整 valid（行数：plan §4.2；本 run 约 200 次满 eval）。
+  - wandb 回退机制：`examples/llada/README.md`。历史 44 个 run 目录全是 `offline-run-*`、0 个 online、只有 5 个曾 `wandb sync`；计算节点探测 `api.wandb.ai` 失败则会 offline，盘上 `${OUTPUT_DIR}/wandb` 仍在 VePFS。
+  - YAML 写了 `RetryOptions`（`EnableRetry` / `MaxRetryTimes: 5` / `PolicySets: [Failed]`），但 `ml_task get --format json` 与 `ml_task export` 都没回显这些字段，**无法确认平台已接受**。手动重提时 entrypoint 的 `RESUME_ARG` 仍会从最新 checkpoint 续。语义见 `examples/llada/README.md`。
+  - `save_top_k` 看合计 `eval_loss`。valid 里 `asd_antibody` 占比远高于 train（plan §4.2 逐源表），抗体–抗原会主导选模，TCR–epitope 不是主信号。checkpoint 保留另有调查；这里只登记构成错配与担心，不给修法。
 
 ## 2026-09-12 filter_report item 13 计数 + manifest `filter_names`（代码已落地；v5 产物未重写）
 
@@ -660,10 +680,11 @@ eval + 前缀截断」时代。现在 `subsample_seed=0` 走 reservoir 抽样、
 
 > Only non-terminal jobs (`Initialized` / `Queue` / `Staging` / `Running` / `Killing`). Remove a row when the job reaches `Success`, `Failed`, or `Killed`.
 
-Last updated: 2026-09-11T11:03Z (UTC+8)
+Last updated: 2026-09-11T18:22Z
 
 | Task ID | Job / TaskName | 队列 | 卡数 | max_steps | 状态 |
 |---|---|---|---:|---:|---|
+| **`t-20260912021346-5xq4s`** | `protein_esmc_llada270m_diffusion_immune_v5_8gpu` | `queue012` **非闲时** | 8 | 200000 | Queue |
 | **`t-20260911190334-kpfsz`** | `eval-ophiuchus-ab-esm-head-epochs-long` | `c20250601` **闲时** | 1 | — | Queue |
 
 已从本表移除（2026-09-11 查询已终态）：`t-20260911085733-5b727`（`eval-ophiuchus-ab-esm-head-epochs`，**Success**）。

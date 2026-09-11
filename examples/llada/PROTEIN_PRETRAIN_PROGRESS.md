@@ -11,9 +11,9 @@
 - 下游数字权威表：[`RESULTS.md`](../../downstream/benchmark/RESULTS.md)
 - 多链关系对照臂设计：[`MULTI_CHAIN_RELATION.md`](MULTI_CHAIN_RELATION.md)
 
-**最近更新 2026-09-12**：v4 / v5 prepared 均已发布；表位源补全 / all-X **已在全量
-语料核验**。行数权威：plan §4.2。见 §3 与 PROJECT_PROCESS 2026-09-12 条。
-v3 长跑账本仍见 §3.1；数字进 RESULTS，不在此复述。
+**最近更新 2026-09-12**：v5 8-GPU diffusion 已提交（Queue）。账本：
+[`PROJECT_PROCESS.md`](../../PROJECT_PROCESS.md) 同日条。v4 / v5 prepared 均已发布；
+行数权威：plan §4.2。v3 长跑账本仍见 §3.1；数字进 RESULTS，不在此复述。
 
 ---
 
@@ -93,7 +93,9 @@ multinomial；`relation_aux_loss`；修 ESMC 条件流在迭代解码中泄漏�
 - ✅ v4 `data/prepared/immune_v4_beta_relation` 已发布（plan §4.1）。
 - ✅ §2.5 / §2.6 已在全量语料落地并核验；v5 `immune_v5_receptor_completion` 已发布（plan §4.2）。
 - ✅ v4 `tcr_repertoire` 可从自身 manifest 重生（3,000 行 0 mismatch）；v5 同 shard byte-identical。
-- ⏳ 正式 v4/v5 训练尚未提交。
+- ✅ v5 8-GPU diffusion 已提交（Queue）。task id / YAML / 取消 / 可复现 commit：
+  [`PROJECT_PROCESS.md`](../../PROJECT_PROCESS.md) 2026-09-12 条。v4 4 卡臂仍未提交。
+  YAML 头部写「见本文 §4.2」是从 v4 YAML 抄来的；§4.2 仍是 v3 50k，不是本 run。
 - `immune_receptor_v2` 仍未通过 runtime/training gate。
 
 ## 3.1 历史 v3 状态（2026-09-07 平台 + 盘上核实）
@@ -783,6 +785,7 @@ python examples/llada/protein_pretrain_esmc.py --dry_run True --max_rows_per_sou
 
 > 一行一条，细节在对应小节。不要在这里重复正文内容。
 
+- **2026-09-12** — 提交 v5 8-GPU diffusion（Queue）。账本 PROJECT_PROCESS 同日条。
 - **2026-09-12** — 表位源补全 + all-X 已在全量语料核验；v5 已发布。见 PROJECT_PROCESS 同日条与 plan §2.5/§2.6/§4.2。
 - **2026-09-11** — 无条件布局加固定 `<null>` 前缀（renderer 改动，预处理无需重跑）；wandb 切 `online`。细节见 plan §2.3.2。
 - **2026-09-11** — v4 数据线完成流式 region profile、beta-only 双链补全、synthetic X loss exclusion、relation target diffusion；链顺序在渲染层统一为 **β→α**（`grammar.py` 的 `receptor = [beta, alpha]`），anchor 判定改 provenance 驱动，corpus 切到 `tcr_repertoire_junc80`。全量 preprocessing 跑完（raw 8,441,615 → kept 7,768,293，train 7,665,574 / valid 102,719），全量审计零不变量违规，`nonbinding` 负样本路径在真实数据上验通。正式训练尚未提交。见 `docs/PLAN_TCR_BETA_ONLY_RELATION_DIFFUSION.md`。

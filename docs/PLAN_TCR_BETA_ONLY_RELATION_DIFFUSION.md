@@ -7,7 +7,7 @@
 §3.1 item 13 计数**代码已落地**；数字是对已发布 JSONL 的 post-hoc 推导，见 §4.2
 （已发布 v5 `filter_report` 未重写）。
 v5 逐源行数 / 与 v4 对照 / 监督 token 份额 / 不变量 / item 13 计数见 §4.2。
-训练提交仍未执行（等平台配额/队列确认）。
+训练提交见 [`PROJECT_PROCESS.md`](../PROJECT_PROCESS.md) 2026-09-12 条。
 
 操作入口：[`dllm/pipelines/immune_llada/README.md`](../dllm/pipelines/immune_llada/README.md)。
 布局字段：[`DATA_FORMAT_AUDIT.md`](../DATA_FORMAT_AUDIT.md)。
@@ -31,7 +31,7 @@ v5 逐源行数 / 与 v4 对照 / 监督 token 份额 / 不变量 / item 13 计�
 | §2.5 表位源 beta-only 补全 | **已在全量语料落地并核验**（产物 `data/prepared/immune_v5_receptor_completion/`，§4.2） |
 | §2.6 all-X epitope 删除 / all-X MHC 降级 | **已在全量语料落地并核验**（与 §2.5 同一次 v5 重跑，§4.2） |
 | §3.1 item 13 计数（`downgraded_all_x_mhc`、各源 `beta_only_completed` / `alpha_only_completed`） | **代码已落地**（post-hoc 数字见 §4.2；已发布 v5 报告未重写） |
-| 训练提交 | **未执行**（v5 已发布；等平台配额/队列确认） |
+| 训练提交 | **已提交**（Queue；task id / YAML：[`PROJECT_PROCESS.md`](../PROJECT_PROCESS.md) 2026-09-12 条） |
 
 ## 1. 当前真实训练数据源
 

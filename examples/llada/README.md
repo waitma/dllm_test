@@ -57,6 +57,7 @@ ESMC 条件融合预训练。历史工作线支持 `diffusion` 与 `bert` 两种
   与 [`docs/PLAN_TCR_BETA_ONLY_RELATION_DIFFUSION.md`](../../docs/PLAN_TCR_BETA_ONLY_RELATION_DIFFUSION.md)。
 - **v5 已发布**：`configs/data/immune_v5_receptor_completion.yaml` →
   `data/prepared/immune_v5_receptor_completion/`。行数 / v4 对照：plan §4.2。
+- **v5 8-GPU 已提交**（Queue）：账本 [`PROJECT_PROCESS.md`](../../PROJECT_PROCESS.md) 2026-09-12 条。配置 [`train_jobs/protein_esmc_llada270m_diffusion_immune_v5_8gpu.yml`](../../train_jobs/protein_esmc_llada270m_diffusion_immune_v5_8gpu.yml)。
 - **wandb `online`**，节点不可达则自动回退 offline（egress 未在计算节点验证）。
 - 提交前：smoke/full preprocess、manifest/profile 审计、residue alphabet、corpus freshness。
 
