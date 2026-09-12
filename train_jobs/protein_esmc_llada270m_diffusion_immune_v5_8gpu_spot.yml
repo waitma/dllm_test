@@ -1,0 +1,235 @@
+TaskName: "protein_esmc_llada270m_diffusion_immune_v5_8gpu_spot"
+# 设计意图、语料实测、已知 caveat 见 examples/llada/PROTEIN_PRETRAIN_PROGRESS.md §4.2。
+# 本文件 = 已排队正式 diffusion 臂
+# train_jobs/protein_esmc_llada270m_diffusion_immune_v5_8gpu.yml（task
+# t-20260912021346-5xq4s，queue012 非抢占）的闲时（抢占）副本，作为「赛跑」第二条线。
+# 目标函数 / 模型 / 数据 / 优化器旗标与正式臂逐字一致：--train_objective diffusion、
+# --diffusion_all_chains False（generated-only）、--relation_aux none、immune_v5
+# receptor-completion、d768/L8/h12/mlp3072、global batch 256 = 4 × 8 × 8、
+# 200,000 steps、cosine 1e-4、warmup 2000。两臂只在队列 / 抢占 / OUTPUT_DIR /
+# resume 校验 / 重试上分叉。
+# 资源形：1 节点 × ml.pni2.28xlarge，RoleReplicas 1，投
+# queue012 + Preemptible: true（与正式臂同队列，只开抢占）。
+# 🔴 提交身份敏感：队列权限按 ml_task submit 时**当前机器的账号**算，不按仓库算。
+# 同一份 vepfs 挂在多台机器上、各机器凭证是不同账号，所以这条 YAML **必须在
+# 251105016 身份的机器上提**（t-20260911054553-jb7v5 / t-20260912035657-dd8v9 都是该身份）。
+# `zhuyiheng` 对 c20250601 无 CreateCustomTask —— 正式 diffusion YAML 头部那句注释是对的、
+# 不是过期结论，它只是在说另一个账号。换机器前先 `ml_task list -o json` 看 Creator。
+# 固定 200,000 steps、cosine 1e-4、warmup 2000：与正式 v5 diffusion 同 horizon，
+# cosine 对着声明长度退火，声明必须等于实际会跑的长度。只传 --max_steps 200000，
+# 不传 --num_train_epochs：本脚本 TrainingArguments 把 max_steps 默认改成了 1000，
+# HF Trainer 规则是 max_steps > 0 时覆盖 num_train_epochs，epoch 旗标会变成空操作，
+# 两旗标并存看起来互相打架。
+# --save_top_k 3 / --slim_checkpoints True 是配额硬约束：稳态约 13.5–16 GB，
+# 抬高 top-k 会把 output/ 往 1.2 TB 死亡水位推。
+# 本任务从零开跑：无 SRC_DIR 拷贝、无 --init_fusion_weights；OUTPUT_DIR 为空就 step 0。
+# OUTPUT_DIR 带 _spot 后缀、本任务独占，不得与正式臂
+# output/protein_esmc_llada270m_diffusion_immune_v5_8gpu 有任何重叠。
+Description: "270m diffusion v5 receptor-completion 八卡闲时"
+
+Storages:
+  - Type: "Vepfs"
+    MountPath: "/vepfs-mlp2/c20250601/251105016"
+    VepfsId: "vepfs-cnbj2c98dea54433"
+    SubPath: "c20250601/251105016"
+
+Entrypoint: |
+  set -euo pipefail
+  cd /vepfs-mlp2/c20250601/251105016/project/dllm_test
+  source activate /vepfs-mlp2/c20250601/251105016/conda/envs/protenix_abtcr
+  export PYTHONPATH=/vepfs-mlp2/c20250601/251105016/project/dllm_test
+  export OMP_NUM_THREADS=8
+  export NCCL_TIMEOUT_SECOND=1800
+  export TORCH_NCCL_HEARTBEAT_TIMEOUT_SEC=1800
+  export NCCL_DEBUG=WARN
+  export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
+  export HF_HUB_OFFLINE=1
+  export TRANSFORMERS_OFFLINE=1
+  export HF_HOME=/vepfs-mlp2/c20250601/251105016/conda/cache/huggingface
+
+  ESMC_DIR=/vepfs-mlp2/c20250601/251105016/project/dllm_test/model_weights/esmc/ESMC-300M
+  PREPARED_DATA_DIR=/vepfs-mlp2/c20250601/251105016/project/dllm_test/data/prepared/immune_v5_receptor_completion
+  OAS_DIR=/vepfs-mlp2/c20250601/251105016/project/dllm_test/data/oas_previous_clean/splits
+  OTS_DIR=/vepfs-mlp2/c20250601/251105016/project/dllm_test/data/ots_paired_clean/final
+  ASD_ANTIBODY_DIR=/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/asd/step6_final/antibody
+  TRAIT_DIR=/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/trait/step4_final
+  TCR_NATIVE_DIR=/vepfs-mlp2/c20250601/251105016/project/dllm_test/data/tcr_native/dataset
+  # v2 corpus of the published papers: same four sources as before plus the three
+  # TcrDesign-2026 epitope layers. Written to a separate root so the corpus the
+  # v2 checkpoints trained on stays byte-identical.
+  TCR_PAPERS_DIR=/vepfs-mlp2/c20250601/251105016/project/dllm_test/data/tcr_papers_v2/dataset
+  # junc80 build: keeps the FULL IMGT junction (C...F/W) and tags rows
+  # fv_source=tcrdesign2026_cdr3_junc80, which is how the adapter decides to peel the
+  # C/F anchors into FR3/FR4. The older data/tcr_repertoire stores anchor-free cores
+  # and is NOT interchangeable; it must not be substituted here.
+  TCR_REPERTOIRE_DIR=/vepfs-mlp2/c20250601/251105016/project/dllm_test/data/tcr_repertoire_junc80/dataset
+  OUTPUT_DIR=/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/protein_esmc_llada270m_diffusion_immune_v5_8gpu_spot
+  LLADA_CACHE=/vepfs-mlp2/c20250601/251105016/conda/cache/huggingface/hub/models--GSAI-ML--LLaDA-8B-Base
+
+  # online so the run is monitorable while it trains. The v3 jobs ran offline and
+  # never called `wandb sync`, so their logs only ever existed on disk.
+  export WANDB_MODE=online
+  export WANDB_PROJECT=bioseq-llada8b-fusion
+  export WANDB_DIR="${OUTPUT_DIR}/wandb"
+  export WANDB_INIT_TIMEOUT=120
+  mkdir -p "${WANDB_DIR}"
+  if [ -f /vepfs-mlp2/c20250601/251105016/.secrets/wandb_api_key ]; then
+    export WANDB_API_KEY="$(cat /vepfs-mlp2/c20250601/251105016/.secrets/wandb_api_key)"
+  fi
+  # Egress from the compute nodes has never been verified. Probe once and drop to
+  # offline if api.wandb.ai is unreachable, so a telemetry failure cannot stall or
+  # kill a multi-day run; the on-disk logs can still be pushed with `wandb sync`.
+  if ! python -c "import socket; socket.create_connection(('api.wandb.ai', 443), 10).close()" 2>/dev/null; then
+    echo "[wandb] api.wandb.ai unreachable from this node -> falling back to WANDB_MODE=offline"
+    export WANDB_MODE=offline
+  fi
+
+  test -f "${ESMC_DIR}/config.json"
+  test -f "${ESMC_DIR}/model.safetensors"
+  test -d "${OAS_DIR}"
+  test -d "${OTS_DIR}"
+  test -d "${ASD_ANTIBODY_DIR}"
+  test -d "${TRAIT_DIR}"
+  test -d "${TCR_NATIVE_DIR}"
+  test -d "${TCR_PAPERS_DIR}"
+  test -d "${TCR_REPERTOIRE_DIR}"
+  # Both new corpora carry a build report asserting zero residual benchmark
+  # leakage. A PASS alone is not enough: it only means "clean against the
+  # blocklists as they were at build time", and on 2026-08-28 a blocklist was
+  # rebuilt 45 min after the corpus, leaving 3 T4 answer keys in train.csv with
+  # the report still saying PASS. This also verifies the blocklists have not
+  # changed since the build.
+  python scripts/data/tcr_native/assert_corpus_fresh.py \
+      data/tcr_papers_v2/dataset/finalize_report.json \
+      data/tcr_repertoire_junc80/dataset/build_report.json
+  # 刻意不跑 scripts/data/assert_residue_alphabet.py（与 v5 diffusion YAML 一致）：
+  # 该 gate 扫的是 raw CSV，而本 entrypoint 只走 load_prepared_dataset(prepared_data_dir)，
+  # 七个 *_dir 旗标对建数据集已无作用，所以它**保护不到本 run 实际读的数据**。
+  # 2026-09-12 本机实测它 exit 0 但耗时约 208 s；抢占任务每次回收重启都要再付一次
+  # （MaxRetryTimes=50 + 看护重提），纯浪费。重建语料后请在提交前手工跑一次（§6.8）。
+  test -s "${TCR_NATIVE_DIR}/t2t3_eval_blocklist.txt"
+  test -s "${TCR_NATIVE_DIR}/t4_refbinder_blocklist.txt"
+  test -s "${TCR_NATIVE_DIR}/asd_antibody_benchmark_blocklist.txt"
+  SNAP_DIR="$(dirname "$(find "${LLADA_CACHE}/snapshots" -name 'config.json' | head -1)")"
+  test -f "${SNAP_DIR}/config.json"
+  test -f "${SNAP_DIR}/tokenizer_config.json"
+  # 闲时三件套之二：自动 resume。OUTPUT_DIR 带 _spot 后缀、本任务独占，不与
+  # 正式 diffusion v5 / 任何 v3 / v4 / BERT v5 spot 目录共用。
+  # 两套同时排队时谁先拿到资源不确定，共用会互相覆盖 checkpoint 并各自触发 top-k 剪枝。
+  # 本 run 从零开始：无 SRC_DIR、无 --init_fusion_weights；目录为空 -> step 0。
+  # 目录里没有 checkpoint 时不能传 --resume_from_checkpoint，HF Trainer 会因找不到而报错；
+  # 且 set -euo pipefail 下 ls 无匹配会让整个脚本退出，所以 || true 不能省。
+  # pick_latest_full 验满包三件套（optimizer.bin + pytorch_model_fsdp.bin +
+  # scheduler.pt）外加 model.safetensors，不信任目录名（§6.5：配额事故里半截
+  # 132 MiB safetensors 曾被目录名骗过，导致「从坏 ckpt 反复续跑」死循环）。
+  pick_latest_full() {
+    local dir="$1"
+    local step
+    for step in $( (ls -d "${dir}"/checkpoint-[0-9]* 2>/dev/null || true) | sed 's#.*/checkpoint-##' | sort -nr ); do
+      local ckpt="${dir}/checkpoint-${step}"
+      if [ -s "${ckpt}/optimizer.bin" ] && [ -s "${ckpt}/pytorch_model_fsdp.bin" ] && [ -s "${ckpt}/model.safetensors" ] && [ -s "${ckpt}/scheduler.pt" ]; then
+        echo "${step}"
+        return 0
+      fi
+    done
+    return 1
+  }
+
+  mkdir -p "${OUTPUT_DIR}"
+  RESUME_ARG=""
+  LATEST_STEP="$(pick_latest_full "${OUTPUT_DIR}" || true)"
+  if [ -n "${LATEST_STEP}" ]; then
+    RESUME_ARG="--resume_from_checkpoint ${OUTPUT_DIR}/checkpoint-${LATEST_STEP}"
+    echo "[resume] continuing from ${OUTPUT_DIR}/checkpoint-${LATEST_STEP}"
+  else
+    echo "[scratch] no full pack under ${OUTPUT_DIR}, training from step 0"
+  fi
+
+  # num_processes 由平台注入的 MLP_WORKER_GPU 决定（本任务 flavor 是 8 卡），无需硬编码。
+  # --diffusion_all_chains False / --relation_aux none 都与当前默认值一致，显式写出是为了
+  # 把本轮语义钉住：即使将来默认值变了，这个任务的口径也不会跟着漂。
+  accelerate launch \
+      --config_file scripts/accelerate_configs/fsdp_llada.yaml \
+      --num_machines ${MLP_WORKER_NUM} \
+      --num_processes $((MLP_WORKER_NUM * MLP_WORKER_GPU)) \
+      --machine_rank ${MLP_ROLE_INDEX} \
+      --main_process_ip ${MLP_WORKER_0_HOST} \
+      --main_process_port ${MLP_WORKER_0_PORT} \
+      examples/llada/protein_pretrain_esmc.py \
+          --model_name_or_path GSAI-ML/LLaDA-8B-Base \
+          --decoder_init scratch \
+          --decoder_d_model 768 \
+          --decoder_n_layers 8 \
+          --decoder_n_heads 12 \
+          --decoder_mlp_hidden 3072 \
+          --decoder_weight_tying False \
+          --esmc_path "${ESMC_DIR}" \
+          --prepared_data_dir "${PREPARED_DATA_DIR}" \
+          --dataset_args oas+ots+asd_antibody+trait+tcr_native+tcr_papers+tcr_repertoire \
+          --oas_dir "${OAS_DIR}" \
+          --ots_dir "${OTS_DIR}" \
+          --asd_antibody_dir "${ASD_ANTIBODY_DIR}" \
+          --trait_dir "${TRAIT_DIR}" \
+          --tcr_native_dir "${TCR_NATIVE_DIR}" \
+          --tcr_papers_dir "${TCR_PAPERS_DIR}" \
+          --tcr_repertoire_dir "${TCR_REPERTOIRE_DIR}" \
+          --train_objective diffusion \
+          --diffusion_all_chains False \
+          --relation_aux none \
+          --residue_cond_mode add \
+          --freeze_encoder False \
+          --condition_norm True \
+          --decoder_grad_ckpt True \
+          --max_length 1024 \
+          --max_protein_length 1024 \
+          --per_device_train_batch_size 4 \
+          --gradient_accumulation_steps 8 \
+          --per_device_eval_batch_size 4 \
+          --max_steps 200000 \
+          --learning_rate 1e-4 \
+          --lr_scheduler_type cosine \
+          --warmup_steps 2000 \
+          --max_grad_norm 1.0 \
+          --logging_steps 20 \
+          --save_strategy steps \
+          --save_steps 1000 \
+          --eval_strategy steps \
+          --eval_steps 1000 \
+          --max_eval_rows_per_source 2000 \
+          --save_top_k 3 \
+          --save_only_model False \
+          --slim_checkpoints True \
+          --dataloader_num_workers 4 \
+          --report_to wandb \
+          --run_name protein_esmc_llada270m_diffusion_immune_v5_8gpu_spot \
+          --output_dir "${OUTPUT_DIR}" \
+          ${RESUME_ARG}
+
+Tags: [bioseq, grammar_v2, llada270m, scratch, esmc300m, fusion, oas, ots, asd_antibody, trait, tcr_native, tcr_papers_v2, tcr_repertoire, tcr_pair, beta_only_completion, synthetic_x_excluded, relation_target_diffusion, decontaminated, v5, receptor_completion, residue_cond_add, diffusion, generated_only, esmc_trainable, fsdp, gradckpt, formal, 1node8gpu, preemptible, autoresume]
+ImageUrl: "cr-mlp-cn-beijing.cr.volces.com/public/airgen:v1"
+Framework: "Custom"
+ResourceQueueName: "queue012"
+TaskRoleSpecs:
+  - RoleName: "worker"
+    RoleReplicas: 1
+    Flavor: "ml.pni2.28xlarge"
+# ActiveDeadlineSeconds 是 MaxRuntime，从 Launch 起算、不含排队。
+# 每次抢占/重提都会重新计时，闲时任务用慷慨值：7776000 = 90 天（与
+# protein_esmc_llada270m_diffusion_immune_v3_spot_2m 及 BERT v5 spot 先例一致）。
+# 正式非抢占臂用 950400 = 11 天；抢占臂会被反复打断，11 天墙钟不够覆盖净训练时间。
+ActiveDeadlineSeconds: 7776000
+DelayExitTimeSeconds: 0
+AccessType: "Private"
+Preemptible: true
+Priority: 6
+# 闲时三件套之三：RetryOptions 必须自己开（平台已下线「抢占后强制重试」）。
+# PolicySets 必须同时含 Failed 与 InstanceReclaimed；照抄非抢占 YAML 会静默丢掉
+# InstanceReclaimed。MaxRetryTimes=50 覆盖反复回收；看护循环补的是
+# 重试用尽或落到 Failed/Killed 终态之后平台不再管的盲区。
+RetryOptions:
+  EnableRetry: true
+  MaxRetryTimes: 50
+  IntervalSeconds: 180
+  PolicySets:
+    - "Failed"
+    - "InstanceReclaimed"

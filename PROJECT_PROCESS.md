@@ -1,6 +1,6 @@
 # Project Process
 
-> Last updated: 2026-09-11T19:31Z
+> Last updated: 2026-09-12T03:17Z
 >
 > 本页保留历史任务账本；顶部最新条目描述当前代码清理和文档同步状态。除明确标注为“本轮已验证”的项目外，历史测试、吞吐和任务数字不能被解释为本轮验证通过。
 
@@ -690,11 +690,13 @@ eval + 前缀截断」时代。现在 `subsample_seed=0` 走 reservoir 抽样、
 
 > Only non-terminal jobs (`Initialized` / `Queue` / `Staging` / `Running` / `Killing`). Remove a row when the job reaches `Success`, `Failed`, or `Killed`.
 
-Last updated: 2026-09-11T18:22Z
+Last updated: 2026-09-12T03:17Z
 
 | Task ID | Job / TaskName | 队列 | 卡数 | max_steps | 状态 |
 |---|---|---|---:|---:|---|
 | **`t-20260912021346-5xq4s`** | `protein_esmc_llada270m_diffusion_immune_v5_8gpu` | `queue012` **非闲时** | 8 | 200000 | Queue |
+| **`t-20260912111652-sqfcw`** | `protein_esmc_llada270m_diffusion_immune_v5_8gpu_spot` | `queue012` **闲时** | 8 | 200000 | Queue |
+| **`t-20260912035657-dd8v9`** | `protein_esmc_llada270m_bert_immune_v5_8gpu_spot` | `c20250601` **闲时** | 8 | 200000 | Queue |
 | **`t-20260911190334-kpfsz`** | `eval-ophiuchus-ab-esm-head-epochs-long` | `c20250601` **闲时** | 1 | — | Queue |
 
 已从本表移除（2026-09-11 查询已终态）：`t-20260911085733-5b727`（`eval-ophiuchus-ab-esm-head-epochs`，**Success**）。
@@ -2205,3 +2207,70 @@ H1 任意步数精确命中、H2 稳定高 0.5、H3 最好仍差 1.55 pp。**同
 - 队列 `c20250601`，`Preemptible: true`，1×`ml.pni2.3xlarge`
 - 复用 `specificity_embeddings.pt`；独立训 200 再训 300，不覆盖 ep50/ep100
 - 产物：`output/downstream_generation/ophiuchus_ab/specificity_esm_ep{200,300}/`；不进 headline
+
+## 2026-09-12 提交 v5 8 卡 BERT 臂（闲时队列）
+
+- submit `protein_esmc_llada270m_bert_immune_v5_8gpu_spot`
+- YAML：`/vepfs-mlp2/c20250601/251105016/project/dllm_test/train_jobs/protein_esmc_llada270m_bert_immune_v5_8gpu_spot.yml`
+- `task_id=t-20260912035657-dd8v9`，初始 `Queue`
+- 队列 **`c20250601`**（闲时，不是 `queue012`），`Preemptible: true`，`Priority: 6`，1×`ml.pni2.28xlarge`（8 卡）
+- 数据 = v5 `data/prepared/immune_v5_receptor_completion`（train 7,626,885，七源计数与 plan §4.2 逐源一致）；
+  `tcr_repertoire` 走 `data/tcr_repertoire_junc80/dataset`，`tcr_papers` 走 `data/tcr_papers_v2/dataset`
+- 目标函数：`--train_objective bert --bert_all_chains True --bert_mask_ratio 0.15 --bert_mask_prob 0.8 --bert_random_prob 0.1`
+- 与已提交的 diffusion 臂 `t-20260912021346-5xq4s` **只差目标函数**：
+  from scratch 270m（d768/L8/h12）、可训 ESMC-300M、`residue_cond_mode add`、`max_length 1024`、
+  global batch **256**、`max_steps 200000`、cosine `1e-4`、`warmup_steps 2000`、
+  `save/eval_steps 1000`、`save_top_k 3`、`slim_checkpoints True` 全同
+- global 256 走 `per_device 2 × ga 16 × 8`（diffusion 臂是 `4 × 8 × 8`）：优化器语义相同（§6.3），
+  但 `per_device 2` 是本机型已实证配置，`per_device 4` 在更长的 v5 记录上尚无起跑实证；
+  闲时任务 `PolicySets` 含 `Failed`，坏配置会被反复重提，故刻意走已实证档
+- 闲时三件套齐（§6.6）：独立 `OUTPUT_DIR=output/protein_esmc_llada270m_bert_immune_v5_8gpu_spot`（提交前为空）；
+  `pick_latest_full` 满包自动 resume（三件套 + `model.safetensors`，目录为空则不传 `--resume_from_checkpoint`）；
+  `RetryOptions` `EnableRetry/MaxRetryTimes 50/IntervalSeconds 180/PolicySets [Failed, InstanceReclaimed]`
+- 平台已接受确认：`ml_task get --format` 回显 `Preemptible: true`；`ml_task export -t ... --config`
+  回显完整 `RetryOptions`（`export` 不回显 `Preemptible` / `ResourceQueueName`，是已知 CLI 缺陷）
+- 看护循环：`scripts/monitor_spot_tasks.py` `TARGETS` 已加本任务，已重启（wrapper pid 3251489 /
+  python pid 3251491），日志确认「追踪到任务 t-20260912035657-dd8v9（状态 Queue）」。
+  🔴 **人工 cancel 前必须先 `touch output/_monitor/STOP.protein_esmc_llada270m_bert_immune_v5_8gpu_spot`**，否则会被重提回来
+- 前置代码修复（必须在同一 checkout）：全链合格集排除 synthetic `X`，见
+  `examples/llada/PROTEIN_PRETRAIN_PROGRESS.md` §6.10。v5 上旧口径 36.8% 的 BERT 目标是占位符
+- 未决策：BERT 臂不训 relation token（`<binding>`/`<nonbinding>` 不在 `residue_mask` 里），
+  与 diffusion 臂不对称，也不能用 `score_binding_relation.py` 评。见 PROGRESS §10
+
+## 2026-09-12 v5 BERT 闲时臂：改为也训 relation target；核实「从未起跑」
+
+- `t-20260912035657-dd8v9`（`protein_esmc_llada270m_bert_immune_v5_8gpu_spot`）
+  **`LaunchTime` 为空、State 仍 `Queue`**，创建后 7.1 小时一步未跑，`OUTPUT_DIR` 下无任何 checkpoint。
+  entrypoint 在 Launch 时才从 vepfs 读代码，故**改代码即生效，未 cancel、未重提**。
+- 代码改动（用户决策「bert 需要学 relation」）：两个全链入口都并入 `relation_target_mask` ——
+  `sample_bioseq_bert_noise(all_chain_targets=True)` 与 `all_residue_eligible_mask`。
+  用的是 `relation_target_mask` **不是** `relation_token_mask`（后者含固定呈递 `<binding>`
+  与 null 前缀 `<unknown>`，v5 实测大 2.15×）。顺带修镜像缺陷：`diffusion_all_chains=True`
+  会用 `all_residue_eligible_mask` 覆写 eligible/loss mask，不并入 relation 就等于打开全链
+  反而丢掉 generated-only 本来在训的 relation 监督。细节见 PROGRESS §6.10.1。
+- 80/10/10 的 random 切片改为只对残基位写残基 id，非残基合格位改写 `<mask>`
+  （对齐 diffusion sampler 既有约定），否则会把 `<binding>` 变成氨基酸。
+- 验证：`scripts/tests/immune_llada/` **213 passed / 3 failed**，3 条全是 `test_full_parity.py`
+  的既存失败（该文件 0 处引用 `protein_fusion_model`，且 `dllm/pipelines/immune_llada/` 对 HEAD 无改动）。
+- 队列权限澄清（**推翻本日早先那条「已过期」的记法**）：权限按 `ml_task submit` 时**当前机器的账号**算。
+  同一 vepfs 挂多台机器、各机凭证是不同账号。`zhuyiheng` 对 `c20250601` 确实无 `CreateCustomTask`
+  （v5 diffusion `t-20260912021346-5xq4s` 的 Creator 就是它，投 `queue012`）；`251105016` 有
+  （`t-20260911054553-jb7v5`、`t-20260912035657-dd8v9`）。见 PROGRESS §6.7。
+- 平台 8 卡供给核实（2026-09-12 02:5x UTC，299 条非终态）：8 卡 **9 Queue / 6 Running**，
+  而 1 卡 190 Running。我们用的两个队列里 8 卡**全部 Queue、零 Running**，4 卡却都在跑
+  （`c20250601` 4 卡 2 Running；`queue012` 4 卡 3 Running）—— 再次印证 §6.7「缺的是连续整节点 8 卡」。
+- 闲时历史起跑等待 13–19 小时，且有多条从未排上（`LaunchTime` 为空即从未起跑）。判据见 PROGRESS §6.7
+
+## 2026-09-12 提交 v5 8 卡 diffusion 闲时臂（queue012 抢占，赛跑第二条线）
+
+- submit `protein_esmc_llada270m_diffusion_immune_v5_8gpu_spot`
+- YAML：`/vepfs-mlp2/c20250601/251105016/project/dllm_test/train_jobs/protein_esmc_llada270m_diffusion_immune_v5_8gpu_spot.yml`
+- `task_id=t-20260912111652-sqfcw`，初始 `Queue`，Creator `zhuyiheng`
+- 队列 **`queue012`**（`q-20260524172355-rnqtf`）+ `Preemptible: true`，`Priority: 6`，1×`ml.pni2.28xlarge`
+- 与正式非抢占臂 `t-20260912021346-5xq4s` **同配置 generated-only diffusion**（`--train_objective diffusion --diffusion_all_chains False --relation_aux none`），只在队列/抢占/OUTPUT_DIR/resume 校验/重试上分叉。独立 `OUTPUT_DIR=output/protein_esmc_llada270m_diffusion_immune_v5_8gpu_spot`（提交前目录不存在）
+- 闲时三件套：`pick_latest_full` 验满包（`optimizer.bin` + `pytorch_model_fsdp.bin` + `scheduler.pt` + `model.safetensors`）；`RetryOptions` `Failed` + `InstanceReclaimed`，`MaxRetryTimes: 50`；`ActiveDeadlineSeconds: 7776000`（90 天）
+- 平台交叉确认：`ml_task get --format` → `Preemptible: true`、队列 `q-20260524172355-rnqtf`、规格 `ml.pni2.28xlarge`；`export --config` → `RetryOptions` 与 `ActiveDeadlineSeconds: 7776000` 已被接受（`export` 不回显 `Preemptible`，已知 CLI 缺陷）
+- **可复用结论（配额）**：CLI 没有队列配额接口。官方 OpenAPI `GetResourceQueue` / `ListResourceQueues`（`ml_platform`，`2024-07-01` / `2021-10-01`）能查。queue012 **有** SharedResource 共享池（当时占用 **78** 卡）；c20250601 共享占用 **24** 卡。验证方法：两边都精确满足「Running 抢占 GPU 数 == `SharedResource`/`SharedQuotaAllocated`」。抢占吃共享池，不吃专用配额账面剩余（queue012 剩 15 卡碎片、c20250601 剩 19，两个 8 卡抢占任务仍在 Queue）。因此本任务与正式非抢占臂不是零和。
+- **当前供给**：queue012 共享池被 78 个 1 卡抢占占满，**0 个** 8 卡抢占在跑；唯一先例 `zyw-new_sampler-find_seal` 已排 17+ 小时。提交是占排队位，不是马上能起跑。
+- 看护：`scripts/monitor_spot_tasks.py` `TARGETS` 含 BERT 闲时臂与本任务；wrapper pid 1819497 / python pid 1819499。状态监控独立实例 pid 1819646，日志 `_jobmon/watch_t-20260912111652-sqfcw.log`（不干扰正式臂 watcher pid 1675184）。
+- 🔴 **人工 cancel 本任务前必须先 `touch output/_monitor/STOP.protein_esmc_llada270m_diffusion_immune_v5_8gpu_spot`**，否则看护会重提回来。BERT 闲时臂对应 `STOP.protein_esmc_llada270m_bert_immune_v5_8gpu_spot`。

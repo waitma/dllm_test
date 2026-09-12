@@ -14,7 +14,9 @@
 **最近更新 2026-09-12**：v5 开跑前核算——`--save_top_k 3` / `--eval_steps 1000` /
 `ActiveDeadlineSeconds 950400` 三者不动。步时/eval/配额数字见 §6.3 / §6.4 / §6.7 与
 [`SPEED_ANALYSIS.md`](../../SPEED_ANALYSIS.md)。离线 binding 评估脚本见 §5.6。
-v5 8-GPU diffusion 仍 Queue。账本：[`PROJECT_PROCESS.md`](../../PROJECT_PROCESS.md) 同日条。
+v5 8-GPU diffusion 仍 Queue；**v5 8-GPU BERT 臂已提交闲时队列**（§3）。
+🔴 **全链口径漏算 synthetic `X` 已修**（§6.10）—— v4/v5 上做 `--bert_all_chains True` 或
+`--diffusion_all_chains True` 之前必读。账本：[`PROJECT_PROCESS.md`](../../PROJECT_PROCESS.md) 同日条。
 
 ---
 
@@ -97,6 +99,20 @@ multinomial；`relation_aux_loss`；修 ESMC 条件流在迭代解码中泄漏�
 - ✅ v4 `tcr_repertoire` 可从自身 manifest 重生（3,000 行 0 mismatch）；v5 同 shard byte-identical。
 - ✅ v5 8-GPU diffusion 已提交（Queue）。task id / YAML / 取消 / 可复现 commit：
   [`PROJECT_PROCESS.md`](../../PROJECT_PROCESS.md) 2026-09-12 条。v4 4 卡臂仍未提交。
+- ✅ **v5 8-GPU BERT 臂已提交到闲时队列**（`c20250601` + `Preemptible: true`，Queue）：
+  `t-20260912035657-dd8v9` / `protein_esmc_llada270m_bert_immune_v5_8gpu_spot`。
+  与 diffusion 臂只差目标函数（数据 / 模型 / global 256 / cosine 1e-4 / warmup 2000 /
+  200k steps 全同；per_device 2×ga 16 vs 4×8 是显存口径，优化器语义相同，§6.3）。
+  **前置修复**：全链口径排除 synthetic `X`（§6.10）—— 不修则 36.8% 的 BERT 目标是占位符。
+  看护循环已接管（§6.6）。账本：[`PROJECT_PROCESS.md`](../../PROJECT_PROCESS.md) 同日条。
+- ✅ **v5 8-GPU diffusion 闲时臂已提交**（`queue012` + `Preemptible: true`，Queue）：
+  `t-20260912111652-sqfcw` / `protein_esmc_llada270m_diffusion_immune_v5_8gpu_spot`。
+  与正式非抢占臂 `t-20260912021346-5xq4s` 同配置 generated-only（`--diffusion_all_chains False`），
+  独立 `OUTPUT_DIR`，赛跑第二条线。queue012 **有** SharedResource（当时 78 卡占用），
+  抢占吃共享池不吃专用配额（验证：Running 抢占 GPU 数 == `SharedResource`；配额只能
+  OpenAPI `GetResourceQueue` 查）。当前共享池被 1 卡任务占满、0 个 8 卡抢占在跑。
+  🔴 cancel 前先 `touch output/_monitor/STOP.protein_esmc_llada270m_diffusion_immune_v5_8gpu_spot`。
+  账本：[`PROJECT_PROCESS.md`](../../PROJECT_PROCESS.md) 同日条。
   YAML 头部写「见本文 §4.2」是从 v4 YAML 抄来的；§4.2 仍是 v3 50k，不是本 run。
   **2026-09-12 开跑前核算：三个 flag 不动**（`--save_top_k 3` / `--eval_steps 1000` /
   `ActiveDeadlineSeconds 950400`），未 cancel、未重提交。步时 / eval / 配额 / deadline
@@ -190,6 +206,12 @@ v3 让两臂数据参数**逐字节一致**（提交前 `diff` 验证），唯�
 不再与目标函数绑在一起。实现只覆写 `diffusion_eligible_mask` / `diffusion_loss_mask` 为
 `residue_mask & attention_mask` —— 时间步与加噪采样器都从这两个 mask 推导，一次覆写同时改到加噪、
 labels 与 ESMC 镜像三条路径，**目标函数本身没动**。
+
+> ⚠️ **上面那个 `residue_mask & attention_mask` 口径只对 v3 语料成立**，v3 没有任何合成位。
+> v4/v5 的 receptor completion 会把缺失链/区写成字面 `X`，它们是 `residue_mask` 的一部分，
+> 于是全链口径会把占位符当成预测目标。2026-09-12 起两个全链入口
+> （`sample_bioseq_bert_noise(all_chain_targets=True)` 与 `all_residue_eligible_mask`）
+> 都改成再 AND 一次 `~synthetic_residue_mask`，见 §6.10。本表的 v3 实测数字不受影响。
 
 本机 A100 实测（ASD batch，含真实抗原上下文）：
 
@@ -519,12 +541,43 @@ resume-only（各 94 G）、5 处 `checkpoint-final/model.safetensors` **改硬�
    （lr schedule、总样本量、每个 optimizer step 的语义全部不变）。实测 **19 秒起跑**，
    而同规格 8 卡任务零 Running、最早的已等 9.8h —— **缺的是连续整节点 8 卡，不是队列配额**，
    也不是优先级问题（`Priority` 已是用户可提交的最高档 6，平台只开放 2/4/6）。
-2. **借闲时资源**：另投 `c20250601` + `Preemptible: true`，但必须满足 §6.6 的三件套。
+2. **借闲时资源**：另投 `c20250601` **或** `queue012` + `Preemptible: true`，但必须满足 §6.6 的三件套。
+   `queue012` **有** SharedResource 共享池（2026-09-12 实测占用 78 卡，且 Running 抢占 GPU 数
+   精确等于该值；全是 1 卡 `ml.pni2.3xlarge`）。抢占吃共享池，不吃专用配额账面剩余
+   （当时 544−529=15，凑不出整机）。配额只能官方 OpenAPI `GetResourceQueue` /
+   `ListResourceQueues`（`ml_platform`）查，CLI 没有队列配额接口。
+   c20250601 同期 SharedResource=24（也被占满）。8 卡抢占能不能排上，看的是共享池里
+   有没有整机空洞，不是专用配额剩多少。
+
+> 🔴 **判断一条任务「有没有真的跑过」只能看 `LaunchTime` 是否为空，不能看 `Status` 或 `Elapsed`。**
+> `Elapsed` 含排队（§6.7 下文），`Killed` 既可能是「跑过一段被抢占/cancel」也可能是
+> **「从头到尾都在排队、一步没跑就被 cancel」**。2026-09-12 逐条核对 `ml_task get` 的结果：
+>
+> | 任务 | CreateTime | LaunchTime | 真实结论 |
+> |---|---|---|---|
+> | `..._diffusion_immune_v3_spot_2m` `t-20260901032620-vvngv` | 08-31 19:26 | **空** | **从未起跑**，`Elapsed` 70.2h 全是排队 |
+> | `..._diffusion_immune_v3_spot` `t-20260831160717-h4jhs` | 08-31 08:07 | **空** | **从未起跑**，`Elapsed` 10.3h 全是排队 |
+> | `..._diffusion_immune_v3_spot` `t-20260829135424-zxdjg` | 08-29 05:54 | 08-30 00:50 | 排 **18.9h** 后起跑 |
+> | `..._bert_immune_v3_spot` `t-20260830190846-wsbvx` | 08-30 11:08 | 08-31 00:15 | 排 **13.1h** 后起跑 |
+>
+> **闲时 8 卡的历史起跑等待是 13–19 小时**，且有多条自始至终没排上。所以
+> ①「`Elapsed` 70 小时」不等于「训练了 70 小时」，写进度时别拿它当训练时长；
+> ② 闲时任务提交后要显式确认 `LaunchTime` 非空，否则你监控的是一条从未跑过的任务。
 
 已知的权限与工具坑：
 
-- 本账号（`zhuyiheng`）对 `c20250601` **已无 `CreateCustomTask` 权限**（`q-20260121145036-6fztt`）。
-  探针任务法：提一条 `probe-perm-check-donotrun` 立刻 cancel，用来验证某队列能否提交。
+- ⚠️ ~~本账号（`zhuyiheng`）对 `c20250601` 已无 `CreateCustomTask` 权限（`q-20260121145036-6fztt`）~~
+  —— **这条仍然成立，对 `zhuyiheng` 没有过期。**
+  🔴 **队列权限按「提交身份」算，不按仓库算 —— 同一份代码在不同机器上能提交的队列不一样。**
+  本项目的 vepfs 挂在多台机器上，各机器的 `volc` 凭证是**不同账号**，而 `ml_task submit`
+  用的是**当前机器的账号**，所以「这条 YAML 能不能提」取决于你在哪台机器上敲命令。
+  - `zhuyiheng` → `c20250601` **不行**。`train_jobs/protein_esmc_llada270m_diffusion_immune_v5_8gpu.yml`
+    头部那句注释是**对的**（该任务 `t-20260912021346-5xq4s` 的 Creator 正是 `zhuyiheng`，投 `queue012`）。
+  - `251105016` → `c20250601` **可以**：`t-20260911054553-jb7v5`（eval，Success）与
+    `t-20260912035657-dd8v9`（§3 的 v5 BERT 闲时臂）都是这个身份提上去的。
+  - **推论：判断能否投闲时队列，先看 `ml_task list -o json` 里同类任务的 `Creator` 字段是哪个账号，
+    不要凭文档里某条历史结论 —— 换机器结论就变。** 同名 YAML 在 A 机器提失败、B 机器提成功是正常的。
+  探针任务法仍是最快的验证：提一条 `probe-perm-check-donotrun` 立刻 cancel。
 - `StopCustomTask` 权限曾对 Creator 为 `251105016` 的任务报未授权，次日同一账号又放行了，原因未知。
   **对存量任务先直接 `ml_task cancel` 试，不必默认走控制台。**
 - `ml_task export --config` **不导出 `Preemptible` 字段**，核对抢占只能用 `get --format`。
@@ -566,6 +619,68 @@ resume-only（各 94 G）、5 处 `checkpoint-final/model.safetensors` **改硬�
 两者无任何关联 —— 曾导致 3 个 T4 参考 binder 留在 `train.csv` 而报告仍显示 `PASS: true`。
 修法：报告记 `blocklist_provenance`（mtime + 内容 sha1），`assert_corpus_fresh.py` 比对活文件 hash，
 训练配置在 entrypoint 里调用它。
+
+### 6.10 🔴 全链口径必须自己排除 synthetic `X`（2026-09-12 修）
+
+v4/v5 的 receptor completion 把缺失链/区写成**字面 `X` 占位符**。renderer 已经把它们排除在
+`diffusion_loss_mask` / `diffusion_eligible_mask` 之外（`grammar.py`：
+`int(not is_fixed) and not synthetic`），所以**走 renderer mask 的路径天然是干净的** ——
+这包括 `--diffusion_all_chains False`（v5 diffusion 主跑）。
+
+但两个「全链」入口是**从 `residue_mask` 重新构造**合格集的，于是把 renderer 刚排掉的合成位
+又收了回来：
+
+| 入口 | 用在哪 |
+|---|---|
+| `sample_bioseq_bert_noise(..., all_chain_targets=True)` | 一切 `--bert_all_chains True`（默认，历史上每条 BERT 臂都是） |
+| `all_residue_eligible_mask(batch)` | `--diffusion_all_chains True` |
+
+**在 v5 上的量级**（2026-09-12 实测，2,800 条真实 prepared 记录过真 renderer + collator）：
+旧全链合格集 910,949 token 里 **335,155（36.79%）是合成 `X`**。逐源：`oas`/`ots`/`asd_antibody`
+**0%**（无补全），`trait` 77.1%、`tcr_native` 79.3%、`tcr_papers` 90.2%、
+`tcr_repertoire` **93.8%**。即：不修的话 BERT 臂有三分之一的 MLM 目标是在学"预测 `X`"。
+
+✅ **已修**：两处都再 AND 一次 `~synthetic_residue_mask`（`batch.get` 取不到就是 no-op，
+故 v3 语料行为逐位不变）。`if not eligible_mask.any(): raise` 的判据落在排除**之后**，
+所以整条链全合成的 batch 会抛错而不是静默零 loss。
+回归测试：`scripts/tests/immune_llada/test_all_chains_excludes_synthetic.py`（CPU，不加载权重）。
+
+> **不要用「字符是不是 `X`」来判断监督范围** —— `X` 也是合法的 unknown 残基（`RESIDUES` 含它），
+> 真实序列里也会出现。唯一权威是 `synthetic_residue_mask`（plan §2.1）。
+
+### 6.10.1 全链口径同样必须并入 relation target（2026-09-12 用户决策）
+
+同一处的第二个漏洞，方向相反：两个全链入口都从 `residue_mask` 出发，而
+`<binding>` / `<nonbinding>` 是 `TOKEN_CLASS_RELATION` **不是 residue**，于是被漏掉。
+generated-only 路径（`diffusion_eligible_mask`）反而是对的 —— renderer 给可训 relation
+标了 `is_fixed=False`，所以它本来就在 loss 里。后果：
+
+- `--bert_all_chains True`：BERT 臂**完全学不到 relation**。
+- `--diffusion_all_chains True`：`compute_loss` 用 `all_residue_eligible_mask` **覆写**
+  `diffusion_eligible_mask` / `diffusion_loss_mask`，所以打开全链反而**丢掉**了
+  generated-only 本来在训的 relation 监督 —— 全链没能成为 generated-only 的超集。
+
+✅ **已修**：两处都 `| relation_target_mask`（缺 key 即 no-op）。
+
+> 🔴 **必须是 `relation_target_mask`，不能是 `relation_token_mask`** —— 与 §5.6 同一个坑。
+> 后者包含 MHC→peptide 的**固定呈递** `<binding>` 和 OAS/OTS 的 null 前缀 `<unknown>`。
+> v5 实测（2,800 条）`relation_token_mask` 是 `relation_target_mask` 的 **2.15×**
+> （3,439 vs 1,600）：多出来的正是 oas/ots/tcr_repertoire 各 400 个 `<unknown>`，
+> 加上 `trait` 239 / `tcr_native` 400 个固定呈递 `<binding>`。用错就是在训固定上下文。
+
+v5 实测（2,800 条，400/源）：`relation_target_mask` 与 `residue_mask` **零重叠**；
+`asd_antibody` / `trait` / `tcr_native` / `tcr_papers` 每条记录**恰好 1 个** relation target，
+`oas` / `ots` / `tcr_repertoire` 为 **0**。全链合格集 575,794 → 577,394（+1,600）。
+
+**80/10/10 的 random 切片只对残基位写残基 id。** 非残基合格位（relation target、骨架 token）
+落在 random 切片时改写为 `<mask>`，否则会把 `<binding>` 变成一个氨基酸。这是对齐
+`sample_bioseq_diffusion_noise` 已有的约定（「Grammar and structure tokens are never
+uniformly replaced」）。10% keep-original 仍按经典 MLM，所有位置保留原 id。
+
+> ⚠️ **两臂的 relation 监督密度差约 3.3×，不是 bug 而是目标函数本身的性质**：BERT 固定 15%
+> 选中率 ⇒ 一条只有 1 个 relation target 的记录只有约 **15%** 的步会拿到该位的 CE；
+> diffusion 是 `t ~ U(eps,1)` ⇒ 约 **50%**。刻意**没有**给 relation 位单开采样率
+> （那就不是经典 MLM 了）。写论文比较两臂的 relation 能力时必须说明这一点。
 
 ---
 
@@ -832,6 +947,9 @@ python examples/llada/protein_pretrain_esmc.py --dry_run True --max_rows_per_sou
 - [ ] **grammar_v2 五条 339 G 是否保留**：内部无 optimizer 只能整份删；`..._7l` 被 `PROJ_GUIDE.md` 钉住，
       其余四条待科研决策。
 - [ ] **T4 Setting-A 参考集是否换成修正版**（§5.4）：换了会改动已有 novelty/JSD 数值。
+- [x] ~~v5 BERT 臂要不要训 relation token~~ → **要训**（2026-09-12 用户决策，已实现，§6.10.1）。
+      `t-20260912035657-dd8v9` 当时仍在 `Queue` 且 `OUTPUT_DIR` 无 checkpoint，
+      entrypoint 在 Launch 时才从 vepfs 读代码，故**改代码即生效，无需 cancel 重提**。
 
 **工程缺陷（未修）**
 
@@ -866,6 +984,11 @@ python examples/llada/protein_pretrain_esmc.py --dry_run True --max_rows_per_sou
 
 > 一行一条，细节在对应小节。不要在这里重复正文内容。
 
+- **2026-09-12** — 🔴 修全链口径漏算 synthetic `X`：`bert_all_chains=True` 与 `diffusion_all_chains=True` 两处都再 AND `~synthetic_residue_mask`。v5 上旧口径 36.8% 的目标是占位符。见 §6.10。
+- **2026-09-12** — **BERT 臂改为也训 relation target**（用户决策）：两个全链入口都并入 `relation_target_mask`；顺带修 `diffusion_all_chains=True` 覆写 eligible 时会丢掉 relation 监督的镜像缺陷。见 §6.10。
+- **2026-09-12** — 提交 v5 8 卡 diffusion 闲时臂到 `queue012`（`t-20260912111652-sqfcw`，`Preemptible: true`），与正式臂赛跑。queue012 有 SharedResource（78 卡占用）。见 §3 / §6.7。
+- **2026-09-12** — 提交 v5 8 卡 BERT 臂到闲时队列 `c20250601`（`t-20260912035657-dd8v9`），看护循环已接管。见 §3。
+- **2026-09-12** — 澄清 §6.7 队列权限：**按提交机器的账号算，不是过期结论** —— `zhuyiheng` 对 `c20250601` 确实没权限，`251105016` 有。同一 vepfs 挂多机、各机不同账号。见 §6.7。
 - **2026-09-12** — v5 开跑前核算：三个 flag 不动。步时/eval/配额/deadline 见 §6.3 / §6.4 / §6.7；离线 binding 脚本见 §5.6。
 - **2026-09-12** — 更正 §6.4 / §10：4 连 Failed 是 4 个不同 JobId 的独立提交，不是平台 `RetryOptions` 自动重试。
 - **2026-09-12** — 更正 §4.1：generated-only 8gpu_2m 是 4 卡 `checkpoint-42000` weights-only 热启动，不是 from scratch。

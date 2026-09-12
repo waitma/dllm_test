@@ -44,6 +44,14 @@ TARGETS = [
         "protein_esmc_llada270m_diffusion_immune_v3_spot_2m",
         "train_jobs/protein_esmc_llada270m_diffusion_immune_v3_spot_2m.yml",
     ),
+    (
+        "protein_esmc_llada270m_bert_immune_v5_8gpu_spot",
+        "train_jobs/protein_esmc_llada270m_bert_immune_v5_8gpu_spot.yml",
+    ),
+    (
+        "protein_esmc_llada270m_diffusion_immune_v5_8gpu_spot",
+        "train_jobs/protein_esmc_llada270m_diffusion_immune_v5_8gpu_spot.yml",
+    ),
 ]
 
 POLL_INTERVAL = 600          # 轮询间隔，10 分钟
