@@ -1,6 +1,6 @@
 # Project Process
 
-> Last updated: 2026-09-12T03:17Z
+> Last updated: 2026-09-12T07:05Z
 >
 > 本页保留历史任务账本；顶部最新条目描述当前代码清理和文档同步状态。除明确标注为“本轮已验证”的项目外，历史测试、吞吐和任务数字不能被解释为本轮验证通过。
 
@@ -690,14 +690,15 @@ eval + 前缀截断」时代。现在 `subsample_seed=0` 走 reservoir 抽样、
 
 > Only non-terminal jobs (`Initialized` / `Queue` / `Staging` / `Running` / `Killing`). Remove a row when the job reaches `Success`, `Failed`, or `Killed`.
 
-Last updated: 2026-09-12T03:17Z
+Last updated: 2026-09-12T07:05Z
 
 | Task ID | Job / TaskName | 队列 | 卡数 | max_steps | 状态 |
 |---|---|---|---:|---:|---|
 | **`t-20260912021346-5xq4s`** | `protein_esmc_llada270m_diffusion_immune_v5_8gpu` | `queue012` **非闲时** | 8 | 200000 | Queue |
-| **`t-20260912111652-sqfcw`** | `protein_esmc_llada270m_diffusion_immune_v5_8gpu_spot` | `queue012` **闲时** | 8 | 200000 | Queue |
 | **`t-20260912035657-dd8v9`** | `protein_esmc_llada270m_bert_immune_v5_8gpu_spot` | `c20250601` **闲时** | 8 | 200000 | Queue |
 | **`t-20260911190334-kpfsz`** | `eval-ophiuchus-ab-esm-head-epochs-long` | `c20250601` **闲时** | 1 | — | Queue |
+
+已从本表移除（2026-09-12 用户授权 cancel）：`t-20260912111652-sqfcw`（`protein_esmc_llada270m_diffusion_immune_v5_8gpu_spot`，**Killed**）。正式臂与 BERT 闲时未动。
 
 已从本表移除（2026-09-11 查询已终态）：`t-20260911085733-5b727`（`eval-ophiuchus-ab-esm-head-epochs`，**Success**）。
 
@@ -2274,3 +2275,38 @@ H1 任意步数精确命中、H2 稳定高 0.5、H3 最好仍差 1.55 pp。**同
 - **当前供给**：queue012 共享池被 78 个 1 卡抢占占满，**0 个** 8 卡抢占在跑；唯一先例 `zyw-new_sampler-find_seal` 已排 17+ 小时。提交是占排队位，不是马上能起跑。
 - 看护：`scripts/monitor_spot_tasks.py` `TARGETS` 含 BERT 闲时臂与本任务；wrapper pid 1819497 / python pid 1819499。状态监控独立实例 pid 1819646，日志 `_jobmon/watch_t-20260912111652-sqfcw.log`（不干扰正式臂 watcher pid 1675184）。
 - 🔴 **人工 cancel 本任务前必须先 `touch output/_monitor/STOP.protein_esmc_llada270m_diffusion_immune_v5_8gpu_spot`**，否则看护会重提回来。BERT 闲时臂对应 `STOP.protein_esmc_llada270m_bert_immune_v5_8gpu_spot`。
+
+## 2026-09-12 新提 v5 diffusion 闲时臂到 c20250601（不取消 queue012）
+
+- submit `protein_esmc_llada270m_diffusion_immune_v5_8gpu_c20250601`
+- YAML：`train_jobs/protein_esmc_llada270m_diffusion_immune_v5_8gpu_c20250601.yml`
+- `task_id=t-20260912150055-44gvc`，初始 `Queue`，`LaunchTime` 空
+- Creator `251105016`，队列 **`c20250601`**（`q-20260121145036-6fztt`），`Preemptible: true`
+- 训练旗标与 queue012 正式臂 `t-20260912021346-5xq4s` 一致：v5、diffusion、generated-only、
+  `per_device 4 × ga 8 × 8`、200k、cosine 1e-4、warmup 2000
+- **独立** `OUTPUT_DIR=output/protein_esmc_llada270m_diffusion_immune_v5_8gpu_c20250601`
+  （不与正式臂、也不与 `zhuyiheng` 的 `t-20260912111652-sqfcw` / `..._8gpu_spot` 共用）
+- **未取消** queue012 上两条：`t-20260912021346-5xq4s`（正式非抢占）与
+  `t-20260912111652-sqfcw`（zhuyiheng 误投的同配置抢占副本）。本账号无 `StopCustomTask`
+- 看护已接管；旧名 `..._8gpu_spot` 留 STOP 哨兵，避免误重提 sqfcw 那条
+
+## 2026-09-12 cancel queue012 闲时 diffusion `t-20260912111652-sqfcw`
+
+- 用户明确授权**只 cancel 这一条**。正式臂 `t-20260912021346-5xq4s` 与 BERT 闲时 `t-20260912035657-dd8v9` **未动**，cancel 后仍为 `Queue`。
+- **顺序**：先 `touch output/_monitor/STOP.protein_esmc_llada270m_diffusion_immune_v5_8gpu_spot`（看护 `check_one` 见哨兵即跳过；未 touch 全局 `output/_monitor/STOP`，未重启看护 wrapper 1819497 / python 1819499），再 `./scripts/volc-no-proxy.sh ml_task cancel --id t-20260912111652-sqfcw`。
+- 平台终态：`JobId=t-20260912111652-sqfcw`，`Status=Killed`，`End=2026-09-12T07:04:18Z`。未重提。YAML 文件保留、未改。
+- `scripts/monitor_spot_tasks.py` `TARGETS` 已去掉 `..._diffusion_immune_v5_8gpu_spot`；保留 v3 spot 与 BERT 闲时。看护**不会**重提本任务（STOP 哨兵 + TARGETS 已删）。
+- 状态监控：`touch _jobmon/STOP.watch_t-20260912111652-sqfcw`，pid 1831910 已退出（日志 `STOP file present; exiting`）。未碰 `_jobmon/STOP`。正式臂 watcher 1675184 与 BERT watcher 1831911 仍活。
+
+## 2026-09-12 纠正：c20250601 上提非抢占 diffusion；Tags 改短
+
+- 用户要的是 queue012 正式臂的**非闲时**副本投到 `c20250601`，不是抢占。
+- 误提闲时版 `t-20260912150055-44gvc`（`Preemptible: true`）已 cancel（本账号创建，有权限）。
+- 新提非抢占：`t-20260912150714-lwf28` / `protein_esmc_llada270m_diffusion_immune_v5_8gpu_c20250601`
+  - 队列 `c20250601`（`q-20260121145036-6fztt`），Creator `251105016`
+  - **`Preemptible: false`**，`RetryOptions` 仅 `Failed`，`ActiveDeadlineSeconds 950400`
+  - 训练旗标对齐 `t-20260912021346-5xq4s`；独立 `OUTPUT_DIR=..._c20250601`
+  - 不进看护 `TARGETS`（非抢占）
+- **Tags 纪律**：YAML Tags 最多 3 个短标签。本文件与
+  `examples/llada/PROTEIN_PRETRAIN_PROGRESS.md` 写口径。
+  已提交的 `lwf28` 平台侧 Tags 仍是长列表（改 YAML 不回写）；之后新提按短标签。

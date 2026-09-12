@@ -105,18 +105,18 @@ multinomial；`relation_aux_loss`；修 ESMC 条件流在迭代解码中泄漏�
   200k steps 全同；per_device 2×ga 16 vs 4×8 是显存口径，优化器语义相同，§6.3）。
   **前置修复**：全链口径排除 synthetic `X`（§6.10）—— 不修则 36.8% 的 BERT 目标是占位符。
   看护循环已接管（§6.6）。账本：[`PROJECT_PROCESS.md`](../../PROJECT_PROCESS.md) 同日条。
-- ✅ **v5 8-GPU diffusion 闲时臂已提交**（`queue012` + `Preemptible: true`，Queue）：
-  `t-20260912111652-sqfcw` / `protein_esmc_llada270m_diffusion_immune_v5_8gpu_spot`。
-  与正式非抢占臂 `t-20260912021346-5xq4s` 同配置 generated-only（`--diffusion_all_chains False`），
-  独立 `OUTPUT_DIR`，赛跑第二条线。queue012 **有** SharedResource（当时 78 卡占用），
-  抢占吃共享池不吃专用配额（验证：Running 抢占 GPU 数 == `SharedResource`；配额只能
-  OpenAPI `GetResourceQueue` 查）。当前共享池被 1 卡任务占满、0 个 8 卡抢占在跑。
-  🔴 cancel 前先 `touch output/_monitor/STOP.protein_esmc_llada270m_diffusion_immune_v5_8gpu_spot`。
-  账本：[`PROJECT_PROCESS.md`](../../PROJECT_PROCESS.md) 同日条。
+- ✅ **v5 8-GPU diffusion 闲时臂已提交后已 cancel**（`queue012` + `Preemptible: true`）：
+  `t-20260912111652-sqfcw` / `protein_esmc_llada270m_diffusion_immune_v5_8gpu_spot`，
+  平台终态 **Killed**（`End=2026-09-12T07:04:18Z`）。先 `touch output/_monitor/STOP.<TaskName>`
+  再 cancel，看护不会重提；正式臂 `t-20260912021346-5xq4s` 与 BERT 闲时 `t-20260912035657-dd8v9`
+  仍 Queue、未动。账本：[`PROJECT_PROCESS.md`](../../PROJECT_PROCESS.md) 同日 cancel 条。
   YAML 头部写「见本文 §4.2」是从 v4 YAML 抄来的；§4.2 仍是 v3 50k，不是本 run。
-  **2026-09-12 开跑前核算：三个 flag 不动**（`--save_top_k 3` / `--eval_steps 1000` /
-  `ActiveDeadlineSeconds 950400`），未 cancel、未重提交。步时 / eval / 配额 / deadline
-  见 §6.3 / §6.4 / §6.7；底稿 `_jobmon/DECISION_NUMBERS.md`（仓库外）。
+  步时 / eval / 配额 / deadline 见 §6.3 / §6.4 / §6.7；底稿 `_jobmon/DECISION_NUMBERS.md`（仓库外）。
+- ✅ **v5 8-GPU diffusion 非抢占臂已提到 `c20250601`**（`Preemptible: false`，Queue）：
+  `t-20260912150714-lwf28` / `protein_esmc_llada270m_diffusion_immune_v5_8gpu_c20250601`。
+  训练旗标与 queue012 正式臂 `t-20260912021346-5xq4s` 相同，只换队列与独立 `OUTPUT_DIR`。
+  误提的闲时版 `t-20260912150055-44gvc` 已 cancel。看护**不**接管非抢占任务。
+  账本：[`PROJECT_PROCESS.md`](../../PROJECT_PROCESS.md) 同日条。
 - `immune_receptor_v2` 仍未通过 runtime/training gate。
 
 ## 3.1 历史 v3 状态（2026-09-07 平台 + 盘上核实）
@@ -591,6 +591,9 @@ resume-only（各 94 G）、5 处 `checkpoint-final/model.safetensors` **改硬�
   `RetryOptions`，并额外补了默认 `EnableReserveResourceOnRetry: false`。
 - CLI **无 update 子命令**，改 YAML 不回写已提交任务，只能 cancel 重提。
 - `Description` 上限 500 字符，写长了直接提交失败 —— YAML 里只留一行指针注释，细节写本文档。
+- **`Tags` 最多 3 个短标签**（例如 `v5, diffusion, c20250601` 或 `v5, bert, spot`）。
+  语料源、模型尺寸、旗标、是否 all-chains **不要**堆进 Tags；那些写本文档与
+  [`PROJECT_PROCESS.md`](../../PROJECT_PROCESS.md)。已提交任务的 Tags 改 YAML 不会回写平台。
 - ⚠️ **配置性失败（OOM / 参数错）后必须立刻 cancel 整条重试链**：`PolicySets: [Failed]` 分不清
   「节点故障」与「配置错误」，会把坏配置反复重提，而新任务与好任务**同名、共用同一 `OUTPUT_DIR`**。
 
@@ -984,6 +987,9 @@ python examples/llada/protein_pretrain_esmc.py --dry_run True --max_rows_per_sou
 
 > 一行一条，细节在对应小节。不要在这里重复正文内容。
 
+- **2026-09-12** — YAML `Tags` 改为最多 3 个短标签，细节只写本文档 / PROJECT_PROCESS。见 §6.7。
+- **2026-09-12** — 新提 v5 diffusion **非抢占**到 `c20250601`：`t-20260912150714-lwf28`（`Preemptible: false`）。误提的闲时版 `t-20260912150055-44gvc` 已 cancel。见 §3。
+- **2026-09-12** — cancel 闲时 diffusion `t-20260912111652-sqfcw`（先 STOP 哨兵再 cancel，终态 Killed）。正式臂与 BERT 闲时保留。见 §3 / PROJECT_PROCESS 同日条。
 - **2026-09-12** — 🔴 修全链口径漏算 synthetic `X`：`bert_all_chains=True` 与 `diffusion_all_chains=True` 两处都再 AND `~synthetic_residue_mask`。v5 上旧口径 36.8% 的目标是占位符。见 §6.10。
 - **2026-09-12** — **BERT 臂改为也训 relation target**（用户决策）：两个全链入口都并入 `relation_target_mask`；顺带修 `diffusion_all_chains=True` 覆写 eligible 时会丢掉 relation 监督的镜像缺陷。见 §6.10。
 - **2026-09-12** — 提交 v5 8 卡 diffusion 闲时臂到 `queue012`（`t-20260912111652-sqfcw`，`Preemptible: true`），与正式臂赛跑。queue012 有 SharedResource（78 卡占用）。见 §3 / §6.7。
