@@ -1,5 +1,7 @@
 # BioSeq downstream tasks
 
+> **Ophiuchus-Ab baseline 表征探针专项（2026-09-13）**：纠错台账和后续 agent 验收入口见 [AB baseline 测评指南](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/AB_BASELINE_EVALUATION_AUDIT.md)。本次仅登记文档，未修改实现或解冻 headline。
+
 > **Agent 阅读顺序（唯一）**：[`benchmark/PROJGUIDE.md`](benchmark/PROJGUIDE.md)（怎么做）→ [`tasks/<TASK>.md`](tasks/)（做什么、怎么填）→ [`benchmark/RESULTS.md`](benchmark/RESULTS.md) §0（数字）。
 > 在范围内六份：[`tasks/TCR_T1_BINDING.md`](tasks/TCR_T1_BINDING.md) · [`TCR_T2_CLUSTERING.md`](tasks/TCR_T2_CLUSTERING.md) · [`TCR_T3_REPRESENTATION.md`](tasks/TCR_T3_REPRESENTATION.md) · [`TCR_T4_GENERATION.md`](tasks/TCR_T4_GENERATION.md) · [`AB_CDR_INFILLING.md`](tasks/AB_CDR_INFILLING.md) · [`AB_LIGHT_CHAIN_PAIRING.md`](tasks/AB_LIGHT_CHAIN_PAIRING.md)。
 > 文档规则：[`../.cursor/rules/downstream-doc-sync.mdc`](../.cursor/rules/downstream-doc-sync.mdc)。排行榜 **论文值优先**。
@@ -14,9 +16,11 @@ Data defaults: `/vepfs-mlp2/c20250601/251105016/project/dllm_test/data/downstrea
 
 ## 评测范围（2026-08-29 收窄，强制）
 
+2026-09-13 TCR 当前子任务与双链生成延后决定见 [benchmark README §0](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/README.md)；本轮新的 Ours 汇总只收指定 49000，不将旧 checkpoint 数字补入空项。
+
 > **当前只做 AB（抗体）与 TCR 两个维度的任务，其余一律不考虑。**
 
-- **在范围内**：TCR T1 Binding / T2 Clustering / T3 Representation / T4 Generation；AB CDR infilling（SAbDab Kong + SAb23H2）、AB Light-chain pairing。AB 的 humanization / GDPa1 / specificity / m396 属 AB 维度但无本地数据或按计划排除。
+- **在范围内**：TCR T1 Binding / T2 Clustering / T3 Representation / T4 Generation；AB CDR infilling（SAbDab Kong + SAb23H2）、AB Light-chain pairing。AB 的 humanization / GDPa1 / specificity / m396 属 AB 维度、本轮按计划排除。后三项数据已落地，见 [`../data/downstream/PROBE_DATA.md`](../data/downstream/PROBE_DATA.md)。
 - **⛔ 已冻结，不在范围内**：`mint_tasks/`（MINT GeneralPPI）、`benchmark/ppi/`（STRING 90/90）、`benchmark/nbbench/`（纳米抗体）、`flab/`（抗体属性回归，锚点是 MINT 而非 AB 主线）。
 - 冻结含义：**代码、数据与已落盘产物全部保留**，但不再更新数字、不进 headline、不写入论文表、不作为结论依据。
 
@@ -83,14 +87,14 @@ PYTHONPATH=. python examples/llada/protein_pretrain_esmc.py --dataset_args trait
 | `comp_chain/` | Light-chain pairing | ✅ |
 | `ophiuchus_eval/` | Ophiuchus-Ab 官方 ckpt 复跑（CDR + pairing） | ✅ |
 | `humanization/` | 抗体人源化（AB 维度，本轮排除） | ◐ |
-| `dev/` | Developability（GDPa1，AB 维度，无数据） | ◐ |
-| `specificity/` | 特异性分类（AB 维度，无数据） | ◐ |
-| `in_silico/` | Desautels m396 亲和力（AB 维度，数据死链） | ◐ |
+| `dev/` | Developability（GDPa1；数据已落地，本轮排除） | ◐ |
+| `specificity/` | 特异性分类（CurrAb；数据已落地，本轮排除） | ◐ |
+| `in_silico/` | Desautels m396 亲和力（数据已落地，本轮排除） | ◐ |
 | `flab/` | FLAb 属性回归 + baseline sweep | ⛔ 冻结 |
 | `mint_tasks/` | MINT GeneralPPI | ⛔ 冻结 |
 | `common.py` / `embeddings.py` | Ophiuchus-Ab 共享加载与嵌入 | ✅ |
 
-✅ 在范围内 · ◐ 属 AB 维度但无数据/按计划排除 · ⛔ 已冻结（见上方「评测范围」）
+✅ 在范围内 · ◐ 属 AB 维度、本轮按计划排除（探针数据见 [`../data/downstream/PROBE_DATA.md`](../data/downstream/PROBE_DATA.md)） · ⛔ 已冻结（见上方「评测范围」）
 
 ---
 
@@ -163,8 +167,7 @@ python -m downstream.grammar.humanization \
 
 | 任务 | Blocker |
 |------|---------|
-| in_silico Desautels m396（论文 binding 口径） | 数据 dead symlink，全盘无副本 |
-| dev GDPa1（论文 Table 4 developability）/ specificity | 本地无数据 |
+| in_silico / GDPa1 / specificity | 数据已落地，本轮按计划不跑；见 [`../data/downstream/PROBE_DATA.md`](../data/downstream/PROBE_DATA.md) |
 | CDR dyMEAN/IgGM | 需结构预测 + 独立 repo |
 | humanization HuDiff/IgCraft | 外部生成器未接（Ours grammar + Ophiuchus-Ab 已通） |
 | ~~AbLang2 (CDR)~~ ✅ 已跑通 | — |
@@ -207,7 +210,7 @@ Prefer [`ophiuchus_eval/`](ophiuchus_eval/) for official-ckpt reruns.
 | Task | sampling_strategy | max_iter | cfg_scale | Notes |
 |------|-------------------|----------|-----------|-------|
 | CDR infilling | `argmax` | **1**（报告口径；sweep 仅作波动带） | 0.0 | 论文未公布 max_iter。SAbDab 用 Kong `sabdab_kong`，禁止默认旧 `sabdab/` |
-| Light-chain pairing | `gumbel_argmax` | **124** | 0.0–1.5 | 官方 AirGen `zero_shot_test.sh` 实际是 124，不是 argparse 默认 32；headline = prompt3 + `light_length_mode=prior`。cfg 在测试集上扫过，不得把 cfg=1.5 标成超过论文 |
+| Light-chain pairing | `gumbel_argmax` | **124** | 0.0–1.5 | 官方 AirGen `heavy2light.sh` 为 prompt3、124 步、固定窗口自吐 EOS；cfg 在测试集上扫过，不得把 cfg=1.5 标成超过论文。Ours 的现行适配协议另见 [AB pairing §4.3](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/AB_LIGHT_CHAIN_PAIRING.md)，不能与官方长度设置混称 |
 | Humanization | `gumbel_argmax` | 32 | 0.0 | FR regions masked; light C-terminal 3 residues kept native |
 
 CDR infilling 报告口径固定 `iter=1`。pairing 对齐官方 `max_iter=124` + gumbel；不要用 argparse 默认 32。

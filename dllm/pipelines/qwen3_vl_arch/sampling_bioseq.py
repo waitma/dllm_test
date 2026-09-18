@@ -23,6 +23,7 @@ from dllm.pipelines.qwen3_vl_arch.modeling_bioseq import (
     BioSeqEncoderDiffusionModel,
     BioSeqNoEncoderDiffusionModel,
     apply_decoder_corruption_to_encoder,
+    apply_decoder_values_to_encoder,
     forbidden_diffusion_target_token_ids,
     mask_forbidden_target_logits,
 )
@@ -61,10 +62,16 @@ def resolve_partial_mask(
     else:
         forced_visible = forced_visible.bool()
 
-    for key in ("structure_token_mask", "relation_token_mask"):
-        extra = batch.get(key)
-        if extra is not None:
-            forced_visible = forced_visible | extra.bool()
+    structure_mask = batch.get("structure_token_mask")
+    if structure_mask is not None:
+        forced_visible = forced_visible | structure_mask.bool()
+    relation_mask = batch.get("relation_token_mask")
+    relation_targets = batch.get("relation_target_mask")
+    if relation_mask is not None:
+        if relation_targets is None:
+            forced_visible = forced_visible | relation_mask.bool()
+        else:
+            forced_visible = forced_visible | (relation_mask.bool() & ~relation_targets.bool())
 
     if partial_mask is None:
         loss_mask = batch.get("diffusion_loss_mask", batch.get("diffusion_target_mask"))
@@ -114,6 +121,39 @@ def _inference_timesteps(step: int, max_step: int, time_epsilon: float, device: 
     return torch.tensor([value], device=device, dtype=torch.float32)
 
 
+def _encoder_input_from_output_tokens(
+    model: BioSeqDiffusionModel,
+    batch: dict[str, Any],
+    output_tokens: torch.Tensor,
+    generation_mask: torch.Tensor,
+    mask_token_id: int,
+    encoder_mask_id: int,
+) -> torch.Tensor:
+    """Mirror committed decoder residues, never reference targets, into ESMC.
+
+    Every generated slot is overwritten on every call: pending or unsupported
+    tokens become encoder MASK, and accepted residues are vocabulary-translated.
+    Thus shrinking the pending mask cannot reveal the original clean targets.
+    """
+
+    accepted = generation_mask & output_tokens.ne(mask_token_id) & batch["residue_mask"].bool()
+    inverse = getattr(model, "llada_to_grammar_ids", None)
+    if inverse is not None:
+        # Fusion uses LLaDA <res_A> IDs in the decoder but ESMC A IDs in
+        # encoder_input_ids. Grammar delimiters must not be fed into ESMC.
+        valid_ids = output_tokens.ge(0) & output_tokens.lt(inverse.numel())
+        mapped = inverse[output_tokens.clamp(min=0, max=inverse.numel() - 1)]
+        residue_ids = getattr(model, "_residue_token_ids", None)
+        if residue_ids is None:
+            raise ValueError("Remapped fusion inference requires decoder residue token IDs")
+        accepted = accepted & valid_ids & mapped.ge(0) & torch.isin(output_tokens, residue_ids)
+    else:
+        # Native BioSeq models share their residue vocabulary with the encoder.
+        mapped = output_tokens
+    encoder_values = torch.where(accepted, mapped, int(encoder_mask_id))
+    return apply_decoder_values_to_encoder(batch, generation_mask, encoder_values)
+
+
 def _model_logits(
     model: BioSeqDiffusionModel,
     batch: dict[str, Any],
@@ -125,7 +165,6 @@ def _model_logits(
     partial_mask: torch.Tensor,
 ) -> torch.Tensor:
 
-    encoder_corruption_mask = generation_mask
     forward_kwargs: dict[str, Any] = {
         "input_ids": output_tokens,
         "attention_mask": batch.get("attention_mask"),
@@ -135,16 +174,14 @@ def _model_logits(
     }
 
     if isinstance(model, BioSeqEncoderDiffusionModel):
-        encoder_batch = dict(batch)
-        encoder_batch["input_ids"] = output_tokens
         encoder_mask_id = int(
             getattr(getattr(model, "config", None), "encoder_mask_token_id", None)
             or mask_token_id
         )
-        noised_encoder_input_ids = apply_decoder_corruption_to_encoder(
-            batch=encoder_batch,
-            corruption_mask=encoder_corruption_mask,
-            mask_token_id=encoder_mask_id,
+        noised_encoder_input_ids = _encoder_input_from_output_tokens(
+            model=model, batch=batch, output_tokens=output_tokens,
+            generation_mask=generation_mask, mask_token_id=mask_token_id,
+            encoder_mask_id=encoder_mask_id,
         )
         forward_kwargs.update(
             {
@@ -158,38 +195,24 @@ def _model_logits(
             }
         )
         if cfg_scale > 0.0:
+            # Residue-condition CFG: remove the observed sequence condition in
+            # both streams, not grammar/type/termination/relation tokens or PAD.
+            # The current generated state is identical in the two passes.
+            condition_mask = partial_mask & batch["residue_mask"].bool()
             unmasked_tokens = output_tokens.clone()
-            unmasked_tokens[partial_mask] = int(mask_token_id)
-            un_encoder_batch = dict(encoder_batch)
-            un_encoder_batch["input_ids"] = unmasked_tokens
+            unmasked_tokens[condition_mask] = int(mask_token_id)
+            un_encoder_batch = {**batch, "encoder_input_ids": noised_encoder_input_ids}
             un_noised_encoder = apply_decoder_corruption_to_encoder(
                 batch=un_encoder_batch,
-                corruption_mask=encoder_corruption_mask | partial_mask,
+                corruption_mask=condition_mask,
                 mask_token_id=encoder_mask_id,
             )
             denoise = getattr(model, "_denoise", None)
-            if callable(denoise):
-                cond_out = denoise(
-                    **forward_kwargs,
-                    input_ids=output_tokens,
-                    encoder_input_ids=noised_encoder_input_ids,
-                )
-                uncond_out = denoise(
-                    **forward_kwargs,
-                    input_ids=unmasked_tokens,
-                    encoder_input_ids=un_noised_encoder,
-                )
-            else:
-                cond_out = model(
-                    **forward_kwargs,
-                    input_ids=output_tokens,
-                    encoder_input_ids=noised_encoder_input_ids,
-                )
-                uncond_out = model(
-                    **forward_kwargs,
-                    input_ids=unmasked_tokens,
-                    encoder_input_ids=un_noised_encoder,
-                )
+            forward = denoise if callable(denoise) else model
+            cond_out = forward(**forward_kwargs)
+            uncond_kwargs = {**forward_kwargs, "input_ids": unmasked_tokens,
+                             "encoder_input_ids": un_noised_encoder}
+            uncond_out = forward(**uncond_kwargs)
             logits = uncond_out.logits + (cfg_scale + 1.0) * (cond_out.logits - uncond_out.logits)
             forbidden = forbidden_diffusion_target_token_ids(model.config)
             return mask_forbidden_target_logits(logits, forbidden)
@@ -430,21 +453,21 @@ def generate_bioseq(
             partial_mask=partial_mask,
         )
         sampled_tokens, sampled_scores = _sample_tokens(logits, config.sampling_strategy, config.temperature)
-        output_tokens = output_tokens.masked_scatter(still_masked, sampled_tokens[still_masked])
-        output_scores = output_scores.masked_scatter(still_masked, sampled_scores[still_masked])
-        history.append(output_tokens.clone())
-
+        # Keep the committed state separate from this step's proposals. Pending
+        # sites must remain MASK in the actual next forward, not merely in the
+        # bookkeeping mask. This also matches the original AirGen decoder.
         still_masked, output_tokens, output_scores = _confidence_decoding(
             output_tokens=output_tokens,
             output_scores=output_scores,
-            cur_tokens=output_tokens,
-            cur_scores=output_scores,
+            cur_tokens=sampled_tokens,
+            cur_scores=sampled_scores,
             decoding_strategy=config.decoding_strategy,
             still_masked=still_masked,
             generation_mask=generation_mask,
             step=step + 1,
             max_step=config.max_iter,
         )
+        history.append(output_tokens.clone())
         if not still_masked.any():
             break
 

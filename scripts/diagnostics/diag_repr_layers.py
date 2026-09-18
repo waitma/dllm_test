@@ -114,7 +114,7 @@ def all_layer_hidden(
 
 def embed_all_layers(model, collator, seqs, device, batch_size=64, disable_esmc=False):
     """-> (per_layer [L+1, N, D] float32, esmc [N, E] float32)."""
-    from dllm.pipelines.qwen3_vl_arch.data import BioSeqChain, BioSeqRecord
+    from dllm.pipelines.immune_llada.data import BioSeqChain, BioSeqRecord
 
     order = sorted(range(len(seqs)), key=lambda i: len(seqs[i]))
     per_layer = None

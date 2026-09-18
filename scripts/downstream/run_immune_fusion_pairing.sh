@@ -1,12 +1,8 @@
 #!/usr/bin/env bash
-# Light-chain pairing only (diffusion ckpts), with the target-length-leakage fix.
-#
-# The previous round built the grammar record from the reference light chain, so the
-# number of masked residue slots equalled the reference length. That leaked the answer's
-# length and turned pairing into near-reconstruction (100% length match, ~0.95 identity,
-# diversity 0.10 vs the paper's 0.335). light_length_mode=prior draws the length from the
-# OAS-train histogram instead, which is the grammar-side analogue of the official AirGen
-# protocol (fixed 128-slot light buffer, model emits its own <eos>).
+# Light-chain pairing only (diffusion ckpts), known-reference-length by default.
+# Reference length is an explicit task condition (user decision 2026-09-13).
+# Only the first three light residues are visible; the remainder is generated.
+# Use prior explicitly for the separate training-length-prior diagnostic.
 #
 # Usage: bash run_immune_fusion_pairing.sh <fusion_ckpt_dir> <tag> [heavy_batch] [length_mode]
 set -euo pipefail
@@ -15,9 +11,8 @@ ROOT="/vepfs-mlp2/c20250601/251105016/project/dllm_test"
 CKPT="${1:?usage: $0 <fusion_ckpt_dir> <tag> [heavy_batch] [length_mode]}"
 TAG="${2:?usage: $0 <fusion_ckpt_dir> <tag> [heavy_batch] [length_mode]}"
 HEAVY_BS="${3:-2}"
-LENGTH_MODE="${4:-prior}"
-# AirGen run/zero_shot_test.sh passes --max_iter 124 for light pairing (the argparse
-# default 32 is not what the paper used).
+LENGTH_MODE="${4:-reference}"
+# AirGen run/heavy2light.sh uses 124; this does not establish the paper's exact run.
 MAX_ITER="${PAIR_MAX_ITER:-124}"
 
 OUT="${ROOT}/output/downstream_generation"

@@ -2,14 +2,27 @@
 
 ## Long-Term Rules
 
+- 2026-09-15 用户明确：任何用于 eval 的 checkpoint 必须在评测前保留独立、按版本/step 命名的权重快照及加载所需配置/tokenizer，记录源路径和 SHA256；评测指向该固定快照。快照不参与训练 top-k/最新 checkpoint 轮换，不得被新 checkpoint 覆盖或自动清理；清理已评测快照须用户明确授权。AB 已保存的 step49000、step92000 位于 `/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/ab_eval_checkpoints/`。
+
+- 当前 AB 结果汇总必须携带论文 baseline，来源及缺失值处理统一遵守 [downstream PROJGUIDE §0.2.2](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/PROJGUIDE.md#022-排行榜构造论文值优先强制2026-09-02-起) 的2026-09-15用户决定。
+
+- TCR 正式生成的严格 JSON 缺失指标契约、不可覆写的 CPU 评分恢复及新 gate 规则见 [T4 §7.7 / §8.0](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/TCR_T4_GENERATION.md)。已评分失败的完整生成不得自动重采或以成功标记覆盖；后续关键修复继续登记总审计。
+
+- 后续测试任何已构建 TCR 任务（T1–T4），必须先读 [TCR baseline 审计 §9.8](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/TCR_BASELINE_EVALUATION_AUDIT.md) 与对应任务手册，遵守任务专属输入/验收约束；所有关键改动同回合回写该审计。该规则不把待执行实验视作已完成，也不替代现有结果/范围/任务账本。
+
 - The project root is `/vepfs-mlp2/c20250601/251105016/project/dllm_test`.
 - The model weight root is `/c20250601/mj/model_weights`.
 - All project docs, configs, examples, and scripts must use absolute paths.
 - Plan changes must be recorded in `/vepfs-mlp2/c20250601/251105016/project/dllm_test/BIOSEQ_MODEL_PLAN.md`.
 - Process changes must be recorded in `/vepfs-mlp2/c20250601/251105016/project/dllm_test/PROJECT_PROCESS.md`.
 - Long-term project rules must be recorded in `/vepfs-mlp2/c20250601/251105016/project/dllm_test/PROJ_GUIDE.md`.
+- Ophiuchus-Ab baseline 表征探针的纠错与后续验收先读 [AB baseline 测评指南](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/AB_BASELINE_EVALUATION_AUDIT.md)；该入口不替代现有数据台账、排行榜或范围定义。
+- Ours 的原生 AB 表征测评走 [AB_NATIVE_PROBES](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/AB_NATIVE_PROBES.md)，不用 Ophiuchus 固定窗口或默认 TCR record。`.gitignore` 只放行本次新增的 `ab_features.py`、`ab_probes.py` 和该任务文档，其余未跟踪 downstream 资源继续忽略；配置生成器必须显式传 checkpoint，不能自动提交或猜选权重。
+- 训练中 checkpoint 的 AB 矩阵统一固定到 `/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/ab_eval_checkpoints/<run_tag>` 独立评测快照；复制前后 SHA 一致，仅保留评测所需权重/tokenizer等，不复制优化器。生成器 `--with-preflight` 输出独立 GPU gate，先通过再提交正式矩阵；执行细则见原生 AB 任务 §8，最新权重选择不等于验证集最优选模。
 
 ## Active foundation-training data boundary
+
+TCR 下游后续关键决策、代码改动与验收必须在 [TCR baseline 审计 §9](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/TCR_BASELINE_EVALUATION_AUDIT.md) 同回合登记；其输入转换约束见该文档 §2 / §4，others 与 β-only 的入口/缓存边界见 §9，不得把下述离线训练数据管线要求直接套到评测数据上。
 
 - The only current immune training implementation is `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/immune_llada`; the formal entry is `/vepfs-mlp2/c20250601/251105016/project/dllm_test/examples/llada/protein_pretrain_esmc.py`.
 - The active data contract is raw source → adapter → `BioSeqRecord` → offline deterministic filters → prepared semantic JSONL/manifest → training-time grammar, padding, per-chain encoder reconstruction, and diffusion/MLM masking. No model-ready token cache is produced.
@@ -57,7 +70,9 @@
 
 - **Training YAMLs** live under `/vepfs-mlp2/c20250601/251105016/project/dllm_test/train_jobs/`; only current immune-fusion training/resume jobs belong here. Old `grammar_v2` YAMLs are historical and must not be used to infer a runnable pipeline.
 - **Eval YAMLs** live under `/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/`; downstream, pairing, and metrics jobs belong here. The old grammar-v2 generators/wrappers/sweeps/retry jobs are retired and must not be regenerated.
+- TCR 简单任务优先本地；用户现已授权 others 完成后将剩余仍排队任务也接续到本机，见 [TCR 审计 §9.24](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/TCR_BASELINE_EVALUATION_AUDIT.md)。本地顺序执行并检查 GPU 占用，不干预其他进程；已实际云端 Running 的任务保留。迁移前核对同范围云端 ID/名称、取消 Queue 并确认 Killed，避免双跑；已完成 tag 不覆盖。执行位置不改变数据、epoch、fold 或候选预算；§9.3–§9.5 及 §9.23 的资源选择是历史，不自动重提已取消任务。
 - Current local evaluation examples are the retained immune-fusion scripts under `/vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/downstream`: `run_immune_fusion_gen.sh`, `run_immune_fusion_pairing.sh`, `run_immune_fusion_repr.sh`, and `run_pairing_pll.sh`. They use the active fusion checkpoint line and the retained public implementations under `/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/grammar`.
+- Pairing's current input/default/provenance contract and separate scoring entry are maintained in [AB pairing §4.3 / §7 h](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/AB_LIGHT_CHAIN_PAIRING.md). Use that owner instead of historical prior-only comments; do not silently resume an old generation protocol.
 - Submit commands, when a current job is explicitly approved, use absolute YAML paths:
   - Training: `volc ml_task submit --conf /vepfs-mlp2/c20250601/251105016/project/dllm_test/train_jobs/<job>.yml`
   - Eval: `volc ml_task submit --conf /vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/<job>.yml`

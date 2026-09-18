@@ -11,7 +11,9 @@
 - 下游数字权威表：[`RESULTS.md`](../../downstream/benchmark/RESULTS.md)
 - 多链关系对照臂设计：[`MULTI_CHAIN_RELATION.md`](MULTI_CHAIN_RELATION.md)
 
-**最近更新 2026-09-12**：v5 开跑前核算——`--save_top_k 3` / `--eval_steps 1000` /
+**最近状态核查 2026-09-13**：v5 平台状态、日志训练步数、最新已保存与验证 loss 最优 checkpoint 的区别，统一见 [PROJECT_PROCESS 的 v5 训练 checkpoint 状态复核](/vepfs-mlp2/c20250601/251105016/project/dllm_test/PROJECT_PROCESS.md)。下方 Queue 表述是提交时历史状态，不代表当前 diffusion 仍在排队；本次仅查询、未修改训练或提交评测。
+
+**2026-09-12 历史更新**：v5 开跑前核算——`--save_top_k 3` / `--eval_steps 1000` /
 `ActiveDeadlineSeconds 950400` 三者不动。步时/eval/配额数字见 §6.3 / §6.4 / §6.7 与
 [`SPEED_ANALYSIS.md`](../../SPEED_ANALYSIS.md)。离线 binding 评估脚本见 §5.6。
 v5 8-GPU diffusion 仍 Queue；**v5 8-GPU BERT 臂已提交闲时队列**（§3）。
@@ -86,7 +88,9 @@ multinomial；`relation_aux_loss`；修 ESMC 条件流在迭代解码中泄漏�
 
 ---
 
-## 3. 当前状态（2026-09-12）
+## 3. 当前状态（2026-09-13）
+
+当前任务/保存进度以 [PROJECT_PROCESS 最新只读快照](/vepfs-mlp2/c20250601/251105016/project/dllm_test/PROJECT_PROCESS.md) 为准；下面保留数据发布与历史提交记录。不要混淆旧 270M@42000 的 AB pairing 分数和正在训练的 v5，也不要将 top-k 验证 loss 最优直接称为下游最优。
 
 ### v4 / v5 数据线（2026-09-12）
 
@@ -985,6 +989,7 @@ python examples/llada/protein_pretrain_esmc.py --dry_run True --max_rows_per_sou
 
 ## 11. 变更日志
 
+- **2026-09-13** — 只读复核 v5 平台/日志/落盘状态，区分训练步数、最新 checkpoint 与验证 loss 最优；权威快照见 [PROJECT_PROCESS](/vepfs-mlp2/c20250601/251105016/project/dllm_test/PROJECT_PROCESS.md)。同步当前状态入口，未更改训练或启动评测。
 > 一行一条，细节在对应小节。不要在这里重复正文内容。
 
 - **2026-09-12** — YAML `Tags` 改为最多 3 个短标签，细节只写本文档 / PROJECT_PROCESS。见 §6.7。

@@ -16,7 +16,7 @@ PROJECT_ROOT = Path("/vepfs-mlp2/c20250601/251105016/project/dllm_test")
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from dllm.pipelines.qwen3_vl_arch.data import BioSeqChain, BioSeqRecord
+from dllm.pipelines.immune_llada.data import BioSeqChain, BioSeqRecord
 from downstream.grammar.common import (
     antibody_pair_record,
     build_eval_collator,

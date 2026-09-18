@@ -210,7 +210,7 @@ def load_fusion_for_eval(
     import transformers
     from safetensors.torch import load_file
 
-    from dllm.pipelines.qwen3_vl_arch.data import (
+    from dllm.pipelines.immune_llada.data import (
         GrammarBioSeqCollator,
         GrammarTokenizer,
         HuggingFaceEsmTokenizerAdapter,
@@ -221,9 +221,9 @@ def load_fusion_for_eval(
         RemapCollator,
         RESIDUES,
         build_remap_lookup,
+        decoder_mask_token_id,
         expand_llada_tokenizer_for_esmc_grammar,
     )
-    from examples.llada.protein_pretrain_esmc import _decoder_mask_token_id
 
     ckpt_dir = resolve_fusion_dir(checkpoint)
     weights = fusion_weight_file(ckpt_dir)
@@ -283,7 +283,7 @@ def load_fusion_for_eval(
         decoder=decoder,
         encoder=encoder,
         encoder_hidden_size=encoder_hidden,
-        decoder_mask_token_id=_decoder_mask_token_id(llada_tok),
+        decoder_mask_token_id=decoder_mask_token_id(llada_tok),
         encoder_mask_token_id=int(gtok.mask_token_id),
         residue_cond_mode="add",
         condition_norm=True,

@@ -472,7 +472,7 @@ class EsmcBioSeqEmbedder(SequenceEmbedder):
         if str(dllm_test_dir) not in _sys.path:
             _sys.path.insert(0, str(dllm_test_dir))
         from dllm.pipelines.qwen3_vl_arch.modeling_bioseq import load_local_esmc_encoder
-        from dllm.pipelines.qwen3_vl_arch.data import HuggingFaceEsmTokenizerAdapter
+        from dllm.pipelines.immune_llada.data import HuggingFaceEsmTokenizerAdapter
 
         self._torch = torch
         self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
@@ -635,7 +635,7 @@ class GrammarEmbedder(SequenceEmbedder):
         from grammar.common import (
             load_grammar_checkpoint, build_grammar_tokenizer, build_grammar_collator,
         )
-        from dllm.pipelines.qwen3_vl_arch.data import BioSeqChain, BioSeqRecord
+        from dllm.pipelines.immune_llada.data import BioSeqChain, BioSeqRecord
 
         self._torch = torch
         self._Chain = BioSeqChain
@@ -977,7 +977,7 @@ class GrammarEmbedder(SequenceEmbedder):
         """
         torch = self._torch
         if not hasattr(self, "_enc_tok"):
-            from dllm.pipelines.qwen3_vl_arch.data import HuggingFaceEsmTokenizerAdapter
+            from dllm.pipelines.immune_llada.data import HuggingFaceEsmTokenizerAdapter
             if not self._encoder_path:
                 raise ValueError("checkpoint args lack encoder_path for single-seq embed()")
             self._enc_tok = HuggingFaceEsmTokenizerAdapter.from_pretrained(self._encoder_path)
@@ -1128,7 +1128,7 @@ class FusionGrammarEmbedder(GrammarEmbedder):
         import sys as _sys
         from pathlib import Path as _P
         import torch
-        from dllm.pipelines.qwen3_vl_arch.data import BioSeqChain, BioSeqRecord
+        from dllm.pipelines.immune_llada.data import BioSeqChain, BioSeqRecord
         from examples.llada.load_fusion_checkpoint import (
             load_fusion_for_eval,
             resolve_fusion_dir,
@@ -1227,6 +1227,9 @@ def build_embedder(spec: str, **kwargs) -> SequenceEmbedder:
       * ``antiberty``                        -> AntiBERTy via the antiberty package.
       * ``hf:<repo_id>``                     -> any HF masked-LM (space-separated).
     """
+    if spec.startswith("tcr-v5:"):
+        from downstream.grammar.tcr_features import TCRRuntimeEmbedder
+        return TCRRuntimeEmbedder(checkpoint_dir=spec.split(":", 1)[1], **kwargs)
     if spec.startswith("fusion:"):
         return FusionGrammarEmbedder(checkpoint_dir=spec.split(":", 1)[1], **kwargs)
     if spec.startswith("grammar:"):

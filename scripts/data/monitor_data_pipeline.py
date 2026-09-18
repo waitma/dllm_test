@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""Real-time monitor for BioSeq data pipeline jobs.
+"""Monitor the retained Nature Methods TCR benchmark download.
+
+The retired PPI/STRING/MINT build jobs are intentionally not monitored.
+Immune preparation reports are published by preprocess_immune_dataset.py.
 
 Example::
 
@@ -22,37 +25,7 @@ PROCESSED = PROJECT_ROOT / "data/ppi_task_raw/processed"
 LOG_DIR = PROCESSED / "pipeline_logs"
 
 JOBS = {
-    "unified_csv": {
-        "log": PROCESSED / "build_unified_csv.log",
-        "output": PROCESSED / "interaction_records_unified.csv",
-        "target_gb": 3.0,
-        "pattern": "build_ppi_interaction_csv",
-    },
-    "string_sequences_redownload": {
-        "log": LOG_DIR / "string_sequences_redownload.log",
-        "output": PROJECT_ROOT / "data/ppi_task_raw/raw/stringdb_mint/protein.sequences.v12.0.fa.gz",
-        "pattern": "aria2c",
-    },
-    "mmseqs_cluster": {
-        "log": LOG_DIR / "mmseqs_cluster.log",
-        "output": PROJECT_ROOT / "data/ppi_task_raw/raw/stringdb_mint/clu50.tsv",
-        "pattern": "mmseqs cluster",
-    },
-    "mint_splits": {
-        "log": LOG_DIR / "mint_splits.log",
-        "output": PROJECT_ROOT / "data/ppi_task_raw/processed/mint_string_pretrain_v1/manifest.json",
-        "pattern": "build_mint_string_splits",
-    },
-    "tcr_piste_shards": {
-        "log": LOG_DIR / "tcr_piste_shards.log",
-        "output": PROJECT_ROOT / "data/bioseq_grammar_v1/tcr_piste/train",
-        "pattern": "build_tcr_grammar_shards",
-    },
-    "mint_grammar_shards": {
-        "log": LOG_DIR / "mint_grammar_shards.log",
-        "output": PROJECT_ROOT / "data/bioseq_grammar_v1/mint_ppi/train",
-        "pattern": "build_mint_grammar_shards",
-    },
+
     "nat_methods_download": {
         "log": LOG_DIR / "nat_methods_download.log",
         "output": PROJECT_ROOT / "data/ppi_task_raw/raw/nat_methods_tcr_benchmark",

@@ -1,20 +1,15 @@
 #!/usr/bin/env python
-"""Audit a light-chain pairing generation CSV for target-length leakage.
+"""Audit pairing length, reference similarity, and candidate diversity.
 
-The grammar-v2 record renders a chain as exactly ``len(sequence)`` residue slots
-and has no in-block terminator, so if the record is built from the reference
-light chain the model is told the answer's length. That turns pairing into a
-near-reconstruction task and silently inflates ImmunoMatch / chain-match /
-V-gene agreement.
+Known-reference-length generation is an explicit protocol, not automatically a
+leak. High similarity is a review signal; only model-input checks can establish
+that hidden reference residues were exposed. This CSV audit does not replace
+those checks. The statistics are:
 
-This script recomputes the four statistics that expose the leak, so every
-pairing run carries its own verdict instead of relying on a manual spot check:
-
-  same_length_frac   fraction of rows where len(gen) == len(ref).  ~1.0 means the
-                     length was leaked; the official AirGen protocol (fixed
-                     128-slot buffer + model-emitted <eos>) lands near 0.4.
+  same_length_frac   fraction of rows where len(gen) == len(ref); expected to be
+                     high in the declared reference-length protocol.
   mean_identity      mean per-position identity to the reference over same-length
-                     rows. High values (>0.9) mean the model is copying.
+                     rows. Values >0.9 trigger review, not proof of copying.
   exact_copy_frac    fraction of rows that reproduce the reference verbatim.
   unique_per_heavy   mean number of distinct generated light chains per heavy.
                      1.0 means the sampler collapsed (e.g. deterministic argmax
@@ -87,17 +82,25 @@ def audit(csv_path: Path) -> dict:
         agree = frame["target_light_length"] == frame["ref_light_length"]
         report["target_equals_ref_length_frac"] = float(agree.mean())
 
+    known_reference_length = report.get("light_length_mode") == ["reference"]
+    report["known_reference_length"] = known_reference_length
     identity_leak = (
         report["mean_identity_same_length"] is not None
         and report["mean_identity_same_length"] >= IDENTITY_LEAK_THRESHOLD
     )
     report["length_leak_suspected"] = bool(
-        report["same_length_frac"] >= SAME_LENGTH_LEAK_THRESHOLD and identity_leak
+        not known_reference_length
+        and report["same_length_frac"] >= SAME_LENGTH_LEAK_THRESHOLD and identity_leak
     )
+    report["high_identity_review_required"] = bool(identity_leak)
     report["sampler_collapse_suspected"] = bool(
         report["unique_gen_per_heavy_mean"] <= COLLAPSE_UNIQUE_THRESHOLD
     )
     verdicts = []
+    if known_reference_length:
+        verdicts.append("reference length is an explicit input; not a native-EOS protocol")
+    if identity_leak:
+        verdicts.append("high reference identity: inspect input-masking tests; similarity alone does not prove copying")
     if report["length_leak_suspected"]:
         verdicts.append("target length leaked -> near-reconstruction, not de-novo pairing")
     if report["sampler_collapse_suspected"]:

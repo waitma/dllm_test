@@ -1,3 +1,10 @@
+"""Tests for the active BioSeq diffusion models with shared immune data.
+
+Run in the ``pllm`` environment::
+
+    python -m pytest /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/tests/bioseq/test_qwen3_vl_bioseq_model.py -q
+"""
+
 from __future__ import annotations
 
 from dataclasses import replace
@@ -8,7 +15,7 @@ import pytest
 import torch
 import torch.nn as nn
 
-from dllm.pipelines.qwen3_vl_arch.data import (
+from dllm.pipelines.immune_llada.data import (
     BioSeqChain,
     BioSeqRecord,
     Esm2SequenceTokenizer,

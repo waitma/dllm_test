@@ -30,6 +30,17 @@ logger = logging.getLogger(__name__)
 RESIDUES = list("LAGVSERTIDPKQNFYMHWCXBUZO")
 
 
+def decoder_mask_token_id(tok: transformers.PreTrainedTokenizer) -> int:
+    """Resolve the shared training/evaluation mask ID without importing Trainer."""
+    mask_id = tok.convert_tokens_to_ids("<|mdm_mask|>")
+    unk = getattr(tok, "unk_token_id", None)
+    if mask_id is None or (unk is not None and int(mask_id) == int(unk)):
+        mask_id = tok.mask_token_id
+    if mask_id is None:
+        raise RuntimeError("LLaDA tokenizer is missing <|mdm_mask|> / mask_token_id")
+    return int(mask_id)
+
+
 class _FusionConfig(SimpleNamespace):
     """Attribute bag for the fusion model's config.
 
@@ -52,20 +63,25 @@ def sample_bioseq_bert_noise(
     residue_token_ids: torch.Tensor | None = None,
     all_chain_targets: bool = True,
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-    """Classic BERT MLM corruption (fixed rate + 80/10/10) on eligible residues.
+    """Classic BERT MLM corruption (fixed rate + 80/10/10) on eligible tokens.
 
     Contrasts with :func:`sample_bioseq_diffusion_noise` (per-sequence rate
     ``t ~ U(eps, 1)`` and 100% ``<mask>`` replacement). Here a fixed
     ``mask_ratio`` fraction of eligible tokens is *selected*; among the selected,
     ``mask_prob`` become ``<mask>``, ``random_prob`` become a random residue
-    token, and the remainder keep their original id. Loss is computed on *all*
+    token on *residue* positions (non-residue selected positions in this slice
+    get ``<mask>`` instead — relation targets must not be rewritten to an amino
+    acid), and the remainder keep their original id. Loss is computed on *all*
     selected positions (labels set there, ``-100`` elsewhere).
 
     ``all_chain_targets`` picks the eligible set. When True (the BERT default)
-    every residue in *all* chains is eligible (``residue_mask`` & attention), so
-    fixed grammar context such as MHC / peptide / antigen is trained too. When
-    False the eligible set mirrors the diffusion sampler
-    (``diffusion_eligible_mask``: generated chains only, context excluded).
+    every *real* residue in *all* chains is eligible (``residue_mask`` &
+    attention, excluding synthetic completion placeholders), plus supervised
+    relation targets (``relation_target_mask``: trainable ``<binding>`` /
+    ``<nonbinding>`` only — not ``relation_token_mask``). Fixed grammar context
+    such as MHC / peptide / antigen is trained too. When False the eligible set
+    mirrors the diffusion sampler (``diffusion_eligible_mask``: generated chains
+    plus those same relation targets, context excluded).
 
     Returns
     -------
@@ -86,12 +102,23 @@ def sample_bioseq_bert_noise(
     residue_mask = batch.get("residue_mask")
 
     if all_chain_targets:
-        # BERT objective: predict every residue across *all* chains, including the
-        # fixed grammar context (MHC / peptide / antigen). Eligibility is the full
-        # residue set, not the diffusion "generated-only" (diffusion_eligible_mask).
+        # BERT objective: predict every *real* residue across *all* chains
+        # (含固定上下文 MHC / peptide / antigen) 以及可训关系 token。
+        # 合格集不是 diffusion 的 generated-only（diffusion_eligible_mask）。
         if residue_mask is None:
             raise KeyError("all_chain_targets=True requires residue_mask")
         eligible_mask = residue_mask.bool()
+        # synthetic X 是补全占位符，不是真实残基；renderer 的
+        # diffusion_eligible_mask 已排除，all-chains 路径必须自己再排一次
+        synthetic = batch.get("synthetic_residue_mask")
+        if synthetic is not None:
+            eligible_mask = eligible_mask & ~synthetic.bool()
+        # 只并入 relation_target_mask（可训的 <binding>/<nonbinding>）。
+        # 不能用 relation_token_mask：后者含 MHC→peptide 固定呈递 <binding>
+        # 和 OAS/OTS null 前缀 <unknown>。缺 key 视为全 0，保持旧行为。
+        relation_target = batch.get("relation_target_mask")
+        if relation_target is not None:
+            eligible_mask = eligible_mask | relation_target.bool()
     else:
         loss_mask = batch.get("diffusion_loss_mask", batch.get("diffusion_target_mask"))
         if loss_mask is None:
@@ -129,31 +156,63 @@ def sample_bioseq_bert_noise(
     to_mask = selection_mask & (roll < mask_prob)
     to_random = selection_mask & (roll >= mask_prob) & (roll < mask_prob + random_prob)
     noised_input_ids[to_mask] = int(mask_token_id)
-    if to_random.any():
+    # 80/10/10 的 random 切片只能对残基位写残基 id。关系 target 是
+    # TOKEN_CLASS_RELATION，均匀抽残基会把 <binding>/<nonbinding> 改成氨基酸。
+    # 对齐 diffusion sampler「Grammar and structure tokens are never uniformly
+    # replaced」：非残基合格位落在 random 切片时改写为 <mask>。
+    # 10% keep-original 仍按经典 MLM，所有位置保留原 id。
+    if residue_mask is not None:
+        residue_random = to_random & residue_mask.bool()
+        other_random = to_random & ~residue_mask.bool()
+    else:
+        residue_random = to_random
+        other_random = to_random.new_zeros(to_random.shape, dtype=torch.bool)
+    if other_random.any():
+        noised_input_ids[other_random] = int(mask_token_id)
+    if residue_random.any():
         if residue_token_ids is not None and int(residue_token_ids.numel()) > 0:
             pool = residue_token_ids.to(device=device, dtype=noised_input_ids.dtype)
-            picks = pool[torch.randint(int(pool.numel()), (int(to_random.sum()),), device=device)]
-            noised_input_ids[to_random] = picks
+            picks = pool[torch.randint(int(pool.numel()), (int(residue_random.sum()),), device=device)]
+            noised_input_ids[residue_random] = picks
         else:
             # No residue vocab provided -> fall back to <mask> for the random slice.
-            noised_input_ids[to_random] = int(mask_token_id)
+            noised_input_ids[residue_random] = int(mask_token_id)
     # Remaining selected positions keep their original id (the "10% unchanged").
     return noised_input_ids, labels, selection_mask
 
 
 def all_residue_eligible_mask(batch: dict[str, Any]) -> torch.Tensor:
-    """``[B, S]`` bool — every residue of every chain, fixed context included.
+    """``[B, S]`` bool — every *real* residue of every chain, fixed context included.
 
     The diffusion counterpart of the BERT ``all_chain_targets=True`` eligible set.
-    Grammar/structure/relation tokens and padding stay excluded; what is added
-    relative to ``diffusion_eligible_mask`` is precisely the fixed context
-    (antigen / MHC / peptide) that the renderer marks as never-corrupted.
+    Grammar/structure tokens, padding, and synthetic completion placeholders stay
+    excluded; what is added relative to ``diffusion_eligible_mask`` is precisely
+    the fixed context (antigen / MHC / peptide) that the renderer marks as
+    never-corrupted. Supervised relation targets (``relation_target_mask``) are
+    carried over so that "all chains" is a true *superset* of generated-only:
+    ``compute_loss`` **overwrites** ``diffusion_eligible_mask`` /
+    ``diffusion_loss_mask`` with this mask, so anything omitted here is silently
+    dropped from the objective.
     """
 
     residue_mask = batch.get("residue_mask")
     if residue_mask is None:
         raise KeyError("diffusion_all_chains=True requires residue_mask")
     eligible_mask = residue_mask.bool()
+    # synthetic X 是补全占位符，不是真实残基；renderer 的
+    # diffusion_eligible_mask 已排除，all-chains 路径必须自己再排一次
+    synthetic = batch.get("synthetic_residue_mask")
+    if synthetic is not None:
+        eligible_mask = eligible_mask & ~synthetic.bool()
+    # 只并入 relation_target_mask（可训的 <binding>/<nonbinding>），与 BERT
+    # all-chains 口径一致。不能用 relation_token_mask：后者含 MHC→peptide 固定
+    # 呈递 <binding> 与 OAS/OTS null 前缀 <unknown>。
+    # 必须并进来：compute_loss 会用本 mask **覆写** diffusion_eligible_mask /
+    # diffusion_loss_mask，漏掉就等于打开 all-chains 反而丢掉了 generated-only
+    # 本来就在训的 relation 监督 —— all-chains 必须是 generated-only 的超集。
+    relation_target = batch.get("relation_target_mask")
+    if relation_target is not None:
+        eligible_mask = eligible_mask | relation_target.bool()
     attention_mask = batch.get("attention_mask")
     if attention_mask is not None:
         eligible_mask = eligible_mask & attention_mask.bool()

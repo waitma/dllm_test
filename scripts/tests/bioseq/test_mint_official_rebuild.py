@@ -117,16 +117,36 @@ def test_three_headline_ppi_split_provenance_is_explicit() -> None:
     assert "+173" in gold["protocol_notes"]
 
 
-def test_step121000_checkpoint_provenance_is_machine_readable() -> None:
-    checkpoint = (
+def test_step121000_checkpoint_provenance_is_archived() -> None:
+    """The step121000 grammar_v2 checkpoint was deleted on 2026-09-08.
+
+    Its live ``checkpoint_manifest.json`` is gone, so this no longer exercises
+    ``_checkpoint_provenance`` against a real file. What still matters is that
+    the recorded identity behind the published three-PPI numbers stays
+    retrievable, so assert against the reconstructed archive instead.
+    """
+
+    archive = (
         ROOT
-        / "output/grammar_v2_esmc300m_integrated_llada_7l_step121000/best.pt"
+        / "docs/archive/grammar_v2_retired_20260908"
+        / "checkpoint_manifests_reconstructed.json"
     )
-    provenance = _checkpoint_provenance(f"grammar:{checkpoint}")
-    assert provenance["checkpoint_step"] == 121000
-    assert provenance["checkpoint_sha256"] == (
+    assert archive.is_file(), "grammar_v2 provenance archive is missing"
+    entries = json.loads(archive.read_text(encoding="utf-8"))["checkpoints"]
+    by_step = {entry["step"]: entry for entry in entries}
+    assert by_step[121000]["sha256"] == (
         "51f0eee5fa7b127a0487a2ea8fdbc322bda6f6908ff2662087bd87d4980d4613"
     )
+
+
+def test_checkpoint_provenance_handles_missing_checkpoint() -> None:
+    """A retired checkpoint path must degrade to path-only provenance."""
+
+    provenance = _checkpoint_provenance(
+        f"grammar:{ROOT}/output/grammar_v2_esmc300m_integrated_llada_7l_step121000/best.pt"
+    )
+    assert provenance["checkpoint_manifest"] is None
+    assert "checkpoint_sha256" not in provenance
 
 
 def test_formal_step121000_three_ppi_jobs_are_uncapped_and_protocol_locked() -> None:

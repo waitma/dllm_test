@@ -14,8 +14,8 @@ from __future__ import annotations
 
 from collections import Counter
 
-from dllm.pipelines.qwen3_vl_arch.data.grammar import GrammarRenderer, GrammarTokenizer
-from dllm.pipelines.qwen3_vl_arch.data.records import BioSeqChain, BioSeqRecord
+from dllm.pipelines.immune_llada.data.grammar import GrammarRenderer, GrammarTokenizer
+from dllm.pipelines.immune_llada.data.records import BioSeqChain, BioSeqRecord
 
 TOK = GrammarTokenizer()
 RENDER = GrammarRenderer(TOK)

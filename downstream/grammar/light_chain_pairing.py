@@ -1,42 +1,46 @@
 """Light-chain pairing eval adapter for grammar BioSeq / LLaDA-fusion models.
 
 Generate + evaluate (ImmunoMatch, diversity, ANARCI chain/V/J metrics):
-  conda activate protenix_abtcr
+  conda activate pllm
   python -m downstream.grammar.light_chain_pairing \\
     --csv-path /vepfs-mlp2/c20250601/251105016/project/dllm_test/data/downstream/comp_chain/test_data_oas_holdout.csv \\
-    --checkpoint-path /vepfs-mlp2/c20250601/251105016/project/dllm_test/output/grammar_v1_esmc300m/latest.pt \\
-    --output-csv /vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/grammar_v1_esmc300m_light_pairing.csv \\
+    --checkpoint-path /vepfs-mlp2/c20250601/251105016/project/dllm_test/output/protein_esmc_llada270m_diffusion_immune/checkpoint-42000 \\
+    --output-csv /vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/pairing_reflen_v3.csv \\
     --device cuda --num-seqs 8 --light-prompt-tokens 3
 
 Target-length discipline (``--light-length-mode``)
 --------------------------------------------------
-The grammar-v2 record renders a chain as exactly ``len(sequence)`` residue slots
-and there is no in-block terminator the model could emit, so the number of masked
-slots *is* the generated length.  Building the record from the reference light
-chain therefore leaks the target length.
+The grammar record preallocates light residue slots and fixes a trailing
+``<protd>``. The parser may truncate earlier if a generated slot emits another
+``<protd>``; this adapter does not implement unconstrained length generation.
 
-``reference``
-    Legacy behaviour: allocate ``len(reference_light)`` slots.  **Leaks the
-    target length** -> generated light is a near-reconstruction of the reference
-    (measured: 100% length match, ~0.95 identity).  Kept only for reproducing
-    older diagnostics; never use it for a pairing capability claim.
+``reference`` (default; user-approved 2026-09-13)
+    Known-reference-length conditional generation: allocate len(reference_light)
+    slots, retain only the declared prompt, and replace the remaining reference
+    residues with placeholders before collation. Both streams initially mask
+    the generated region, then share only committed generated residues each step.
+    Disclose the length condition when comparing with an
+    Ophiuchus native-EOS baseline. See docs/AB_BASELINE_EVALUATION_AUDIT.md section 9.
 
-``prior`` (default)
+``prior`` (optional diagnostic)
     Draw the light-chain length from a reference-independent prior histogram
     built from the OAS *training* split
     (``data/downstream/comp_chain/oas_train_light_length_prior.json``).  This is
     the grammar-side analogue of the official AirGen protocol
     (``AirGen-Dev/downstream/comp_chain/generate_light_from_csv.py``), which
     allocates a fixed 128-token light buffer, masks everything after the prompt
-    and lets the model emit its own ``<eos>``.  Our model has no terminator, so
-    the length comes from the marginal prior instead of from this row's
-    reference.
+    and lets the model emit its own ``<eos>``. Here the allocated slot budget
+    comes from the marginal prior instead of from this row's
+    reference. This is a different length condition, not an exact reproduction
+    of native EOS generation.
 """
 
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
+import math
 import random
 import sys
 from pathlib import Path
@@ -59,7 +63,11 @@ LENGTH_PRIOR_FILLER = "A"
 # stale `.progress.pt` from the previous protocol can never be resumed into a new run.
 # v2 = light_length_mode + the ESMC encoder-stream leak fix (encoder now mirrors the
 # whole generation mask instead of the shrinking corruption mask).
-GENERATION_PROTOCOL_VERSION = 2
+# v3 = committed-state sampler fix + explicit reference-length protocol.
+# v4 = prompt0/prompt3 + explicit residue-condition CFG (structure preserved).
+# v5 = feed committed generated residues back into ESMC with vocabulary remapping;
+# pending positions stay masked in both streams, never restored from the reference.
+GENERATION_PROTOCOL_VERSION = 5
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
@@ -91,6 +99,8 @@ class HeavyLightCsvDataset(Dataset):
         frame = frame[~frame[heavy_col].isna()].copy()
         frame["_input_row_idx"] = frame.index
         frame = frame.iloc[start_index:end_index].copy()
+        if light_col not in frame:
+            raise ValueError(f"Pairing evaluation requires reference column {light_col!r}")
         self.heavy_col = heavy_col
         self.light_col = light_col
         self.heavy = frame[heavy_col].astype(str).str.replace("-", "").tolist()
@@ -186,10 +196,14 @@ def _generation_signature(args, dataset_len: int) -> dict[str, Any]:
         "max_iter": int(args.max_iter),
         "sampling_strategy": args.sampling_strategy,
         "temperature": float(args.temperature),
+        "cfg_scale": float(args.cfg_scale),
+        "cfg_condition": "observed_residues_both_streams_structure_preserved",
+        "encoder_state": "committed_generated_residues_pending_mask_no_reference_targets",
         "light_prompt_tokens": int(args.light_prompt_tokens),
         "light_length_mode": str(args.light_length_mode),
         "protocol_version": int(GENERATION_PROTOCOL_VERSION),
         "seed": args.seed,
+        "implementation_sha256": _protocol_source_hashes(),
     }
 
 
@@ -265,9 +279,14 @@ def generate_for_batch(
     light_prompt_tokens: int,
     light_length_mode: str,
     length_prior: LightLengthPrior | None,
+    cfg_scale: float = 0.0,
 ) -> list[dict]:
     records = []
     metadata_rows: list[tuple[str, str, int, dict, int]] = []
+    if not math.isfinite(cfg_scale) or cfg_scale < 0:
+        raise ValueError("cfg_scale must be finite and nonnegative")
+    if light_prompt_tokens < 0:
+        raise ValueError("light_prompt_tokens must be nonnegative")
 
     if light_length_mode == "prior":
         if length_prior is None:
@@ -279,12 +298,15 @@ def generate_for_batch(
     cursor = 0
     for heavy, light, metadata in samples:
         for variant_idx in range(num_seqs):
+            if len(light) <= max(int(light_prompt_tokens), 0):
+                raise ValueError("Reference light must contain residues beyond the declared prompt")
             if drawn is not None:
                 target_length = int(drawn[cursor])
-                slot_light = build_placeholder_light(light, target_length, light_prompt_tokens)
             else:
                 target_length = len(light)
-                slot_light = light
+            # Never render the hidden reference suffix, even in reference-length
+            # mode. The clean answer is kept only in the scoring metadata.
+            slot_light = build_placeholder_light(light, target_length, light_prompt_tokens)
             cursor += 1
             records.append(antibody_pair_record(heavy, slot_light))
             metadata_rows.append((heavy, light, variant_idx, metadata, target_length))
@@ -303,6 +325,7 @@ def generate_for_batch(
         max_iter=max_iter,
         sampling_strategy=sampling_strategy,
         temperature=temperature,
+        cfg_scale=cfg_scale,
     )
 
     rows: list[dict] = []
@@ -323,6 +346,11 @@ def generate_for_batch(
             "light_length_mode": light_length_mode,
             "target_light_length": int(target_length),
             "ref_light_length": len(light),
+            "generated_light_length": len(generated_light),
+            "generation_protocol_version": GENERATION_PROTOCOL_VERSION,
+            "light_prompt_tokens": int(light_prompt_tokens),
+            "cfg_scale": float(cfg_scale),
+            "length_condition": "reference" if light_length_mode == "reference" else "train_prior",
         }
         for key, value in metadata.items():
             if key not in result:
@@ -347,7 +375,56 @@ def run_comp_chain_eval(generated_csv: Path, num_seqs: int) -> dict:
     )
 
 
+def _file_sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for block in iter(lambda: handle.read(8 * 1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def _protocol_source_hashes() -> dict[str, str]:
+    source_paths = [
+        Path(__file__),
+        PROJECT_ROOT / "dllm/pipelines/qwen3_vl_arch/sampling_bioseq.py",
+        PROJECT_ROOT / "dllm/pipelines/qwen3_vl_arch/modeling_bioseq.py",
+        PROJECT_ROOT / "dllm/pipelines/llada/models/modeling_llada.py",
+        PROJECT_ROOT / "dllm/pipelines/immune_llada/data/grammar.py",
+        PROJECT_ROOT / "examples/llada/protein_fusion_model.py",
+        PROJECT_ROOT / "examples/llada/load_fusion_checkpoint.py",
+        PROJECT_ROOT / "downstream/grammar/masks.py",
+        PROJECT_ROOT / "downstream/grammar/common.py",
+    ]
+    return {str(path): _file_sha256(path) for path in source_paths}
+
+
+def _write_run_manifest(args, saved_path: Path, signature: dict[str, Any]) -> None:
+    """Record exact weights/data and active source content, including dirty edits."""
+    checkpoint = Path(args.checkpoint_path) if args.checkpoint_path else None
+    weights = checkpoint / "model.safetensors" if checkpoint and checkpoint.is_dir() else checkpoint
+    payload = {
+        **signature,
+        "protocol_id": f"ab_pairing_{args.light_length_mode}_length_prompt{args.light_prompt_tokens}_cfg{args.cfg_scale:g}_v{GENERATION_PROTOCOL_VERSION}",
+        "length_condition": "reference" if args.light_length_mode == "reference" else "train_prior",
+        "sampler_state": "committed_tokens_only_v1",
+        "cfg_scale": float(args.cfg_scale),
+        "cfg_formula": "cond + scale * (cond - uncond)",
+        "cfg_condition": "observed_residues_both_streams_structure_preserved",
+        "checkpoint_sha256": _file_sha256(weights) if weights else None,
+        "input_csv_sha256": _file_sha256(Path(args.csv_path)),
+        "source_sha256": signature["implementation_sha256"],
+        "torch_version": torch.__version__,
+        "known_deviations": ["known reference length; not native-EOS protocol"]
+        if args.light_length_mode == "reference" else ["length sampled from training prior"],
+    }
+    manifest_path = saved_path.with_name(saved_path.stem + "_manifest.json")
+    manifest_path.parent.mkdir(parents=True, exist_ok=True)
+    manifest_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+
 def run_generation(args) -> Path:
+    if not math.isfinite(args.cfg_scale) or args.cfg_scale < 0 or args.light_prompt_tokens < 0:
+        raise ValueError("CFG must be finite and nonnegative; prompt length must be nonnegative")
     if args.device == "auto":
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     else:
@@ -368,8 +445,8 @@ def run_generation(args) -> Path:
         )
     else:
         print(
-            "WARNING: --light-length-mode=reference allocates len(reference_light) slots and "
-            "therefore LEAKS the target length. Diagnostic only; not a pairing capability claim.",
+            "Known-reference-length pairing: target length is an explicit condition; "
+            "only the declared light prompt is visible. Not a native-EOS comparison.",
             flush=True,
         )
 
@@ -393,6 +470,10 @@ def run_generation(args) -> Path:
     saved_path = generation_csv_path(output_path, args.num_seqs)
     progress_path = _progress_path(saved_path)
     signature = _generation_signature(args, len(dataset))
+    if saved_path.exists() and not progress_path.exists():
+        raise FileExistsError(f"Refusing to overwrite a completed generation CSV: {saved_path}")
+    if not len(dataset):
+        raise ValueError("No heavy/light samples selected for generation")
     resume_index = 0
     all_rows: list[dict] = []
     if progress_path.is_file():
@@ -407,6 +488,8 @@ def run_generation(args) -> Path:
             f"from {progress_path}",
             flush=True,
         )
+
+    _write_run_manifest(args, saved_path, signature)
 
     for start_idx in tqdm(
         range(resume_index, len(dataset), heavy_batch_size),
@@ -429,6 +512,7 @@ def run_generation(args) -> Path:
             light_prompt_tokens=args.light_prompt_tokens,
             light_length_mode=args.light_length_mode,
             length_prior=length_prior,
+            cfg_scale=args.cfg_scale,
         ))
         next_index = min(start_idx + heavy_batch_size, len(dataset))
         _save_progress(
@@ -480,19 +564,20 @@ def main() -> None:
     parser.add_argument("--start-index", type=int, default=0)
     parser.add_argument("--max-samples", type=int, default=None)
     parser.add_argument("--num-seqs", type=int, default=8)
-    parser.add_argument("--max-iter", type=int, default=32)
+    parser.add_argument("--max-iter", type=int, default=124)
     parser.add_argument("--sampling-strategy", type=str, default="gumbel_argmax")
     parser.add_argument("--temperature", type=float, default=1.0)
+    parser.add_argument("--cfg-scale", type=float, default=0.0,
+                        help="cond + s*(cond-uncond); uncond masks observed residues in both streams, preserving grammar")
     parser.add_argument("--light-prompt-tokens", type=int, default=3)
     parser.add_argument(
         "--light-length-mode",
         type=str,
-        default="prior",
+        default="reference",
         choices=("prior", "reference"),
         help=(
-            "prior: draw the light length from the OAS-train histogram (no target-length "
-            "leakage, default). reference: allocate len(reference_light) slots (LEAKS length; "
-            "diagnostic only)."
+            "reference (default): known-length conditional generation; disclose reference "
+            "length as input. prior: optional training-length-prior diagnostic."
         ),
     )
     parser.add_argument("--length-prior-json", type=str, default=str(DEFAULT_LENGTH_PRIOR_JSON))

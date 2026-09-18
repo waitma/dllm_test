@@ -28,6 +28,9 @@ BLOCKLIST_NAMES = (
 )
 DISABLED_BLOCKLIST_SENTINELS = frozenset({"none", "off", "disabled", "-"})
 
+#: ``drop_nonbinding_sources`` accepts this to mean "every processed source".
+ALL_SOURCES_SENTINEL = "all"
+
 
 @dataclass(frozen=True)
 class RecordFilter:
@@ -93,19 +96,43 @@ def _project_cores(keys: set[str]) -> set[str]:
     return {key.split("|", 1)[0] for key in keys if "|" in key and key.split("|", 1)[0]} | {key for key in keys if "|" not in key}
 
 
+def _is_nonbinding(record: BioSeqRecord) -> bool:
+    """True only for an explicitly negative recognition label.
+
+    ``unknown`` is not negative: ``tcr_repertoire`` labels all 2.1M of its rows
+    that way and they are unlabeled pretraining pairs, not measured non-binders.
+    """
+    relation = record.labels.get("relation") or record.metadata.get("relation")
+    return str(relation or "").strip().lower().replace(" ", "_").replace("-", "_") == "nonbinding"
+
+
 def build_filters(
     source: str,
     mix: Sequence[str],
     blocklists: Mapping[str, set[str]],
     max_protein_length: int,
     max_length: int,
+    drop_nonbinding_sources: Sequence[str] = (),
 ) -> list[RecordFilter]:
-    """Build legacy decontamination/budgets plus approved offline quality checks."""
+    """Build legacy decontamination/budgets plus approved offline quality checks.
+
+    ``drop_nonbinding_sources`` names the sources whose measured non-binders are
+    dropped (``"all"`` for every source), producing a binding-only corpus for the
+    conditional-generation objective. It is empty by default: the relation token
+    is a *supervised loss target* when a row carries a real label
+    (``relation_target_mask`` in ``examples/llada/protein_fusion_model.py``), not
+    a fixed prefix, so removing negatives removes the only signal that teaches
+    ``<nonbinding>`` and disables the discriminative relation-token protocol in
+    ``downstream/benchmark/tcr_binding/run_relation_token.py``. Enabling this is
+    therefore a versioned corpus decision, and the constructed filter name is
+    recorded in the manifest.
+    """
     missing = [name for name in BLOCKLIST_NAMES if name not in blocklists]
     if missing:
         raise KeyError(f"Missing blocklist keys: {missing}")
     source = str(source).strip()
     mix_set = set(mix)
+    drop_nonbinding = {str(name).strip().lower() for name in drop_nonbinding_sources}
     filters: list[RecordFilter] = []
 
     def add(filter_: RecordFilter | None) -> None:
@@ -152,6 +179,8 @@ def build_filters(
     # thousands of epitopes), hence dropped rather than repaired.
     if source in {"trait", "tcr_native", "tcr_papers"}:
         add(RecordFilter("quality.blank_epitope", _has_blank_epitope))
+    if drop_nonbinding & {source, ALL_SOURCES_SENTINEL}:
+        add(RecordFilter("recipe.binding_only", _is_nonbinding))
     return filters
 
 
@@ -193,6 +222,7 @@ def union_filter_names(per_source: Iterable[Sequence[str]]) -> list[str]:
 
 
 __all__ = [
+    "ALL_SOURCES_SENTINEL",
     "BLOCKLIST_NAMES", "DISABLED_BLOCKLIST_SENTINELS", "RecordFilter",
     "build_filters", "constructed_filter_names", "filter_reason", "load_blocklists",
     "union_filter_names",

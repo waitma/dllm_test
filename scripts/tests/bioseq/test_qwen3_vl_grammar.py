@@ -14,7 +14,7 @@ import pytest
 import torch
 import torch.nn as nn
 
-from dllm.pipelines.qwen3_vl_arch.data import (
+from dllm.pipelines.immune_llada.data import (
     BioSeqChain,
     BioSeqRecord,
     Esm2SequenceTokenizer,
@@ -22,7 +22,7 @@ from dllm.pipelines.qwen3_vl_arch.data import (
     GrammarRenderer,
     GrammarTokenizer,
 )
-from dllm.pipelines.qwen3_vl_arch.data.esm_encoding import HuggingFaceEsmTokenizerAdapter
+from dllm.pipelines.immune_llada.data.esm_encoding import HuggingFaceEsmTokenizerAdapter
 from dllm.pipelines.qwen3_vl_arch.modeling_bioseq import (
     BioSeqDiffusionTransformerConfig,
     BioSeqEncoderDiffusionModel,
@@ -36,6 +36,12 @@ def rendered_tokens(record: BioSeqRecord, *, rng: random.Random | None = None) -
     tokenizer = GrammarTokenizer(Esm2SequenceTokenizer())
     row = GrammarRenderer(tokenizer, rng=rng).encode(record)
     return tokenizer.decode_tokens(row["input_ids"]), row
+
+
+# Unconditional records open with a fixed, residue-free no-context block so their
+# layout matches conditioned ones slot-for-slot. All four tokens are fixed
+# context: attention only, no diffusion loss, no corruption.
+_NULL_PREFIX = ["<prots>", "<null>", "<protd>", "<unknown>"]
 
 
 def test_grammar_renders_oas_and_ots_in_canonical_chain_order() -> None:
@@ -59,7 +65,7 @@ def test_grammar_renders_oas_and_ots_in_canonical_chain_order() -> None:
     antibody_tokens, antibody_row = rendered_tokens(antibody)
     tcr_tokens, _ = rendered_tokens(tcr)
 
-    assert antibody_tokens == [
+    assert antibody_tokens == _NULL_PREFIX + [
         "<prots>",
         "<ab>",
         "H",
@@ -71,20 +77,22 @@ def test_grammar_renders_oas_and_ots_in_canonical_chain_order() -> None:
         "L",
         "<protd>",
     ]
-    assert antibody_row["fixed_context_mask"][1] == 0
-    assert antibody_row["fixed_context_mask"][0] == 0
-    assert all(not value for value in antibody_row["fixed_context_mask"])
+    # The no-context prefix is fixed; everything the model must generate is not.
+    assert antibody_row["fixed_context_mask"][: len(_NULL_PREFIX)] == [1, 1, 1, 1]
+    assert all(not value for value in antibody_row["fixed_context_mask"][len(_NULL_PREFIX) :])
 
-    assert tcr_tokens == [
+    # The receptor block encodes beta before alpha (heavy-analog first), matching
+    # the antibody heavy-before-light layout.
+    assert tcr_tokens == _NULL_PREFIX + [
         "<prots>",
         "<tcr>",
-        "A",
-        "A",
-        "A",
+        "B",
+        "B",
+        "B",
         ".",
-        "B",
-        "B",
-        "B",
+        "A",
+        "A",
+        "A",
         "<protd>",
     ]
 
@@ -98,10 +106,9 @@ def test_nanobody_uses_nb_marker_inside_prots() -> None:
 
     tokens, row = rendered_tokens(nanobody)
 
-    assert tokens == ["<prots>", "<nb>", "V", "H", "H", "V", "H", "H", "<protd>"]
-    assert row["fixed_context_mask"][1] == 0
-    assert row["fixed_context_mask"][0] == 0
-    assert all(not value for value in row["fixed_context_mask"])
+    assert tokens == _NULL_PREFIX + ["<prots>", "<nb>", "V", "H", "H", "V", "H", "H", "<protd>"]
+    assert row["fixed_context_mask"][: len(_NULL_PREFIX)] == [1, 1, 1, 1]
+    assert all(not value for value in row["fixed_context_mask"][len(_NULL_PREFIX) :])
 
 
 def test_antibody_pair_keeps_both_chains_in_one_prots_block() -> None:
@@ -116,7 +123,7 @@ def test_antibody_pair_keeps_both_chains_in_one_prots_block() -> None:
 
     tokens, _ = rendered_tokens(record)
 
-    assert tokens == [
+    assert tokens == _NULL_PREFIX + [
         "<prots>",
         "<ab>",
         "A",
@@ -163,13 +170,13 @@ def test_grammar_renders_tcr_peptide_and_ppi() -> None:
         "<binding>",
         "<prots>",
         "<tcr>",
-        "A",
-        "A",
-        "A",
+        "B",
+        "B",
+        "B",
         ".",
-        "B",
-        "B",
-        "B",
+        "A",
+        "A",
+        "A",
         "<protd>",
     ]
     assert all(tcr_row["fixed_context_mask"][:7])
@@ -195,6 +202,23 @@ def test_grammar_renders_tcr_peptide_and_ppi() -> None:
     assert ppi_row["grammar_name"] == "ppi_conditional"
     assert all(ppi_row["fixed_context_mask"][:7])
     assert not any(ppi_row["fixed_context_mask"][7:])
+
+
+def test_catalysis_renders_target_fixed_actor_generated() -> None:
+    record = BioSeqRecord(
+        chains=[
+            BioSeqChain("TARGETSEQ", "protein_a"),
+            BioSeqChain("ACTORSEQ", "protein_b"),
+        ],
+        task_type="ppi",
+        source="unit",
+        split="train",
+        labels={"relation": "catalysis"},
+    )
+    tokens, row = rendered_tokens(record)
+    assert tokens[:4] == ["<prots>", "T", "A", "R"]
+    assert "<catalysis>" in tokens
+    assert tokens.index("<catalysis>") < tokens.index("A", tokens.index("<catalysis>"))
 
 
 def test_antigen_antibody_fixes_antigen_and_binding() -> None:
@@ -278,12 +302,12 @@ def test_tcr_pmhc_layout_and_fixed_masks() -> None:
         "<tcr>",
         "C",
         "A",
-        "V",
+        "S",
+        "S",
         ".",
         "C",
         "A",
-        "S",
-        "S",
+        "V",
         "<protd>",
     ]
     # MHC block + first binding + peptide block + second binding are fixed.
@@ -583,7 +607,7 @@ def test_diffusion_respects_fixed_context() -> None:
 
 
 def test_record_within_max_protein_length() -> None:
-    from dllm.pipelines.qwen3_vl_arch.data.records import record_within_max_protein_length
+    from dllm.pipelines.immune_llada.data.records import record_within_max_protein_length
 
     ok = BioSeqRecord(
         chains=[BioSeqChain("A" * 1024, "protein_a"), BioSeqChain("B" * 10, "protein_b")],
@@ -598,32 +622,6 @@ def test_record_within_max_protein_length() -> None:
     assert record_within_max_protein_length(ok, 1024)
     assert not record_within_max_protein_length(long, 1024)
 
-
-def test_task_homogeneous_batch_skips_long_chains_and_keeps_batch_size() -> None:
-    from dllm.pipelines.qwen3_vl_arch.data.mixture import TaskHomogeneousBatchDataset
-
-    long = BioSeqRecord(
-        chains=[BioSeqChain("A" * 1025, "protein_a"), BioSeqChain("B" * 10, "protein_b")],
-        task_type="ppi",
-        source="unit",
-    )
-    ok = BioSeqRecord(
-        chains=[BioSeqChain("A" * 10, "protein_a"), BioSeqChain("B" * 10, "protein_b")],
-        task_type="ppi",
-        source="unit",
-    )
-
-    def stream():
-        for _ in range(12):
-            yield long
-            yield ok
-
-    batches = list(TaskHomogeneousBatchDataset(stream(), batch_size=2, max_protein_length=1024))
-    assert batches
-    assert all(len(batch) == 2 for batch in batches)
-    for batch in batches:
-        for record in batch:
-            assert all(len(chain.sequence) <= 1024 for chain in record.chains)
 
 
 def test_grammar_renderer_rejects_long_ppi_without_loader_filter() -> None:
@@ -650,7 +648,7 @@ def _shuffle_probe_records(count: int) -> list[BioSeqRecord]:
 
 
 def test_streaming_shuffle_is_count_preserving_and_reproducible() -> None:
-    from dllm.pipelines.qwen3_vl_arch.data.grammar import _streaming_shuffle
+    from dllm.pipelines.immune_llada.data.grammar import _streaming_shuffle
 
     records = _shuffle_probe_records(200)
     original = [record.sequences[0] for record in records]
@@ -673,7 +671,7 @@ def test_streaming_shuffle_is_count_preserving_and_reproducible() -> None:
 
 
 def test_streaming_shuffle_window_of_one_is_identity() -> None:
-    from dllm.pipelines.qwen3_vl_arch.data.grammar import _streaming_shuffle
+    from dllm.pipelines.immune_llada.data.grammar import _streaming_shuffle
 
     records = _shuffle_probe_records(50)
     passthrough = list(_streaming_shuffle(iter(records), 1, random.Random(0)))
@@ -685,7 +683,7 @@ def test_streaming_shuffle_window_of_one_is_identity() -> None:
 def test_grammar_arrow_source_shuffle_pass_seed_differs_per_pass() -> None:
     """Two passes over the same shard should reshuffle (no repeated order)."""
 
-    from dllm.pipelines.qwen3_vl_arch.data.grammar import (
+    from dllm.pipelines.immune_llada.data.grammar import (
         GrammarArrowSource,
         GrammarArrowSourceConfig,
     )

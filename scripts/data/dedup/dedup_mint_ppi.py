@@ -43,7 +43,7 @@ MINT_DIR = DATA / "ppi_task_raw/processed/mint_string_pretrain_v1"
 
 
 def _load_records_mod():
-    path = PROJECT_ROOT / "dllm/pipelines/qwen3_vl_arch/data/records.py"
+    path = PROJECT_ROOT / "dllm/pipelines/immune_llada/data/records.py"
     name = "_dedup_records_mint"
     spec = importlib.util.spec_from_file_location(name, path)
     assert spec and spec.loader

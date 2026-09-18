@@ -5,7 +5,7 @@
 > 为 `dllm_test` 的扩散式免疫受体基础模型 (BioSeq) 搭建统一、可复现、防数据泄露的下游评测，
 > baseline 按论文值、官方 artifact、官方代码重跑和本地重实现分层记录。
 >
-> **Agent 阅读顺序（唯一）**：[`PROJGUIDE.md`](PROJGUIDE.md)（怎么做）→ [`../tasks/<TASK>.md`](../tasks/)（做什么、怎么填）→ [`RESULTS.md`](RESULTS.md) §0（数字）。
+> **Agent 阅读顺序（唯一）**：[PROJGUIDE](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/PROJGUIDE.md)（怎么做）→ [任务手册](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/README.md)（做什么、怎么填）→ [RESULTS](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/RESULTS.md)（数字；上半部分 AB，下半部分 TCR，保留 §0.x 编号）。旧过程/旧协议结果已移至 [整理前全文归档](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/RESULTS_ARCHIVE_20260915.md)，不作为当前排行榜。
 >
 > **现役 v3 diffusion 评哪个 ckpt / 怎么提交**：见 [`examples/llada/README.md`](../../examples/llada/README.md)「下游评测（v3 diffusion）」。
 
@@ -19,7 +19,12 @@
 |---|---|
 | TCR | T1 Binding · T2 Clustering · T3 Representation · T4 Generation |
 | AB | CDR infilling（SAbDab Kong / SAb23H2）· Light-chain pairing |
-| AB（有 harness、无本地数据或按计划排除） | Humanization · Developability (GDPa1) · Specificity (CoV/Flu/HD) · Binding affinity (m396) |
+| AB（新授权的附加测评，不自动进 headline） | Ours 原生 GDPa1 / Specificity / m396，见 [原生探针任务](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/AB_NATIVE_PROBES.md)；历史 Ophiuchus baseline 结果保持独立 |
+| AB（本轮仍排除） | Humanization |
+
+2026-09-13：baseline 纠错与新授权 Ours 测评的区别见 [AB 测评指南 §10](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/AB_BASELINE_EVALUATION_AUDIT.md)。本轮新增原生适配及分组作业方案，不自动改变 headline；尚未提交的方案不能写成完成成绩。
+
+2026-09-13 本轮 TCR 执行范围：用户指定 v5 49000 的 T1 四输入轨、T2 A/B、T3 已构建的本地 deep/broad，以及 T4 Setting B 的 benchmark14/held20 β-only 生成。新配对 αβ 生成、IMMREP23 双链评测推迟到后续，不随本轮提交；旧 full/unconditional 模式不冒充条件双链任务。决策与执行边界见 [审计 §9.21](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/TCR_BASELINE_EVALUATION_AUDIT.md)。
 
 **已冻结，不在范围内**
 
@@ -111,7 +116,7 @@ $ENV/bin/python tcr_binding/run.py --method embed --embedder bioseq:/abs/path/fi
 |---|------|----------|------|--------|
 | T1 | TCR Binding | Nature Methods 2025 original CDR3β/AS `[P]` | 二分类 | seen/unseen overall AUPRC（辅 AUROC） |
 | T2 | TCR Clustering | NAR-GAB Retention/Purity `[P]` + TCREmbedding `[L]` | 无监督聚类 | Retention / Purity；本地 ARI/NMI |
-| T3 | TCR Representation | SCEPTR Table SI `[P]` + compatible local audit `[L]` | few-shot NN + linear probe | per-pMHC AUROC |
+| T3 | TCR Representation | SCEPTR Table SI `[P]` + mismatched local control `[L]`（见任务 §7.2） | few-shot NN + linear probe | per-pMHC AUROC |
 | T4 | **TCR Generation** | TCRT5 sparse-13 official artifact `[A]`; 14-pMHC 仅 control | 采样 / 表位条件设计 | F1 / edit distance / sequence recovery / BLEU |
 | AB | 抗体生成 | Ophiuchus-Ab CDR Table 1/2 `[P]` + Table 3 pairing `[P]` | 生成 | CDR=AAR；pairing=ImmunoMatch |
 
@@ -136,10 +141,16 @@ $ENV/bin/python tcr_binding/run.py --method embed --embedder bioseq:/abs/path/fi
 |---|---|---|---|---|---|---|
 | **T1** Binding | Nature Methods 2025 · [10.1038/s41592-025-02910-0](https://doi.org/10.1038/s41592-025-02910-0) · repo `SuoLab-GZLab/TCREpitopeBenchmark`@`ec832b47` | figshare `original.zip`（seen 3 表位 / unseen 40，neg=AS）；retrained 协议用 `retrain.zip` 五个 AS fold | ① original-only（现成官方 ckpt，零训练）② retrained 五折（冻骨干 + 每 fold MLP）。**禁止混排** | overall AUPRC，**估计量 = R `precrec::evalmod`**（非 sklearn AP，后者单侧偏高 +0.001/+0.002） | 13×`[R]` + SETE/TEPCAM `[P]` + kNN/Random `[C]`；58 行 `[P]` 出自 Supplementary Table 4-1/4-2 | ⚠️ **有条件**：original unseen 须附 `TTAATHREK` 污染注；retrained unseen 可引用；retrained seen 仅作同口径相对比较 |
 | **T2** Clustering | NAR Genom Bioinform 2025 · [10.1093/nargab/lqaf150](https://doi.org/10.1093/nargab/lqaf150) · repo `i3-unit/TCR_Unsupervised_Benchmark`@`ac767882` | curated pooled DB（IEDB+McPAS+VDJdb），本地 curation **已精确复现论文四常量**（4,779 配对 / 8,395 序列 / 4,103 α / 4,292 β）；HD/LD 本地重建 | 表位标签只用于评测，不参与聚类 | Retention / Purity（Th=1，簇大小 > 1）；本地辅报 ARI/NMI | 36 行 `[P]` 出自 Figure 3A（9 方法 × 4 指标）；本地为 `[L]` | ⚠️ **`[P]` 为主表**：本地校准 **9/9** 落在 \|Δ\|≤0.03（最大 \|Δ\| 0.005）；HD/LD 存在 Fig 3A 与补充表 S2 矛盾（已披露）；(b) 区为塌缩标签口径（purity 低估 ≤0.0023，已量化）；**(c) 区嵌入曲线仍在旧 5,368 universe 上，待重跑，不可引用** |
-| **T3** Representation | SCEPTR · [arXiv:2406.06397](https://arxiv.org/abs/2406.06397) | 六个 pMHC，k=200 | few-shot per-epitope NN AUROC 为**主**任务；24-way linear probe 仅辅报 | per-pMHC AUROC | 36 行 `[P]` 出自 Table SI；本地重建 `[L]` | ⚠️ **须按输入字段分层**：SCEPTR / TCRdist 额外使用 V(/J) 基因，我方与其他 PLM 只有 CDR3β+CDR3α；本地跑数对论文值有系统性负偏（已披露） |
+| **T3** Representation | SCEPTR · Cell Systems 2025 · [DOI](https://doi.org/10.1016/j.cels.2024.12.006)；旧登记来自 arXiv v2 | 六个 pMHC，k=200；本地数据未对齐 | few-shot NN 为主；本地 24-way probe 仅辅报 | per-pMHC AUROC | 36 行历史 `[P]` 出自 Table SI；本地控制 `[L]` | ⚠️ 原论文复核已确认本地协议失配；输入/权重/数据/统计的权威说明见 [T3 §7.2](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/TCR_T3_REPRESENTATION.md)。旧 compatible 判定撤回，不改论文原值。 |
 | **T4** Generation | TCRT5 · [10.1038/s42256-025-01096-6](https://doi.org/10.1038/s42256-025-01096-6) | 官方 `benchmark_data_w_preds.csv`；主榜 = sparse-13 | 表位条件设计。`RVRAYTYSK/HLA-A*03:01` 是论文 simulation 保留项，已剔除；held20 是**验证**集非测试集 | F1 / edit distance / sequence recovery / Char-BLEU | sparse-13 `[A]`（官方 artifact 重评分）+ 84 行 `[P]`（Supplementary Table 2，**另一套协议，不可与 sparse-13 合表**） | ⚠️ **跨模型只能用 `bioseq_unseen_common`（固定 6 个 pMHC）**；`bioseq_unseen` 成员随 run 变化不可比；Char-BLEU 的 greedy/sampled 口径跨模型不一致；Setting A 的 `ours_bioseq` 存在出处缺陷（已记录） |
 | **AB** CDR infilling | Ophiuchus-Ab · [10.64898/2026.02.02.703197](https://doi.org/10.64898/2026.02.02.703197) | Table 1 = SAb23H2（`IgGM_Test_set`，n=60）；Table 2 = SAbDab Kong 划分（n=3,127，十折） | 六个 CDR 分别掩码回填 | AAR（%），**固定 `iter=1`**（此前"1/2/4/8 各取最优"等于测试集调参，已撤回） | 86 行 `[P]`（Table 1 + Table 2）+ 官方 ckpt `[R]` | 🚨 **Ours 行只能作上界**：抗体侧去污染被禁用，实测 SAbDab Kong 折 **54.4%** 测试抗体的 CDR-H3 原样在训练语料中（胚系背景对照 0.83%）。SAb23H2 污染面 25%，较可引用 |
-| **AB** Light pairing | Ophiuchus-Ab · [10.64898/2026.02.02.703197](https://doi.org/10.64898/2026.02.02.703197) | OAS holdout500，每条重链生成 8 条轻链 | Table 3 有**两种条件化设定**（仅重链 / 重链+轻链前 3 残基），方向相反，必须先声明属于哪一种 | ImmunoMatch（主）+ 9 项辅助 | 60 行 `[P]`（Table 3）+ 官方 ckpt `[R]`（Ophiuchus-Ab / p-IgGen / LICHEN） | ✅ 已复现：LICHEN 九项均在 0.015 内，p-IgGen 除 ImmunoMatch/Better 外在 0.023 内。`W_property` 本地未实现，指标覆盖 9/10。机制已定位：我方仅捕获官方 ~30% 的重链条件化强度 |
+| **AB** Light pairing | Ophiuchus-Ab · [10.64898/2026.02.02.703197](https://doi.org/10.64898/2026.02.02.703197) | OAS holdout500，每条重链生成 8 条轻链 | Table 3 有**两种条件化设定**（仅重链 / 重链+轻链前 3 残基），方向相反，必须先声明属于哪一种 | ImmunoMatch（主）+ 9 项辅助 | 60 行 `[P]`（Table 3）+ 官方 ckpt `[R]`（Ophiuchus-Ab / p-IgGen / LICHEN） | baseline 历史出处层不变；新 Ours reference-length v3 已完成全量，按独立长度条件报告，不与原生 EOS 混称同协议。旧“机制已定位”归因撤回；状态与边界见 [任务 §4.3/§7](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/AB_LIGHT_CHAIN_PAIRING.md)，数字见 RESULTS §0.6。`W_property` 未实现，覆盖 9/10 |
+
+> **2026-09-13 T4补充登记**：β-only / 配对αβ的方法清单、官方来源与尚未关闭的运行门禁见 [T4 §7.5](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/TCR_T4_GENERATION.md)。这是候选研究，不增加已验证的 `[R]` 或配对性能行；旧β投影不能充当配对评测，也不自动满足同条件/同预算可比性。任务范围和既有数值不变。
+
+> **2026-09-14 比较出处更新**：新增 T1 others 的出版社 Supplementary Table 7 `[P]` 转录；其与公开本地行集的差异及历史 checkpoint 比较边界见 [T1 §7.1](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/TCR_T1_BINDING.md)。T3 论文 ESM2 标签和历史/新评分分层见 [T3 §7.3](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/TCR_T3_REPRESENTATION.md)。此次来源补齐不增加新的 baseline `[R]`，不改变冻结任务范围或将 local-control 升为论文同条件 headline。
+
+> **配对数据来源复核**：已有模型的实际生成用途、官方数据与本地版本核对见 [T4 §7.6](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/TCR_T4_GENERATION.md)。来源确认不升级为新运行的exact/compatible判定，不将原生带V/长度/结构条件的成绩冒充无参考受体条件结果。
 
 > **配套产物**：论文值全表 `outputs/external/paper_reported_baselines.csv`（557 行，`in_scope` 列区分范围）；机器可读策略 `outputs/external/baseline_registry.json`；出处审计 `outputs/external/baseline_provenance_audit.json`；逐任务审计报告 [`audit_2026_08_29/`](audit_2026_08_29/)（T1/T2/T3/T4/AB-CDR/AB-pairing 各一份）。
 
@@ -150,7 +161,7 @@ $ENV/bin/python tcr_binding/run.py --method embed --embedder bioseq:/abs/path/fi
 | T2 | 仅用测试表位的 TCR；表位标签只用于打分，不参与聚类 |
 | T3 | 复用 T1 unseen split；冻结主干只训 probe |
 | T4 | 用 OTS holdout；报告与训练集 CDR3 的新颖度/最近邻距离（**参考集有已知缺陷，见 §4.1**） |
-| AB | CDR：SAbDab 用论文口径的 Kong 冻结快照（3,127 条）+ 官方 10 折切分脚本；SAb23H2 用官方 `IgGM_Test_set`。pairing：OAS holdout500，长度走与参考无关的 train 先验 |
+| AB | CDR：SAbDab 用论文口径的 Kong 冻结快照（3,127 条）+ 官方 10 折切分脚本；SAb23H2 用官方 `IgGM_Test_set`。pairing：OAS holdout500；现行 Ours 使用 reference 长度，原生 baseline 保持 EOS 协议，见 [任务 §4.3](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/AB_LIGHT_CHAIN_PAIRING.md) |
 | ⛔ P1 | 已冻结（§0）。原防控：直接用 STRING 90/90 split（两端蛋白互相 <90% 相似） |
 
 ### 4.1 ⚠️ T4 Setting-A 参考集构造缺陷（2026-08-28 发现，未修正打分）
@@ -195,7 +206,7 @@ python downstream/benchmark/scripts/prepare_tcr_generation.py \
 | T1/T2/T3 | `data/tcr/`（VDJdb / McPAS / MIRA / IEDB / PIRD） |
 | T4 | `data/ots_paired_clean/final`、`data/downstream/cdr_infilling/tcr` |
 | AB CDR | `data/downstream/cdr_infilling/sabdab_kong`（Kong 3,127）；SAb23H2 eval harness = `data/downstream/cdr_infilling/sab23h2_converted/`（raw 仍是 `sab23h2/` 的 `IgGM_Test_set`） |
-| AB pairing | `data/downstream/comp_chain/test_data_oas_holdout.csv` + `oas_train_light_length_prior.json` |
+| AB pairing | `/vepfs-mlp2/c20250601/251105016/project/dllm_test/data/downstream/comp_chain/test_data_oas_holdout.csv`；长度条件与可选先验文件的使用见 [任务 §4.3](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/AB_LIGHT_CHAIN_PAIRING.md) |
 | ⛔ P1 | `data/ppi/string_model_org_90_90_split`（已冻结） |
 | ⛔ A1 | `data/nanobody_raw/nbbench/hf_data`（已冻结） |
 

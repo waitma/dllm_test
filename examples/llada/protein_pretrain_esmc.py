@@ -47,6 +47,7 @@ from examples.llada.protein_fusion_model import (
     LLaDAEsmcFusion,
     RemapCollator,
     build_remap_lookup,
+    decoder_mask_token_id as _decoder_mask_token_id,
     expand_llada_tokenizer_for_esmc_grammar,
 )
 
@@ -130,16 +131,25 @@ class TrainingArguments(transformers.TrainingArguments):
     bert_mask_ratio: float = 0.15
     bert_mask_prob: float = 0.8
     bert_random_prob: float = 0.1
-    # BERT objective only: when True, compute MLM loss over every residue in all
-    # chains (including fixed context: MHC/peptide/antigen). When False, restrict
-    # to generated chains (diffusion_eligible_mask). No effect on the diffusion
-    # objective, which is always generated-only.
+    # BERT objective only: when True, compute MLM loss over every *real* residue
+    # in all chains (including fixed context: MHC/peptide/antigen) plus
+    # supervised relation targets (relation_target_mask: trainable
+    # <binding>/<nonbinding> only -- never relation_token_mask, which also
+    # lights up the MHC->peptide presentation <binding> and OAS/OTS <unknown>
+    # prefix). When False, restrict to generated chains
+    # (diffusion_eligible_mask, which already contains those relation targets).
+    # No effect on the diffusion objective.
+    # Synthetic completion placeholders (the literal `X` that v4/v5 receptor
+    # completion writes for missing chains/regions) are excluded either way --
+    # see sample_bioseq_bert_noise, which ANDs in ~synthetic_residue_mask.
     bert_all_chains: bool = True
     # Diffusion objective only: the mirror image of bert_all_chains. When True the
-    # eligible set becomes every residue of every chain, so fixed grammar context
-    # (antigen / MHC / peptide) is corrupted and scored like a generated chain --
-    # i.e. no chain is held fixed. False (the default) keeps the historical
-    # generated-only behaviour so existing diffusion checkpoints stay continuable.
+    # eligible set becomes every *real* residue of every chain, so fixed grammar
+    # context (antigen / MHC / peptide) is corrupted and scored like a generated
+    # chain -- i.e. no chain is held fixed. Synthetic completion placeholders stay
+    # excluded (all_residue_eligible_mask ANDs in ~synthetic_residue_mask).
+    # False (the default) keeps the historical generated-only behaviour so
+    # existing diffusion checkpoints stay continuable.
     diffusion_all_chains: bool = False
     # GIDD hybrid noise + Ophiuchus ratio / focal / reciprocal loss. Defaults
     # keep the original absorbing-mask + unweighted CE so existing diffusion
@@ -211,8 +221,8 @@ class TrainingArguments(transformers.TrainingArguments):
 
 
 class FusionTrainer(transformers.Trainer):
-    # Row counts per eval source, used to recombine per-source losses. Set by the
-    # caller when eval_dataset is a dict.
+    # Source row counts retained for composition reporting; eval_loss gives each
+    # source equal weight regardless of its row count.
     eval_source_rows: dict[str, int] | None = None
 
     def evaluate(
@@ -223,10 +233,9 @@ class FusionTrainer(transformers.Trainer):
         With a dict ``eval_dataset``, ``Trainer.evaluate`` recurses once per key
         and emits only ``eval_<source>_loss`` -- no plain ``eval_loss``, which is
         what ``TopKValLossCheckpointCallback`` and ``metric_for_best_model`` rank
-        by. Rather than paying for a second pass over a blended copy, reconstruct
-        the global figure as the row-weighted mean of the per-source losses (equal
-        to the blended loss up to batch-padding effects) and ``log`` it so it
-        reaches both ``state.log_history`` and wandb.
+        by. Average the per-source losses with equal weight and ``log`` the
+        result so it reaches both ``state.log_history`` and wandb. This is a
+        macro-average across sources; each source's own loss is unchanged.
         """
 
         metrics = super().evaluate(
@@ -239,22 +248,20 @@ class FusionTrainer(transformers.Trainer):
         if (
             not isinstance(resolved, dict)
             or loss_key in metrics
-            or not self.eval_source_rows
+            or not resolved
         ):
             return metrics
 
-        weighted = 0.0
-        covered = 0
-        for name, rows in self.eval_source_rows.items():
+        source_losses = []
+        for name in resolved:
             value = metrics.get(f"{metric_key_prefix}_{name}_loss")
             if value is None:
                 continue
-            weighted += float(value) * rows
-            covered += rows
+            source_losses.append(float(value))
         # Publish only when every source reported: a mean over a shifting subset
         # would rank checkpoints against a moving target.
-        if covered and covered == sum(self.eval_source_rows.values()):
-            metrics[loss_key] = weighted / covered
+        if len(source_losses) == len(resolved):
+            metrics[loss_key] = sum(source_losses) / len(source_losses)
             self.log({loss_key: metrics[loss_key]})
         return metrics
 
@@ -541,16 +548,6 @@ def _resolve_esmc_path(path: str) -> Path:
     if not p.is_absolute():
         p = _ROOT / p
     return p.resolve()
-
-
-def _decoder_mask_token_id(tok: transformers.PreTrainedTokenizer) -> int:
-    mask_id = tok.convert_tokens_to_ids("<|mdm_mask|>")
-    unk = getattr(tok, "unk_token_id", None)
-    if mask_id is None or (unk is not None and int(mask_id) == int(unk)):
-        mask_id = tok.mask_token_id
-    if mask_id is None:
-        raise RuntimeError("LLaDA tokenizer is missing <|mdm_mask|> / mask_token_id")
-    return int(mask_id)
 
 
 def dry_run_check(

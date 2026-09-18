@@ -53,8 +53,9 @@ RESIDUES = "LAGVSERTIDPKQNFYMHWCXBUZO"
 BAD_CHAR = re.compile(f"[^{RESIDUES}]")
 RESIDUE_ONLY = re.compile(f"[{RESIDUES}]+")
 
-# Paths the v3 trainer actually reads (ImmuneSourceSpec + _source_split_path).
-# OAS uses the *_oas_label.csv template, not the unlabeled clustered_*.csv.
+# Paths used to rebuild the prepared v3 dataset from raw sources. The trainer
+# itself reads prepared semantic JSONL; these CSV paths are only for an offline
+# pre-processing preflight.
 _OAS = "data/oas_previous_clean/splits/cleaned_merged_data_step_clustered_{split}_oas_label.csv"
 _STD = {
     "ots": "data/ots_paired_clean/final/{split}.csv",
@@ -62,7 +63,8 @@ _STD = {
     "trait": "downstream/trait/step4_final/{split}.csv",
     "tcr_native": "data/tcr_native/dataset/{split}.csv",
     "tcr_papers_v2": "data/tcr_papers_v2/dataset/{split}.csv",
-    "tcr_repertoire": "data/tcr_repertoire/dataset/{split}.csv",
+    # junc80 build (full IMGT junctions), matching configs/data/immune_v4_beta_relation.yaml.
+    "tcr_repertoire": "data/tcr_repertoire_junc80/dataset/{split}.csv",
 }
 
 

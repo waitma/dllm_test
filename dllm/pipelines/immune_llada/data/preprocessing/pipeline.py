@@ -21,7 +21,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from ..registry import SourceSpec, parse_sources, source_spec, source_split_path
+from ..registry import SOURCE_REGISTRY, SourceSpec, parse_sources, source_spec, source_split_path
 from ..sources import (
     COMPLETION_SOURCES,
     partner_completion_flags,
@@ -30,7 +30,7 @@ from ..sources import (
 )
 
 from ..profiles import add_tcr_region_lengths, empty_tcr_region_lengths, fallback_region_profile, finalize_region_profile, profile_digest, profile_summary
-from .filters import BLOCKLIST_NAMES, build_filters, constructed_filter_names, filter_reason, load_blocklists, union_filter_names
+from .filters import ALL_SOURCES_SENTINEL, BLOCKLIST_NAMES, build_filters, constructed_filter_names, filter_reason, load_blocklists, union_filter_names
 from .reports import add_filter_drop, audit_totals, new_source_stats, totals
 from .validators import SCHEMA_VERSION, add_schema_version, validate_prepared_row
 from .writers import JsonlShardWriter, atomic_json_dump
@@ -62,6 +62,11 @@ class PreprocessConfig:
     #: dataset it produced before; widening it is an explicit, versioned choice
     #: because it changes every affected record's layout.
     completion_sources: tuple[str, ...] = ("tcr_repertoire",)
+    #: Sources whose measured non-binders are dropped (``("all",)`` for every
+    #: source). Empty by default: the relation token is a supervised loss target
+    #: for labelled rows, so this changes what the corpus can teach. See
+    #: ``filters.build_filters``.
+    drop_nonbinding_sources: tuple[str, ...] = ()
 
     @classmethod
     def from_mapping(cls, config: Mapping[str, Any]) -> PreprocessConfig:
@@ -79,6 +84,7 @@ class PreprocessConfig:
         budget = config.get("budget") or {}
         output = config.get("output") or {}
         region_profile = config.get("tcr_region_profile") or {}
+        recipe = config.get("recipe") or {}
         return cls(
             sources=source_items,
             blocklists={name: blocklists[name] for name in BLOCKLIST_NAMES},
@@ -90,7 +96,29 @@ class PreprocessConfig:
             region_profile_seed=int(region_profile.get("seed", 42)),
             region_profile_source_policy=str(region_profile.get("source_policy", "current_complete_tcr_rows")),
             completion_sources=_completion_sources(region_profile.get("completion_sources")),
+            drop_nonbinding_sources=_drop_nonbinding_sources(recipe.get("drop_nonbinding_sources")),
         )
+
+
+def _drop_nonbinding_sources(value: Any) -> tuple[str, ...]:
+    if value is None:
+        return ()
+    if isinstance(value, str):
+        raise TypeError(
+            "recipe.drop_nonbinding_sources must be a list of source names "
+            f"(or ['all']), not the string {value!r}"
+        )
+    names = tuple(str(item).strip().lower() for item in value)
+    if not all(names):
+        raise ValueError("recipe.drop_nonbinding_sources contains an empty source name")
+    known = set(SOURCE_REGISTRY) | {ALL_SOURCES_SENTINEL}
+    unknown = sorted(set(names) - known)
+    if unknown:
+        raise ValueError(
+            f"recipe.drop_nonbinding_sources has unknown sources {unknown}; "
+            f"known: {sorted(known)}"
+        )
+    return names
 
 
 def _completion_sources(value: Any) -> tuple[str, ...]:
@@ -199,7 +227,10 @@ def _process_source(
     if not path.is_file():
         raise FileNotFoundError(f"Raw immune source not found: {path}")
     stats = new_source_stats(spec.name, split, str(path))
-    filters = build_filters(spec.name, mix, blocklists, config.max_protein_length, config.max_length)
+    filters = build_filters(
+        spec.name, mix, blocklists, config.max_protein_length, config.max_length,
+        config.drop_nonbinding_sources,
+    )
     stats["filter_names"] = constructed_filter_names(filters)
     writer = None if dry_run else JsonlShardWriter(output_dir / split, split, spec.name, config.shard_size)
     # Withholding the profile is what disables completion for a source, so only
@@ -310,6 +341,10 @@ def preprocess_dataset(
             profile_source: build_filters(
                 profile_source, source_names, blocklists,
                 config.max_protein_length, config.max_length,
+                # Deliberately NOT config.drop_nonbinding_sources: this pass
+                # learns FR/CDR *length* distributions, which do not depend on
+                # the binding label. Narrowing it would change the frozen
+                # profile digest for no modelling benefit.
             )
             for profile_source in ("ots", "tcr_native", "tcr_papers")
             if profile_source in source_names
@@ -401,6 +436,15 @@ def preprocess_dataset(
             # sources. Per-source lists live on each filter_report entry.
             "filter_names": union_filter_names(item["filter_names"] for item in all_stats),
             "budget": {"max_protein_length": config.max_protein_length, "max_length": config.max_length},
+            # A binding-only corpus cannot be reconstructed from filter_names
+            # alone (that field is a union across sources), so record which
+            # sources had their measured non-binders dropped.
+            "recipe": {
+                "drop_nonbinding_sources": [
+                    name for name in config.drop_nonbinding_sources
+                    if name == ALL_SOURCES_SENTINEL or name in source_names
+                ],
+            },
             "shard_size": config.shard_size,
             "tcr_region_profile": ({
                 "profile": region_profile,

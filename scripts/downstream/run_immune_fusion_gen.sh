@@ -87,10 +87,8 @@ fi
 
 if stage_enabled pairing; then
 
-# light_length_mode=prior draws the light length from the OAS-train histogram, so
-# the target length is no longer taken from this row's reference. The old
-# `reference` mode leaked it (100% length match, ~0.95 identity to the reference).
-PAIR_LENGTH_MODE="${PAIR_LENGTH_MODE:-prior}"
+# User-approved known-length protocol; prior remains an explicit diagnostic.
+PAIR_LENGTH_MODE="${PAIR_LENGTH_MODE:-reference}"
 PAIR_OUT="${PREFIX}_light_pairing_holdout500_prompt3_len${PAIR_LENGTH_MODE}_iter${PAIR_MAX_ITER}"
 echo "$(date -Is) light pairing holdout500 prompt3 (light_length_mode=${PAIR_LENGTH_MODE} max_iter=${PAIR_MAX_ITER})" | tee -a "${LOG}"
 python -u -m downstream.grammar.light_chain_pairing \

@@ -46,13 +46,14 @@ csv.field_size_limit(min(sys.maxsize, 2**31 - 1))
 
 
 def _load_normalizer():
-    path = PROJECT_ROOT / "dllm/pipelines/qwen3_vl_arch/data/records.py"
-    spec = importlib.util.spec_from_file_location("_decontam_records", path)
-    assert spec and spec.loader
-    mod = importlib.util.module_from_spec(spec)
-    sys.modules["_decontam_records"] = mod
-    spec.loader.exec_module(mod)
-    return mod.normalize_sequence, mod.is_valid_protein_sequence
+    root = str(PROJECT_ROOT)
+    if root not in sys.path:
+        sys.path.insert(0, root)
+    from dllm.pipelines.immune_llada.data.records import (
+        is_valid_protein_sequence,
+        normalize_sequence,
+    )
+    return normalize_sequence, is_valid_protein_sequence
 
 
 normalize_sequence, is_valid_protein_sequence = _load_normalizer()

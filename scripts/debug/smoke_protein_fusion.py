@@ -35,7 +35,7 @@ from dllm.pipelines.llada.models.modeling_llada import (
     LLaDAModelLM,
     create_model_config_from_pretrained_config,
 )
-from dllm.pipelines.qwen3_vl_arch.data import (
+from dllm.pipelines.immune_llada.data import (
     BioSeqChain,
     BioSeqRecord,
     GrammarBioSeqCollator,

@@ -30,7 +30,7 @@ ROOT = Path("/vepfs-mlp2/c20250601/251105016/project/dllm_test")
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from dllm.pipelines.qwen3_vl_arch.data import BioSeqChain, BioSeqRecord
+from dllm.pipelines.immune_llada.data import BioSeqChain, BioSeqRecord
 from dllm.pipelines.qwen3_vl_arch.modeling_bioseq import (
     apply_decoder_corruption_to_encoder,
 )

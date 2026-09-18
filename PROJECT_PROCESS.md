@@ -1,8 +1,266 @@
 # Project Process
 
-> Last updated: 2026-09-12T07:05Z
+> Last updated: 2026-09-17T15:56:31Z
 >
 > 本页保留历史任务账本；顶部最新条目描述当前代码清理和文档同步状态。除明确标注为“本轮已验证”的项目外，历史测试、吞吐和任务数字不能被解释为本轮验证通过。
+>
+> **训练（2026-09-17 cancel）**：`t-20260912150714-lwf28` → **Killed**（End=`2026-09-17T08:13:43Z`）；BERT 闲时 `t-20260912035657-dd8v9` → **Killed**（End=`2026-09-17T09:37:24Z`）。未 cancel 评测 / FABind。
+
+> **157000 矩阵（未启动，2026-09-17）**：用户选定 v5 **157000**（pairing 拟 p0 / CFG=0 / **iter=16**）后，源目录 `checkpoint-157000` 已被 top-k 删除（2026-09-17 07:12:46，训练写入 158000 时 prune）。无评测快照、无 SHA、无 submit/cancel、未改用 158000。训练 `t-20260912150714-lwf28` 未动。140000 RESULTS 主行保持。
+>
+> **当前 140000 矩阵（已完成，2026-09-17）**：独立评测快照已锁定；数字已写入 [RESULTS](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/RESULTS.md)。49000/92000 主行未覆盖。pairing 仅 p0/CFG0，CDR 为 iter=2，Specificity 为 100-epoch。本轮文档回填，无 submit/cancel。
+>
+> **92000 矩阵（历史对照）**：非 pairing 产物仍保留在 RESULTS。AB pairing 49000 修复后 p3 行仍在主表；92000 pairing 不入主表。
+>
+> **49000 矩阵终态（对照）**：指定 v5 49000 的 AB 11/11 与 TCR 10/10 已完成并通过各自结果核对。结果见 [RESULTS](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/RESULTS.md)。
+
+## 2026-09-17 v5 159000 TCR 评测
+
+- 最新（15:56Z）：159000 全部 AB/TCR 最终汇总已写入 [RESULTS](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/RESULTS.md)，并完成产物身份、数量、折完整性、部分聚合与文档核对；不等于重新运行所有逐预测评分。范围与SHA记录：[文档核对](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/tcr_v5_159000_20260917/results_document_audit.json)。历史“待整理”状态已由本条取代，无新任务操作。
+
+> 最新：159000 AB 六项、TCR 十项均已执行完成；完整独立结果审计待做。详见本文末“159000 AB/TCR 执行完成核对”，下面提交与运行状态为历史快照。
+
+- 12:56:19Z 复核：T1 四轨 Running，T4 benchmark14 / held20 Queue；均 c20250601 非闲时单卡。四项 T2/T3 未提交云端，避免重复输出。本地 tmux=`tcr-159000-local`，pane PID=3326686，12:55:57Z 启动 T2A，后续顺序 T2B → T3-broad → T3-deep；状态看 [local_repr.log](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/tcr_v5_159000_20260917/local_repr.log) 与各任务 run_manifest.json，done 仅表示执行完成待结果验收。
+- 81 项 CPU 测试和真实 GPU 三类 gate 已通过：T1 四轨 batch/order consistency，T2/T3 四轨 batch/order consistency，T4 隐藏 target 扰动/固定 context/正式32步采样路径/评分JSON写读。数据、代码及权重身份锁定在 gate 中，运行时核对；不是质量分数，也不是去污染证明。[机器可读总索引](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/tcr_v5_159000_20260917/all_159000_tcr_submissions.json)。
+
+- submit：`t-20260917205616-jwmqq`，`tcr-v5-159000-20260917-t4-held20`；[YAML](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_tcr_v5_159000_20260917_t4-held20.yml)，c20250601、Preemptible=false、单卡；已提交，待查询状态。
+
+- submit：`t-20260917205613-lr9cf`，`tcr-v5-159000-20260917-t4-benchmark14`；[YAML](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_tcr_v5_159000_20260917_t4-benchmark14.yml)，c20250601、Preemptible=false、单卡；已提交，待查询状态。
+
+- submit：`t-20260917205541-gnj99`，`tcr-v5-159000-20260917-t1-others-longab`；[YAML](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_tcr_v5_159000_20260917_t1-others_longab.yml)，c20250601、Preemptible=false、单卡；已提交，待查询状态。
+
+- submit：`t-20260917205538-r2ldn`，`tcr-v5-159000-20260917-t1-others-cdr3b`；[YAML](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_tcr_v5_159000_20260917_t1-others_cdr3b.yml)，c20250601、Preemptible=false、单卡；已提交，待查询状态。
+
+- submit：`t-20260917205534-878fc`，`tcr-v5-159000-20260917-t1-cdr3ab`；[YAML](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_tcr_v5_159000_20260917_t1-cdr3ab.yml)，c20250601、Preemptible=false、单卡；已提交，待查询状态。
+
+- submit：`t-20260917205531-55dxp`，`tcr-v5-159000-20260917-t1-cdr3b`；[YAML](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_tcr_v5_159000_20260917_t1-cdr3b.yml)，c20250601、Preemptible=false、单卡；已提交，待查询状态。
+
+- 用户授权补齐 TCR 十项，可优先本地。复用 AB 留存的 159000 快照及 SHA，不新选权重、不重复提交 AB。T1 四轨与 T4 两数据集准备非闲时单卡云作业；T2A/T2B/T3-broad/T3-deep 在本机 A100 串行，避免平台排队；不停止 occupy.py 或看护程序。
+- 81 项 CPU 测试通过。正在执行真实 GPU 输入预检（与 140000 的 CPU identity-only 记录区分），通过后才执行正式任务；不修改既有输入/评分协议或主结果。
+- 输出根：[159000 TCR](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/tcr_v5_159000_20260917)；本地入口：[run_local_repr.sh](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/tcr_v5_159000_20260917/run_local_repr.sh)。任务 ID 与本地状态在本节更新。
+
+## 2026-09-17 v5 159000 AB 评测
+
+- 12:42Z 六项均提交成功：pairing 16步 / CDR Kong / Specificity 为 Running，CDR SAb23 / GDPa1 / m396 为 Staging。38 项 CPU 测试、真实 native GPU 预检、4步真实 ESMC 反馈与隐藏参考替换 gate 均通过；预检不是正式成绩。本机预检已结束，正式评测均在云端。完整任务索引：[job_plan.json](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/ab_v5_159000_full_20260917/job_plan.json)。
+
+- submit：`t-20260917204150-2kzlj`，m396；[YAML](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_ab_v5_159000_full_20260917_m396.yml)，Preemptible=false，单卡；提交成功、待查询状态。
+
+- submit：`t-20260917204147-ztdwf`，gdp_a1；[YAML](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_ab_v5_159000_full_20260917_gdp_a1.yml)，Preemptible=false，单卡；提交成功、待查询状态。
+
+- submit：`t-20260917204143-6b7vr`，specificity；[YAML](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_ab_v5_159000_full_20260917_specificity.yml)，Preemptible=false，单卡；提交成功、待查询状态。
+
+- submit：`t-20260917204140-gqlsz`，cdr-sab23；[YAML](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_ab_v5_159000_full_20260917_cdr-sab23.yml)，Preemptible=false，单卡；提交成功、待查询状态。
+
+- submit：`t-20260917204115-pj2rk`，pair-p0-cfg0；[YAML](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_ab_v5_159000_full_20260917_pair-p0-cfg0.yml)，Preemptible=false，单卡；提交成功、待查询状态。
+
+- 用户要求测试 159000，并明确 pairing 为 **16 步**；本轮限 AB：pairing p0/CFG0/reference-length/iter16/500×8，CDR Kong 与 SAb23H2 argmax/iter2，Specificity 五折固定 100 epoch，GDPa1 参考 CV，m396 六档主协议。pairing 与 140000 的 124 步不同，不能仅归因于权重；不提交 TCR、p3 或 CFG 网格。124 步 pairing 从未提交。
+- submit：`t-20260917203938-l9f72`，cdr-kong，2026-09-17T12:39:38Z；[YAML](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_ab_v5_159000_full_20260917_cdr-kong.yml)，Preemptible=false，单卡；现已 Running。
+- 已留存独立快照 [159000](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/ab_eval_checkpoints/ab_v5_159000_full_20260917)，源与副本 SHA256 一致：`01b3d1446b21f56b3a3658528a405cb34dee7dc889eb1f162e423d64141faf3e`；源 trainer_state.global_step=159000。未复制优化器，源权重及历史评测保留。
+- 准备六项 c20250601 非闲时单卡任务；38 项 CPU 测试通过（protenix_abtcr 实际运行环境）。本地执行小规模真实 GPU 预检，非质量结果；正式提交状态在下方更新。不修改训练、BERT 看护或 occupy.py；RESULTS 未填未完成分数。
+- 产物：[159000 AB](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/ab_v5_159000_full_20260917)。通用 prepare 产生的额外 p3/CFG YAML 不在本轮提交范围。
+
+## 2026-09-17 Cancelled v5 8-GPU training
+
+- 操作：cancel。用户要求停掉 Running 的 8 卡 diffusion，不 cancel 评测 / FABind / 无关队列。
+- `task_id=t-20260912150714-lwf28`，任务名 `protein_esmc_llada270m_diffusion_immune_v5_8gpu_c20250601`
+- YAML：`/vepfs-mlp2/c20250601/251105016/project/dllm_test/train_jobs/protein_esmc_llada270m_diffusion_immune_v5_8gpu_c20250601.yml`
+- 最终状态：**Killed**，Start=`2026-09-12T07:07:14Z`，End=`2026-09-17T08:13:43Z`，`Preemptible: false`
+- BERT 闲时 `t-20260912035657-dd8v9` 查询仍为 **Queue**（未 Running），未 cancel。
+- 盘上 checkpoint：37000 / 43000 / 92000 / **159000**（完整 resumable，`global_step=159000`）。**158000 已不在**。未启动评测或 158000 下游矩阵。
+
+## 2026-09-17 Stopped: v5 157000 weights already pruned
+
+- 操作：无 submit / 无 cancel。用户明确要求对 **checkpoint-157000** 跑完整 AB+TCR 矩阵（pairing 仅 p0 / CFG=0 / **`--max-iter 16`**，CDR iter=2）。到达时源目录已不存在。
+- 源路径 `dllm_test/output/protein_esmc_llada270m_diffusion_immune_v5_8gpu_c20250601/checkpoint-157000`：No such file。`ab_eval_checkpoints/` 无 `ab_v5_157000_*`。未创建 `ab_v5_157000_full_20260917` / `tcr_v5_157000_20260917`。
+- 训练日志：2026-09-17 06:27:11 仍 keep 157000（`eval_loss=0.790879`）；2026-09-17 07:12:46 prune 157000，keep latest `checkpoint-158000`（`eval_loss=0.790139`，`trainer_state.global_step=158000`）。topk 现为 37000 / 43000 / 92000 + resume 158000。
+- 未替换 158000 或其他 step；未动训练 `t-20260912150714-lwf28`；未改 RESULTS 主表数字；无本机 pid、无新 Volc task id。
+
+## 2026-09-17 RESULTS 写入 accepted v5 140000
+
+- 操作：只读回填文档。从 AB/TCR 产物 JSON 与聚合日志写入 [RESULTS](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/RESULTS.md)；49000/92000 历史行未改。无 submit/cancel，未动训练 `t-20260912150714-lwf28`。
+- 快照 [ab_v5_140000_llada_20260917](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/ab_eval_checkpoints/ab_v5_140000_llada_20260917)，SHA256=`a482afa425ef4f058d88e38d316aca096341af471b504efe948434d3ebc2dfe2`。
+
+## 2026-09-17 Submitted Ours v5 140000 full AB/TCR matrix
+
+- 操作：submit + 本机串行。用户要求对 v5 **140000** 按 AB/TCR 审计清单重跑，协议改为 pairing **仅 p0/CFG0**、CDR **iter=2**。未 cancel 训练 `t-20260912150714-lwf28`，未覆盖 49000/92000 产物或 RESULTS 主行。
+- 锁定独立快照 [ab_v5_140000_llada_20260917](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/ab_eval_checkpoints/ab_v5_140000_llada_20260917)，权重 SHA256=`a482afa425ef4f058d88e38d316aca096341af471b504efe948434d3ebc2dfe2`，与源 `checkpoint-140000` 一致；`trainer_state.global_step=140000`。未复制优化器。
+- 提交前 CPU 113 passed（pairing / sampling / AB probes / T1–T4）。TCR 侧为 CPU identity gate（非 GPU batch-consistency）。机器可读索引：[all_140000_matrix_submissions.json](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/ab_v5_140000_full_20260917/all_140000_matrix_submissions.json)。
+- 17:58Z 复核：pairing / CDR Kong / CDR SAb23 / T1 cdr3b / T1 cdr3ab / T1 others_cdr3b 为 **Running**；T1 others_longab / T4×2 为 **Queue**。本机 Specificity 已启动。完整 ID 与 YAML 见文末同名章节。
+
+## 2026-09-17 无前缀 pairing 六档步数扫描完成验收
+
+- 用户授权新增六档步数对照；准确协议、输入和验收见 [AB pairing §4.5](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/AB_LIGHT_CHAIN_PAIRING.md)。固定49000修复后p0，六档完整500×8，124步旧产物只作参照；不换模型、不动其他任务。
+- 六项非闲时单卡现均Success，最晚于2026-09-16T21:40:00Z结束。2026-09-17重新只读核验全部24,000候选、六份真实反馈gate、原124步参照、各率分母和summary记录的指标／CSV／manifest哈希均通过；冻结源码／数据／原参考产物无漂移。提交前45项CPU回归为历史已通过，本轮未重新采样、评分或跑CPU suite。
+- [实验目录](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/ab_v5_49000_pairing_iters_p0_20260916)已保存完整产物，[汇总](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/ab_v5_49000_pairing_iters_p0_20260916/summary.json)为complete=true、pending=[]、errors={}。全部档作为独立诊断写入[RESULTS §0.6](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/RESULTS.md#ab-pairing)，不按扫描最优值更新p3主行。六项已移出两张Active表；没有操作或重查140000及其他任务，其状态保持原快照。
+
+## 2026-09-16 本地 SAb23H2 多步 CDR 对照完成
+
+- 用户明确授权本地测试多个iter。准确协议、验收及入口见 [AB CDR §4.3](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/AB_CDR_INFILLING.md)。先跑完整SAb23H2六CDR、iter1/2/4/8，固定92000留存快照与原batch1/argmax，Kong不在本轮启动范围；不按测试集最优步数替换主行。
+- 37项CPU回归通过；未修改共享生成器、训练、checkpoint、旧预测或指标。新增独立runner保存逐条预测、SHA、实时状态、真实encoder输入审计，iter1须复现旧结果。
+- 本机A100-80GB，原`occupy.py`与其他tmux不动；tmux=`ab-cdr-92000-iters-20260916`，pane PID=`2535199`、Python PID=`2535233`，Python启动=`2026-09-16T07:58:12Z`，完成=`2026-09-16T08:02:12Z`，进程已退出。含加载与审计共240秒，PyTorch峰值分配显存约2.77GiB。本地任务不进入Volc Active表，无submit/cancel。[status.json](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/ab_v5_92000_cdr_iter_20260916/status.json)为complete，[日志](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/ab_v5_92000_cdr_iter_20260916.log)及逐条产物已保留。
+- 1,440条预测与24格指标独立验收通过，六模式iter1精确复现旧日志；真实模型反馈／隐藏参考扰动检查通过，细节只维护于[任务 §4.3](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/AB_CDR_INFILLING.md)。完整数值作为诊断写入 [RESULTS §0.5](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/RESULTS.md#ab-cdr)，原主表与其他任务产物未改。
+
+## 2026-09-16 ESMC 反馈修复与 AB pairing 重评
+
+- 实施与协议 owner：[AB pairing §7 k](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/AB_LIGHT_CHAIN_PAIRING.md)。生成／采样两份 CPU suite 28 passed；已添加真实权重逐轮输入门禁及独立单卡非闲时 YAML，准备 p0/p3 两组 500×8 重跑。固定既有 49000 评测快照，未改权重、训练或历史生成／指标；未重跑其他下游任务。
+- 17:25Z 查询 p0/p3 均 Success，完整生成与评分产物已验收；终态耗时见本页末尾 dated 记录，已从两张 Active 表移除。只将有前缀修复后结果写入 RESULTS，p0 保留诊断产物；本轮只读核验与文档同步，无新推理、submit/cancel，未改其他任务。
+
+## 2026-09-16 RESULTS 写入 92000 非 pairing 主行
+
+- 按用户决定：pairing 先不管；其余已完成 92000 数字写入 [RESULTS](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/RESULTS.md)。49000 同行保留对照。AB pairing 六组与 §0.6b 消融仍用 49000；未写入不完整 92000 pairing。
+- 数字来自各任务产物 JSON/聚合日志，不是 49000 comparison 的重算；本轮没有训练、推理、submit 或 cancel。
+
+## 2026-09-15 本地 T1 recognition token 直接评分
+
+- 用户授权本地测试；复用独立留存 v5 49000，未修改其他本地/云端任务。进程 PID `2002254` 已 exit 0，本地 A100 单卡、batch 8；完整 others β-only AS 测试，10,312 个独立输入，评分耗时 258.66 秒（不含加载）。入口及协议见 [TCR T1 §4.1a](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/TCR_T1_BINDING.md)。状态：完成；55 项输入协议 CPU 测试通过，逐行数量/有限分数/重新计算 AUROC/脚本哈希/独立集跨折 SHA 均验证通过。按用户决定不写入 `RESULTS.md` 正式结果；产物仅保留于 [relation-token](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/outputs/tcr_binding_relation_token/ours_v5_49000_20260915_others_cdr3b) 供诊断。未跑其余三条输入轨。
+
+## 2026-09-15 AB / TCR 结果文档重排与 TCR 最终收口同步
+
+- 按用户要求将 [RESULTS](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/RESULTS.md) 改为上半部分 AB、下半部分 TCR；逐任务集中 baseline、明确 checkpoint 的 Ours 结果及必要协议限制。AB prompt/CFG、历史长度/sampler 和 Specificity 训练预算诊断分层呈现，未把失效多步产物当成 v5 消融。
+- TCR [最终 comparison](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/tcr_v5_49000_20260913/comparison_v1/final_49000_vs_baselines_and_29000.json) 已确认 complete=true、missing_tasks=[]；补齐遗漏的大数据 T1 β-only，移除顶部过期运行状态。当前矩阵仍固定 49000；29k 仅作已有 others 历史对照，AB 92000 仅用于已完成的 Specificity。
+- 整理前 RESULTS 全文保存在 [RESULTS_ARCHIVE_20260915.md](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/RESULTS_ARCHIVE_20260915.md)，原正文完整保留并加归档警示。已冻结任务、旧排队过程和重复/失效表格仅移出当前主文档，不删除预测、指标、日志、权重或历史审计。
+- 本次为文档整理及只读复核：最终比较所登记 139 个来源文件 SHA 全部一致；AB 当前采样/Specificity 指标从既有 metrics 读取。没有新训练/模型推理、没有 submit/cancel，Active 表及其他运行任务不动。数字仅维护在 RESULTS，关键决定记入 TCR 审计 §9.28。
+- 文档验收：主文档 459 行、60 个唯一链接均可解析且为绝对路径，表格列数及页内锚点检查通过；归档去除新增警示头后与整理前完整正文一致。另逐项检查 T1/T3/GDPa1/m396 共 56 个当前显示值与结果 JSON 一致，9 个 AB CDR 格与各自聚合日志一致；git diff --check 通过。未把这些文档检查称为新一次模型评测。
+
+## 2026-09-15 Foundation eval macro mean 与 antigen→AB 调研
+
+- 已将多来源 `eval_loss` 从样本数加权改为来源等权均值；没有排除来源。实现及兼容边界见 [模型方案](/vepfs-mlp2/c20250601/251105016/project/dllm_test/BIOSEQ_MODEL_PLAN.md#2026-09-15-foundation-eval-改为来源等权均值)。
+- 本轮 CPU 回归 7 passed；未加载模型权重、未跑真实数据评估、未修改 conda 依赖、未提交/取消/重启训练任务，Active 表不变。已有 checkpoint 和历史 loss 未重算。
+- Antigen 条件生成调研已留档：[研究记录](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/ANTIGEN_CONDITIONED_AB_RESEARCH.md)。未实施新的下游任务或改排行榜。
+
+## 2026-09-15 Cancel queue012 v5 8-GPU；提交 FABind 2×4
+
+- **操作**：用户授权停掉 queue012 上的 v5 8 卡 diffusion，把调度位给 FABind 两节点四卡复现。
+- **cancel**：`t-20260912021346-5xq4s`（`protein_esmc_llada270m_diffusion_immune_v5_8gpu`）→ **Killed**。不在闲时看护 TARGETS，未放 STOP。c20250601 的 `t-20260912150714-lwf28` 与 BERT 闲时 `t-20260912035657-dd8v9` 未动。
+- **submit**：`t-20260915103955-twdv5` / `fabind-paper-2node4gpu`，queue012 非闲时，2 × `ml.pni2.14xlarge`，初始 Queue，Creator `zhuyiheng`。YAML：`/vepfs-mlp2/c20250601/251105016/project/FABind/repro/train_jobs/fabind_paper_2node4gpu.yml`。账本：[`FABind/REPRODUCTION_PROCESS.md`](/vepfs-mlp2/c20250601/251105016/project/FABind/REPRODUCTION_PROCESS.md)。
+- FABind 不是 LLaDA 线，不列入上方 Active 训练表；本条只记录对 `5xq4s` 的 cancel。
+
+## 2026-09-15 AB 分类头核查与论文baseline展示
+
+- Specificity原始头类/实际调用、启动脚本与本轮保存头已核对，结构/宽度/选模证据唯一见 [AB Native Probes §4.4](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/AB_NATIVE_PROBES.md#44-specificity-分类头对齐核查2026-09-15)。CPU读取原类AST，在768/2560维共享同一state_dict时前向逐位一致；读取fold0头确认768维与fixed_last=100。先激活pllm后使用既有protenix_abtcr，无基础模型加载或重训。
+- 用户要求的baseline展示规则登记于 [PROJGUIDE §0.2.2](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/PROJGUIDE.md)。从本地论文PDF第17–18页核对Table 1–5，当前AB结果各节补论文参考，Figure 4缺少精确点值保持明确缺失；Ours及历史复跑原值不改。
+- 本轮仅核查及文档同步，没有生产代码、权重、数据或评测产物变更，无submit/cancel，Active不变。
+
+## 2026-09-15 AB GDPa1 reference-only 协议同步
+
+- 按用户决定更新 GDPa1 入口及协议 owner，详见 [AB Native Probes §4.2](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/AB_NATIVE_PROBES.md#42-预测头与协议切割线)；[RESULTS §0.6a](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/RESULTS.md) 调整当前/历史展示，不改既有数值或原始产物。
+- 按要求先激活 pllm，再切既有 protenix_abtcr：`python -m pytest scripts/tests/bioseq/test_ab_native_probes.py -q -p no:cacheprovider`，8 passed（8.28s）。覆盖参考 GridSearchCV 的 alpha/折均值/OOF一致性、仅一次选参搜索、缺失标签行映射、不生成 nested 产物及历史文件不变，并回归 Specificity、m396、原生输入与单卡矩阵。
+- 未加载模型权重、重提特征、启动全量评测或 submit/cancel；Active 表及其他任务不变，无新增模型分数。
+
+## 2026-09-13 T4 现成配对测试数据核查
+
+- 已用pllm进行只读CSV全行解析及官方solutions字段对照，核对作者生成/评分代码、现有benchmark14交集和本地数据SHA。来源、方法与结果边界见 [T4 §7.6](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/TCR_T4_GENERATION.md)，日志见 [审计 §9.20](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/TCR_BASELINE_EVALUATION_AUDIT.md)。仅研究与文档/身份清单更新，无生产代码、数据副本、权重、模型分数或submit/cancel变化，Active表不变。
+
+## 2026-09-13 T4 双链 baseline 研究与分组登记
+
+- 论文/官方代码、相关本地权重存在性和配对数据候选表头核对完成；方法清单、尚未修复的适配问题和执行门禁见 [T4 §7.5](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/TCR_T4_GENERATION.md)，用户决定见 [审计 §9.19](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/TCR_BASELINE_EVALUATION_AUDIT.md)。本轮只有研究与文档同步，无生产/数据变更、权重下载或重新SHA核验、GPU运行及submit/cancel；没有新模型成绩，Active表不变。
+
+## 2026-09-13 benchmark14 格式与 TCRT5 输出范围核对
+
+- 对照论文公开正文、官方代码及本地CSV/JSON解释用户问题；结论与字段实例见 [T4 §7.4.2](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/TCR_T4_GENERATION.md)，关键理解见 [审计 §9.18](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/TCR_BASELINE_EVALUATION_AUDIT.md)。只读核查与文档补充，无生产改动、数据写入、GPU运行或submit/cancel，Active不变，无新性能指标。
+
+## 2026-09-13 T4 区域语义确认与源数据字段核查
+
+- 用户已确认此前的生成区域选择；具体协议与上游/评测输入的字段区分见 [T4 §7.4](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/TCR_T4_GENERATION.md)，关键日志见 [审计 §9.17](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/TCR_BASELINE_EVALUATION_AUDIT.md)。该选择不再是待用户澄清项，但生成实现及任务专属gate仍未完成。
+- 激活pllm后进行只读CSV全行扫描，检查全部评测JSON字段并复核官方源文件SHA；身份清单和文档已同步。未修改生产代码、数据、权重或旧指标，没有GPU运行及submit/cancel，Active表不变。
+
+## 2026-09-13 TCR 49000 提交前复核（未提交）
+
+- 用户本轮范围、仅最新 checkpoint 汇总要求与逐任务未关闭 gate 见 [TCR 审计 §9.16](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/TCR_BASELINE_EVALUATION_AUDIT.md)。当前不满足“所有任务确认无问题”的前置条件；没有启动正式 TCR 评测，Active 表不变，也未操作既有 AB/训练作业。
+- 可用模型为既有独立 [49000 快照](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/ab_eval_checkpoints/ab_v5_49000_llada_20260913)，本轮重新读取全部 `model.safetensors` 得 SHA256=`d5f892bce7d18106a7c417a3e4605f2bf1feac2bfa80709ca74fb149e5c07d92`，与快照 manifest 和原复制记录相符；trainer_state.global_step=49000。该目录虽用 AB 命名，保存的是同一完整 fusion checkpoint，不是 AB 微调权重；此轮仅只读核验，未覆盖或复制快照。
+- 快照 manifest 所指原训练路径 `/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/protein_esmc_llada270m_diffusion_immune_v5_8gpu_c20250601/checkpoint-49000` 在 21:34Z 检查时已不存在；不推断删除原因，不改用其他 checkpoint。现有快照权重、tokenizer、trainer state 仍在，后续执行应锁定已验证快照而非失效原路径。
+- CPU 复跑：激活 pllm，执行 `python -m pytest -q`，测试文件为 `/vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/tests/immune_llada/test_tcr_binding_query.py`、`/vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/tests/immune_llada/test_tcr_binding_others_beta.py`、`/vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/tests/immune_llada/test_tcr_binding_long.py`，**55 passed in 5.49s**。这是输入/缓存等 CPU 回归，不是 49000 TCR 真实 GPU 验收或性能结果。
+- 本轮只有只读核验、既有 CPU 测试与文档登记；没有 submit/cancel、训练数据/生产代码/权重变更、新模型指标或旧结果覆盖。
+
+## 2026-09-13 T4 联合 αβ 生成提议核对
+
+- 用户方向及待确认的X/MASK、目标区域边界见 [T4 §7.4](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/TCR_T4_GENERATION.md) / [审计 §9.15](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/TCR_BASELINE_EVALUATION_AUDIT.md)。本轮仅静态核对/文档，无生产改动、GPU运行或submit/cancel，Active不变。
+
+## 2026-09-13 T4 对 v5 train / valid 的全量重叠核查
+
+- 已按实际启动参数和prepared manifest完成只读全量核查，结果、复跑入口与代码/数据身份见 [T4 §7.3](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/TCR_T4_GENERATION.md)，关键日志见 [审计 §9.14](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/TCR_BASELINE_EVALUATION_AUDIT.md)。最终v2完整性门禁和独立产物检查均通过，初版未通过报告不作为结论。
+- 新增CPU诊断脚本、报告和文档；没有训练数据、blocklist、生产生成代码、权重修改，没有submit/cancel或模型新分数，Active表不变。
+
+## 2026-09-13 T4 baseline 生成方式审计
+
+- 研究结果及条件问题见 [T4 §7.2](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/TCR_T4_GENERATION.md) / [审计 §9.13](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/TCR_BASELINE_EVALUATION_AUDIT.md)，RESULTS 同步引用限制；仅文档更新，没有生产代码/数据改动、权重加载、submit/cancel或新增指标，Active不变。
+
+## 2026-09-13 T4 当前实现与结果状态初查
+
+- 当前 T4 输入/目标/采样路径、数据条目及部分旧 metrics 已只读核对；详细发现见 [T4 §7.1](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/TCR_T4_GENERATION.md)，关键日志见 [TCR 审计 §9.12](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/TCR_BASELINE_EVALUATION_AUDIT.md)。RESULTS §0.4 同步版本与指标解释边界，原数字保留。
+- 仅文档/静态诊断，未改生产代码或数据、未加载权重、提交或取消任务；Active 表不变，无新模型性能。不将此次初查称为 v5 或完整生成审计验收。
+
+## 2026-09-13 Ours AB 单卡矩阵（09-14复核：11项全部Success）
+
+最新状态与完整结果已收口，见末尾2026-09-14 AB终态章节及RESULTS对应三节；下方“已提交/尚无完整CSV”保留为09-13历史提交快照。
+
+- 用户授权在我们的模型上评测 AB，并增加 pairing prompt0/prompt3 × CFG；非闲时、非抢占、独立单卡。实现/CPU 验收和方法边界见 [原生 AB 任务](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/AB_NATIVE_PROBES.md) 与 [pairing §4.4](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/AB_LIGHT_CHAIN_PAIRING.md)。
+- 配置生成器 [prepare_ab_native_jobs.py](/vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/downstream/prepare_ab_native_jobs.py) 规划6 pairing +2 CDR数据集 +3原生探针，均 c20250601 / ml.pni2.3xlarge / 1 replica / Preemptible:false。
+- 用户已指定使用最新 v5；权重选择、独立快照 SHA、GPU 预检和正式任务记录见本文件末尾 `Submitted Ours AB v5 49000` 系列条目。真实模型 GPU gate 已通过，11项正式单卡任务已全部提交；不混用旧42000或后续训练步数。正式 pairing 已产生独立 manifest / progress 文件，尚无完整 CSV 与评分。
+- 本轮仅改评测适配、测试及文档；不修改训练或已有 baseline/生成结果。相关30项CPU测试通过，不能据此声称完整评测已完成。
+- 三份真实数据的原生输入预检已通过（无模型加载），均在1024 token上限内；pllm 的生成相关测试23 passed、原生探针文件因缺依赖明确skip，protenix_abtcr 中全部30项通过。仅对3个新增 downstream 文件加入精确gitignore例外，不放开数据/模型/产物。
+
+## 2026-09-13 v5 训练 checkpoint 状态复核（19:26–19:28 UTC）
+
+- 操作：只读查询当前三条 v5 任务的 `ml_task get`，读取两条 diffusion 的 worker 日志、checkpoint 文件列表、`trainer_state.json` 与 `topk_val_manifest.json`；没有 submit/cancel、改参、复制权重或启动评测。
+- `t-20260912150714-lwf28`（c20250601，8 卡非闲时）：**Running**，日志已到约 **47,900 / 200,000**；最新已保存 [checkpoint-47000](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/protein_esmc_llada270m_diffusion_immune_v5_8gpu_c20250601/checkpoint-47000)，trainer state=47000，最新 eval_loss=0.764063。当前保留 checkpoint 中验证 loss 最低为 **43000 / 0.747695**，依据 [top-k manifest](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/protein_esmc_llada270m_diffusion_immune_v5_8gpu_c20250601/topk_val_manifest.json)。
+- `t-20260912021346-5xq4s`（queue012，8 卡非闲时）：**Running**，日志已到约 **38,400 / 200,000**；最新已保存 [checkpoint-38000](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/protein_esmc_llada270m_diffusion_immune_v5_8gpu/checkpoint-38000)，trainer state=38000，最新 eval_loss=0.757379。当前保留 checkpoint 中验证 loss 最低为 **37000 / 0.750480**，依据 [top-k manifest](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/protein_esmc_llada270m_diffusion_immune_v5_8gpu/topk_val_manifest.json)。
+- `t-20260912035657-dd8v9`（BERT，c20250601，8 卡闲时）：仍为 **Queue**；`/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/protein_esmc_llada270m_bert_immune_v5_8gpu_spot/` 当前仅见 wandb，没有 checkpoint 目录。
+- 最新两个 diffusion checkpoint 都有 `model.safetensors`、tokenizer、trainer state 和续训状态文件；本轮未加载权重做推理。“日志训练步数”“最新保存”“验证 loss 最优”分别报告，不相互替代，验证 loss 最优也不等于 pairing 最优。训练仍持续写入，以上为查询时快照。
+- 刚完成的 AB pairing 对应旧 `protein_esmc_llada270m_diffusion_immune/checkpoint-42000`，**不是上述 v5**；不能把旧模型下游分数当作 v5 当前水平。下游权威数字仍见 RESULTS §0.6。
+
+## 2026-09-13 T3 论文 baseline 实验复核
+
+- 后续文档整理：按用户要求将关键理解及使用准则直接加入 [TCR 总审计 §9.11.1](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/TCR_BASELINE_EVALUATION_AUDIT.md)，详细证据仍由任务 §7.2 维护。仅文档更新，未执行新实验。
+
+- 完成原文/作者 notebook/模型卡核对、本地源数据来源匹配与 artifact 字段只读检查；详细协议及失配见 [T3 §7.2](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/TCR_T3_REPRESENTATION.md)，关键记录见 [总审计 §9.11](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/TCR_BASELINE_EVALUATION_AUDIT.md)。引用状态已同步至 RESULTS / README / BASELINE_VERIFICATION，旧模型分数未改。
+- 本轮未提交/取消任务，未加载权重、改生产代码/原始数据或执行模型重评；Active 表不变。论文对齐和纠正后 v5 T3 均仍待实施/验收，不能以此次研究作为新实验完成凭据。
+
+## 2026-09-13 T3 representation / few-shot 专项初查
+
+- 详细发现、CPU 验证与数据边界见 [T3 任务 §7.1](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/TCR_T3_REPRESENTATION.md)，关键记录与身份见 [TCR 审计 §9.10](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/TCR_BASELINE_EVALUATION_AUDIT.md)。完成诊断与文档同步；未加载模型、修改生产代码/数据、提交或取消任务，Active 表不变，无新性能指标。T3 v5 适配、真实模型与其余 gate 仍待做，T4 尚未专项验证。
+
+## 2026-09-13 T2 clustering 输入/关系审计
+
+- 按用户要求开始审计；完成静态接线与真实 tokenizer/原生 collator 的 CPU 标签边界检查（decoder 用替身），详细发现见 [T2 任务 §7.1](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/TCR_T2_CLUSTERING.md)，关键身份与后续事项见 [TCR 审计 §9.9](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/TCR_BASELINE_EVALUATION_AUDIT.md)。
+- 仅诊断与文档同步；未加载模型权重、修改生产 Python/训练 renderer、提交或取消作业；没有新性能结果，Active 表不变。T2 v5 运行时适配及真实模型重评仍待做，T3/T4 专项未完成。
+
+## 2026-09-13 TCR T1–T4 测试准则确认
+
+- 用户希望测试全部已构建 TCR 任务，且后续必须遵守指定审计；已登记任务文档清单和持续执行要求，见 [TCR 审计 §9.8](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/TCR_BASELINE_EVALUATION_AUDIT.md)，并在项目指南/模型计划加入必读引用。
+- 本轮仅只读核对文档入口与提交前 gate、固化用户要求；未跑模型测试、未提交或取消任务、未产生新指标，Active 表不变。T2–T4 专项输入/协议验收尚未完成，不把此前 T1 Success 当作全套完成。
+
+## 2026-09-13 TCR T1 运行时输入纠错
+
+- LongAB 同数据对照 **Success**：`t-20260914005618-vr2nb`，单卡非闲时，五折×三测试集及产物复核完成；实施/验证见 [TCR 审计 §9.7](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/TCR_BASELINE_EVALUATION_AUDIT.md)，指标见 [RESULTS §0.1c](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/RESULTS.md)，提交/终态账本见末尾 `Submitted TCR v5 LongAB control on others`。
+
+- v5 29k 同 others 数据的 β-only 对照 **Success**：`t-20260913202402-c9hf5`，五折×三测试集及逐行核验完成；协议/验收见 [TCR 审计 §9.6](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/TCR_BASELINE_EVALUATION_AUDIT.md)，指标见 [RESULTS §0.1b](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/RESULTS.md)。不影响旧 αβ 结果或其他任务。
+- 用户最新授权在本地资源繁忙时使用单卡非闲时；新任务已 **Success**，独立重跑及产物复核完成，详见末尾 `Submitted TCR others nonspot rerun` 及 [TCR 审计 §9.5](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/TCR_BASELINE_EVALUATION_AUDIT.md)。旧闲时任务仍 Killed，本地占卡/FABind 进程未动；这是新授权下的独立提交，不是自动重提取消任务。
+- 按用户要求再次同步关键改动登记与历史/当前状态区分，见 [TCR 审计 §9.2 文档复核](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/TCR_BASELINE_EVALUATION_AUDIT.md)。本次仅文档复核，未重新测试、提交或取消作业，Active 表不变。
+- 实现、验证、数据轨道和验收边界统一见 [TCR baseline 审计 §9](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/TCR_BASELINE_EVALUATION_AUDIT.md)。初次 beta-only 修正仅做 CPU 验证；后续 others/cdr3ab GPU 五折已 **Success**，见本文件末尾 `Submitted TCR others CDR3ab v5` 账本。新指标只写 [RESULTS §0.1a](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/RESULTS.md)，不替换历史 β-only 榜。
+
+## 2026-09-13 AB pairing / AirGen 对照诊断
+
+- 全量评测已 **Success**，完整产物已核验；结果见 [RESULTS §0.6 全量](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/RESULTS.md)，协议验收及因果归因限制见 [任务 §7 h](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/AB_LIGHT_CHAIN_PAIRING.md)。本文件末尾保留该作业的提交、运行和终态时间线，下方为历史阶段记录。
+- 用户已授权开始评测；新作业见本文件末尾 `Submitted reference-length pairing v3` 账本。实现/测试状态统一见 [任务 §7 h](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/AB_LIGHT_CHAIN_PAIRING.md)；下方“仅文档”条目为本次实施前的历史记录。
+- 按用户要求在 [AB 测评审计 §9](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/AB_BASELINE_EVALUATION_AUDIT.md) 登记新的长度协议决定，并同步任务手册、结果引用提示及入口文档；具体协议只维护在任务 §4.3。只修改 Markdown，未更改 CLI/wrapper/YAML、修复 sampler、启动测试或提交评测，既有分数保留。
+- 追加 PAD attention 追问的静态核查，跟踪至 LLaDA attention bias，并核对 AirGen poas 训练 collator/噪声目标；方案限制见 [任务文档 §7 i/j 第 5–7 点](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/AB_LIGHT_CHAIN_PAIRING.md)。本次未运行新的 CPU 模型测试、训练或 GPU 评测，仅更新方法说明。
+- 追加用户关于 padding、终止符与 CFG 的复核：[任务文档 §7 i/j](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/AB_LIGHT_CHAIN_PAIRING.md)。本轮实际 collator/mask/parser 的双样本 CPU 检查全部通过（退出码 0）；仅更新审计文档，未改训练/推理源码、运行模型评测或提交作业。
+- 按用户要求核查官方 baseline 与 Ours 的生成、评分和历史产物；新发现的问题及唯一证据记录见 [AB pairing §7 h](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/AB_LIGHT_CHAIN_PAIRING.md)。
+- 已在 pllm 环境用 AST 提取真实函数做四 token、两步解码的 CPU 最小诊断，退出码 0，约 4.9 秒；未加载模型、未用 GPU。结果证明状态差异，不证明模型分数变化。
+- 按下游规则同步任务缺陷、相关旧结果引用限制与方法记录；未修改采样代码、覆盖结果、提交或取消作业。修复和真实模型受控重评尚未执行。
+
+## 2026-09-13 Ophiuchus-Ab baseline 探针测评文档
+
+- 按用户要求创建 [AB baseline 测评审计与完善指南](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/AB_BASELINE_EVALUATION_AUDIT.md)，作为三个冻结表征探针的纠错台账与后续验收入口；细节只在该文档维护。
+- 已同步下游入口、范围说明旁的审计链接、结果引用警示、方法计划与项目指南；现有 headline 范围与旧数值不变。
+- 本轮只核查源码/既有产物并修改文档，未修改测评实现、提交或取消作业，也未产生新模型指标；后续修复与运行尚待执行。
+- 文档检查：本地引用目标全部存在；只读 jq 命令已验证末轮与历史记录两种聚合，确认原文件含五折、每折 100 轮；已通过所涉已跟踪文件的 diff 空白检查。
+
+## 2026-09-13 TCR baseline 评测纠错文档
+
+- 按用户要求创建 [TCR baseline 纠错记录](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/TCR_BASELINE_EVALUATION_AUDIT.md)，集中登记代码证据、问题状态、修正方案与验收要求。
+- 已同步下游任务入口、结果引用警示、方法计划和下游进展；本轮只做静态代码/官方来源审计，未修改训练或评测实现、未提交或取消作业、未产生新指标。
 
 ## 2026-09-12 Submitted v5 8-GPU immune diffusion
 
@@ -690,13 +948,13 @@ eval + 前缀截断」时代。现在 `subsample_seed=0` 走 reservoir 抽样、
 
 > Only non-terminal jobs (`Initialized` / `Queue` / `Staging` / `Running` / `Killing`). Remove a row when the job reaches `Success`, `Failed`, or `Killed`.
 
-Last updated: 2026-09-12T07:05Z
+Last updated: 2026-09-17T12:21:56Z（只读核对；BERT 看护自动重提，当前 Queue）
 
 | Task ID | Job / TaskName | 队列 | 卡数 | max_steps | 状态 |
 |---|---|---|---:|---:|---|
-| **`t-20260912021346-5xq4s`** | `protein_esmc_llada270m_diffusion_immune_v5_8gpu` | `queue012` **非闲时** | 8 | 200000 | Queue |
-| **`t-20260912035657-dd8v9`** | `protein_esmc_llada270m_bert_immune_v5_8gpu_spot` | `c20250601` **闲时** | 8 | 200000 | Queue |
-| **`t-20260911190334-kpfsz`** | `eval-ophiuchus-ab-esm-head-epochs-long` | `c20250601` **闲时** | 1 | — | Queue |
+| `t-20260917174134-kxmkk` | `protein_esmc_llada270m_bert_immune_v5_8gpu_spot` | `c20250601` 闲时 | 8 | — | Queue（看护于 09:41Z 自动重提） |
+
+已从本表移除（2026-09-17 用户授权 cancel）：`t-20260912150714-lwf28`（`protein_esmc_llada270m_diffusion_immune_v5_8gpu_c20250601`，**Killed**，End=`2026-09-17T08:13:43Z`）；`t-20260912035657-dd8v9`（`protein_esmc_llada270m_bert_immune_v5_8gpu_spot`，**Killed**，End=`2026-09-17T09:37:24Z`）。评测 / FABind 未动。
 
 已从本表移除（2026-09-12 用户授权 cancel）：`t-20260912111652-sqfcw`（`protein_esmc_llada270m_diffusion_immune_v5_8gpu_spot`，**Killed**）。正式臂与 BERT 闲时未动。
 
@@ -759,32 +1017,14 @@ repr/gen，本不该记在训练表里）。
 
 ## Active Volc Evaluation Tasks
 
-Last updated: 2026-09-11T11:03Z (UTC+8)
+Last updated: 2026-09-17T14:51:05Z（159000 AB/TCR十二项云端均Success，移出Active；四项本地亦完成）
+
+已从本表移除（2026-09-17 查询已终态）：`t-20260917015632-hx44v` pairing p0/CFG0、`t-20260917015637-5k6vp` CDR Kong、`t-20260917015642-9t4rd` CDR SAb23、`t-20260917015648-qmhgs` T1 cdr3b、`t-20260917015653-492rz` T1 cdr3ab、`t-20260917015658-blclc` T1 others_cdr3b、`t-20260917015703-xnnpp` T1 others_longab、`t-20260917015708-rsccg` T4 benchmark14、`t-20260917015713-rk77d` T4 held20（均为 **Success**）。另移出已 Killed 的 92000 闲时 pairing 残留四项：`t-20260915235443-7sb5d` / `t-20260915235447-qcz5f` / `t-20260915235450-8dvfl` / `t-20260915235454-6dmgm`。
 
 | Task ID | Job / TaskName | 队列 | 卡数 | 覆盖 | 状态 |
 |---|---|---|---|---|---|
-| **`t-20260911190334-kpfsz`** | `eval-ophiuchus-ab-esm-head-epochs-long` | `c20250601` **闲时** | 1 | Table 5 ESM head 200→300 ep | Queue |
-| `t-20260907044259-qd52v` | `eval-v3-allchains-8gpu2m-151000-repr` | `queue012` **非闲时** | 1 | T1 / T2 / T3 | Queue |
-| `t-20260907044303-ks4x6` | `eval-v3-allchains-8gpu2m-151000-cdr` | `queue012` **非闲时** | 1 | AB CDR infill | Queue |
-| `t-20260907044307-btjxr` | `eval-v3-allchains-8gpu2m-151000-pairing` | `queue012` **非闲时** | 1 | AB light pairing | Queue |
-| `t-20260907044310-wlm9h` | `eval-v3-allchains-8gpu2m-151000-t4` | `queue012` **非闲时** | 1 | T4 generation | Queue |
-| `t-20260907044314-mtzn9` | `eval-v3-genonly-8gpu2m-44000-repr` | `queue012` **非闲时** | 1 | T1 / T2 / T3 | Queue |
-| `t-20260907044317-kfhk2` | `eval-v3-genonly-8gpu2m-44000-cdr` | `queue012` **非闲时** | 1 | AB CDR infill | Queue |
-| `t-20260907044321-ht8b6` | `eval-v3-genonly-8gpu2m-44000-pairing` | `queue012` **非闲时** | 1 | AB light pairing | Queue |
-| `t-20260907044324-tcmhs` | `eval-v3-genonly-8gpu2m-44000-t4` | `queue012` **非闲时** | 1 | T4 generation | Queue |
-| `t-20260907044328-wwfjn` | `eval-v3-bert-1m-105000-repr` | `queue012` **非闲时** | 1 | T1 / T2 / T3 only | Queue |
-| `t-20260906233442-d2gzt` | `eval-v3-allchains-8gpu2m-151000-repr` | `c20250601` 闲时 | 1 | T1 / T2 / T3 | Queue（🔴 待控制台停） |
-| `t-20260907001930-qtf2s` | `eval-v3-allchains-8gpu2m-151000-cdr` | `c20250601` 闲时 | 1 | AB CDR infill | Queue（🔴 待控制台停） |
-| `t-20260906233451-fjzmm` | `eval-v3-allchains-8gpu2m-151000-pairing` | `c20250601` 闲时 | 1 | AB light pairing | Queue（🔴 待控制台停） |
-| `t-20260906233455-djlmk` | `eval-v3-allchains-8gpu2m-151000-t4` | `c20250601` 闲时 | 1 | T4 generation | Queue（🔴 待控制台停） |
-| `t-20260906233500-9f7vp` | `eval-v3-genonly-8gpu2m-44000-repr` | `c20250601` 闲时 | 1 | T1 / T2 / T3 | Queue（🔴 待控制台停） |
-| `t-20260906233504-x2n8b` | `eval-v3-genonly-8gpu2m-44000-cdr` | `c20250601` 闲时 | 1 | AB CDR infill | Queue（🔴 待控制台停） |
-| `t-20260906233508-svn2t` | `eval-v3-genonly-8gpu2m-44000-pairing` | `c20250601` 闲时 | 1 | AB light pairing | Queue（🔴 待控制台停） |
-| `t-20260906233513-mpfv5` | `eval-v3-genonly-8gpu2m-44000-t4` | `c20250601` 闲时 | 1 | T4 generation | Queue（🔴 待控制台停） |
-| `t-20260906233517-9x8kq` | `eval-v3-bert-1m-105000-repr` | `c20250601` 闲时 | 1 | T1 / T2 / T3 only | Queue（🔴 待控制台停） |
 
-> 上表后九条（`c20250601` 闲时）与前九条**同名、共用同一产物前缀**。本账号无 `StopCustomTask`
-> 权限（creator 是 `251105016`），cancel 失败，**必须到控制台停掉**，否则两批可能互相覆盖产物。
+159000 AB/TCR 云作业均已 Success，当前本表无活跃评测。历史 v3 队列警告及提交状态仅保留为当时记录。
 
 > **2026-08-25 23:47 收口**：SAb23H2 sweep 与 pairing `max_iter=124` 均已 Success，数字写入 `downstream/benchmark/RESULTS.md` §0.5 / §0.6。活跃 `eval-immune-*` 列表为空。SAbDab Kong + 官方 ckpt 复现已在 §0.5。仍待做：T4-held20 immune 语料泄露报告、T4 sparse-13 重评分。
 
@@ -2310,3 +2550,729 @@ H1 任意步数精确命中、H2 稳定高 0.5、H3 最好仍差 1.55 pp。**同
 - **Tags 纪律**：YAML Tags 最多 3 个短标签。本文件与
   `examples/llada/PROTEIN_PRETRAIN_PROGRESS.md` 写口径。
   已提交的 `lwf28` 平台侧 Tags 仍是长列表（改 YAML 不回写）；之后新提按短标签。
+
+## 2026-09-13 Submitted reference-length pairing v3
+
+- 操作：submit；用户要求“开始测试进行评价”。
+- task_id：`t-20260913180327-vszq6`；任务名 `eval-immune-270m-42000-pairing-reference-v3`。
+- **终态复核（19:01Z）**：平台 **Success**，End=`2026-09-13T12:59:20Z`，Start=`2026-09-13T10:03:28Z`，总墙钟 2:55:52（含 pilot 与 full）。全量生成约 2:21:33；完整 CSV / metrics 已落盘并通过核验，数值唯一记录在 [RESULTS §0.6 全量](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/RESULTS.md)。已从两个 Active 表移除本任务；未修改或取消其他作业。本轮只读核验产物、复跑 CPU 回归并同步文档，没有新 GPU 作业。
+- 12:23Z 状态复核：平台仍为 **Running**；全量 generation log 为 220/250 batch，即 440/500 条重链、3,520/4,000 个候选（88%）。按当前日志 ETA，生成约剩 17 分钟；之后才开始全量 ImmunoMatch / ANARCI 评分，全量 metrics 尚未落盘。本轮没有重提、取消或更改参数。
+- YAML：`/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_immune_270m_42000_pairing_reference_v3.yml`。
+- 提交时刻：2026-09-13T10:03:27Z；首次查询 10:04Z 为 **Running**，平台 Start=10:03:28Z。
+- 10:19Z 阶段更新：pilot32 的 CSV / metrics 已完整落盘并通过逐行复核；新数值见 [RESULTS §0.6 预检](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/RESULTS.md)。同一作业 full500 已启动并写出 manifest、首批进度；仍为 Running，未完成全量评价。pilot 生成约 9 分钟；按 full 首批约 33 秒 / 2 条重链估计，完整生成约需 2.3 小时，另加评分，属估计而非完成承诺。
+- 资源：`c20250601` / `q-20260121145036-6fztt`，1×`ml.pni2.3xlarge`，**Preemptible: false**，最长 12 小时。
+- checkpoint：`/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/protein_esmc_llada270m_diffusion_immune/checkpoint-42000`；沿用历史 270M 快照作本次评测，不改训练任务。
+- 顺序：固定前 32 条重链预检评分，再完整 500 条；每条 n=8，prompt3，reference 长度，gumbel_argmax，iter124，cfg0，seed42，heavy batch=2。32 条只作 pilot，不代替全量结论。
+- 产物根：`/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/ab_pairing_reference_v3_20260913_270m42000/`；每阶段单独 CSV、manifest、generation/scoring log、metrics JSON。
+- 环境：先激活 pllm 跑 CPU regression；真实生成与评分显式用既有 `protenix_abtcr` Python（ESMC/ANARCI/ImmunoMatch 依赖齐全）。未向共享环境安装包；已通过实际 checkpoint 的 CPU load + tokenizer/collator 检查。
+- 本次只更新评测代码与必要的共享 mask-ID helper 提取（行为不变），未修改训练 recipe、提交训练或覆盖旧结果。具体修复和测试边界见任务文档，不把运行中当成已出分。
+
+## 2026-09-13 Submitted TCR others CDR3ab v5
+
+- 操作：submit；用户授权实现并测试 others 数据的 CDR3α 输入版本。
+- task_id：`t-20260913180748-44599`；任务名 `eval-tcr-others-cdr3ab-v5-29000`；提交时刻约 2026-09-13T10:07:48Z，首次查询 10:08Z 为 **Running**，平台 Start=10:07:48Z。
+- 终态：**Success**；平台 End=2026-09-13T10:10:40Z，Elapsed=172 秒；10:11Z 核验后从 Active 表移除。五折×三个测试集均完成；15 份预测逐行、字段、标签、hash、重算指标与汇总检查通过，详见审计 §9；未提交/取消其他任务。
+- YAML：`/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_tcr_others_cdr3ab_v5_29000.yml`。
+- 资源：`c20250601`，1×`ml.pni2.3xlarge`，**Preemptible: false**，最长 4 小时；没有修改/取消任何预训练任务。
+- 实验配置、checkpoint 快照、数据/代码身份和 CPU 验证见 [TCR 审计 §9：others 第一版](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/TCR_BASELINE_EVALUATION_AUDIT.md)；不是全参数微调，也不是全部 others 字段 baseline 复现。
+- 日志：`/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/eval_tcr_others_cdr3ab_v5_29000.log`；结果根：`/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/outputs/tcr_binding_nm2025_retrained/ours_v5_29000_others_cdr3ab_masked_runtime_v2/cdr3ab/AS/`。
+
+## 2026-09-13 TCR others spot submit：CLI 配置校验失败（未创建任务）
+
+- 操作：submit；用户要求使用闲时资源开始测试。任务名 `eval-tcr-others-cdr3ab-v5-29000-spot`；YAML：`/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_tcr_others_cdr3ab_v5_29000_spot.yml`；配置 **Preemptible: true**。
+- 10:27Z 首次尝试在本地 CLI 解析时退出：`cannot unmarshal !!seq into common.RetryOptions`。没有创建远端任务、没有 task_id 或平台初始状态；Active 表不增加虚假任务行，其他任务未动。
+- 已将 RetryOptions 从旧模板的列表形式修为当前 CLI 所需的映射形式；仅修新 eval YAML，不修改原实验或历史训练 YAML。校验后再次 submit，成功任务另记下方。
+
+## 2026-09-13 Submitted TCR others CDR3ab v5 spot
+
+- 操作：submit（修复本地配置解析后再次提交，非重复运行中的任务）；task_id=`t-20260913182826-c4pw2`；任务名 `eval-tcr-others-cdr3ab-v5-29000-spot`。平台 CreateTime=2026-09-13 10:28:26，首次查询状态 **Queue**，`LaunchTime` 为空，尚未真正启动。平台 `Start` 在排队时也有值，不能以该字段宣称已经开始计算。
+- 10:30Z 再次查询仍为 **Queue**、LaunchTime 为空、Preemptible=true；本次交接为已提交等待调度，非测试完成。
+- YAML：`/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_tcr_others_cdr3ab_v5_29000_spot.yml`。
+- 资源：`c20250601` / `q-20260121145036-6fztt`，单卡 `ml.pni2.3xlarge`；`ml_task get --format` 已确认 **Preemptible: true**。YAML ActiveDeadlineSeconds=14400；仅 InstanceReclaimed 自动重试，最多 3 次、间隔 180 秒，不启用无限重提或额外看护进程。
+- 协议/恢复边界和独立输出路径见 [TCR 审计 §9.3](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/TCR_BASELINE_EVALUATION_AUDIT.md)；保留非闲时已完成实验，不修改/取消任何其他任务。此次新实验的分数不能沿用前一个 tag。
+
+## 2026-09-13 Cancel TCR others spot：用户改用本地测试
+
+- 操作：cancel；用户明确要求取消排队任务，不再提交任务，改用本地测试。
+- task_id=`t-20260913182826-c4pw2`；任务名 `eval-tcr-others-cdr3ab-v5-29000-spot`；YAML：`/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_tcr_others_cdr3ab_v5_29000_spot.yml`；队列 c20250601，**Preemptible: true**。
+- 取消前状态 Queue、LaunchTime 为空；11:16Z CLI 返回 `cancel success`，随后确认终态 **Killed**、End=2026-09-13T11:16:17Z、LaunchTime 仍为空，已从 Active 表移除。没有启动过模型计算；不取消其他任务、不自动重提本任务、不删除已有快照/代码/结果。
+- 本地只读资源检查发现 A100-SXM4-80GB 上已有两个计算进程，15,220 MiB 显存占用、GPU 利用率 88%；没有终止这些进程或立即叠加新的本地模型评测。具体执行边界登记于 [TCR 审计 §9.4](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/TCR_BASELINE_EVALUATION_AUDIT.md)。
+
+## 2026-09-13 Submitted TCR others nonspot rerun
+
+- 操作：submit；用户最新明确授权“如果本地不行，可以提交一个非闲时资源的卡”。本地 GPU 仍有占卡脚本和 FABind 训练，不终止或叠加这些进程；提交前查询无同范围在途 TCR others 任务。
+- task_id=`t-20260913192406-hxhfb`；任务名 `eval-tcr-others-cdr3ab-v5-29000-nonspot`；平台 CreateTime=2026-09-13 11:24:07，LaunchTime=11:24:33，首次查询为 **Running**。
+- 终态 **Success**，End=2026-09-13T11:27:24Z，平台 Elapsed=197 秒（包含提交到启动的等待）；11:28Z 核验后从 Active 表移除。五折×三测试集全部完成，产物复核见审计 §9.5；不是读取旧缓存后直接退出。
+- YAML：`/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_tcr_others_cdr3ab_v5_29000_nonspot.yml`。
+- 资源：c20250601 / q-20260121145036-6fztt，1×ml.pni2.3xlarge，平台 get 已确认 **Preemptible: false**，YAML ActiveDeadlineSeconds=14400；没有重新启用已取消的闲时任务，没有提交预训练或修改其他作业。
+- 独立重评的协议、tag/缓存/日志及验证状态见 [TCR 审计 §9.5](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/TCR_BASELINE_EVALUATION_AUDIT.md)。本次不是 full finetuning，也不是更换模型后的新实验；不覆盖此前已完成的同协议五折结果。
+
+## 2026-09-13 Submitted TCR v5 beta-only control on others
+
+- 操作：submit；用户要求测试 v5 checkpoint，承接同 others 数据的 β-only 对照。沿用此前允许的单卡非闲时方式；本地 GPU 利用率 95%，未动已有进程；提交前无同范围在途 TCR 任务。
+- task_id=`t-20260913202402-c9hf5`；任务名 `eval-tcr-others-cdr3b-v5-29000-nonspot`；Start=2026-09-13T12:24:02Z，首次查询 **Staging**。
+- 12:25Z 确认 **Running**，新日志显示加载同一 29k 权重并开始抽取 18,868 个 peptide/beta 输入。
+- 终态 **Success**，LaunchTime=2026-09-13T12:24:32Z，End=2026-09-13T12:27:40Z；平台 Elapsed=218 秒，Launch→End=188 秒；平台确认 Preemptible=false。已从 Active 表移除，15 份预测与原始官方行集及重算指标核验通过，见审计 §9.6；指标唯一归档于 RESULTS §0.1b。
+- YAML：`/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_tcr_others_cdr3b_v5_29000_nonspot.yml`；c20250601 / q-20260121145036-6fztt，1×ml.pni2.3xlarge；配置 **Preemptible: false**，ActiveDeadlineSeconds=14400。
+- 数据/代码/模型身份、43 项 CPU 回归及独立产物目录见 [TCR 审计 §9.6](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/TCR_BASELINE_EVALUATION_AUDIT.md)。提交时尚无新指标；不是大 β-only 数据集重跑、全参数微调或官方 baseline 重训。
+
+## 2026-09-13 Submitted TCR v5 LongAB control on others
+
+- 操作：submit；用户批准 LongA/LongB 版本及相同 v5 29k、相同 others/AS 五折测试。提交前无在途 TCR 作业，本地 A100 利用率 87%，未干扰现有进程。
+- task_id=`t-20260914005618-vr2nb`；TaskName=`eval-tcr-others-longab-v5-29000-nonspot`；首次查询 **Running**，CreateTime=2026-09-13T16:56:19Z，LaunchTime=16:56:37Z，平台确认 Preemptible=false。任务 ID 使用平台命名日期，本记录使用 UTC。
+- 终态 **Success**，End=2026-09-13T16:59:36Z，提交至结束 197 秒，Launch→End=179 秒；17:00Z 从 Active 表移除。全部 15 份预测、原始行/标签及 hash、指标重算、五折汇总、训练内标准化核验通过。新分数仅归档于 RESULTS §0.1c；未重新提交或取消其他作业。
+- YAML：[eval_tcr_others_longab_v5_29000_nonspot.yml](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_tcr_others_longab_v5_29000_nonspot.yml)；c20250601，1×ml.pni2.3xlarge，配置 **Preemptible=false**，ActiveDeadlineSeconds=14400。
+- 协议、独立输出/cache/tag 与 55 项 CPU 回归见 [TCR 审计 §9.7](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/TCR_BASELINE_EVALUATION_AUDIT.md)。提交时没有 LongAB 新指标；旧 β-only/CDR3αβ 结果不覆盖。
+
+## 2026-09-13 Submitted Ours AB v5 49000 preflight
+
+- 操作：submit；task_id=`t-20260914045427-6lsdw`；TaskName=`ab-v5-49000-llada-20260913-preflight`；首次查询 Staging，CreateTime=2026-09-13T20:54:28Z。
+- YAML：[eval_ab_v5_49000_llada_20260913_preflight.yml](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_ab_v5_49000_llada_20260913_preflight.yml)；c20250601 / ml.pni2.3xlarge / 1 replica / 1 GPU；**Preemptible:false，非闲时、非抢占**。仅 GPU 执行门禁，不产出正式成绩。
+- 用户指定用最新 v5；20:50Z 核对两条 diffusion 保存点，c20250601 最新为 49000，queue012 为 40000；选前者。trainer_state.global_step=49000，最新 eval_loss=0.760879465386504；不是按最优 loss 选模。
+- 源：[checkpoint-49000](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/protein_esmc_llada270m_diffusion_immune_v5_8gpu_c20250601/checkpoint-49000)；独立评测快照：[ab_v5_49000_llada_20260913](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/ab_eval_checkpoints/ab_v5_49000_llada_20260913)。复制前后权重 SHA256 一致：`d5f892bce7d18106a7c417a3e4605f2bf1feac2bfa80709ca74fb149e5c07d92`；不复制优化器，不改变训练任务。
+- 11项正式作业配置已生成，见 [job_plan.json](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/ab_v5_49000_llada_20260913/job_plan.json)；提交以 GPU gate 通过为前提。30项 CPU 回归通过。
+- 终态 **Success**，End=2026-09-13T20:56:02Z，20:56Z 从两张 Active 表移除；A100-80GB 真实模型加载、3任务16样本表征、6种prompt/CFG、9种CDR模式全部通过，服务器端30项测试通过。原始门禁报告：[passed.json](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/ab_v5_49000_llada_20260913/preflight/passed.json)。预检只验证执行不变量，不作为正式质量结果。
+
+## 2026-09-13 Submitted Ours AB v5 49000 pair-p0-cfg0
+
+- 操作：submit；task_id=`t-20260914045749-mv7sv`；TaskName=`ab-v5-49000-llada-20260913-pair-p0-cfg0`；首次查询 Queue，查询时间 2026-09-13T20:57:52Z。
+- YAML：[eval_ab_v5_49000_llada_20260913_pair-p0-cfg0.yml](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_ab_v5_49000_llada_20260913_pair-p0-cfg0.yml)；c20250601 / ml.pni2.3xlarge / 1 replica / 1 GPU；**Preemptible:false，非闲时、非抢占**。
+- 统一独立评测快照：[ab_v5_49000_llada_20260913](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/ab_eval_checkpoints/ab_v5_49000_llada_20260913)；实验计划与产物根：[ab_v5_49000_llada_20260913](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/ab_v5_49000_llada_20260913)。本条是提交记录，不代表评测完成。
+
+## 2026-09-13 Submitted Ours AB v5 49000 pair-p0-cfg1
+
+- 操作：submit；task_id=`t-20260914045802-jxn8p`；TaskName=`ab-v5-49000-llada-20260913-pair-p0-cfg1`；首次查询 Queue，查询时间 2026-09-13T20:58:05Z。
+- YAML：[eval_ab_v5_49000_llada_20260913_pair-p0-cfg1.yml](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_ab_v5_49000_llada_20260913_pair-p0-cfg1.yml)；c20250601 / ml.pni2.3xlarge / 1 replica / 1 GPU；**Preemptible:false，非闲时、非抢占**。
+- 统一独立评测快照：[ab_v5_49000_llada_20260913](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/ab_eval_checkpoints/ab_v5_49000_llada_20260913)；实验计划与产物根：[ab_v5_49000_llada_20260913](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/ab_v5_49000_llada_20260913)。本条是提交记录，不代表评测完成。
+
+## 2026-09-13 Submitted Ours AB v5 49000 pair-p0-cfg1p5
+
+- 操作：submit；task_id=`t-20260914045806-sgrlb`；TaskName=`ab-v5-49000-llada-20260913-pair-p0-cfg1p5`；首次查询 Waiting，查询时间 2026-09-13T20:58:08Z。
+- YAML：[eval_ab_v5_49000_llada_20260913_pair-p0-cfg1p5.yml](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_ab_v5_49000_llada_20260913_pair-p0-cfg1p5.yml)；c20250601 / ml.pni2.3xlarge / 1 replica / 1 GPU；**Preemptible:false，非闲时、非抢占**。
+- 统一独立评测快照：[ab_v5_49000_llada_20260913](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/ab_eval_checkpoints/ab_v5_49000_llada_20260913)；实验计划与产物根：[ab_v5_49000_llada_20260913](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/ab_v5_49000_llada_20260913)。本条是提交记录，不代表评测完成。
+
+## 2026-09-13 Submitted Ours AB v5 49000 pair-p3-cfg0
+
+- 操作：submit；task_id=`t-20260914045810-ss6ml`；TaskName=`ab-v5-49000-llada-20260913-pair-p3-cfg0`；首次查询 Waiting，查询时间 2026-09-13T20:58:13Z。
+- YAML：[eval_ab_v5_49000_llada_20260913_pair-p3-cfg0.yml](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_ab_v5_49000_llada_20260913_pair-p3-cfg0.yml)；c20250601 / ml.pni2.3xlarge / 1 replica / 1 GPU；**Preemptible:false，非闲时、非抢占**。
+- 统一独立评测快照：[ab_v5_49000_llada_20260913](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/ab_eval_checkpoints/ab_v5_49000_llada_20260913)；实验计划与产物根：[ab_v5_49000_llada_20260913](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/ab_v5_49000_llada_20260913)。本条是提交记录，不代表评测完成。
+
+## 2026-09-13 Submitted Ours AB v5 49000 pair-p3-cfg1
+
+- 操作：submit；task_id=`t-20260914045814-csgm4`；TaskName=`ab-v5-49000-llada-20260913-pair-p3-cfg1`；首次查询 Waiting，查询时间 2026-09-13T20:58:16Z。
+- YAML：[eval_ab_v5_49000_llada_20260913_pair-p3-cfg1.yml](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_ab_v5_49000_llada_20260913_pair-p3-cfg1.yml)；c20250601 / ml.pni2.3xlarge / 1 replica / 1 GPU；**Preemptible:false，非闲时、非抢占**。
+- 统一独立评测快照：[ab_v5_49000_llada_20260913](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/ab_eval_checkpoints/ab_v5_49000_llada_20260913)；实验计划与产物根：[ab_v5_49000_llada_20260913](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/ab_v5_49000_llada_20260913)。本条是提交记录，不代表评测完成。
+
+## 2026-09-13 Submitted Ours AB v5 49000 pair-p3-cfg1p5
+
+- 操作：submit；task_id=`t-20260914045817-trh7j`；TaskName=`ab-v5-49000-llada-20260913-pair-p3-cfg1p5`；首次查询 Waiting，查询时间 2026-09-13T20:58:20Z。
+- YAML：[eval_ab_v5_49000_llada_20260913_pair-p3-cfg1p5.yml](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_ab_v5_49000_llada_20260913_pair-p3-cfg1p5.yml)；c20250601 / ml.pni2.3xlarge / 1 replica / 1 GPU；**Preemptible:false，非闲时、非抢占**。
+- 统一独立评测快照：[ab_v5_49000_llada_20260913](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/ab_eval_checkpoints/ab_v5_49000_llada_20260913)；实验计划与产物根：[ab_v5_49000_llada_20260913](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/ab_v5_49000_llada_20260913)。本条是提交记录，不代表评测完成。
+
+## 2026-09-13 Submitted Ours AB v5 49000 specificity
+
+- 操作：submit；task_id=`t-20260914045834-cfk6n`；TaskName=`ab-v5-49000-llada-20260913-specificity`；首次查询 Waiting，查询时间 2026-09-13T20:58:36Z。
+- YAML：[eval_ab_v5_49000_llada_20260913_specificity.yml](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_ab_v5_49000_llada_20260913_specificity.yml)；c20250601 / ml.pni2.3xlarge / 1 replica / 1 GPU；**Preemptible:false，非闲时、非抢占**。
+- 统一独立评测快照：[ab_v5_49000_llada_20260913](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/ab_eval_checkpoints/ab_v5_49000_llada_20260913)；实验计划与产物根：[ab_v5_49000_llada_20260913](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/ab_v5_49000_llada_20260913)。本条是提交记录，不代表评测完成。
+
+## 2026-09-13 Submitted Ours AB v5 49000 gdp_a1
+
+- 操作：submit；task_id=`t-20260914045837-2lp8v`；TaskName=`ab-v5-49000-llada-20260913-gdp-a1`；首次查询 Waiting，查询时间 2026-09-13T20:58:40Z。
+- YAML：[eval_ab_v5_49000_llada_20260913_gdp_a1.yml](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_ab_v5_49000_llada_20260913_gdp_a1.yml)；c20250601 / ml.pni2.3xlarge / 1 replica / 1 GPU；**Preemptible:false，非闲时、非抢占**。
+- 统一独立评测快照：[ab_v5_49000_llada_20260913](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/ab_eval_checkpoints/ab_v5_49000_llada_20260913)；实验计划与产物根：[ab_v5_49000_llada_20260913](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/ab_v5_49000_llada_20260913)。本条是提交记录，不代表评测完成。
+
+## 2026-09-13 Submitted Ours AB v5 49000 m396
+
+- 操作：submit；task_id=`t-20260914045841-v242p`；TaskName=`ab-v5-49000-llada-20260913-m396`；首次查询 Waiting，查询时间 2026-09-13T20:58:44Z。
+- YAML：[eval_ab_v5_49000_llada_20260913_m396.yml](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_ab_v5_49000_llada_20260913_m396.yml)；c20250601 / ml.pni2.3xlarge / 1 replica / 1 GPU；**Preemptible:false，非闲时、非抢占**。
+- 统一独立评测快照：[ab_v5_49000_llada_20260913](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/ab_eval_checkpoints/ab_v5_49000_llada_20260913)；实验计划与产物根：[ab_v5_49000_llada_20260913](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/ab_v5_49000_llada_20260913)。本条是提交记录，不代表评测完成。
+
+## 2026-09-13 Submitted Ours AB v5 49000 cdr-kong
+
+- 操作：submit；task_id=`t-20260914045845-pgvzj`；TaskName=`ab-v5-49000-llada-20260913-cdr-kong`；首次查询 Waiting，查询时间 2026-09-13T20:58:48Z。
+- YAML：[eval_ab_v5_49000_llada_20260913_cdr-kong.yml](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_ab_v5_49000_llada_20260913_cdr-kong.yml)；c20250601 / ml.pni2.3xlarge / 1 replica / 1 GPU；**Preemptible:false，非闲时、非抢占**。
+- 统一独立评测快照：[ab_v5_49000_llada_20260913](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/ab_eval_checkpoints/ab_v5_49000_llada_20260913)；实验计划与产物根：[ab_v5_49000_llada_20260913](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/ab_v5_49000_llada_20260913)。本条是提交记录，不代表评测完成。
+
+## 2026-09-13 Submitted Ours AB v5 49000 cdr-sab23
+
+- 操作：submit；task_id=`t-20260914045849-zgkfs`；TaskName=`ab-v5-49000-llada-20260913-cdr-sab23`；首次查询 Waiting，查询时间 2026-09-13T20:58:52Z。
+- YAML：[eval_ab_v5_49000_llada_20260913_cdr-sab23.yml](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_ab_v5_49000_llada_20260913_cdr-sab23.yml)；c20250601 / ml.pni2.3xlarge / 1 replica / 1 GPU；**Preemptible:false，非闲时、非抢占**。
+- 统一独立评测快照：[ab_v5_49000_llada_20260913](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/ab_eval_checkpoints/ab_v5_49000_llada_20260913)；实验计划与产物根：[ab_v5_49000_llada_20260913](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/ab_v5_49000_llada_20260913)。本条是提交记录，不代表评测完成。
+
+## 2026-09-13 Ours AB v5 49000 matrix submission complete
+
+- 11项正式任务全部提交；2026-09-13T20:59:14Z 逐项查询为5项 Running、6项 Queue，另独立 GPU preflight 已 Success。Active 表仅保留正式在途任务；后续状态以重新查询为准。
+- 全部使用同一快照、独立单卡非闲时（Preemptible:false）。机器可读任务索引：[submissions.json](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/ab_v5_49000_llada_20260913/submissions.json)；准确 YAML 与首次状态见上方逐项 dated 条目。
+- pairing 全量六组各500×8候选、iter124；三个原生探针及两套 CDR 数据分别运行。门禁短迭代序列不混入正式 CSV；尚无完整测评成绩，也未覆盖旧 baseline/旧42000结果。
+
+## 2026-09-13 Submitted TCR 49000 t1-cdr3b
+
+- submit：`t-20260914062343-ppw4j`，TaskName=`tcr-v5-49000-20260913-t1-cdr3b`；首次查询 Queue（2026-09-13T22:24Z）。c20250601 / ml.pni2.3xlarge / 单卡；Preemptible:false（非闲时）。
+- YAML：[eval_tcr_v5_49000_20260913_t1-cdr3b.yml](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_tcr_v5_49000_20260913_t1-cdr3b.yml)。固定同一 v5 49000 快照；全 5 folds × 3 test sets，冻结骨干 + MLP，不是全参微调。
+- Binding GPU gate 已通过；提交不代表质量评测完成。
+
+## 2026-09-13 Submitted TCR 49000 t1-cdr3ab
+
+- submit：`t-20260914062429-xhj5d`，TaskName=`tcr-v5-49000-20260913-t1-cdr3ab`；首次查询 Queue（2026-09-13T22:24:57Z）。c20250601 / ml.pni2.3xlarge / 单卡；Preemptible:false（非闲时）。
+- YAML：[eval_tcr_v5_49000_20260913_t1-cdr3ab.yml](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_tcr_v5_49000_20260913_t1-cdr3ab.yml)。同一 v5 49000 快照；全 5 folds × 3 test sets，冻结骨干 + MLP。
+- 提交记录结束：`t-20260914062429-xhj5d`；通过 binding GPU gate，不等于质量评测完成。
+
+## 2026-09-13 Submitted TCR 49000 t1-others_cdr3b
+
+- submit：`t-20260914062458-rzd6q`，TaskName=`tcr-v5-49000-20260913-t1-others-cdr3b`；首次查询 Queue（2026-09-13T22:25:01Z）。c20250601 / ml.pni2.3xlarge / 单卡；Preemptible:false（非闲时）。
+- YAML：[eval_tcr_v5_49000_20260913_t1-others_cdr3b.yml](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_tcr_v5_49000_20260913_t1-others_cdr3b.yml)。同一 v5 49000 快照；全 5 folds × 3 test sets，冻结骨干 + MLP。
+- 提交记录结束：`t-20260914062458-rzd6q`；通过 binding GPU gate，不等于质量评测完成。
+
+## 2026-09-13 Submitted TCR 49000 t1-others_longab
+
+- submit：`t-20260914062502-nj89p`，TaskName=`tcr-v5-49000-20260913-t1-others-longab`；首次查询 Queue（2026-09-13T22:25:04Z）。c20250601 / ml.pni2.3xlarge / 单卡；Preemptible:false（非闲时）。
+- YAML：[eval_tcr_v5_49000_20260913_t1-others_longab.yml](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_tcr_v5_49000_20260913_t1-others_longab.yml)。同一 v5 49000 快照；全 5 folds × 3 test sets，冻结骨干 + MLP。
+- 提交记录结束：`t-20260914062502-nj89p`；通过 binding GPU gate，不等于质量评测完成。
+
+## 2026-09-13 Submitted TCR 49000 t2a
+
+- submit：`t-20260914063213-6twth`，TaskName=`tcr-v5-49000-20260913-t2a`；首次查询 Waiting（2026-09-13T22:32:16Z）。c20250601 / ml.pni2.3xlarge / 单卡；Preemptible:false（非闲时）。
+- YAML：[eval_tcr_v5_49000_20260913_t2a.yml](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_tcr_v5_49000_20260913_t2a.yml)。同一 v5 49000 快照；运行时 v5 补全、无表位/结合标签输入、observed-only 池化。T3 标为本地对照，不冒称论文同版复现。
+- 提交记录结束：`t-20260914063213-6twth`；T2/T3 GPU gate 和 5 项运行环境回归已通过，不等于质量评测完成。
+
+## 2026-09-13 Submitted TCR 49000 t2b
+
+- submit：`t-20260914063217-fmff2`，TaskName=`tcr-v5-49000-20260913-t2b`；首次查询 Waiting（2026-09-13T22:32:20Z）。c20250601 / ml.pni2.3xlarge / 单卡；Preemptible:false（非闲时）。
+- YAML：[eval_tcr_v5_49000_20260913_t2b.yml](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_tcr_v5_49000_20260913_t2b.yml)。同一 v5 49000 快照；运行时 v5 补全、无表位/结合标签输入、observed-only 池化。T3 标为本地对照，不冒称论文同版复现。
+- 提交记录结束：`t-20260914063217-fmff2`；T2/T3 GPU gate 和 5 项运行环境回归已通过，不等于质量评测完成。
+
+## 2026-09-13 Submitted TCR 49000 t3deep
+
+- submit：`t-20260914063220-gnnsk`，TaskName=`tcr-v5-49000-20260913-t3deep`；首次查询 Waiting（2026-09-13T22:32:23Z）。c20250601 / ml.pni2.3xlarge / 单卡；Preemptible:false（非闲时）。
+- YAML：[eval_tcr_v5_49000_20260913_t3deep.yml](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_tcr_v5_49000_20260913_t3deep.yml)。同一 v5 49000 快照；运行时 v5 补全、无表位/结合标签输入、observed-only 池化。T3 标为本地对照，不冒称论文同版复现。
+- 提交记录结束：`t-20260914063220-gnnsk`；T2/T3 GPU gate 和 5 项运行环境回归已通过，不等于质量评测完成。
+
+## 2026-09-13 Submitted TCR 49000 t3broad
+
+- submit：`t-20260914063224-dghz2`，TaskName=`tcr-v5-49000-20260913-t3broad`；首次查询 Waiting（2026-09-13T22:32:27Z）。c20250601 / ml.pni2.3xlarge / 单卡；Preemptible:false（非闲时）。
+- YAML：[eval_tcr_v5_49000_20260913_t3broad.yml](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_tcr_v5_49000_20260913_t3broad.yml)。同一 v5 49000 快照；运行时 v5 补全、无表位/结合标签输入、observed-only 池化。T3 标为本地对照，不冒称论文同版复现。
+- 提交记录结束：`t-20260914063224-dghz2`；T2/T3 GPU gate 和 5 项运行环境回归已通过，不等于质量评测完成。
+
+## 2026-09-13 Submitted TCR 49000 t4-benchmark14
+
+- submit：`t-20260914064033-ktgjc`，TaskName=`tcr-v5-49000-20260913-t4-benchmark14`；首次查询 Waiting（2026-09-13T22:40:35Z）。c20250601 / ml.pni2.3xlarge / 单卡；Preemptible:false（非闲时）。
+- YAML：[eval_tcr_v5_49000_20260913_t4-benchmark14.yml](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_tcr_v5_49000_20260913_t4-benchmark14.yml)。同一 v5 49000 快照，任务定义与门禁见 [T4 §8.0](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/TCR_T4_GENERATION.md)。双链生成未提交。
+- 提交记录结束：`t-20260914064033-ktgjc`；T4 专属 GPU gate 与 5 项 CPU 回归通过，不等于生成评分完成。
+
+## 2026-09-13 Submitted TCR 49000 t4-held20
+
+- submit：`t-20260914064037-74plf`，TaskName=`tcr-v5-49000-20260913-t4-held20`；首次查询 Waiting（2026-09-13T22:40:39Z）。c20250601 / ml.pni2.3xlarge / 单卡；Preemptible:false（非闲时）。
+- YAML：[eval_tcr_v5_49000_20260913_t4-held20.yml](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_tcr_v5_49000_20260913_t4-held20.yml)。同一 v5 49000 快照，任务定义与门禁见 [T4 §8.0](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/TCR_T4_GENERATION.md)。双链生成未提交。
+- 提交记录结束：`t-20260914064037-74plf`；T4 专属 GPU gate 与 5 项 CPU 回归通过，不等于生成评分完成。
+
+## 2026-09-13 TCR 49000 当前矩阵提交完成
+
+- 2026-09-13T22:43:13Z 查询十项新 TCR 作业，全部 Queue；排队不等于开始运行或完成。准确 YAML/ID/状态索引：[submissions.json](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/tcr_v5_49000_20260913/submissions.json)。
+- 三类 GPU gate 已通过；实际运行环境联合回归 71 passed，新增脚本 py_compile 通过。关键改动、范围及可引用性限制见 [TCR 审计 §9.21](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/TCR_BASELINE_EVALUATION_AUDIT.md)。
+- 正式结果未完成；只收指定 49000，不拼接旧 checkpoint。双链生成延后、未提交；未取消/修改既有 AB 或训练作业。
+
+## 2026-09-13 Cancel stale TCR 49000 t2a for scoring re-audit
+
+- cancel：`t-20260914063213-6twth`，TaskName=`tcr-v5-49000-20260913-t2a`；2026-09-13T22:56:52Z 取消前 Queue、CLI cancel success，随即查询终态 Killed。
+- YAML：[eval_tcr_v5_49000_20260913_t2a.yml](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_tcr_v5_49000_20260913_t2a.yml)；Preemptible:false，c20250601 / ml.pni2.3xlarge / 单卡。
+- 原因：T2A retention 锚点仍是旧 universe、阈值有损取整；修复会改变 T2/T3 共用验收指纹，四项均先取消旧提交，重新验收后按新版本重提。T1/T4 保留。
+- 取消记录结束：`t-20260914063213-6twth`；不删除历史 gate/YAML/结果，不操作 AB 或训练作业。
+
+## 2026-09-13 Cancel stale TCR 49000 t2b for scoring re-audit
+
+- cancel：`t-20260914063217-fmff2`，TaskName=`tcr-v5-49000-20260913-t2b`；2026-09-13T22:56:53Z 取消前 Queue、CLI cancel success，随即查询终态 Killed。
+- YAML：[eval_tcr_v5_49000_20260913_t2b.yml](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_tcr_v5_49000_20260913_t2b.yml)；Preemptible:false，c20250601 / ml.pni2.3xlarge / 单卡。
+- 原因：T2A retention 锚点仍是旧 universe、阈值有损取整；修复会改变 T2/T3 共用验收指纹，四项均先取消旧提交，重新验收后按新版本重提。T1/T4 保留。
+- 取消记录结束：`t-20260914063217-fmff2`；不删除历史 gate/YAML/结果，不操作 AB 或训练作业。
+
+## 2026-09-13 Cancel stale TCR 49000 t3deep for scoring re-audit
+
+- cancel：`t-20260914063220-gnnsk`，TaskName=`tcr-v5-49000-20260913-t3deep`；2026-09-13T22:56:54Z 取消前 Queue、CLI cancel success，随即查询终态 Killed。
+- YAML：[eval_tcr_v5_49000_20260913_t3deep.yml](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_tcr_v5_49000_20260913_t3deep.yml)；Preemptible:false，c20250601 / ml.pni2.3xlarge / 单卡。
+- 原因：T2A retention 锚点仍是旧 universe、阈值有损取整；修复会改变 T2/T3 共用验收指纹，四项均先取消旧提交，重新验收后按新版本重提。T1/T4 保留。
+- 取消记录结束：`t-20260914063220-gnnsk`；不删除历史 gate/YAML/结果，不操作 AB 或训练作业。
+
+## 2026-09-13 Cancel stale TCR 49000 t3broad for scoring re-audit
+
+- cancel：`t-20260914063224-dghz2`，TaskName=`tcr-v5-49000-20260913-t3broad`；2026-09-13T22:56:55Z 取消前 Queue、CLI cancel success，随即查询终态 Killed。
+- YAML：[eval_tcr_v5_49000_20260913_t3broad.yml](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_tcr_v5_49000_20260913_t3broad.yml)；Preemptible:false，c20250601 / ml.pni2.3xlarge / 单卡。
+- 原因：T2A retention 锚点仍是旧 universe、阈值有损取整；修复会改变 T2/T3 共用验收指纹，四项均先取消旧提交，重新验收后按新版本重提。T1/T4 保留。
+- 取消记录结束：`t-20260914063224-dghz2`；不删除历史 gate/YAML/结果，不操作 AB 或训练作业。
+
+## 2026-09-13 Submitted TCR 49000 suite audit
+
+- submit：`t-20260914070810-2k5j8`，TaskName=`tcr-v5-49000-20260913-suite-audit`；2026-09-13T23:08:46Z 首次查询 Queue。
+- YAML：[eval_tcr_v5_49000_20260913_suite-audit.yml](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_tcr_v5_49000_20260913_suite-audit.yml)；与 AB 预检同资源：c20250601 / ml.pni2.3xlarge / 1 GPU / Preemptible:false，3600 秒。
+- 本地 A100-80GB 已通过 T1 四轨、T2 A/B、T3 deep/broad、T4 两数据集的小样本执行评分验收及 81 项回归；云端额外重新验证实际运行环境。gate：[suite_audit_local_v2/passed.json](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/tcr_v5_49000_20260913/suite_audit_local_v2/passed.json)。
+- 提交记录结束：`t-20260914070810-2k5j8`；仅执行/评分云端复验，不是正式质量结果。
+
+## 2026-09-13 Resubmitted TCR 49000 t2a-v2 after scoring audit
+
+- resubmit：`t-20260914070922-l6fz2`，TaskName=`tcr-v5-49000-20260913-t2a-v2`；2026-09-13T23:09:25Z 首次查询 Queue。替换已取消的同范围 v1 提交，非重复跑。
+- YAML：[eval_tcr_v5_49000_20260913_t2a-v2.yml](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_tcr_v5_49000_20260913_t2a-v2.yml)；c20250601 / ml.pni2.3xlarge / 1 GPU / Preemptible:false，43200 秒。
+- 指定 49000 权重不变；v2 真实模型输入 gate、T1–T4 完整小样本执行评分 gate 和 81 项回归已通过，启动再次核验 v2 源码/输入指纹。独立 runtime_v2 输出不覆盖旧 gate/结果。云端额外复验另为独立任务。
+- 提交记录结束：`t-20260914070922-l6fz2`；只放行注明限制的本地对照，不证明论文同版复现或预训练无污染。
+
+## 2026-09-13 Resubmitted TCR 49000 t2b-v2 after scoring audit
+
+- resubmit：`t-20260914070926-86nrn`，TaskName=`tcr-v5-49000-20260913-t2b-v2`；2026-09-13T23:09:30Z 首次查询 Queue。替换已取消的同范围 v1 提交，非重复跑。
+- YAML：[eval_tcr_v5_49000_20260913_t2b-v2.yml](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_tcr_v5_49000_20260913_t2b-v2.yml)；c20250601 / ml.pni2.3xlarge / 1 GPU / Preemptible:false，43200 秒。
+- 指定 49000 权重不变；v2 真实模型输入 gate、T1–T4 完整小样本执行评分 gate 和 81 项回归已通过，启动再次核验 v2 源码/输入指纹。独立 runtime_v2 输出不覆盖旧 gate/结果。云端额外复验另为独立任务。
+- 提交记录结束：`t-20260914070926-86nrn`；只放行注明限制的本地对照，不证明论文同版复现或预训练无污染。
+
+## 2026-09-13 Resubmitted TCR 49000 t3deep-v2 after scoring audit
+
+- resubmit：`t-20260914070931-shsrz`，TaskName=`tcr-v5-49000-20260913-t3deep-v2`；2026-09-13T23:09:34Z 首次查询 Queue。替换已取消的同范围 v1 提交，非重复跑。
+- YAML：[eval_tcr_v5_49000_20260913_t3deep-v2.yml](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_tcr_v5_49000_20260913_t3deep-v2.yml)；c20250601 / ml.pni2.3xlarge / 1 GPU / Preemptible:false，43200 秒。
+- 指定 49000 权重不变；v2 真实模型输入 gate、T1–T4 完整小样本执行评分 gate 和 81 项回归已通过，启动再次核验 v2 源码/输入指纹。独立 runtime_v2 输出不覆盖旧 gate/结果。云端额外复验另为独立任务。
+- 提交记录结束：`t-20260914070931-shsrz`；只放行注明限制的本地对照，不证明论文同版复现或预训练无污染。
+
+## 2026-09-13 Resubmitted TCR 49000 t3broad-v2 after scoring audit
+
+- resubmit：`t-20260914070935-lzmgz`，TaskName=`tcr-v5-49000-20260913-t3broad-v2`；2026-09-13T23:09:38Z 首次查询 Queue。替换已取消的同范围 v1 提交，非重复跑。
+- YAML：[eval_tcr_v5_49000_20260913_t3broad-v2.yml](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_tcr_v5_49000_20260913_t3broad-v2.yml)；c20250601 / ml.pni2.3xlarge / 1 GPU / Preemptible:false，43200 秒。
+- 指定 49000 权重不变；v2 真实模型输入 gate、T1–T4 完整小样本执行评分 gate 和 81 项回归已通过，启动再次核验 v2 源码/输入指纹。独立 runtime_v2 输出不覆盖旧 gate/结果。云端额外复验另为独立任务。
+- 提交记录结束：`t-20260914070935-lzmgz`；只放行注明限制的本地对照，不证明论文同版复现或预训练无污染。
+
+## 2026-09-13 TCR re-audit final status snapshot
+
+- 2026-09-13T23:13:11Z 查询当前矩阵：10 项正式＋1 项独立云端 suite 复验全部 **Queue**。旧 T2/T3 四项 Killed，不在 Active 表。新五项平台 get 再核实 Preemptible:false、队列 ID q-20260121145036-6fztt、worker=1、ml.pni2.3xlarge；T1/T4 六项保留，没有重复提交。
+- 当前机器可读索引：[submissions_v2.json](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/tcr_v5_49000_20260913/submissions_v2.json)。原 submissions.json 保留为 22:43 的历史快照，不能把其中已取消四项的 Queue 当最新状态。
+- 本地套件 81 passed，产物：[cpu_tests.xml](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/tcr_v5_49000_20260913/suite_audit_local_v2/cpu_tests.xml)；真实 GPU 完整小样本 suite passed；最终 gate/当前源码数据身份再次一致，新增代码 py_compile 与相关 git diff --check 通过。云端 suite 尚未运行，不标成功；无新正式性能数字。
+- 关键修正、已验范围和剩余科学边界见 [TCR 审计 §9.22](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/TCR_BASELINE_EVALUATION_AUDIT.md)。本轮没有修改/取消 AB 或预训练作业、权重、原始数据及历史性能结果。
+
+## 2026-09-13 Cancel queued t2a-v2 for local short-job policy
+
+- cancel：`t-20260914070922-l6fz2`，TaskName=`tcr-v5-49000-20260913-t2a-v2`；2026-09-13T23:17:44Z 取消前 Queue，CLI cancel success，随后确认 Killed（End=2026-09-13T23:17:43Z）。
+- YAML：[eval_tcr_v5_49000_20260913_t2a-v2.yml](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_tcr_v5_49000_20260913_t2a-v2.yml)；原资源 c20250601 / ml.pni2.3xlarge / 1 GPU / Preemptible:false。
+- 用户授权短任务本地运行；已确认当前正式输出目录不存在，取消云端后按相同 YAML 参数本地串行执行。
+- 转本地取消记录结束：`t-20260914070922-l6fz2`；原 YAML、gate 与历史产物保留，未修改其他任务。
+
+## 2026-09-13 Cancel queued t2b-v2 for local short-job policy
+
+- cancel：`t-20260914070926-86nrn`，TaskName=`tcr-v5-49000-20260913-t2b-v2`；2026-09-13T23:17:45Z 取消前 Queue，CLI cancel success，随后确认 Killed（End=2026-09-13T23:17:45Z）。
+- YAML：[eval_tcr_v5_49000_20260913_t2b-v2.yml](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_tcr_v5_49000_20260913_t2b-v2.yml)；原资源 c20250601 / ml.pni2.3xlarge / 1 GPU / Preemptible:false。
+- 用户授权短任务本地运行；已确认当前正式输出目录不存在，取消云端后按相同 YAML 参数本地串行执行。
+- 转本地取消记录结束：`t-20260914070926-86nrn`；原 YAML、gate 与历史产物保留，未修改其他任务。
+
+## 2026-09-13 Cancel queued t3broad-v2 for local short-job policy
+
+- cancel：`t-20260914070935-lzmgz`，TaskName=`tcr-v5-49000-20260913-t3broad-v2`；2026-09-13T23:17:46Z 取消前 Queue，CLI cancel success，随后确认 Killed（End=2026-09-13T23:17:46Z）。
+- YAML：[eval_tcr_v5_49000_20260913_t3broad-v2.yml](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_tcr_v5_49000_20260913_t3broad-v2.yml)；原资源 c20250601 / ml.pni2.3xlarge / 1 GPU / Preemptible:false。
+- 用户授权短任务本地运行；已确认当前正式输出目录不存在，取消云端后按相同 YAML 参数本地串行执行。
+- 转本地取消记录结束：`t-20260914070935-lzmgz`；原 YAML、gate 与历史产物保留，未修改其他任务。
+
+## 2026-09-13 Cancel queued t1-others_cdr3b for local short-job policy
+
+- cancel：`t-20260914062458-rzd6q`，TaskName=`tcr-v5-49000-20260913-t1-others-cdr3b`；2026-09-13T23:17:48Z 取消前 Queue，CLI cancel success，随后确认 Killed（End=2026-09-13T23:17:47Z）。
+- YAML：[eval_tcr_v5_49000_20260913_t1-others_cdr3b.yml](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_tcr_v5_49000_20260913_t1-others_cdr3b.yml)；原资源 c20250601 / ml.pni2.3xlarge / 1 GPU / Preemptible:false。
+- 用户授权短任务本地运行；已确认当前正式输出目录不存在，取消云端后按相同 YAML 参数本地串行执行。
+- 转本地取消记录结束：`t-20260914062458-rzd6q`；原 YAML、gate 与历史产物保留，未修改其他任务。
+
+## 2026-09-13 Cancel queued t1-cdr3ab for local short-job policy
+
+- cancel：`t-20260914062429-xhj5d`，TaskName=`tcr-v5-49000-20260913-t1-cdr3ab`；2026-09-13T23:17:49Z 取消前 Queue，CLI cancel success，随后确认 Killed（End=2026-09-13T23:17:48Z）。
+- YAML：[eval_tcr_v5_49000_20260913_t1-cdr3ab.yml](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_tcr_v5_49000_20260913_t1-cdr3ab.yml)；原资源 c20250601 / ml.pni2.3xlarge / 1 GPU / Preemptible:false。
+- 用户授权短任务本地运行；已确认当前正式输出目录不存在，取消云端后按相同 YAML 参数本地串行执行。
+- 转本地取消记录结束：`t-20260914062429-xhj5d`；原 YAML、gate 与历史产物保留，未修改其他任务。
+
+## 2026-09-13 Cancel queued t1-others_longab for local short-job policy
+
+- cancel：`t-20260914062502-nj89p`，TaskName=`tcr-v5-49000-20260913-t1-others-longab`；2026-09-13T23:17:50Z 取消前 Queue，CLI cancel success，随后确认 Killed（End=2026-09-13T23:17:50Z）。
+- YAML：[eval_tcr_v5_49000_20260913_t1-others_longab.yml](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_tcr_v5_49000_20260913_t1-others_longab.yml)；原资源 c20250601 / ml.pni2.3xlarge / 1 GPU / Preemptible:false。
+- 用户授权短任务本地运行；已确认当前正式输出目录不存在，取消云端后按相同 YAML 参数本地串行执行。
+- 转本地取消记录结束：`t-20260914062502-nj89p`；原 YAML、gate 与历史产物保留，未修改其他任务。
+
+## 2026-09-13 Cancel queued suite-audit for local short-job policy
+
+- cancel：`t-20260914070810-2k5j8`，TaskName=`tcr-v5-49000-20260913-suite-audit`；2026-09-13T23:17:52Z 取消前 Queue，CLI cancel success，随后确认 Killed（End=2026-09-13T23:17:51Z）。
+- YAML：[eval_tcr_v5_49000_20260913_suite-audit.yml](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_tcr_v5_49000_20260913_suite-audit.yml)；原资源 c20250601 / ml.pni2.3xlarge / 1 GPU / Preemptible:false。
+- 独立云端复验不再重复排队，沿用已完整通过的本地 suite gate；不声称云端复验成功。
+- 转本地取消记录结束：`t-20260914070810-2k5j8`；原 YAML、gate 与历史产物保留，未修改其他任务。
+
+## 2026-09-13 Started short TCR evaluations locally
+
+- 用户允许简单、短耗时任务在本机运行；六个正式任务及一个冗余云端复验均已在 Queue 时取消、确认 Killed。保留四个云端正式任务：大数据 T1 cdr3b、T3 deep、T4 benchmark14/held20，最后查询仍 Queue。未操作 AB/预训练/常驻占卡进程。
+- 本机 host=`di-20260121220916-9rvmj`，A100-SXM4-80GB；启动前已有约 1.7 GiB GPU 常驻占用，并非完全空闲。tmux session=`tcr49000-local-short`，runner PID=719232，启动于 2026-09-13T23:19:23Z；本轮每次仅一个正式子任务占用 GPU，OMP/OpenBLAS 仍为 8 线程。
+- 顺序：t2a-v2 → t2b-v2 → t3broad-v2 → t1-others_cdr3b → t1-cdr3ab → t1-others_longab。目前 T2A 已启动，实际读取 4,779 行，子任务 10 项评分回归通过，其余等待本地串行队列。
+- 入口：[run_tcr_local_short.py](/vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/downstream/run_tcr_local_short.py)；冻结计划：[local_plan_v1.json](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/tcr_v5_49000_20260913/local_plan_v1.json)；实时状态：[local_short_v1/status.json](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/tcr_v5_49000_20260913/local_short_v1/status.json)。任务日志保留原 OUT/key/run.log，另在 local_short_v1 保存逐任务完整日志和耗时。
+- 启动前 `--check-only`、py_compile 通过；逐项核对云端任务 ID/名称/Killed、YAML SHA/bash 语法、结果目录不存在及原工程 gate 当前身份。原 YAML Entrypoint 原样执行，不降低完整数据、epoch、fold、候选预算或改变 batch/seed。运行互斥锁与结果目录保护防止误重跑；GPU 空闲显存不足 24 GiB 拒绝启动，失败即停止后续，单项实测超过 10 分钟则完成该项后暂停后续排程。
+- 本地启动登记结束：原数据、权重、采样/训练参数与实验输出身份不变；完整结果仍需独立验收，不以进程退出码替代指标复核。
+
+## 2026-09-13 TCR local serial execution status
+
+- 2026-09-13T23:24:03Z 本地进度快照：t2a-v2=executed_pending_result_audit（78.68s）；t2b-v2=executed_pending_result_audit（146.29s）；t3broad-v2=running；t1-others_cdr3b=pending；t1-cdr3ab=pending；t1-others_longab=pending。进程/状态文件仍为 running；`executed_pending_result_audit` 表示执行和预期 JSON 落盘，不表示最终指标独立复算验收。
+- 运行地点索引：[execution_plan_v3.json](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/tcr_v5_49000_20260913/execution_plan_v3.json)，实时状态唯一取 local_short_v1/status.json。四项较大任务仍云端 Queue（本轮最近查询）；没有重提已取消的七项或干预其他作业。
+- 本地迁移代码 py_compile/check-only 和文档 diff 检查通过；checkpoint/输入 gate/YAML 指纹保持一致。后续按完整产物验收再汇总，只收 49000，不把本轮落盘结果与旧 checkpoint 拼接。
+
+
+## 2026-09-13 Cancel queued t3deep-v2 after others completed
+
+- cancel：`t-20260914070931-shsrz`，TaskName=`tcr-v5-49000-20260913-t3deep-v2`；2026-09-13T23:38:43Z 复核终态：取消前 Queue，CLI cancel success，随后确认 Killed（End=2026-09-13T23:38:00Z）。
+- YAML：[eval_tcr_v5_49000_20260913_t3deep-v2.yml](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_tcr_v5_49000_20260913_t3deep-v2.yml)；原资源 c20250601 / ml.pni2.3xlarge / 1 GPU / Preemptible:false。
+- 用户要求 others 完成后本地接续并持续监控。六项前置队列已全部执行完成（最后一项 LongAB 于 23:36:37Z 正常退出），原参数/完整数据/49000 不变；云端终态确认后才允许本地启动，原 YAML/历史产物保留。
+- 接续本地取消记录结束：`t-20260914070931-shsrz`；只操作本轮 TCR 排队作业，未干预其他任务。
+
+
+## 2026-09-13 Cancel queued t4-benchmark14 after others completed
+
+- cancel：`t-20260914064033-ktgjc`，TaskName=`tcr-v5-49000-20260913-t4-benchmark14`；2026-09-13T23:38:44Z 复核终态：取消前 Queue，CLI cancel success，随后确认 Killed（End=2026-09-13T23:38:44Z）。
+- YAML：[eval_tcr_v5_49000_20260913_t4-benchmark14.yml](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_tcr_v5_49000_20260913_t4-benchmark14.yml)；原资源 c20250601 / ml.pni2.3xlarge / 1 GPU / Preemptible:false。
+- 用户要求 others 完成后本地接续并持续监控。六项前置队列已全部执行完成（最后一项 LongAB 于 23:36:37Z 正常退出），原参数/完整数据/49000 不变；云端终态确认后才允许本地启动，原 YAML/历史产物保留。
+- 接续本地取消记录结束：`t-20260914064033-ktgjc`；只操作本轮 TCR 排队作业，未干预其他任务。
+
+
+## 2026-09-13 Cancel queued t4-held20 after others completed
+
+- cancel：`t-20260914064037-74plf`，TaskName=`tcr-v5-49000-20260913-t4-held20`；2026-09-13T23:38:45Z 复核终态：取消前 Queue，CLI cancel success，随后确认 Killed（End=2026-09-13T23:38:45Z）。
+- YAML：[eval_tcr_v5_49000_20260913_t4-held20.yml](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_tcr_v5_49000_20260913_t4-held20.yml)；原资源 c20250601 / ml.pni2.3xlarge / 1 GPU / Preemptible:false。
+- 用户要求 others 完成后本地接续并持续监控。六项前置队列已全部执行完成（最后一项 LongAB 于 23:36:37Z 正常退出），原参数/完整数据/49000 不变；云端终态确认后才允许本地启动，原 YAML/历史产物保留。
+- 接续本地取消记录结束：`t-20260914064037-74plf`；只操作本轮 TCR 排队作业，未干预其他任务。
+
+
+## 2026-09-13 Cancel queued t1-cdr3b after others completed
+
+- cancel：`t-20260914062343-ppw4j`，TaskName=`tcr-v5-49000-20260913-t1-cdr3b`；2026-09-13T23:38:47Z 复核终态：取消前 Queue，CLI cancel success，随后确认 Killed（End=2026-09-13T23:38:46Z）。
+- YAML：[eval_tcr_v5_49000_20260913_t1-cdr3b.yml](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_tcr_v5_49000_20260913_t1-cdr3b.yml)；原资源 c20250601 / ml.pni2.3xlarge / 1 GPU / Preemptible:false。
+- 用户要求 others 完成后本地接续并持续监控。六项前置队列已全部执行完成（最后一项 LongAB 于 23:36:37Z 正常退出），原参数/完整数据/49000 不变；云端终态确认后才允许本地启动，原 YAML/历史产物保留。
+- 接续本地取消记录结束：`t-20260914062343-ppw4j`；只操作本轮 TCR 排队作业，未干预其他任务。
+
+
+## 2026-09-13 Remaining TCR jobs started locally after others finished
+
+- 2026-09-13T23:41:24Z 状态：六项前置本地任务全部执行完成；others 三轨的 45 个逐样本预测文件已独立验收通过，覆盖五折×三个测试集，模型/特征/head/数据成员身份、训练内标准化均值、逐预测评分和折间 mean/std 一致。验收证据：[others.json](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/tcr_v5_49000_20260913/result_audit_v1/others.json)；新数字仅入 RESULTS，不复制本过程日志。
+- 四个剩余云端作业均 Queue 时取消至 Killed；最新按本轮 TaskName 查询返回空列表。准确 ID/YAML/Preemptible:false 与终态已在上一组逐项记录；没有重提或操作其他 AB/训练作业。
+- 本地接续启动：host=di-20260121220916-9rvmj，A100-80GB，tmux=tcr49000-local-remaining，PID=732591，start=2026-09-13T23:39:40Z。顺序 T3 deep → T4 benchmark14 → T4 held20 → T1 大数据 cdr3b；T3 deep 已进入正式完整 25,816 行任务。每次仅一项 GPU 评测，原常驻进程保留。
+- 新入口 py_compile、6 项前置/范围拒绝检查、完整 --check-only（前置六项/原输出空/云端 Killed/YAML/gate）通过；启动时重新验证。指纹：plan a3c022ad2b768d566ae532c9eb4febbd22fe0108198d274c25c794ad6845226c，runner 0664ec3c1dc61a42d05b4a27952f7b6e44e48daca96251b9e177c4157d87c222。
+- 冻结计划：[local_remaining_plan_v1.json](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/tcr_v5_49000_20260913/local_remaining_plan_v1.json)；实时状态：[local_remaining_v1/status.json](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/tcr_v5_49000_20260913/local_remaining_v1/status.json)；最新运行地点索引：[execution_plan_v4.json](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/tcr_v5_49000_20260913/execution_plan_v4.json)。v3 及此前提交索引均保留为历史。
+- 接续启动记录结束：所有取消与运行地点可追溯，持续监控状态/日志/显存；执行完成不自动等于论文可比或预训练无重叠。
+
+
+## 2026-09-13 Persistent local TCR monitoring and audited partial results
+
+- 2026-09-13T23:56:41Z：已完整执行 7/10 正式任务（others×3、T2 A/B、T3 broad/deep），对应结果审计通过；T1 为逐预测重算，T2/T3 为保存曲线/episode/聚合一致性，不把两类审计说成相同强度。新数字只收指定 49000，见 RESULTS §0.1–§0.3。T3 deep 23:45:17Z exit 0、耗时 336.68 秒。
+- 当前运行 T4 benchmark14（随后 held20，再大数据 T1 cdr3b）；原本地 runner PID 732591 未中断。每个 pMHC 100 stochastic + 1 independent greedy；32 为 max_iter 上限，不强求实际 history 长度必须等于 32。原配置未调小、未知上下文 X 未改。
+- 新持久监控：[monitor_tcr_49000_local.py](/vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/downstream/monitor_tcr_49000_local.py)，tmux=tcr49000-monitor-v2，PID=741215，start=2026-09-13T23:54:20+00:00；每 30 秒核对两队列、producer PID/命令/host、计划/runner/YAML 指纹、GPU 和日志心跳。日志 900 秒未更新记警示，不凭此杀任务；生产子任务失败由原 runner 停止后续，监控/结果审计异常标 attention_required，不取消/杀死或重试任何其他进程。
+- 已完成任务自动核对既有审计报告及产物 SHA；以后完成的 T4/T1 会以 CPU 启动已固定脚本复核，成功后才加入本轮 JSON 汇总。全部 10 项执行且审计通过才记 all_tasks_executed_and_audits_passed；不把待跑项写成完成。实时 [monitor_v2/status.json](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/tcr_v5_49000_20260913/monitor_v2/status.json)、[results_49000.json](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/tcr_v5_49000_20260913/monitor_v2/results_49000.json)；冻结 [monitor_plan_v2.json](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/tcr_v5_49000_20260913/monitor_plan_v2.json)。已观察至少两轮心跳、7 项验收、alerts=[]。
+- 监控准备中保留一处检查失败：新增生成结果审计曾错误要求 actual steps==32，实际已落盘完整候选为 30/31 步。原 sampler 在所有目标解掩码后 break，这是正常规则，不是降预算或生产 bug。仅停止自建监控 PID 739836，保留 [v1 diagnostic](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/tcr_v5_49000_20260913/monitor_v1/auditor_check_failure.json) 与快照；修结果审计为 1≤steps≤32 并保持完整序列/上下文/预算约束，CPU 检查重跑通过，以新计划 v2 启动。生产 runner/原 sampler/其他任务未动。
+- 新脚本 py_compile、拒绝缺失队列/指标不一致的检查、已生成三个 pMHC 的实际步数/固定上下文检查及 monitor --check-only 通过；现有七项结果报告的 source/artifact SHA 一致。文档登记关键区别，未覆盖旧结果或原始数据。
+- 持续监控启动登记结束：后台会继续运行，JSON 心跳/逐任务审计为实时事实来源；未承诺未经实现的消息推送或自动修改论文表。
+
+## 2026-09-14 TCR status query: generation output serialization failed
+
+- 2026-09-14T04:18:55Z 查询确认：7/10 项已完整执行并通过各自层级产物核对；T4 benchmark14 于 00:15:30Z exit 1，local_remaining_v1 停止，held20 和大数据 T1 cdr3b 未启动。监控于 00:15:52Z 转 attention_required 并退出；tmux 已无本轮 runner/monitor，不能继续把此前运行快照说成当前仍在跑。
+- benchmark14 的 14 个 pMHC、每个 100 条有效候选＋独立 greedy 已全部落盘。失败发生在保存 metrics.json 时，ValueError: Out of range float values are not JSON compliant: nan；不是 CUDA/OOM/非法序列失败。只读 CPU 重评分复现：非有限值只来自辅助 novelty_vs_conditioning 及其聚合；当前模型/数据/评分代码身份与原 manifest 一致。具体缺陷 owner 见 [T4 §7.7](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/TCR_T4_GENERATION.md)，本次不新增正式 T4 数字。
+- 证据：[原运行日志](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/tcr_v5_49000_20260913/local_remaining_v1/t4-benchmark14.log)、[队列终态](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/tcr_v5_49000_20260913/local_remaining_v1/status.json)、[monitor 终态](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/tcr_v5_49000_20260913/monitor_v2/status.json)。monitor.jobs 中 benchmark14=running/13 是抛错前的上一轮快照，不应覆盖根 status/error 与正式队列终态。
+- 本轮 TaskName 云端查询为空；已取消任务没有恢复，也未操作 AB/其他常驻进程。本次仅核查、只读 CPU 诊断及同步状态文档，没有修改生产/监控代码、覆盖产物、重跑、重提或恢复队列。后续可复用现有完整设计序列修复写出/重评分，再安排未启动两项。
+
+## 2026-09-14 TCR serialization repaired and local queue resumed
+
+- 用户授权修复后，完成 T4 专属 JSON 边界/CPU 恢复、100 项回归、新版真实 GPU gate、benchmark14 全量独立重评分；具体协议和证据唯一见 [T4 §7.7](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/TCR_T4_GENERATION.md) / [总审计 §9.26](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/TCR_BASELINE_EVALUATION_AUDIT.md)。新增正式数字只进入 RESULTS §0.4，旧 failed/raw/日志完整保留。
+- 真实恢复计划 check-only 通过，原 7 个完成结果与新 benchmark14 恢复结果均核对 artifact SHA；只启动两项原本 pending 的任务。原配置 YAML 未改，Preemptible:false；没有新云端 submit/cancel，云端 Active 表不新增本地 PID。启动前只读确认 `t-20260914064037-74plf`（held20）与 `t-20260914062343-ppw4j`（大数据 β-only）的原 TaskName 匹配且仍为 Killed，避免双跑。
+- 本地 producer：host=`di-20260121220916-9rvmj`，tmux=`tcr49000-resume-v2`，PID=889428，start=`2026-09-14T04:37:22+00:00`。固定 [local_resume_plan_v2.json](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/tcr_v5_49000_20260913/local_resume_plan_v2.json)，状态 [local_resume_v2/status.json](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/tcr_v5_49000_20260913/local_resume_v2/status.json)。held20 模型进程 PID=889676，原 [held20 YAML](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_tcr_v5_49000_20260913_t4-held20.yml) 与后续 [T1 cdr3b YAML](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_tcr_v5_49000_20260913_t1-cdr3b.yml) 不变；仅 T4 入口默认新 gate/新输出版本，候选/数据/权重参数不变。
+- 持久 monitor：tmux=`tcr49000-monitor-v3`，PID=889780，start=`2026-09-14T04:37:35+00:00`。复用未修改 monitor 代码、冻结 [monitor_plan_v3.json](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/tcr_v5_49000_20260913/monitor_plan_v3.json)，[实时状态](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/tcr_v5_49000_20260913/monitor_v3/status.json) / [49000-only 结果](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/tcr_v5_49000_20260913/monitor_v3/results_49000.json)。截至 04:39:36Z 已连续 5 次心跳，executed=8、audited=8，held20 running、T1 cdr3b pending、alerts=[]；首个 pMHC 已 100/100 valid。完成后自动只读验收并收数，不自行重试/改预算。
+- 本轮只操作该 TCR 恢复与监控，未改 checkpoint、原始数据、采样器、AB 代码/作业或其他常驻 GPU 进程。新执行位置索引见 [execution_plan_v5.json](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/tcr_v5_49000_20260913/execution_plan_v5.json)，旧 v4 与失败队列保留历史。
+
+## 2026-09-14 Ours AB v5 49000 全部完成（只读复核）
+
+- 04:15 UTC 逐项查询11项正式任务全部 **Success**；从两张 Active 表移除，未 submit/cancel、未重跑模型、未修改训练或原始指标。独立 preflight 仍为此前已记录的 Success。
+- 本次11项终态如下；每项对应的绝对 YAML、非闲时/Preemptible:false 和统一快照 SHA 见此前 `Submitted Ours AB v5 49000` 条目。
+
+| 子任务 | task ID | 状态 | End（UTC） |
+|---|---|---|---|
+| pair-p0-cfg0 | `t-20260914045749-mv7sv` | Success | 2026-09-13T23:39:07Z |
+| pair-p0-cfg1 | `t-20260914045802-jxn8p` | Success | 2026-09-14T00:15:58Z |
+| pair-p0-cfg1p5 | `t-20260914045806-sgrlb` | Success | 2026-09-14T00:19:50Z |
+| pair-p3-cfg0 | `t-20260914045810-ss6ml` | Success | 2026-09-13T23:42:33Z |
+| pair-p3-cfg1 | `t-20260914045814-csgm4` | Success | 2026-09-14T00:16:26Z |
+| pair-p3-cfg1p5 | `t-20260914045817-trh7j` | Success | 2026-09-14T02:30:17Z |
+| specificity | `t-20260914045834-cfk6n` | Success | 2026-09-13T23:43:22Z |
+| gdp_a1 | `t-20260914045837-2lp8v` | Success | 2026-09-13T23:43:54Z |
+| m396 | `t-20260914045841-v242p` | Success | 2026-09-13T23:58:03Z |
+| cdr-kong | `t-20260914045845-pgvzj` | Success | 2026-09-13T23:53:18Z |
+| cdr-sab23 | `t-20260914045849-zgkfs` | Success | 2026-09-13T23:55:29Z |
+
+- 六组 pairing 均完整500×8；原始行/重链/参考轻链/前缀/声明长度及逐条有效率、V/J/类型匹配汇总检查通过；六组记录的权重、输入数据及生成源码 SHA 全部一致。本轮未重跑 ImmunoMatch 神经评分器。
+- 三探针 metrics 与保存预测核对结果及数值统一见 [RESULTS](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/RESULTS.md) 的2026-09-14 AB条目；CDR为已有日志聚合值，缺逐序列预测，不能声称独立全量重评分。
+
+## 2026-09-14 TCR comparison collection and remaining execution
+
+- 05:08:03Z 只读检查：原 producer PID 889428、held20 PID 889676、monitor PID 889780 正常；8/10 已审计，held20 已落盘 14/20 个目标（每个 100/100 valid），大数据 T1 cdr3b 仍待前一项结束。未修改 YAML、模型输入/gate/预算，未 submit/cancel、重启或操作 AB/其他 GPU 进程。
+- 新增官方补充表原件和收集/比较代码；来源身份唯一见下载清单，协议/比较局限见任务 owner，关键决策见 [总审计 §9.27](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/TCR_BASELINE_EVALUATION_AUDIT.md)。激活 pllm 后切到 protenix_abtcr，10 项 pytest 在 0.38 秒内通过、py_compile 和 monitor --check-only 通过；已生成明确 incomplete 的分层比较 JSON，不误标当前全量结束。
+- 新 CPU-only 等待器：host=`di-20260121220916-9rvmj`，tmux=`tcr49000-comparison-v1`，PID=907034，start=`2026-09-14T05:07:38+00:00`。入口 `collect_tcr_49000_comparison.py --wait-for-complete`，输出目录 [comparison_v1](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/tcr_v5_49000_20260913/comparison_v1)，[实时收口状态](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/tcr_v5_49000_20260913/comparison_v1/final_49000_vs_baselines_and_29000.status.json) 和 waiter.log 每 30 秒更新。只等既有 monitor 完成；全部 10 项审计通过后才创建 `final_49000_vs_baselines_and_29000.json`，否则明确异常，不重试模型、不自动修改 Markdown 数字。新旧部分汇总保留，不覆盖原始评测/历史结果。
+- 补充回归：05:12Z，CPU 执行 binding query/others-beta/long、generation-v5、native-features、scoring-audit、generation-result-io、comparison-collection 八个测试文件，**104 passed in 5.06s**；仅两条已有 `np.trapz` 弃用警告，不改运行中的评分实现。数字转录另核对 41 个已报告 others 论文单元格、9 个新旧 checkpoint 对照行、6 个生成 baseline 行，均与来源匹配；`git diff --check` 通过。
+- 后续状态（05:23:54Z）：held20 于 **05:20:39Z exit 0**，完整生成约 43 分钟；monitor 于 **05:21:10Z** 已完成其独立审计，audited=9，未出现写出故障。T1 大数据 cdr3b 于 **05:20:42Z** 自动接续，日志已至 **14,336/462,883（3.1%）** 唯一输入、约 90.6 pairs/s；五折分类头尚未开始，不能用 feature 百分比当训练 epoch 或完整评测进度。此时预计特征阶段还需约 83 分钟，之后另有完整头训练与验收，估算不作完成承诺。队列/monitor/collector 健康，云端作业不恢复。
+- 最新已完成部分见 [audited9_20260914.json](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/tcr_v5_49000_20260913/comparison_v1/audited9_20260914.json)，`complete=false, missing=[t1-cdr3b]`；held20 数字与 baseline 对照已入 RESULTS §0.4。自动 final JSON 仍须等待最后一项审计，Markdown 不自动覆写。
+
+## 2026-09-15 Submitted AB v5 49000 Specificity 200 epoch diagnostic
+
+- 操作：submit（独立新实验，非100轮状态续训）。task_id=`t-20260915103954-2sw2c`，TaskName=`ab-v5-49000-specificity-ep200-20260915`；YAML：[eval_ab_v5_49000_specificity_ep200_20260915.yml](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_ab_v5_49000_specificity_ep200_20260915.yml)。`Preemptible:false`，`c20250601`，单worker/单卡`ml.pni2.3xlarge`，deadline7200秒。
+- API Start=`2026-09-15T02:39:55Z`，首次get状态`Running`；02:40:43Z已读到真实worker输出fold0第23/200轮，非仅调度状态。随后fold0训练完成并进入fold1，尚无完整五折200轮结果。原10项CPU门禁及精确缓存provenance检查通过，特征没有重提。
+- 具体LR、fixed-last、诊断曲线/中间头和禁止选优契约见 [AB Native Probes §4.5](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/AB_NATIVE_PROBES.md#45-specificity-200-epoch-学习曲线诊断2026-09-15)。同v5 49000快照，SHA=`d5f892bce7d18106a7c417a3e4605f2bf1feac2bfa80709ca74fb149e5c07d92`；从旧缓存独立复制4398×768特征并严格核对数据/顺序/源码/权重/精度，不修改原目录。
+- 新产物：[ep200目录](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/ab_v5_49000_specificity_ep200_20260915)，运行日志`run.log`，每折实时`epoch_metrics.json`，每20轮/末轮diagnostic head，全部完成后`epoch_mean.json`、5个selected heads、OOF、metrics。不得从第一个fold中间指标外推完整结果。
+- 本轮10项CPU回归通过（5.23s），日志开关不改变同seed训练loss/最终state_dict；真实缓存CPU门禁和YAML/Bash/资源/新目录检查通过。未修改基础模型、pooling、其他AB/TCR任务或GDPa1，不重跑Ophiuchus；其50/100/200/300轮历史记录仅用于诊断对照，数字见RESULTS §0.6a。
+
+### 2026-09-15T02:47:04Z Success 与结果验收
+
+- Volc终态：`Success`，Start=`2026-09-15T02:39:55Z`，End=`2026-09-15T02:47:04Z`，Elapsed=429秒；已从两张Active表移除。
+- 固定第200轮正式五折等权均值：Accuracy=`0.6273252146 ± 0.0128182319`、macro-F1=`0.6257822727 ± 0.0127047818`、MCC=`0.4416933132 ± 0.0193624453`（SD ddof=1）；末轮train loss=`0.7427279986`、留出折loss=`0.8384949803`。论文Ophiuchus-Ab baseline为0.6796/0.6790/0.5203，不以本地Ophiuchus重跑替换。
+- 完整性与复算：5折各200条逐轮记录、每折10个诊断头、5个selected head、4398条OOF齐全；所有折末轮`lr_next_step=0`。逐轮五折均值、正式折指标、正式均值与第200轮逐字段复算最大误差均为0。OOF全样本聚合复算为0.627331/0.625866/0.441598，与正式折等权均值的约1e-4微差来自聚合方式。
+- 收敛诊断：同一次200轮运行第100→200轮留出折loss `0.847112→0.838495`、Accuracy `0.620958→0.627325`；平均loss在第200轮为全程最低，各折最低loss在141/184/193/178/187轮，末轮均低于各折第100轮。判断为后期缓慢改善伴随波动、没有明显过拟合反弹；第191轮Accuracy瞬时最高0.630281仅作诊断，未用于选头或正式报分。
+
+## 2026-09-15 Submitted AB v5 step92000 Specificity 200 epoch comparison
+
+- 用户要求用“最新89000”测试；只读盘点确认v5训练的step89000已被top-k清理，当前实际最新完整保存点为step92000（训练任务`t-20260912150714-lwf28`仍Running）。为遵循“最新”意图，按step92000执行并明确标号，不将其写成89000。
+- 提交：task_id=`t-20260915132856-tlxtc`，TaskName=`ab-v5-92000-specificity-ep200-20260915`；首次查询`Staging`，05:30Z已进入`Running`，API Start=`2026-09-15T05:28:56Z`，worker Launch=`05:29:19Z`。YAML：[eval_ab_v5_92000_specificity_ep200_20260915.yml](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_ab_v5_92000_specificity_ep200_20260915.yml)；`c20250601`非闲时、单卡`ml.pni2.3xlarge`、`Preemptible:false`、deadline7200秒。
+- 在训练top-k继续清理前冻结只读评测快照：[ab_v5_92000_llada_20260915](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/ab_eval_checkpoints/ab_v5_92000_llada_20260915)，权重SHA256=`2f003a5b42a15498a7d6f2fc51414cad717f96a9cb405dca2388fcef0de3039c`，与源checkpoint逐位一致；`trainer_state.global_step=92000`。快照/YAML/Bash/新输出目录门禁通过。
+- 与step49000正式比较保持同一4398条TTE五折、post-LLaDA完整H/L有效残基global mean、768维、batch8、lr5e-5、seed42+fold、200轮fresh head和fixed-last；逐轮留出折曲线仅诊断。新checkpoint必须重新提取表征，不复用49000的`features.pt`。输出：[step92000结果目录](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/ab_v5_92000_specificity_ep200_20260915)。
+
+### 2026-09-15T05:36:53Z Success 与结果验收
+
+- Volc终态`Success`，Start=`2026-09-15T05:28:56Z`，End=`05:36:53Z`，Elapsed=477秒；已从两张Active表移除。4398条step92000表征重新提取完成，没有复用step49000缓存。
+- 固定第200轮五折等权均值：Accuracy=`0.6434677836 ± 0.0157851642`、macro-F1=`0.6417304340 ± 0.0152889822`、MCC=`0.4661190972 ± 0.0240161409`；train loss=`0.7071762518`、留出折loss=`0.8211460233`。相对同协议step49000/200轮分别提升`+0.016143/+0.015948/+0.024426`，相对论文Ophiuchus-Ab仍差`0.036132/0.037270/0.054181`。
+- 完整性与复算：五折各连续1–200轮、各10个诊断头、5个selected head、4398条OOF齐；末轮LR全为0。逐轮均值、折指标、折等权均值与第200轮一致性最大误差均为0。OOF全样本聚合为Accuracy/F1/MCC=`0.643474/0.641885/0.465870`，与折等权均值的微差来自聚合方式。
+- 收敛：同次运行第100→200轮平均留出折loss=`0.828617→0.821146`、Accuracy=`0.639832→0.643468`；五折末轮loss均不高于各自第100轮。平均loss第200轮全程最低；各折最低loss轮次`102/184/173/119/139`，属于后期平台波动。Accuracy瞬时最高为第189轮`0.646197`，仅诊断，不用于选头。
+
+## 2026-09-15 Submitted v5 92000 Specificity 300 / 400 / 500 epoch
+
+- 用户要求比较三个更长预算；全部是同92000的独立fresh heads，不从200轮续训。缓存、scheduler和fixed-last契约见 [AB Native Probes §4.7](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/AB_NATIVE_PROBES.md)。只增加本次三项，既有训练/AB/TCR作业不动。
+- submit：`t-20260915143055-j547p`，TaskName=`ab-v5-92000-specificity-ep300-20260915`，YAML：[300轮](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_ab_v5_92000_specificity_ep300_20260915.yml)。提交时间06:30:55Z，06:31:16Z首次复核状态 **Queue**；单worker/单卡 `ml.pni2.3xlarge`，`c20250601`，`Preemptible:false`，deadline7200秒。
+- submit：`t-20260915143055-pgzq6`，TaskName=`ab-v5-92000-specificity-ep400-20260915`，YAML：[400轮](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_ab_v5_92000_specificity_ep400_20260915.yml)。提交时间06:30:55Z，06:31:16Z首次复核状态 **Running**；单worker/单卡 `ml.pni2.3xlarge`，`c20250601`，`Preemptible:false`，deadline7200秒。
+- submit：`t-20260915143055-xzftx`，TaskName=`ab-v5-92000-specificity-ep500-20260915`，YAML：[500轮](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_ab_v5_92000_specificity_ep500_20260915.yml)。提交时间06:30:55Z，06:31:16Z首次复核状态 **Queue**；单worker/单卡 `ml.pni2.3xlarge`，`c20250601`，`Preemptible:false`，deadline7200秒。
+- 提交前10项CPU回归通过（8.32秒）；三份YAML的单卡/非闲时/预算/缓存来源及bash -n通过；真实缓存门禁核对4398×768、五折、checkpoint step/SHA以及特征provenance通过，临时副本未触发骨干加载。源features.pt SHA=`276981b93993375f1e6f270a9199bd487a410b515354aa16069d66b17619bb0e`，检查前后不变。
+- 每项输出独立目录 `output/downstream_generation/ab_v5_92000_specificity_ep{300,400,500}_20260915`，含run.log、run_manifest、features副本、每折逐轮曲线/诊断头/最终头/预测，全部完成后有epoch_mean与metrics。不得由某一折或最高曲线点提前填正式结果。当前结果页仅标待完成，历史200轮不覆盖。
+
+## 2026-09-15 v5 92000 长预算评测自动验收
+
+后台会话`ab92000-specificity-budget-monitor-v2`接替仅只读的旧监控（只停止监控会话，未取消训练任务）。发布器4项CPU测试通过；每30秒核验，限定维护这三条结果及对应终态。日志：[monitor_v2.log](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/ab_v5_92000_specificity_budget_audit_20260915/monitor_v2.log)。
+
+<!-- ab92000-budget-terminal:start -->
+- `t-20260915193857-zmtc6` / 100轮：**Success**；End=2026-09-15T11:43:19Z；[完整验收](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/ab_v5_92000_specificity_budget_audit_20260915/ep100_audit.json)。
+- `t-20260915143055-j547p` / 300轮：**Success**；End=2026-09-15T06:54:19Z；[完整验收](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/ab_v5_92000_specificity_budget_audit_20260915/ep300_audit.json)。
+- `t-20260915143055-pgzq6` / 400轮：**Success**；End=2026-09-15T06:44:11Z；[完整验收](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/ab_v5_92000_specificity_budget_audit_20260915/ep400_audit.json)。
+- `t-20260915143055-xzftx` / 500轮：**Success**；End=2026-09-15T07:10:37Z；[完整验收](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/ab_v5_92000_specificity_budget_audit_20260915/ep500_audit.json)。
+- 数字只进入 RESULTS §0.6a 的训练预算诊断表；未按曲线最优轮选模。其余任务与原始产物未修改。
+<!-- ab92000-budget-terminal:end -->
+
+## 2026-09-15 Submitted Ours v5 92000 full AB/TCR matrix
+
+- 操作：submit。用户要求对当前最新完整保存点 92000 按 AB/TCR 审计清单逐项测试；49000 结果仅作对照，不覆盖。锁定既有独立快照 [ab_v5_92000_llada_20260915](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/ab_eval_checkpoints/ab_v5_92000_llada_20260915)，权重 SHA256=`2f003a5b42a15498a7d6f2fc51414cad717f96a9cb405dca2388fcef0de3039c`，与训练目录 `checkpoint-92000` 重算一致；`trainer_state.global_step=92000`。未复制优化器，未改训练任务。训练侧现已出现 95000，本轮仍固定 92000。
+- Specificity：200/300/400/500 轮已 Success 并写入 RESULTS 诊断表，故不重复提交 100 轮作业。YAML 已生成但未 submit：[eval_ab_v5_92000_full_20260915_specificity.yml](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_ab_v5_92000_full_20260915_specificity.yml)。
+- 其余 20 项均为 `c20250601` / `ml.pni2.3xlarge` / 1 replica / 1 GPU / **Preemptible:false**。首次查询：`pair-p0-cfg0` 为 Staging，其余 19 项为 Queue。机器可读索引：[all_92000_matrix_submissions.json](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/ab_v5_92000_full_20260915/all_92000_matrix_submissions.json)。
+- AB 10 项（独立输出根 [ab_v5_92000_full_20260915](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/ab_v5_92000_full_20260915)）：
+  - `t-20260915153001-lpxs5` `ab-v5-92000-full-20260915-pair-p0-cfg0` → [pair-p0-cfg0.yml](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_ab_v5_92000_full_20260915_pair-p0-cfg0.yml)
+  - `t-20260915153015-g4999` `ab-v5-92000-full-20260915-pair-p0-cfg1` → [pair-p0-cfg1.yml](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_ab_v5_92000_full_20260915_pair-p0-cfg1.yml)
+  - `t-20260915153020-qhkn9` `ab-v5-92000-full-20260915-pair-p0-cfg1p5` → [pair-p0-cfg1p5.yml](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_ab_v5_92000_full_20260915_pair-p0-cfg1p5.yml)
+  - `t-20260915153025-7dc7n` `ab-v5-92000-full-20260915-pair-p3-cfg0` → [pair-p3-cfg0.yml](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_ab_v5_92000_full_20260915_pair-p3-cfg0.yml)
+  - `t-20260915153030-j87kk` `ab-v5-92000-full-20260915-pair-p3-cfg1` → [pair-p3-cfg1.yml](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_ab_v5_92000_full_20260915_pair-p3-cfg1.yml)
+  - `t-20260915153034-9vsmd` `ab-v5-92000-full-20260915-pair-p3-cfg1p5` → [pair-p3-cfg1p5.yml](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_ab_v5_92000_full_20260915_pair-p3-cfg1p5.yml)
+  - `t-20260915153040-km76g` `ab-v5-92000-full-20260915-gdp-a1` → [gdp_a1.yml](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_ab_v5_92000_full_20260915_gdp_a1.yml)
+  - `t-20260915153045-jj6fj` `ab-v5-92000-full-20260915-m396` → [m396.yml](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_ab_v5_92000_full_20260915_m396.yml)
+  - `t-20260915153050-stwdn` `ab-v5-92000-full-20260915-cdr-kong` → [cdr-kong.yml](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_ab_v5_92000_full_20260915_cdr-kong.yml)
+  - `t-20260915153055-tfnfz` `ab-v5-92000-full-20260915-cdr-sab23` → [cdr-sab23.yml](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_ab_v5_92000_full_20260915_cdr-sab23.yml)
+- TCR 10 项（独立输出根 [tcr_v5_92000_20260915](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/tcr_v5_92000_20260915)）：
+  - `t-20260915153101-dn5qm` `tcr-v5-92000-20260915-t1-cdr3b` → [t1-cdr3b.yml](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_tcr_v5_92000_20260915_t1-cdr3b.yml)
+  - `t-20260915153106-d4ccf` `tcr-v5-92000-20260915-t1-cdr3ab` → [t1-cdr3ab.yml](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_tcr_v5_92000_20260915_t1-cdr3ab.yml)
+  - `t-20260915153111-4q55g` `tcr-v5-92000-20260915-t1-others-cdr3b` → [t1-others_cdr3b.yml](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_tcr_v5_92000_20260915_t1-others_cdr3b.yml)
+  - `t-20260915153116-t29vf` `tcr-v5-92000-20260915-t1-others-longab` → [t1-others_longab.yml](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_tcr_v5_92000_20260915_t1-others_longab.yml)
+  - `t-20260915153121-hp4j9` `tcr-v5-92000-20260915-t2a-v2` → [t2a-v2.yml](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_tcr_v5_92000_20260915_t2a-v2.yml)
+  - `t-20260915153125-hzz2q` `tcr-v5-92000-20260915-t2b-v2` → [t2b-v2.yml](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_tcr_v5_92000_20260915_t2b-v2.yml)
+  - `t-20260915153130-kkwcf` `tcr-v5-92000-20260915-t3broad-v2` → [t3broad-v2.yml](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_tcr_v5_92000_20260915_t3broad-v2.yml)
+  - `t-20260915153135-dcfgj` `tcr-v5-92000-20260915-t3deep-v2` → [t3deep-v2.yml](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_tcr_v5_92000_20260915_t3deep-v2.yml)
+  - `t-20260915153143-t6f4z` `tcr-v5-92000-20260915-t4-benchmark14` → [t4-benchmark14.yml](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_tcr_v5_92000_20260915_t4-benchmark14.yml)
+  - `t-20260915153147-n87nx` `tcr-v5-92000-20260915-t4-held20` → [t4-held20.yml](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_tcr_v5_92000_20260915_t4-held20.yml)
+- 提交前 CPU 回归 108 passed（pairing / sampling / AB probes / T1–T4 协议测试）。TCR 侧为复用 49000 生成器，增加 `TCR_EVAL_*` pin；本轮门禁是 CPU 协议指纹 + 权重 SHA/step，不是新的 GPU batch-consistency gate。未把本次提交写成成绩，RESULTS 数字待作业 Success 且产物验收后再填。
+
+## 2026-09-15 Split 92000 matrix: local A100 + preemptible cluster
+
+- 操作：cancel + submit。用户决定：本机可跑的探针/表征走本地 A100；light-chain pairing 及同类生成/绑定作业提交集群，并且改成闲时。训练 `t-20260912150714-lwf28` 与 BERT 闲时 `t-20260912035657-dd8v9` 未动。49000 对照数字未覆盖。
+- **保留未 cancel**：`t-20260915153001-lpxs5` pairing p0/CFG0 已 **Success**（End=`2026-09-15T10:10:55Z`，产物 [holdout500_metrics.json](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/ab_v5_92000_full_20260915/pair-p0-cfg0/holdout500_metrics.json)）；`t-20260915153015-g4999` pairing p0/CFG1 仍 **Running**（`Preemptible: false`）。
+- **cancel** 18 条排队中的原非闲时作业，终态均为 **Killed**（`t-20260915153111-4q55g` / `t-20260915153116-t29vf` 首次 cancel 后仍短暂 Queue，二次 cancel 后 Killed）。机器可读：[92000_cancel_report.json](/tmp/92000_cancel_report.json)。
+  - pairing：`t-20260915153020-qhkn9`、`t-20260915153025-7dc7n`、`t-20260915153030-j87kk`、`t-20260915153034-9vsmd`
+  - 改本机：`t-20260915153040-km76g`（gdp_a1）、`t-20260915153045-jj6fj`（m396）、`t-20260915153121-hp4j9`（t2a）、`t-20260915153125-hzz2q`（t2b）、`t-20260915153130-kkwcf`（t3broad）、`t-20260915153135-dcfgj`（t3deep）
+  - 改闲时：`t-20260915153050-stwdn`、`t-20260915153055-tfnfz`、`t-20260915153101-dn5qm`、`t-20260915153106-d4ccf`、`t-20260915153111-4q55g`、`t-20260915153116-t29vf`、`t-20260915153143-t6f4z`、`t-20260915153147-n87nx`
+- **submit 闲时** 12 条：同一 YAML 已改为 `Preemptible: true`，队列仍 `c20250601` / 单卡 `ml.pni2.3xlarge`。索引：[spot_resubmissions.json](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/ab_v5_92000_full_20260915/spot_resubmissions.json)。10:25:24Z 复核：
+  - `t-20260915182201-75kdf` pair-p0-cfg1p5 → [pair-p0-cfg1p5.yml](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_ab_v5_92000_full_20260915_pair-p0-cfg1p5.yml) **Running**
+  - `t-20260915182207-5n2mq` pair-p3-cfg0 → [pair-p3-cfg0.yml](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_ab_v5_92000_full_20260915_pair-p3-cfg0.yml) **Running**
+  - `t-20260915182211-btc4k` pair-p3-cfg1 → [pair-p3-cfg1.yml](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_ab_v5_92000_full_20260915_pair-p3-cfg1.yml) **Running**
+  - `t-20260915182216-6tdqs` pair-p3-cfg1p5 → [pair-p3-cfg1p5.yml](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_ab_v5_92000_full_20260915_pair-p3-cfg1p5.yml) Queue
+  - `t-20260915182220-ts2bg` cdr-kong → [cdr-kong.yml](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_ab_v5_92000_full_20260915_cdr-kong.yml) Queue
+  - `t-20260915182225-xlj8j` cdr-sab23 → [cdr-sab23.yml](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_ab_v5_92000_full_20260915_cdr-sab23.yml) Queue
+  - `t-20260915182229-4xs47` t1-cdr3b → [t1-cdr3b.yml](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_tcr_v5_92000_20260915_t1-cdr3b.yml) Queue
+  - `t-20260915182235-xtcbg` t1-cdr3ab → [t1-cdr3ab.yml](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_tcr_v5_92000_20260915_t1-cdr3ab.yml) Queue
+  - `t-20260915182240-fbf9c` t1-others_cdr3b → [t1-others_cdr3b.yml](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_tcr_v5_92000_20260915_t1-others_cdr3b.yml) Queue
+  - `t-20260915182246-dg74f` t1-others_longab → [t1-others_longab.yml](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_tcr_v5_92000_20260915_t1-others_longab.yml) Queue
+  - `t-20260915182250-457bk` t4-benchmark14 → [t4-benchmark14.yml](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_tcr_v5_92000_20260915_t4-benchmark14.yml) Queue
+  - `t-20260915182255-ptmzj` t4-held20 → [t4-held20.yml](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_tcr_v5_92000_20260915_t4-held20.yml) Queue
+- **本机串行**（不进 Active 表）：脚本 [run_local_serial.sh](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/ab_v5_92000_full_20260915/run_local_serial.sh)，日志 [local_serial.log](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/ab_v5_92000_full_20260915/local_serial.log)，宿主 `di-20260121220916-9rvmj` / NVIDIA A100-SXM4-80GB，pid `1873356`。启动前 CPU 协议测试 43 passed。10:25Z：gdp_a1 已写出 [metrics.json](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/ab_v5_92000_full_20260915/gdp_a1/metrics.json)；t2a 已写出曲线；t2b 正在跑（pid `1875713`）；其后 t3broad → t3deep → m396。未把未验收 92000 数字写入 RESULTS 主行。
+
+## 2026-09-15 Submitted 92000 Specificity 100 epoch
+
+- submit：`t-20260915193857-zmtc6`，TaskName=`ab-v5-92000-specificity-ep100-20260915`；[YAML](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_ab_v5_92000_specificity_ep100_20260915.yml)。11:38:58Z提交，11:39:15Z为Staging；c20250601单卡ml.pni2.3xlarge，Preemptible:false。14项CPU测试及bash语法检查通过。本地GPU已有占用，未改动其他任务。
+- 冻结92000骨干，独立100轮五折分类头；复制并严格验证200轮特征缓存，不从旧头续训。后台会话`ab92000-specificity-ep100-monitor`复用完整验收发布器，并接入100轮ID；完成后更新RESULTS及本文件终态。产物：[100轮目录](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/ab_v5_92000_specificity_ep100_20260915)。
+
+## 2026-09-15 Resubmitted preempted 92000 missing jobs as spot
+
+- 操作：submit。用户要求重跑缺少项。未 cancel 仍 Running 的 pairing p0/CFG1 `t-20260915153015-g4999`，未动训练。已完成项不重提。
+- pairing 保留各目录 `holdout500_n8.progress.pt`，重提后从中断 batch 续跑。T1 cdr3b 保留 `_feature_cache/ours_tcr_v5_92000_20260915_cdr3b/cdr3b/AS` 部分特征（约 45%）。T4 不能续写：已将不完整 `setting_B` 目录挪开（benchmark14 8 条、held20 1 条），新鲜生成。
+- 全部 `c20250601` / 单卡 `ml.pni2.3xlarge` / **Preemptible: true**。索引：[spot_resubmissions_missing_20260915.json](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/ab_v5_92000_full_20260915/spot_resubmissions_missing_20260915.json)。
+  - `t-20260915202050-8z5v8` pair-p0-cfg1p5 → [pair-p0-cfg1p5.yml](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_ab_v5_92000_full_20260915_pair-p0-cfg1p5.yml) Staging
+  - `t-20260915202053-q6shs` pair-p3-cfg0 → [pair-p3-cfg0.yml](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_ab_v5_92000_full_20260915_pair-p3-cfg0.yml) Staging
+  - `t-20260915202057-qnsf2` pair-p3-cfg1 → [pair-p3-cfg1.yml](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_ab_v5_92000_full_20260915_pair-p3-cfg1.yml) Queue
+  - `t-20260915202101-2j6j5` pair-p3-cfg1p5 → [pair-p3-cfg1p5.yml](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_ab_v5_92000_full_20260915_pair-p3-cfg1p5.yml) Queue
+  - `t-20260915202105-qr58s` t1-cdr3b → [t1-cdr3b.yml](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_tcr_v5_92000_20260915_t1-cdr3b.yml) Queue
+  - `t-20260915202109-hkqvx` t4-benchmark14 → [t4-benchmark14.yml](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_tcr_v5_92000_20260915_t4-benchmark14.yml) Queue
+  - `t-20260915202112-qlvtx` t4-held20 → [t4-held20.yml](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_tcr_v5_92000_20260915_t4-held20.yml) Queue
+- 未把本次提交写成 RESULTS 成绩。
+
+## 2026-09-15 Move queued 92000 non-pairing jobs to local A100
+
+- 操作：用户要求 pairing 以外的 92000 queue 改本机，不必再排队。未改 YAML / 协议 / 权重 / 数据。训练 `t-20260912150714-lwf28` 与 BERT 闲时 `t-20260912035657-dd8v9` 未动。未把未验收 92000 数字写入 RESULTS。
+- **现场**：补提的 7 条闲时作业均已是 **Killed**（约 12:34–12:47Z 抢占），无需再 cancel。pairing p0/CFG1 `t-20260915153015-g4999` 已 **Success**（End=`2026-09-15T13:28:29Z`）。CDR 两项与 T1 三轨仍为既有 Success。本机第一批 `run_local_serial.sh` 已完成，GPU 空余约 79 GiB（`occupy.py` 占位未动）。
+- **pairing 留集群**：同一冻结 YAML 重提闲时，续 `holdout500_n8.progress.pt`。索引：[pairing_resubmit_local_move_20260915.json](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/ab_v5_92000_full_20260915/pairing_resubmit_local_move_20260915.json)。
+  - `t-20260915213936-6rr6g` pair-p0-cfg1p5 → [pair-p0-cfg1p5.yml](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_ab_v5_92000_full_20260915_pair-p0-cfg1p5.yml) Queue
+  - `t-20260915213939-g5jf2` pair-p3-cfg0 → [pair-p3-cfg0.yml](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_ab_v5_92000_full_20260915_pair-p3-cfg0.yml) Queue
+  - `t-20260915213943-gnb8k` pair-p3-cfg1 → [pair-p3-cfg1.yml](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_ab_v5_92000_full_20260915_pair-p3-cfg1.yml) Queue
+  - `t-20260915213947-s9jc7` pair-p3-cfg1p5 → [pair-p3-cfg1p5.yml](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_ab_v5_92000_full_20260915_pair-p3-cfg1p5.yml) Queue
+- **本机串行**（不进 Active 表）：脚本 [run_local_remaining.sh](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/tcr_v5_92000_20260915/run_local_remaining.sh)，宿主 `di-20260121220916-9rvmj` / A100-80GB，pid `2001280`。顺序：冻结 YAML 的 T1 cdr3b → T4 benchmark14 → T4 held20。T1 从 `217600/462883` 续特征缓存。T4 不能续写：再次挪开不完整 `setting_B`（空 `designs.jsonl`，后缀 `.preempted_20260915T133907Z`）。启动前 CPU 协议测试已过。未覆盖 RESULTS。
+
+## 2026-09-15 Resubmitted remaining 92000 pairing after second spot kill
+
+- 操作：submit。用户要求继续提交被抢占的 pairing。未改 YAML / 协议 / 权重。训练未动。未把未验收 92000 数字写入 RESULTS。
+- 上一轮 `6rr6g` / `g5jf2` / `gnb8k` / `s9jc7` 均已 **Killed**，无在途重复。本机 remaining 已于 `2026-09-15T15:43:41Z` 写完 `local_remaining.done`（T1 cdr3b、T4 两项均已出产物，待验收）。
+- 同一冻结 YAML 重提闲时，续各目录 `holdout500_n8.progress.pt`。索引：[pairing_resubmit_20260915T1554Z.json](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/ab_v5_92000_full_20260915/pairing_resubmit_20260915T1554Z.json)。
+  - `t-20260915235443-7sb5d` pair-p0-cfg1p5 → [pair-p0-cfg1p5.yml](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_ab_v5_92000_full_20260915_pair-p0-cfg1p5.yml) Staging
+  - `t-20260915235447-qcz5f` pair-p3-cfg0 → [pair-p3-cfg0.yml](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_ab_v5_92000_full_20260915_pair-p3-cfg0.yml) Staging
+  - `t-20260915235450-8dvfl` pair-p3-cfg1 → [pair-p3-cfg1.yml](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_ab_v5_92000_full_20260915_pair-p3-cfg1.yml) Queue
+  - `t-20260915235454-6dmgm` pair-p3-cfg1p5 → [pair-p3-cfg1p5.yml](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_ab_v5_92000_full_20260915_pair-p3-cfg1p5.yml) Queue
+
+## 2026-09-16 Submitted pairing ESMC-feedback v5 p0
+
+- 操作：submit；`task_id=t-20260916131024-kdcz5`，TaskName=`ab-v5-49000-encoder-sync-20260916-p0`；YAML：[p0](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_ab_v5_49000_encoder_sync_20260916_p0.yml)。`c20250601` 单卡，`Preemptible:false`；05:10:51Z 首次查询 **Running**，Start=`2026-09-16T05:10:24Z`。
+- 固定独立 49000 权重、holdout500×8、p0、CFG0；先真实模型逐步输入门禁，再 iter124 全量推理及评分。新目录 `output/downstream_generation/ab_v5_49000_pairing_encoder_sync_20260916/pair-p0-cfg0`（仓库绝对根见 YAML）；旧产物不覆盖，不取消其他任务。
+- CPU：pllm 生成 28 passed + 训练 corruption 3 passed；实际执行环境 protenix_abtcr 生成／AB probe 三套共 38 passed。真实门禁和完整分数以作业实际产物为准。
+
+## 2026-09-16 Submitted pairing ESMC-feedback v5 p3
+
+- 操作：submit；`task_id=t-20260916131128-ht8s4`，TaskName=`ab-v5-49000-encoder-sync-20260916-p3`；YAML：[p3](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_ab_v5_49000_encoder_sync_20260916_p3.yml)。`c20250601` 单卡，`Preemptible:false`；05:12:10Z 首次查询 **Running**，Start=`2026-09-16T05:11:29Z`。
+- 与上述 p0 固定相同权重／数据／采样预算，仅允许前三轻链残基；流程为逐步输入门禁 → full500×8 → 原有评分。独立输出：[p3 run](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/ab_v5_49000_pairing_encoder_sync_20260916/pair-p3-cfg0)。不取消其他任务，旧产物保留。
+- p0 门禁已通过：[gate](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/ab_v5_49000_pairing_encoder_sync_20260916/pair-p0-cfg0/encoder_feedback_gate.json)；实际 A100、49000 权重及输入 CSV SHA 与修复前一致；4 步 ESMC 可见生成残基递增，隐藏参考扰动不影响两路输入或生成结果。p0 全量已完成首批，约 33 秒／2 heavies，估计生成约 2.3 小时（非完整评分完成时间）。
+
+### 2026-09-16T05:14:53Z 两组真实门禁与启动验收
+
+- p0 和 [p3 gate](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/ab_v5_49000_pairing_encoder_sync_20260916/pair-p3-cfg0/encoder_feedback_gate.json) 均通过；各4步／4候选，两路状态一致、隐藏参考扰动不影响输入或生成。与各自旧实验相比，权重 SHA、数据 SHA 及所有采样配置一致；gate／full manifest／当前磁盘九份源码 SHA 全部一致。
+- 实际 full500 已分别生成 12 条 heavy／96 候选（p0）和 8 条 heavy／64 候选（p3）；平台二者均 Running，约34秒／batch。尚无完整指标，不将4步门禁输出当作性能结果。后续自动按既有脚本完成生成和评分；原始日志／progress／manifest 在各自目录，终态再验收 metrics 并更新主表，未启动其他新评测。
+- `git diff --check` 通过；本轮未取消任何已有任务，未修改评测快照或历史 CSV／metrics。
+
+## 2026-09-16 Pairing ESMC-feedback p0/p3 终态验收
+
+- 17:25Z 平台只读查询均 **Success**：p0 `t-20260916131024-kdcz5`，Start=`2026-09-16T05:10:24Z`，End=`2026-09-16T07:51:37Z`，Elapsed=9,673秒；p3 `t-20260916131128-ht8s4`，Start=`2026-09-16T05:11:29Z`，End=`2026-09-16T07:53:11Z`，Elapsed=9,702秒。两项均约2小时42分（含生成与评分），从Active表移除，其他任务未操作或重查。
+- 两组各500×8预测与全部评分记录完整，协议／身份／分母验收见 [AB pairing §7 k](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/AB_LIGHT_CHAIN_PAIRING.md)。RESULTS仅更新p3与论文主对照，保留修复前源产物，不恢复CFG消融表。
+- 本轮没有重新采样或评分，没有模型／数据／训练代码变更，也没有submit/cancel；只读验收后同步结果、过程及协议状态。
+
+## 2026-09-16 Submitted no-prefix pairing iteration sweep
+
+- 操作submit：iter8，`t-20260917014444-tgctn`，TaskName=`ab-v5-49000-pair-iters-p0-20260916-s8`；[YAML](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_ab_v5_49000_pairing_iters_p0_20260916_iter8.yml)。c20250601／单卡／Preemptible:false；17:44:56Z查询Staging，Start=`2026-09-16T17:44:44Z`。完整500×8，新独立目录，不取消其他任务。
+- 操作submit：iter16，`t-20260917014624-xrz96`，TaskName=`ab-v5-49000-pair-iters-p0-20260916-s16`；[YAML](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_ab_v5_49000_pairing_iters_p0_20260916_iter16.yml)。c20250601／单卡／Preemptible:false；2026-09-16T17:46:26Z查询Queue，Start=`2026-09-16T17:46:24Z`。完整500×8，新独立目录，不取消其他任务。
+- 操作submit：iter32，`t-20260917014628-p7tqj`，TaskName=`ab-v5-49000-pair-iters-p0-20260916-s32`；[YAML](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_ab_v5_49000_pairing_iters_p0_20260916_iter32.yml)。c20250601／单卡／Preemptible:false；2026-09-16T17:46:30Z查询Waiting，Start=`2026-09-16T17:46:28Z`。完整500×8，新独立目录，不取消其他任务。
+- 操作submit：iter64，`t-20260917014632-cv9z4`，TaskName=`ab-v5-49000-pair-iters-p0-20260916-s64`；[YAML](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_ab_v5_49000_pairing_iters_p0_20260916_iter64.yml)。c20250601／单卡／Preemptible:false；2026-09-16T17:46:35Z查询Queue，Start=`2026-09-16T17:46:32Z`。完整500×8，新独立目录，不取消其他任务。
+- 操作submit：iter96，`t-20260917014636-s2shg`，TaskName=`ab-v5-49000-pair-iters-p0-20260916-s96`；[YAML](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_ab_v5_49000_pairing_iters_p0_20260916_iter96.yml)。c20250601／单卡／Preemptible:false；2026-09-16T17:46:38Z查询Queue，Start=`2026-09-16T17:46:36Z`。完整500×8，新独立目录，不取消其他任务。
+- 操作submit：iter128，`t-20260917014639-bpp64`，TaskName=`ab-v5-49000-pair-iters-p0-20260916-s128`；[YAML](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_ab_v5_49000_pairing_iters_p0_20260916_iter128.yml)。c20250601／单卡／Preemptible:false；2026-09-16T17:46:42Z查询Queue，Start=`2026-09-16T17:46:40Z`。完整500×8，新独立目录，不取消其他任务。
+<!-- pairing-step-submit-log:end -->
+
+### 2026-09-16T17:47:11Z 步数扫描启动核对
+
+- 六项全部查询确认，8/16/32 Running，64/96/128 Queue。iter8已通过真实反馈gate并生成30/250 batches，其余Running项处于启动／gate阶段。完整IM尚未产生；所有档均完整500×8，没有减样本或跳过评分。
+- 冻结manifest、旧124步参照验收和45项CPU检查通过；各档将自动生成与评分并更新汇总JSON，未配置测试集best-step替换主行。没有取消、抢占或修改原有训练／评测任务。
+
+## 2026-09-17 Submitted Ours v5 140000 full AB/TCR matrix
+
+- 操作：submit。用户要求对当前完整保存点 140000 按 AB/TCR 审计清单逐项测试；49000/92000 结果仅作对照，不覆盖。锁定独立快照 [ab_v5_140000_llada_20260917](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/ab_eval_checkpoints/ab_v5_140000_llada_20260917)，权重 SHA256=`a482afa425ef4f058d88e38d316aca096341af471b504efe948434d3ebc2dfe2`，与训练目录 `checkpoint-140000` 重算一致；`trainer_state.global_step=140000`。未复制优化器，未改训练任务 `t-20260912150714-lwf28`。
+- 协议变更：pairing **仅 p0 / CFG=0**（reference length, iter=124, gumbel_argmax, seed=42, 500×8）；**不跑 p3，不跑 p0/p3×CFG 六格**。CDR Kong + SAb23H2 为 **argmax / max-iter=2**（只改 140000 YAML，未改 49000/92000 历史产物或 prepare 默认值）。其余任务同 92000/49000 审计矩阵。Specificity 无既有 140000 完整产物，按标准 100-epoch native 协议在本机跑，不跳过。
+- 提交前 CPU 113 passed（pairing / sampling / AB probes / T1–T4）。TCR 侧复用 49000 生成器 + `TCR_EVAL_*` pin；本轮门禁是 CPU 协议指纹 + 权重 SHA/step（[write_tcr_cpu_identity_gates.py](/vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/downstream/write_tcr_cpu_identity_gates.py)），不是新的 GPU batch-consistency gate。
+- **集群闲时** 9 项，`c20250601` / `ml.pni2.3xlarge` / 1 replica / 1 GPU / **Preemptible: true**。17:58Z 复核见下。机器可读索引：[all_140000_matrix_submissions.json](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/ab_v5_140000_full_20260917/all_140000_matrix_submissions.json)。
+  - `t-20260917015632-hx44v` `ab-v5-140000-full-20260917-pair-p0-cfg0` → [pair-p0-cfg0.yml](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_ab_v5_140000_full_20260917_pair-p0-cfg0.yml) **Running**
+  - `t-20260917015637-5k6vp` `ab-v5-140000-full-20260917-cdr-kong` → [cdr-kong.yml](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_ab_v5_140000_full_20260917_cdr-kong.yml) **Running**
+  - `t-20260917015642-9t4rd` `ab-v5-140000-full-20260917-cdr-sab23` → [cdr-sab23.yml](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_ab_v5_140000_full_20260917_cdr-sab23.yml) **Running**
+  - `t-20260917015648-qmhgs` `tcr-v5-140000-20260917-t1-cdr3b` → [t1-cdr3b.yml](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_tcr_v5_140000_20260917_t1-cdr3b.yml) **Running**
+  - `t-20260917015653-492rz` `tcr-v5-140000-20260917-t1-cdr3ab` → [t1-cdr3ab.yml](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_tcr_v5_140000_20260917_t1-cdr3ab.yml) **Running**
+  - `t-20260917015658-blclc` `tcr-v5-140000-20260917-t1-others-cdr3b` → [t1-others_cdr3b.yml](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_tcr_v5_140000_20260917_t1-others_cdr3b.yml) **Running**
+  - `t-20260917015703-xnnpp` `tcr-v5-140000-20260917-t1-others-longab` → [t1-others_longab.yml](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_tcr_v5_140000_20260917_t1-others_longab.yml) **Queue**
+  - `t-20260917015708-rsccg` `tcr-v5-140000-20260917-t4-benchmark14` → [t4-benchmark14.yml](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_tcr_v5_140000_20260917_t4-benchmark14.yml) **Queue**
+  - `t-20260917015713-rk77d` `tcr-v5-140000-20260917-t4-held20` → [t4-held20.yml](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_tcr_v5_140000_20260917_t4-held20.yml) **Queue**
+- **本机串行**（不进 Active 表）：脚本 [run_local_serial.sh](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/ab_v5_140000_full_20260917/run_local_serial.sh)，日志 [local_serial.log](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/ab_v5_140000_full_20260917/local_serial.log)，宿主 `di-20260121220916-9rvmj` / NVIDIA A100-SXM4-80GB，pid `2780601`。顺序：Specificity 100-epoch → GDPa1 → T2A → T2B → T3-broad → T3-deep → m396。17:57:37Z 已 start specificity。未把未验收 140000 数字写入 RESULTS 主行。
+- 产物根：AB [ab_v5_140000_full_20260917](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/ab_v5_140000_full_20260917)；TCR [tcr_v5_140000_20260917](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/tcr_v5_140000_20260917)。prepare 生成的 p0-cfg1/p3 网格 YAML 已标 DO NOT SUBMIT，未提交。
+
+## 2026-09-17 Pairing p0 iteration sweep 终态核对
+
+- 本轮只读查询六项均Success（队列c20250601、独立单卡、Preemptible:false），逐项结束UTC：
+  - iter8 `t-20260917014444-tgctn`，End=`2026-09-16T18:15:35Z`。
+  - iter16 `t-20260917014624-xrz96`，End=`2026-09-16T18:26:52Z`。
+  - iter32 `t-20260917014628-p7tqj`，End=`2026-09-16T18:54:17Z`。
+  - iter64 `t-20260917014632-cv9z4`，End=`2026-09-16T19:49:52Z`。
+  - iter96 `t-20260917014636-s2shg`，End=`2026-09-16T20:37:52Z`。
+  - iter128 `t-20260917014639-bpp64`，End=`2026-09-16T21:40:00Z`。
+- 全部24,000条新增候选及原124步参照验收通过，完整输入／统计边界见[AB pairing §4.5](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/AB_LIGHT_CHAIN_PAIRING.md)，数值只维护于RESULTS独立诊断表。未替换p3主结果或140000矩阵；六项从Active表移除，旧提交快照保留，新增[终态快照](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/ab_v5_49000_pairing_iters_p0_20260916/terminal_status_20260917.json)。
+- 没有submit/cancel、重新推理／评分或权重／生产代码修改。本轮检查不等于重新运行ImmunoMatch／ANARCI，也未查其他平台任务。
+
+## 2026-09-17 Stopped: v5 157000 weights already pruned
+
+- 操作：无 submit / 无 cancel。用户选定 **157000** 全矩阵（pairing p0 / CFG=0 / **max-iter=16**；CDR iter=2）。源 `checkpoint-157000` 已不在；无独立评测快照；未用 158000 顶替。
+- 训练 `t-20260912150714-lwf28` 未 cancel。2026-09-17 07:12:46 日志：`Pruned checkpoint .../checkpoint-157000`；latest 为 `checkpoint-158000`（`global_step=158000`）。
+- 无本机 pid、无新 Volc task id、无 submissions JSON、RESULTS 主行未改。
+
+## 2026-09-17 Cancelled v5 8-GPU training
+
+- 操作：cancel
+- `task_id=t-20260912150714-lwf28`，任务名 `protein_esmc_llada270m_diffusion_immune_v5_8gpu_c20250601`
+- YAML：`/vepfs-mlp2/c20250601/251105016/project/dllm_test/train_jobs/protein_esmc_llada270m_diffusion_immune_v5_8gpu_c20250601.yml`
+- 最终状态：**Killed**，Start=`2026-09-12T07:07:14Z`，End=`2026-09-17T08:13:43Z`
+- `Preemptible: false`（c20250601 非闲时，1× `ml.pni2.28xlarge`）
+- 未 cancel 评测任务、FABind、无关队列。BERT 闲时 `t-20260912035657-dd8v9` 仍为 **Queue**，未 cancel。
+- 盘上仍保留 `checkpoint-37000` / `43000` / `92000` / **`159000`**（完整 resumable，`trainer_state.global_step=159000`）。**`checkpoint-158000` 已不在**（top-k 在写入 159000 时 prune）。未做 SHA 快照，未启动评测或 158000 下游矩阵。
+
+## 2026-09-17T12:21:56Z 平台与本机只读核对
+
+- 未 submit / cancel / kill，也未启动评测。按本项目任务名前缀查询非终态列表，并核对历史 Active 表 ID；未发现 AB/TCR v5 或 159000 活跃评测。本机没有训练、特征抽取、生成或评分进程。查询范围是当前 CLI 可见任务和当前开发机，不代表所有其他主机。
+- BERT 闲时 `t-20260917174134-kxmkk` 为 Queue，09:41:35Z 创建。监控日志记录旧 `t-20260912035657-dd8v9` Killed 后，09:41:37Z 自动重提；不是本轮操作，不是 159000 评测。YAML：[BERT v5](/vepfs-mlp2/c20250601/251105016/project/dllm_test/train_jobs/protein_esmc_llada270m_bert_immune_v5_8gpu_spot.yml)。
+- 本机 `monitor_spot_tasks.py` PID 3616013、父包装循环 PID 3616011 仍存活；BERT 没有 STOP 哨兵，取消云任务后仍可能再次自动重提。未修改看护或 STOP 文件。证据：[监控日志](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/_monitor/monitor.log)、[状态](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/_monitor/state.json)。
+- 本机 `python occupy.py` PID 13069 仍运行，cwd 为 flow_antibody_tcr；代码为 GPU 循环矩阵计算而非训练/评测。A100 80GB 查询时显存约 1693 MiB，GPU 利用率约 61%；驱动返回的 GPU PID 不在当前进程命名空间，未据此作精确 PID 映射。tmux `tcrvalid-adc` 当前 pane 为 bash，没有对应评测子进程。
+- 从 Active 表移出以下已核实的历史终态（不是本轮终止任务）：
+  - `t-20260911190334-kpfsz`：Success，End=`2026-09-11T14:53:27Z`。
+  - `t-20260907044259-qd52v`：Killed，End=`2026-09-06T21:24:58Z`。
+  - `t-20260907044303-ks4x6`：Killed，End=`2026-09-06T21:24:59Z`。
+  - `t-20260907044307-btjxr`：Success，End=`2026-09-07T07:10:02Z`。
+  - `t-20260907044310-wlm9h`：Killed，End=`2026-09-06T21:24:59Z`。
+  - `t-20260907044314-mtzn9`：Killed，End=`2026-09-06T21:25:00Z`。
+  - `t-20260907044317-kfhk2`：Killed，End=`2026-09-06T21:25:00Z`。
+  - `t-20260907044321-ht8b6`：Success，End=`2026-09-07T07:12:21Z`。
+  - `t-20260907044324-tcmhs`：Killed，End=`2026-09-06T21:25:01Z`。
+  - `t-20260907044328-wwfjn`：Killed，End=`2026-09-06T21:25:01Z`。
+  - `t-20260906233442-d2gzt`：Killed，End=`2026-09-06T23:20:08Z`。
+  - `t-20260907001930-qtf2s`：Killed，End=`2026-09-06T23:20:19Z`。
+  - `t-20260906233451-fjzmm`：Killed，End=`2026-09-06T23:20:18Z`。
+  - `t-20260906233455-djlmk`：Killed，End=`2026-09-06T23:20:19Z`。
+  - `t-20260906233500-9f7vp`：Killed，End=`2026-09-06T23:20:20Z`。
+  - `t-20260906233504-x2n8b`：Killed，End=`2026-09-06T23:20:22Z`。
+  - `t-20260906233508-svn2t`：Killed，End=`2026-09-06T23:20:20Z`。
+  - `t-20260906233513-mpfv5`：Killed，End=`2026-09-06T23:20:22Z`。
+  - `t-20260906233517-9x8kq`：Killed，End=`2026-09-06T23:20:22Z`。
+
+## 2026-09-17 159000 AB/TCR 执行完成核对
+
+- 2026-09-17T14:51:05Z 只读检查：AB 六项云端与 TCR 六项云端均 Success；本机 T2A/T2B/T3-broad/T3-deep 四项均 run_manifest.status=success、global_step=159000，local_repr.done 存在，无残留本地评测进程。总计 16/16 执行完成，零 Failed；不等于完整独立结果审计完成。
+- 本地四项 12:55:57Z 至 13:06:46Z，约 10分49秒；全部任务最晚于 13:46:38Z 完成（T1 cdr3b）。AB 四份指标 JSON 与九份 CDR 聚合日志、TCR 四份 Binding summary、T2/T3 指标与两份 T4 metrics 均已落盘。本轮未重跑模型或评分、未 submit/cancel。
+- Pairing 仍为用户指定16步；4,000候选／500重链的聚合指标可读。具体数字先以原始 metrics 为准，未完成逐预测／折／split核对前不自动更新 RESULTS。历史 submission JSON 与之前状态记录是当时快照，最新平台终态见 [terminal_status_20260917.json](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/tcr_v5_159000_20260917/terminal_status_20260917.json)。
+- 已将以下12项终态从 Active Evaluation 表移出（不是本轮停止任务）：
+  - `t-20260917204150-2kzlj` ab-v5-159000-full-20260917-m396：Success，End=`2026-09-17T12:57:06Z`。
+  - `t-20260917204147-ztdwf` ab-v5-159000-full-20260917-gdp-a1：Success，End=`2026-09-17T12:43:17Z`。
+  - `t-20260917204143-6b7vr` ab-v5-159000-full-20260917-specificity：Success，End=`2026-09-17T12:47:24Z`。
+  - `t-20260917204140-gqlsz` ab-v5-159000-full-20260917-cdr-sab23：Success，End=`2026-09-17T12:44:49Z`。
+  - `t-20260917204115-pj2rk` ab-v5-159000-full-20260917-pair-p0-cfg0：Success，End=`2026-09-17T13:21:05Z`。
+  - `t-20260917203938-l9f72` ab-v5-159000-full-20260917-cdr-kong：Success，End=`2026-09-17T12:53:31Z`。
+  - `t-20260917205616-jwmqq` tcr-v5-159000-20260917-t4-held20：Success，End=`2026-09-17T13:20:57Z`。
+  - `t-20260917205613-lr9cf` tcr-v5-159000-20260917-t4-benchmark14：Success，End=`2026-09-17T13:13:33Z`。
+  - `t-20260917205541-gnj99` tcr-v5-159000-20260917-t1-others-longab：Success，End=`2026-09-17T12:58:49Z`。
+  - `t-20260917205538-r2ldn` tcr-v5-159000-20260917-t1-others-cdr3b：Success，End=`2026-09-17T12:58:51Z`。
+  - `t-20260917205534-878fc` tcr-v5-159000-20260917-t1-cdr3ab：Success，End=`2026-09-17T12:58:47Z`。
+  - `t-20260917205531-55dxp` tcr-v5-159000-20260917-t1-cdr3b：Success，End=`2026-09-17T13:46:38Z`。

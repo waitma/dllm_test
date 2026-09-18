@@ -1,4 +1,4 @@
-"""Grammar downstream eval adapters."""
+"""Current Immune LLaDA fusion evaluation adapters."""
 
 from downstream.grammar.common import (
     DEFAULT_GRAMMAR_DATA_DIR,

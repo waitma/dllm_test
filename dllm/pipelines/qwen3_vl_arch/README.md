@@ -1,11 +1,25 @@
-# Qwen3-VL Architecture Snapshot
+# Qwen3-VL / BioSeq model-layer snapshot
 
-Source root:
+This directory is retained as a model-layer namespace and compatibility location. It is **not**
+the current immune data or training pipeline. The current immune data implementation is
+`/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/immune_llada`, and the formal
+training entry is
+`/vepfs-mlp2/c20250601/251105016/project/dllm_test/examples/llada/protein_pretrain_esmc.py`.
+
+The former `data/` alias tree, former `training/` tree, `GRAMMAR_V1.md`, and old BioSeq training
+examples were deleted. Do not restore them or use their historical commands. Historical audit
+snapshots remain under
+`/vepfs-mlp2/c20250601/251105016/project/dllm_test/refactor_baseline`; archived historical
+evidence remains under
+`/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/archive`.
+
+## Qwen3-VL architecture snapshot
+
+The copied Qwen source files live under:
 
 `/vepfs-mlp2/c20250601/251105016/project/dllm_test/base_model/Qwen3-VL/qwen-vl-finetune/qwenvl/model`
 
-This directory keeps only the latest Qwen architecture files needed before
-adapting the model for BioSeq:
+The retained snapshot contains the dense and MoE Qwen3-VL configuration/model/modular files:
 
 - `qwen3_vl/configuration_qwen3_vl.py`
 - `qwen3_vl/modeling_qwen3_vl.py`
@@ -14,109 +28,87 @@ adapting the model for BioSeq:
 - `qwen3_vl_moe/modeling_qwen3_vl_moe.py`
 - `qwen3_vl_moe/modular_qwen3_vl_moe.py`
 
-Intentionally not migrated:
+Processors, data loaders, finetuning scripts, demo assets, cookbooks, evaluation scripts, and
+Docker files were not migrated into this snapshot. The copied model files use `transformers.*`
+for shared Hugging Face utilities and keep relative imports between local Qwen3-VL files.
 
-- Qwen2/Qwen2.5 model files
-- processors and video processors
-- finetuning scripts
-- data loaders
-- demo assets
-- cookbooks
-- evaluation scripts
-- Docker files
+The local environment has `transformers==4.48.1`, while this Qwen3-VL snapshot expects newer
+internal APIs. Syntax checks may pass even when runtime model import requires a newer compatible
+Transformers environment or local compatibility shims.
 
-The copied model files were adjusted so imports of shared Hugging Face utility
-modules use `transformers.*` instead of the original relative package path.
-Local imports between the migrated Qwen3-VL dense and MoE files remain relative.
+## Retained BioSeq model layer
 
-The current environment has `transformers==4.48.1`, which is older than this
-Qwen3-VL snapshot and does not provide several newer internal APIs such as
-`transformers.masking_utils`, `transformers.modeling_layers`,
-`transformers.vision_utils`, `transformers.utils.output_capturing`,
-`transformers.initialization`, `RopeParameters`, and `auto_docstring`. Syntax
-validation passes, but runtime model import requires a matching newer
-Transformers version or local compatibility shims.
-
-## BioSeq Training Models
-
-Training models for this path live in:
+The retained BioSeq model-layer implementation is:
 
 `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/modeling_bioseq.py`
 
-Current exported entry points:
+It provides reusable diffusion/model primitives used by the current fusion implementation in
+`/vepfs-mlp2/c20250601/251105016/project/dllm_test/examples/llada/protein_fusion_model.py`:
 
-- `BioSeqNoEncoderDiffusionModel`: no-encoder masked diffusion over the token stream emitted by `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/data/grammar.py`. This path uses bidirectional self-attention and has no ESM/ESMC encoder; it is not a causal/autoregressive LM.
-- `BioSeqEncoderDiffusionModel`: ESMC/ESM feature-conditioned masked diffusion. ESMC runs on the current per-chain diffusion state `x_t` and returns token-level features; the BioSeq denoiser still runs over the concatenated multi-chain token stream and models chain-chain denoising jointly.
-- `BioSeqDiffusionTransformerConfig`: vocabulary/model/loss config. The local
-  ESM2 and ESMC sequence tokenizers expose 33 active ids. `grammar_v1` appends
-  23 structural/relation ids for a decoder vocabulary of 56.
-- `load_local_esmc_encoder`: local Biohub ESMC loader for `/c20250601/mj/model_weights/esmc/<model>` checkpoints when Hugging Face `AutoModel` does not recognize `model_type="esmc"`.
-- `sample_bioseq_diffusion_noise`: BioSeq diffusion corruption over `diffusion_loss_mask`.
-- `apply_decoder_corruption_to_encoder`: builds the per-chain ESMC `x_t` by mapping the decoder corruption state back to encoder residue positions.
+- `BioSeqEncoderDiffusionModel`: ESMC/ESM-conditioned masked diffusion model primitives.
+- `BioSeqNoEncoderDiffusionModel`: no-encoder bidirectional masked-diffusion primitive retained
+  for compatibility and controlled diagnostics; it is not the current immune training entry.
+- `BioSeqDiffusionTransformerConfig`: configuration for the retained BioSeq decoder stack.
+- `load_local_esmc_encoder` and `BioSeqEncoderDiffusionModel.from_esmc`: local ESMC loading with
+  a Biohub `esm==3.2.3` fallback when `transformers==4.48.1` cannot resolve `model_type="esmc"`.
+- `sample_bioseq_diffusion_noise`, `sample_chain_conditioned_timesteps`, and
+  `apply_decoder_corruption_to_encoder`: corruption and encoder-state mirroring utilities.
 
-The encoder model keeps the biological encoder trainable by default. Use `freeze_encoder=True` only for ablations or debugging.
+The current fusion data path supplies prepared semantic records and batch tensors from
+`/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/immune_llada/data`. That
+package owns the active records, grammar, tokenizer adapter, prepared loader, collator, and
+per-chain encoder input construction. This directory does not provide a replacement data loader.
 
-Encoder-condition magnitude (important): the encoder condition is injected by
-**replacing** the decoder residue embeddings (`hidden = hidden*(1-mask) + cond*mask`),
-so the condition enters the residual stream un-normalized and reaches the read-out
-via skip connections (`out = lm_head(RMSNorm(cond + Σ sublayer_outputs))`). The
-per-position RMSNorm normalizes sublayer *inputs* but NOT the condition's relative
-weight in that residual sum — so the condition only influences the output if its
-magnitude is comparable to the rest of the stream. ESM2's `last_hidden_state`
-(per-pos L2 ≈ 9.5) is naturally large enough; **ESMC's post-final-norm output is
-tiny (per-pos L2 ≈ 1.3, final-LayerNorm gamma ≈ 0.04)**, ~7× smaller than ESM2's
-(L2 ≈ 9.5). Measured on the trained grammar-v2 checkpoints (val loss with condition
-vs condition zeroed): ESM2 reliance +2.11 (0.75→2.86), ESMC-300M +1.17 (1.71→2.88),
-ESMC-600M +1.20 (1.77→2.97). So trained ESMC *does* use its condition, but extracts
-only ~half the benefit ESM2 does, and **ESMC-600M ≈ ESMC-300M** ⇒ the bottleneck is
-the feature injection (the squashed post-final-norm output), not ESMC size or raw
-feature quality. Mitigation: enable `condition_norm` (config flag / `--condition-norm`)
-to LayerNorm the condition to a usable, encoder-agnostic scale before injection
-(short-training ablation: a fixed scalar scale, RMSNorm, or LayerNorm all help
-equally → it is a magnitude effect, not centering). Whether this closes the full
-gap is being validated by the 50k ESMC retrains; see `PROJECT_PROCESS.md`
-(2026-06-28) and `scripts/debug/{ab_test_esmc_condition_norm,confirm_esm2_shrink_breaks,condition_reliance_trained}.py`.
+## Sampling and relation auxiliaries
 
-The structured multi-entity representation and Arrow preprocessing contract
-are documented in [GRAMMAR_V1.md](GRAMMAR_V1.md).
+Sampling utilities are retained in:
 
-Known environment constraint: local ESMC checkpoints under `/c20250601/mj/model_weights/esmc/ESMC-300M`, `/c20250601/mj/model_weights/esmc/ESMC-600M`, and `/c20250601/mj/model_weights/esmc/ESMC-6B` declare `model_type="esmc"`, but this environment uses `transformers==4.48.1`, which does not recognize that type through `AutoModel`. The project loader handles this by falling back to Biohub `esm==3.2.3`, instantiating native `esm.models.esmc.ESMC`, and converting local safetensor keys before strict state-dict loading.
+`/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/sampling_bioseq.py`
 
-Verification:
+The default decoding behavior remains `confidence-deterministic-linear`; future remasking or
+region-aware strategies must be explicit opt-in changes and must not silently change the current
+fusion baseline.
 
-```bash
-python -m py_compile /vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/modeling_bioseq.py /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/tests/bioseq/test_qwen3_vl_bioseq_model.py
-python -m pytest /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/tests/bioseq/test_qwen3_vl_grammar.py /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/tests/bioseq/test_qwen3_vl_bioseq_model.py /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/tests/bioseq/test_qwen3_vl_ddp_training.py -q
-```
+Relation auxiliary helpers are retained in:
 
-## DDP Training
+`/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/relation_aux.py`
 
-The BioSeq foundation-model DDP trainer is:
+They support the current fusion relation/pairing diagnostics where enabled. The model-layer
+functions are not evidence that the deleted qwen data/training implementation remains available.
 
-`/vepfs-mlp2/c20250601/251105016/project/dllm_test/examples/bioseq/train_qwen3_vl_bioseq_ddp.py`
+## Active downstream boundary
 
-It should be launched with `torchrun` for multi-node/multi-GPU training. The
-streaming data path is rank-aware: `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/data/mixture.py`
-combines DDP rank and DataLoader worker id when sharding iterable source files.
-The objective is the grammar diffusion target: every token outside the
-`<fixs>...<fixd>` fixed-context block (antigen / peptide / MHC conditioning) is a
-diffusion target, and train/validation loss is computed only on corrupted target
-tokens. Run with `--num-workers 0`: each extra DataLoader worker re-shards the
-infinite weighted stream in its own process and can desync the first batch across
-ranks, causing NCCL collective timeouts.
+The current fusion evaluation continues to use the shared public implementations under:
 
-Local CPU DDP smoke:
+`/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/grammar`
+
+In particular, CDR infilling, light-chain pairing, and TCR generation remain active. Typical
+retained runners are:
+
+- `/vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/downstream/run_immune_fusion_gen.sh`
+- `/vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/downstream/run_immune_fusion_pairing.sh`
+- `/vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/downstream/run_immune_fusion_repr.sh`
+- `/vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/downstream/run_pairing_pll.sh`
+- `/vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/downstream/score_pairing_pll.py`
+
+The old evaluation wrappers, sweeps, and retry jobs are historical/retired. External baseline
+protocols are outside this model-layer cleanup and must not be changed.
+
+## Validation boundary
+
+A documentation update does not claim that the latest full validation passed. Main-agent follow-up
+must record the actual command, exit code, duration, and absolute artifact path in
+`/vepfs-mlp2/c20250601/251105016/project/dllm_test/PROJECT_PROCESS.md` for any fresh validation.
+
+Useful targeted checks, when their environment is available, should start from the active files:
 
 ```bash
-torchrun --standalone --nproc_per_node=2 \
-  /vepfs-mlp2/c20250601/251105016/project/dllm_test/examples/bioseq/train_qwen3_vl_bioseq_ddp.py \
-  --device cpu --model-type no_encoder --sources oas --limit-per-source 16 \
-  --batch-size 2 --max-steps 2 --max-sequence-length 256 \
-  --hidden-size 32 --num-hidden-layers 1 --num-attention-heads 4 --intermediate-size 64 \
-  --num-workers 0 --save-interval 1 --resume none --wandb-mode disabled \
-  --output-dir /tmp/qwen3_vl_bioseq_ddp_smoke
+/vepfs-mlp2/c20250601/251105016/conda/envs/pllm/bin/python -m py_compile \
+  /vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/modeling_bioseq.py \
+  /vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/sampling_bioseq.py \
+  /vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/relation_aux.py
 ```
 
-Cluster template:
-
-`/vepfs-mlp2/c20250601/251105016/project/dllm_test/train_jobs/qwen3_vl_bioseq_16gpu_smoke.yml`
+The path above is intentionally absolute; correct the environment executable if the local
+machine exposes the project environment at another approved absolute path. Do not run deleted
+`qwen3_vl_bioseq` DDP tests or deleted grammar-v1 tests as current validation.

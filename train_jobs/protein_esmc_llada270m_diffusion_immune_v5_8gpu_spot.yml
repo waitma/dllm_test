@@ -1,4 +1,4 @@
-TaskName: "protein_esmc_llada270m_diffusion_immune_v5_8gpu_spot"
+TaskName: "protein_esmc_llada270m_diffusion_immune_v5_8gpu_c20250601"
 # 设计意图、语料实测、已知 caveat 见 examples/llada/PROTEIN_PRETRAIN_PROGRESS.md §4.2。
 # 本文件 = 已排队正式 diffusion 臂
 # train_jobs/protein_esmc_llada270m_diffusion_immune_v5_8gpu.yml（task
@@ -9,12 +9,12 @@ TaskName: "protein_esmc_llada270m_diffusion_immune_v5_8gpu_spot"
 # 200,000 steps、cosine 1e-4、warmup 2000。两臂只在队列 / 抢占 / OUTPUT_DIR /
 # resume 校验 / 重试上分叉。
 # 资源形：1 节点 × ml.pni2.28xlarge，RoleReplicas 1，投
-# queue012 + Preemptible: true（与正式臂同队列，只开抢占）。
+# c20250601 + Preemptible: true（闲时队列；正式臂仍在 queue012 非抢占）。
 # 🔴 提交身份敏感：队列权限按 ml_task submit 时**当前机器的账号**算，不按仓库算。
 # 同一份 vepfs 挂在多台机器上、各机器凭证是不同账号，所以这条 YAML **必须在
 # 251105016 身份的机器上提**（t-20260911054553-jb7v5 / t-20260912035657-dd8v9 都是该身份）。
-# `zhuyiheng` 对 c20250601 无 CreateCustomTask —— 正式 diffusion YAML 头部那句注释是对的、
-# 不是过期结论，它只是在说另一个账号。换机器前先 `ml_task list -o json` 看 Creator。
+# `zhuyiheng` 对 c20250601 无 CreateCustomTask，曾把同名 YAML 误投到 queue012
+# （t-20260912111652-sqfcw）。换机器前先 `ml_task list -o json` 看 Creator。
 # 固定 200,000 steps、cosine 1e-4、warmup 2000：与正式 v5 diffusion 同 horizon，
 # cosine 对着声明长度退火，声明必须等于实际会跑的长度。只传 --max_steps 200000，
 # 不传 --num_train_epochs：本脚本 TrainingArguments 把 max_steps 默认改成了 1000，
@@ -25,7 +25,7 @@ TaskName: "protein_esmc_llada270m_diffusion_immune_v5_8gpu_spot"
 # 本任务从零开跑：无 SRC_DIR 拷贝、无 --init_fusion_weights；OUTPUT_DIR 为空就 step 0。
 # OUTPUT_DIR 带 _spot 后缀、本任务独占，不得与正式臂
 # output/protein_esmc_llada270m_diffusion_immune_v5_8gpu 有任何重叠。
-Description: "270m diffusion v5 receptor-completion 八卡闲时"
+Description: "270m diffusion v5 八卡闲时 c20250601"
 
 Storages:
   - Type: "Vepfs"
@@ -63,7 +63,7 @@ Entrypoint: |
   # C/F anchors into FR3/FR4. The older data/tcr_repertoire stores anchor-free cores
   # and is NOT interchangeable; it must not be substituted here.
   TCR_REPERTOIRE_DIR=/vepfs-mlp2/c20250601/251105016/project/dllm_test/data/tcr_repertoire_junc80/dataset
-  OUTPUT_DIR=/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/protein_esmc_llada270m_diffusion_immune_v5_8gpu_spot
+  OUTPUT_DIR=/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/protein_esmc_llada270m_diffusion_immune_v5_8gpu_c20250601
   LLADA_CACHE=/vepfs-mlp2/c20250601/251105016/conda/cache/huggingface/hub/models--GSAI-ML--LLaDA-8B-Base
 
   # online so the run is monitorable while it trains. The v3 jobs ran offline and
@@ -201,14 +201,14 @@ Entrypoint: |
           --slim_checkpoints True \
           --dataloader_num_workers 4 \
           --report_to wandb \
-          --run_name protein_esmc_llada270m_diffusion_immune_v5_8gpu_spot \
+          --run_name protein_esmc_llada270m_diffusion_immune_v5_8gpu_c20250601 \
           --output_dir "${OUTPUT_DIR}" \
           ${RESUME_ARG}
 
 Tags: [bioseq, grammar_v2, llada270m, scratch, esmc300m, fusion, oas, ots, asd_antibody, trait, tcr_native, tcr_papers_v2, tcr_repertoire, tcr_pair, beta_only_completion, synthetic_x_excluded, relation_target_diffusion, decontaminated, v5, receptor_completion, residue_cond_add, diffusion, generated_only, esmc_trainable, fsdp, gradckpt, formal, 1node8gpu, preemptible, autoresume]
 ImageUrl: "cr-mlp-cn-beijing.cr.volces.com/public/airgen:v1"
 Framework: "Custom"
-ResourceQueueName: "queue012"
+ResourceQueueName: "c20250601"
 TaskRoleSpecs:
   - RoleName: "worker"
     RoleReplicas: 1

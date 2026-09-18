@@ -31,6 +31,11 @@ Pipeline:
      generated-token budget and crush every other layout; 2M gives ~2.8%)
   5. MMseqs2 0.80/0.80 cluster decontamination on the sampled train only --
      clustering 32M sequences is not worth it when only the sample ships
+
+The live v3 corpus is this random-2M path. Cluster-then-pick (0.80 linclust,
+one representative per clean cluster) lives in
+``cluster_sample_repertoire.py`` and writes ``data/tcr_repertoire_cluster80/``
+without replacing this directory.
 """
 
 from __future__ import annotations

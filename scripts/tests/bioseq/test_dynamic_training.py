@@ -2,29 +2,25 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
+from typing import Any
 
 PROJECT_ROOT = Path("/vepfs-mlp2/c20250601/251105016/project/dllm_test")
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-import torch
-
 from dllm.pipelines.bioseq import Esm2ProteinTokenizer, MultiChainDynamicCollator
-from dllm.pipelines.bioseq.datasets import (
-    ImmuneCsvDataset,
-    ImmuneSourceSpec,
-    default_immune_specs,
+from dllm.pipelines.immune_llada.data.records import BioSeqRecord
+from dllm.pipelines.immune_llada.data.sources import (
     nanobody_row_to_record,
-    oas_paired_row_to_record,
-    ots_paired_row_to_record,
+    oas_row_to_record,
+    ots_row_to_record,
 )
-from examples.bioseq.train_bioseq_ddp import select_source_specs
 
 
 def test_dynamic_collator_variable_length_paired():
     tokenizer = Esm2ProteinTokenizer()
     collator = MultiChainDynamicCollator(tokenizer=tokenizer)
-    batch = collator(
+    batch: dict[str, Any] = collator(
         [
             {"chains": ["QVQLVQSGAE", "DIQMTQSPSS"], "task_type": "antibody"},
             {"chains": ["QVQLVQSGAEVKKPGAS", "DIQMTQ"], "task_type": "antibody"},
@@ -46,7 +42,7 @@ def test_dynamic_collator_variable_length_paired():
 def test_dynamic_collator_single_chain_nanobody():
     tokenizer = Esm2ProteinTokenizer()
     collator = MultiChainDynamicCollator(tokenizer=tokenizer)
-    batch = collator([{"chains": ["QVQLVESGGG"], "task_type": "antibody"}])
+    batch: dict[str, Any] = collator([{"chains": ["QVQLVESGGG"], "task_type": "antibody"}])
     heavy = batch["heavy_tokens"]["targets"]
     light = batch["light_tokens"]["targets"]
     assert heavy.shape == (1, 12)
@@ -59,53 +55,43 @@ def test_dynamic_collator_single_chain_nanobody():
 def test_dynamic_collator_max_length_cap():
     tokenizer = Esm2ProteinTokenizer()
     collator = MultiChainDynamicCollator(tokenizer=tokenizer, max_length=8)
-    batch = collator([{"chains": ["A" * 50, "C" * 50], "task_type": "antibody"}])
+    batch: dict[str, Any] = collator([{"chains": ["A" * 50, "C" * 50], "task_type": "antibody"}])
     assert batch["heavy_tokens"]["targets"].shape == (1, 8)
     assert batch["light_tokens"]["targets"].shape == (1, 8)
 
 
-def test_immune_csv_dataset_from_synthetic_files(tmp_path):
-    oas = tmp_path / "train.csv"
-    oas.write_text(
-        "cleaned_chain1_seq,cleaned_chain2_seq,chain1_anarci_type,chain2_anarci_type\n"
-        "DIQMTQSPSS,QVQLVQSGAE,L,H\n"  # light first; should be reordered heavy-first
+def test_source_adapters_from_synthetic_rows():
+    oas_record = oas_row_to_record(
+        {
+            "cleaned_chain1_seq": "DIQMTQSPSS",
+            "cleaned_chain2_seq": "QVQLVQSGAE",
+            "chain1_anarci_type": "L",
+            "chain2_anarci_type": "H",
+        },
+        split="train",
     )
-    record = ImmuneCsvDataset(
-        ImmuneSourceSpec("oas", oas, oas_paired_row_to_record, "antibody"), split="train"
-    )[0]
-    assert record["chains"][0] == "QVQLVQSGAE"  # heavy oriented to slot 0
-    assert record["task_type"] == "antibody"
+    assert isinstance(oas_record, BioSeqRecord)
+    assert oas_record.sequences == ["QVQLVQSGAE", "DIQMTQSPSS"]
+    assert oas_record.task_type == "antibody"
 
-    ots = tmp_path / "ots.csv"
-    ots.write_text(
-        "cleaned_chain1_seq,cleaned_chain2_seq,chain1_anarci_type,chain2_anarci_type\n"
-        "AAAAAA,CCCCCC,A,B\n"  # alpha first; should be reordered beta-first
+    ots_record = ots_row_to_record(
+        {
+            "cleaned_chain1_seq": "AAAAAA",
+            "cleaned_chain2_seq": "CCCCCC",
+            "chain1_anarci_type": "A",
+            "chain2_anarci_type": "B",
+        }
     )
-    ots_record = ImmuneCsvDataset(
-        ImmuneSourceSpec("ots", ots, ots_paired_row_to_record, "tcr"), split="ots"
-    )[0]
-    assert ots_record["chains"][0] == "CCCCCC"  # beta oriented to slot 0
-    assert ots_record["task_type"] == "tcr"
+    assert isinstance(ots_record, BioSeqRecord)
+    assert ots_record.sequences == ["CCCCCC", "AAAAAA"]
+    assert ots_record.task_type == "tcr"
 
-    nano = tmp_path / "nano.csv"
-    nano.write_text("vhh_seq,cleaned_seq\nXXXX,QVQLVESGGG\n")
-    nano_record = ImmuneCsvDataset(
-        ImmuneSourceSpec("nanobody", nano, nanobody_row_to_record, "antibody"), split="nano"
-    )[0]
-    assert nano_record["chains"] == ["QVQLVESGGG"]
-    assert len(nano_record["chains"]) == 1
+    nano_record = nanobody_row_to_record({"vhh_seq": "QVQLVESGGG"})
+    assert isinstance(nano_record, BioSeqRecord)
+    assert nano_record.sequences == ["QVQLVESGGG"]
+    assert nano_record.chain_roles == ["nanobody_vhh"]
 
 
-def test_invalid_rows_are_skipped(tmp_path):
-    nano = tmp_path / "n.csv"
-    nano.write_text("cleaned_seq\nINVALID1\nQVQLVESGGG\n")  # first row has a digit -> invalid
-    dataset = ImmuneCsvDataset(
-        ImmuneSourceSpec("nanobody", nano, nanobody_row_to_record, "antibody"), split="n"
-    )
-    assert len(dataset) == 1
-    assert dataset[0]["chains"] == ["QVQLVESGGG"]
-
-
-def test_train_ddp_sources_can_select_oas_and_ots_only():
-    selected = select_source_specs(default_immune_specs(), "oas,ots")
-    assert [spec.name for spec in selected] == ["oas", "ots"]
+def test_source_adapters_skip_invalid_rows():
+    assert nanobody_row_to_record({"cleaned_seq": "INVALID1"}) is None
+    assert nanobody_row_to_record({"cleaned_seq": "QVQLVESGGG"}) is not None

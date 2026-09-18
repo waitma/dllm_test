@@ -15,4 +15,20 @@ rest of the framework stays importable on a CPU-only / minimal environment.
 
 BENCHMARK_VERSION = "irbench.v1"
 
-__all__ = ["BENCHMARK_VERSION"]
+#: Default checkpoint for smoke tests and ad-hoc probes.
+#:
+#: An ``examples/llada`` immune-fusion Trainer directory, so it works with the
+#: ``grammar:`` / ``fusion:`` specs (which accept a directory) but **not** with
+#: ``bioseq:`` / ``bioseq-llada:`` (which ``torch.load`` a single ``.pt``).
+#:
+#: This is deliberately a small 270m snapshot: smoke tests want fast load, not
+#: the headline number. For real results use the checkpoint named by the task's
+#: eval job. The retired ``grammar_v2_*`` ``.pt`` checkpoints that these scripts
+#: previously defaulted to were deleted on 2026-09-08; see
+#: ``docs/archive/grammar_v2_retired_20260908``.
+SMOKE_FUSION_CHECKPOINT = (
+    "/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/"
+    "protein_esmc_llada270m_diffusion_immune_v3_8gpu_2m/eval_snapshot_44000"
+)
+
+__all__ = ["BENCHMARK_VERSION", "SMOKE_FUSION_CHECKPOINT"]

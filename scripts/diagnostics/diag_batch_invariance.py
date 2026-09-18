@@ -54,7 +54,7 @@ def sanitize(seq: str) -> str:
 @torch.no_grad()
 def pooled_final(model, collator, seqs, device):
     """Pooled ``hidden_states[-1]`` over residue tokens, one row per input."""
-    from dllm.pipelines.qwen3_vl_arch.data import BioSeqChain, BioSeqRecord
+    from dllm.pipelines.immune_llada.data import BioSeqChain, BioSeqRecord
 
     records = [
         BioSeqRecord(

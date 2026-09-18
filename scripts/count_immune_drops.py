@@ -1,163 +1,148 @@
-"""Per-source attribution of how many rows the immune mix actually drops.
+"""Report first-failure drops from a published immune LLaDA prepared dataset.
 
-Reuses the training entry's own ``build_immune_specs`` so every predicate is the
-production one. Four nested configurations are built and evaluated against the
-SAME parsed CSV row in a single pass, which keeps the 2.9 GB OAS file to one
-read instead of four:
+Usage::
 
-  stage 0  raw          rows in the CSV
-  stage 1  schema       ``row_to_record`` accepts (no blocklist, no length cap)
-  stage 2  +length      max_protein_length / max_length caps applied
-  stage 3  +supersede   replaces_trait blocklist (TRAIT rows superseded by native)
-  stage 4  +decontam    benchmark blocklists = FINAL training rows
+    python scripts/count_immune_drops.py --prepared-data-dir data/prepared/immune_v3 \
+        --split train --sources oas+trait
 
-Usage:
-  python scripts/count_immune_drops.py [--scenario as_run|current] [--split train]
+Read dataset_manifest.json and filter_report.json only; shards and raw inputs
+are not scanned. Report counts are checked against the manifest. --sources
+selects an existing prepared mix, without recomputing supersession or filters.
 
-``as_run`` reproduces the four completed v1 runs (ASD blocklist disabled, T4 and
-T2/T3 blocklists did not exist yet, no tcr_papers). ``current`` is the config on
-disk now (all blocklists active, tcr_papers included).
-
-Both scenarios run at ``max_length = max_protein_length = 1024``, matching every
-``train_jobs/*.yml``. Do not lower these to compare against older reports: at 512
-the ASD antigen budget collapses to ~268 aa and ``asd_antibody`` reads 159,331
-rows instead of its real 276,412.
+filter_reasons records the FIRST rejection in the offline preprocessing pass.
+The current order is schema conversion, source-specific dedup/decontamination,
+length budgets, then quality checks. A row failing decontamination AND length
+is attributed only to decontamination. This differs from the retired script's
+schema -> length -> supersession -> decontamination stage differences, obtained
+by evaluating several raw configurations. No counterfactual stage counts can be
+recovered from this report. --scenario and raw/trainer overrides are retired;
+prepare a separate dataset to compare another policy. --json emits to stdout.
 """
 
 from __future__ import annotations
 
-import argparse
-import csv
+import json
 import sys
+from collections.abc import Sequence
 from pathlib import Path
+from typing import Any
 
 _ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(_ROOT))
-sys.path.insert(0, str(_ROOT / "examples" / "llada"))
+if str(_ROOT) not in sys.path:
+    sys.path.insert(0, str(_ROOT))
 
-from dllm.pipelines.bioseq.datasets import _source_split_path  # noqa: E402
-from protein_pretrain_esmc import DataArguments, build_immune_specs  # noqa: E402
+from dllm.pipelines.immune_llada.data.preprocessing.reports import (
+    totals as report_totals,
+)
+from scripts.count_immune_mix import (
+    counting_parser,
+    load_manifest,
+    nonnegative_count,
+    read_json,
+    selected_sources,
+)
 
-csv.field_size_limit(2**31 - 1)
-
-# "none" (not "") -- load_exclusion_keys rejects an empty path outright, since a
-# blocklist that silently does nothing is indistinguishable from a working one.
-_OFF = {
-    "ots_benchmark_blocklist": "none",
-    "oas_benchmark_blocklist": "none",
-    "asd_antibody_benchmark_blocklist": "none",
-    "asd_nanobody_benchmark_blocklist": "none",
-    "trait_benchmark_blocklist": "none",
-    "t4_refbinder_blocklist": "none",
-    "t2t3_eval_blocklist": "none",
-}
+_COUNT_KEYS = ("raw_rows", "converted_rows", "kept_rows", "dropped_schema", "dropped_filters", "errors")
 
 
-def _args(tokens: str, **over) -> DataArguments:
-    # Length caps and blocklist paths are left at their DataArguments defaults,
-    # which are the production values. Anything this script needs to turn off it
-    # turns off explicitly via ``over``.
-    base = dict(dataset_args=tokens)
-    base.update(over)
-    return DataArguments(**base)
+def load_drop_report(dataset_dir: str | Path, *, split: str = "train", sources: str | None = None) -> dict[str, Any]:
+    root = Path(dataset_dir)
+    manifest = load_manifest(root)
+    selected = selected_sources(manifest, split, sources)
+    report = read_json(root / "filter_report.json")
+    if report.get("schema_version") != manifest["schema_version"]:
+        raise ValueError("filter_report.json and dataset_manifest.json have different schema versions")
+    if report.get("dry_run") is not False:
+        raise ValueError("filter_report.json must declare dry_run=false for a published dataset")
+    stats_list = report.get("splits")
+    if not isinstance(stats_list, list):
+        raise TypeError("filter_report.json requires a splits list")
+    stats_by_source: dict[tuple[str, str], dict[str, Any]] = {}
+    for stats in stats_list:
+        if not isinstance(stats, dict):
+            raise TypeError("filter_report.json source statistics must be objects")
+        split_name, source = stats.get("split"), stats.get("source")
+        if not isinstance(split_name, str) or not isinstance(source, str):
+            raise TypeError("filter_report.json requires source and split names")
+        key = (split_name, source)
+        if key in stats_by_source:
+            raise ValueError(f"Duplicate filter report entry for {split_name}/{source}")
+        declared = manifest["splits"].get(split_name, {}).get("sources", {}).get(source)
+        if declared is None:
+            raise ValueError(f"Filter report entry absent from manifest: {split_name}/{source}")
+        label = f"{split_name}/{source}"
+        counts = {name: nonnegative_count(stats.get(name), f"{label} {name}") for name in _COUNT_KEYS}
+        if counts["errors"]:
+            raise ValueError(f"Filter report contains preprocessing errors for {label}")
+        if (
+            counts["raw_rows"] != counts["converted_rows"] + counts["dropped_schema"]
+            or counts["converted_rows"] != counts["kept_rows"] + counts["dropped_filters"]
+        ):
+            raise ValueError(f"Inconsistent first-failure counts for {label}")
+        reasons = stats.get("filter_reasons")
+        if not isinstance(reasons, dict) or not all(isinstance(name, str) and name for name in reasons):
+            raise ValueError(f"filter_reasons for {label} must map nonempty names to counts")
+        reasons = {name: nonnegative_count(count, f"{label} {name}") for name, count in reasons.items()}
+        if sum(reasons.values()) != counts["dropped_filters"]:
+            raise ValueError(f"First-failure reason total does not match dropped_filters for {label}")
+        if declared["records"] != counts["kept_rows"] or declared["raw_rows"] != counts["raw_rows"]:
+            raise ValueError(f"Manifest/report raw or kept count mismatch for {label}")
+        stats_by_source[key] = {"source": source, **counts, "filter_reasons": reasons}
+    expected = {(name, source) for name, info in manifest["splits"].items() for source in info["sources"]}
+    if set(stats_by_source) != expected:
+        raise ValueError(f"filter_report.json has no stats for: {sorted(expected - set(stats_by_source))}")
+    declared_totals = report.get("totals")
+    if not isinstance(declared_totals, dict):
+        raise TypeError("filter_report.json requires totals")
+    declared_totals = {name: nonnegative_count(declared_totals.get(name), f"report totals {name}") for name in _COUNT_KEYS}
+    if declared_totals != report_totals(list(stats_by_source.values())):
+        raise ValueError("filter_report.json totals do not match its source/split entries")
+
+    rows = [stats_by_source[(split, source)] for source in selected]
+    totals: dict[str, Any] = report_totals(rows)
+    reason_totals: dict[str, int] = {}
+    for row in rows:
+        for reason, count in row["filter_reasons"].items():
+            reason_totals[reason] = reason_totals.get(reason, 0) + count
+    totals["filter_reasons"] = dict(sorted(reason_totals.items()))
+    return {
+        "prepared_data_dir": str(root), "split": split, "sources": selected,
+        "attribution": "first_failure_from_offline_preprocessing",
+        "basis": "manifest_and_filter_report", "budget": manifest.get("budget"),
+        "rows": rows, "totals": totals,
+    }
 
 
-def build_stages(tokens: str, *, t4: bool, asd: bool) -> list[tuple[str, dict]]:
-    """Four nested configs -> {source_name: row_to_record}."""
-    final_off = {}
-    if not t4:
-        final_off["t4_refbinder_blocklist"] = "none"
-        final_off["t2t3_eval_blocklist"] = "none"
-    if not asd:
-        final_off["asd_antibody_benchmark_blocklist"] = "none"
-
-    cfgs = [
-        # stage 1: nothing on. Length caps off via 0/0 so with_length_filter is a no-op.
-        ("schema", _args(tokens, max_length=0, max_protein_length=0,
-                         replaces_trait_blocklist="none", **_OFF)),
-        # stage 2: length caps only.
-        ("length", _args(tokens, replaces_trait_blocklist="none", **_OFF)),
-        # stage 3: + replaces_trait supersession.
-        ("supersede", _args(tokens, **_OFF)),
-        # stage 4: + benchmark decontamination (production).
-        ("decontam", _args(tokens, **final_off)),
-    ]
-    out = []
-    for name, da in cfgs:
-        specs = build_immune_specs(da)
-        out.append((name, {s.name: s for s in specs}))
-    return out
+def _print_report(result: dict[str, Any]) -> None:
+    print(f"prepared={result['prepared_data_dir']}  split={result['split']}  sources={'+'.join(result['sources'])}")
+    print("Drop attribution: FIRST FAILURE recorded offline; not old length-first stage differences.")
+    print("Manifest/report counts only; raw inputs and shard contents were not scanned.\n")
+    for row in result["rows"]:
+        print(
+            f"{row['source']:16s} raw={row['raw_rows']:>9,} converted={row['converted_rows']:>9,} "
+            f"kept={row['kept_rows']:>9,} schema_drop={row['dropped_schema']:>8,} "
+            f"filter_drop={row['dropped_filters']:>8,}"
+        )
+        for reason, count in sorted(row["filter_reasons"].items()):
+            print(f"  {reason}: {count:,}")
+    totals = result["totals"]
+    print("\nTOTAL " + "  ".join(f"{key}={totals[key]:,}" for key in _COUNT_KEYS))
+    print(f"first-failure reasons: {totals['filter_reasons']}")
 
 
-def main() -> None:
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--scenario", choices=["as_run", "current"], default="as_run")
-    ap.add_argument("--split", default="train")
-    args = ap.parse_args()
-
-    if args.scenario == "as_run":
-        # The four completed (v1) runs: no tcr_papers, and both the T4/T2-T3 and
-        # the ASD antibody blocklists inert.
-        tokens = "oas+ots+asd_antibody+trait+tcr_native"
-        t4 = asd = False
+def main(argv: Sequence[str] | None = None) -> int:
+    parser = counting_parser(__doc__)
+    args = parser.parse_args(argv)
+    try:
+        result = load_drop_report(args.prepared_data_dir, split=args.split, sources=args.sources)
+    except (OSError, ValueError, TypeError, KeyError) as exc:
+        parser.error(str(exc))
+    if args.as_json:
+        print(json.dumps(result, ensure_ascii=False, sort_keys=True))
     else:
-        tokens = "oas+ots+asd_antibody+trait+tcr_native+tcr_papers"
-        t4 = asd = True
-
-    stages = build_stages(tokens, t4=t4, asd=asd)
-    stage_names = [n for n, _ in stages]
-    order = list(stages[-1][1].keys())
-
-    print(f"scenario={args.scenario}  split={args.split}  tokens={tokens}")
-    print(f"t4_refbinder+t2t3_eval={'ON' if t4 else 'OFF'}  "
-          f"asd_antibody_benchmark_blocklist={'ON' if asd else 'OFF'}  "
-          f"max_length=max_protein_length=1024\n")
-
-    rows_out = []
-    for name in order:
-        spec = stages[-1][1][name]
-        path = _source_split_path(spec, args.split)
-        if not path.is_file():
-            print(f"  {name:14s} MISSING {path}")
-            continue
-        fns = [(sn, sm[name].row_to_record) for sn, sm in stages if name in sm]
-        counts = {sn: 0 for sn, _ in fns}
-        raw = 0
-        with path.open(newline="") as fh:
-            for row in csv.DictReader(fh):
-                raw += 1
-                for sn, fn in fns:
-                    if fn(row) is not None:
-                        counts[sn] += 1
-        rows_out.append((name, raw, counts))
-        kept = counts[stage_names[-1]]
-        print(f"  {name:14s} raw={raw:>9,} -> kept={kept:>9,}  "
-              f"dropped={raw - kept:>9,} ({100 * (raw - kept) / raw:>5.2f}%)", flush=True)
-
-    print(f"\n{'source':14s} {'raw':>10s} {'schema':>10s} {'+length':>10s} "
-          f"{'+supersede':>11s} {'+decontam':>10s} | {'d_schema':>9s} {'d_length':>9s} "
-          f"{'d_supers':>9s} {'d_decont':>9s} {'kept%':>7s}")
-    tot = {k: 0 for k in ["raw"] + stage_names}
-    for name, raw, c in rows_out:
-        d_schema = raw - c["schema"]
-        d_len = c["schema"] - c["length"]
-        d_sup = c["length"] - c["supersede"]
-        d_dec = c["supersede"] - c["decontam"]
-        print(f"{name:14s} {raw:>10,} {c['schema']:>10,} {c['length']:>10,} "
-              f"{c['supersede']:>11,} {c['decontam']:>10,} | {d_schema:>9,} {d_len:>9,} "
-              f"{d_sup:>9,} {d_dec:>9,} {100 * c['decontam'] / raw:>6.2f}%")
-        tot["raw"] += raw
-        for k in stage_names:
-            tot[k] += c[k]
-
-    print(f"{'TOTAL':14s} {tot['raw']:>10,} {tot['schema']:>10,} {tot['length']:>10,} "
-          f"{tot['supersede']:>11,} {tot['decontam']:>10,} | "
-          f"{tot['raw'] - tot['schema']:>9,} {tot['schema'] - tot['length']:>9,} "
-          f"{tot['length'] - tot['supersede']:>9,} {tot['supersede'] - tot['decontam']:>9,} "
-          f"{100 * tot['decontam'] / tot['raw']:>6.2f}%")
-    print(f"\ntotal dropped = {tot['raw'] - tot['decontam']:,} of {tot['raw']:,} "
-          f"({100 * (tot['raw'] - tot['decontam']) / tot['raw']:.2f}%)")
+        _print_report(result)
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

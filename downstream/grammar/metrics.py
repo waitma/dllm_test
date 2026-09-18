@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import torch
 
-from dllm.pipelines.qwen3_vl_arch.data import GrammarTokenizer
+from dllm.pipelines.immune_llada.data import GrammarTokenizer
 
 
 def masked_token_accuracy(

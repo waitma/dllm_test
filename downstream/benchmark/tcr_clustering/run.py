@@ -251,11 +251,17 @@ def _components_at_threshold(sim, tau, min_size=2):
     return labels
 
 
+# Fig 3A individual-method values, verified in RESULTS §T2(a). The previous
+# anchors came from the obsolete 5,368-pair local universe, not the paper.
+PAPER_RETENTIONS = {"clusTCR": .09, "TCRMatch": .09, "GLIPH2": .22,
+                    "TCRdist3": .44, "GIANA": .25, "DeepTCR": .92,
+                    "HD": .27, "LD": .31, "iSMART": .18}
+
 # Target retention levels for the sweep. Include the baselines' own retentions so
 # every embedder is scored at matched retention (purity at ret ~ clusTCR/GLIPH2/…).
 TARGET_RETENTIONS = sorted(set(
     [0.05, 0.08, 0.09, 0.11, 0.15, 0.18, 0.19, 0.22, 0.25, 0.30, 0.39, 0.44,
-     0.50, 0.60, 0.70, 0.82, 0.90]), reverse=True)
+     0.50, 0.60, 0.70, 0.82, 0.90] + list(PAPER_RETENTIONS.values())), reverse=True)
 
 
 def _taus_from_targets(sim, targets, min_size=2, edge_floor=0.30):
@@ -318,8 +324,10 @@ def _taus_from_targets(sim, targets, min_size=2, edge_floor=0.30):
             ti += 1
         if ti >= len(targets_sorted):
             break
-    taus = sorted({round(v, 5) for v in hits.values()})
-    return np.array(taus) if taus else np.array([round(float(ew[-1]), 5)])
+    # Float32 similarities may differ by much less than 1e-5. Rounding here
+    # merges thresholds, changing connected components and actual retention.
+    taus = sorted(set(hits.values()))
+    return np.array(taus) if taus else np.array([float(ew[-1])])
 
 
 def run_embed_threshold(df, embedder_spec, tag, use_alpha, taus):
@@ -335,7 +343,7 @@ def run_embed_threshold(df, embedder_spec, tag, use_alpha, taus):
     for tau in taus:
         labels = _components_at_threshold(sim, float(tau))
         m = score(labels, true)
-        curve.append({"tau": round(float(tau), 4), **{
+        curve.append({"tau": float(tau), **{
             k: m[k] for k in ["purity", "retention", "sensitivity",
                               "sensitivity_top6", "nmi", "ari",
                               "pct_clusters_purity_gt90",
@@ -350,21 +358,26 @@ def run_embed_threshold(df, embedder_spec, tag, use_alpha, taus):
     curve_df.to_csv(out_dir / "curve.csv", index=False)
 
     # Alignment points: purity at retention closest to each baseline's retention.
-    ref_ret = {"clusTCR": 0.08, "TCRMatch": 0.11, "GLIPH2": 0.19,
-               "TCRdist3": 0.39, "GIANA": 0.18, "DeepTCR": 0.82}
     aligned = {}
-    for name, r in ref_ret.items():
+    for name, r in PAPER_RETENTIONS.items():
         idx = (curve_df["retention"] - r).abs().idxmin()
         row = curve_df.loc[idx]
         aligned[f"purity@ret~{name}({r})"] = {
-            "tau": row["tau"], "retention": round(row["retention"], 3),
-            "purity": round(row["purity"], 3)}
+            "tau": float(row["tau"]), "retention": float(row["retention"]),
+            "purity": float(row["purity"]), "target_retention": r,
+            "retention_gap": float(abs(row["retention"] - r)),
+            # Tied edges/duplicate receptors can make an anchor unreachable.
+            # Keep the nearest diagnostic but do not call it matched retention.
+            "comparison_allowed": bool(abs(row["retention"] - r) <= .02)}
 
     summary = {
         "method": "embed-threshold", "model": model_name, "tag": out_tag,
         "embedder": embedder_spec, "use_alpha": use_alpha,
         "embed_sec": round(embed_sec, 1),
-        "n_units": int(len(df)), "taus": [round(float(t), 4) for t in taus],
+        "n_units": int(len(df)), "taus": [float(t) for t in taus],
+        "scoring_protocol": "exact_threshold_paper_retention_v2",
+        "retention_alignment_tolerance": .02,
+        "alignment_reference": "paper Fig 3A; not evidence of identical input universes",
         "aligned_points": aligned,
         "auc_purity_retention": float(np.trapz(
             curve_df.sort_values("retention")["purity"],

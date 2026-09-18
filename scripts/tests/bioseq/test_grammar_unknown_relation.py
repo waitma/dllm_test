@@ -1,10 +1,15 @@
-"""Tests for grammar unknown relation token."""
+"""Tests for grammar unknown relation token.
+
+Run in the ``pllm`` environment::
+
+    python -m pytest /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/tests/bioseq/test_grammar_unknown_relation.py -q
+"""
 
 from __future__ import annotations
 
-from dllm.pipelines.qwen3_vl_arch.data.grammar import GRAMMAR_RELATIONS, _relation_token
-from dllm.pipelines.qwen3_vl_arch.data.records import BioSeqChain, BioSeqRecord
-from dllm.pipelines.qwen3_vl_arch.data.grammar import GrammarRenderer, GrammarTokenizer
+from dllm.pipelines.immune_llada.data.grammar import GRAMMAR_RELATIONS, _relation_token
+from dllm.pipelines.immune_llada.data.records import BioSeqChain, BioSeqRecord
+from dllm.pipelines.immune_llada.data.grammar import GrammarRenderer, GrammarTokenizer
 
 
 def test_unknown_in_relation_vocabulary() -> None:

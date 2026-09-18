@@ -1,5 +1,290 @@
 # IRBench 过程记录
 
+## 2026-09-17 159000 最终汇总写入 RESULTS
+
+- 将 AB 六项、TCR 十项的最终产物写入 [RESULTS](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/RESULTS.md)，以159000为当前Ours行，保留论文baseline及49000/92000/140000历史对照。明确AB pairing 16步、CDR2步、Specificity100 epoch、TCR T4仍32步；按用户既定要求不展示m396附加分组结果。
+- 核对30个来源SHA、四轨Binding五折完整性、生成候选数量、Specificity与m396及T3/T4部分聚合；20条新增展示行逐字匹配来源生成值，126个本地链接及表格列数通过检查。边界：[汇总核对记录](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/tcr_v5_159000_20260917/results_document_audit.json)。未重跑模型、IM评分器或完整逐预测重评分，不称完全论文复现。无submit/cancel，原始产物及权重未改。
+
+## 2026-09-17 159000 全部执行完成
+
+- AB 六项与 TCR 十项均完成：12个云作业 Success，4个本地任务 success；预期聚合产物已落盘。本轮只读核对执行状态和产物存在性，不声称完成逐预测的独立结果审计，暂不改 RESULTS 主表。终态、时间及原始产物入口见 [PROJECT_PROCESS](/vepfs-mlp2/c20250601/251105016/project/dllm_test/PROJECT_PROCESS.md)。无新提交、取消、推理或评分。
+
+## 2026-09-17 v5 159000 TCR 补充评测
+
+- 用户授权补齐十项 TCR：T1 四轨及 T4 两集合云端单卡，T2/T3 四项本地串行。共用已留存 159000 权重，沿用现有协议与评分，不将预检当作质量结果。状态、门禁、任务 ID 及产物入口见 [PROJECT_PROCESS](/vepfs-mlp2/c20250601/251105016/project/dllm_test/PROJECT_PROCESS.md)；未完成前不填 RESULTS 数字。
+
+## 2026-09-17 v5 159000 AB 评测启动
+
+- 按用户要求准备独立 159000 快照与六项 AB 任务：pairing p0/CFG0/**16 步**（用户明确修正，124 步未提交）、CDR 2 步、Specificity 100 epoch、GDPa1 参考 CV、m396 六档主协议。pairing 步数不同于 140000，不能仅作权重差分。无 TCR 或新增 CFG/步数扫描；不覆盖旧结果。快照 SHA、门禁与任务 ID 只维护在 [PROJECT_PROCESS](/vepfs-mlp2/c20250601/251105016/project/dllm_test/PROJECT_PROCESS.md)；完整验收前不新增排行榜数字。
+
+## 2026-09-17 无前缀 pairing 六档步数扫描完成验收
+
+- 六项平台均Success，完整24,000条新增候选及124步参照只读复核通过；各档身份、指标文件哈希、匹配率分母和真实反馈gate见 [任务§4.5](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/AB_LIGHT_CHAIN_PAIRING.md)。[RESULTS §0.6](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/RESULTS.md#ab-pairing)新增独立步数诊断折叠表，保留全部档、论文无前缀参考和单seed限制，不替换p3主行、不与140000矩阵混用。已从Active表移除六项终态；本轮没有新推理／评分、submit/cancel或修改其他任务。
+
+## 2026-09-16 无前缀 pairing iteration 六档已提交
+
+- 用户要求检验采样步数对IM的影响；[AB pairing §4.5](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/AB_LIGHT_CHAIN_PAIRING.md)登记完整六档、固定49000反馈修复版本、单seed解释边界及原124步参照。六项非闲时单卡均已提交，45项CPU回归与实际权重／参考产物身份检查通过；iter8真实门禁通过并开始全量生成。平台状态见 [PROJECT_PROCESS](/vepfs-mlp2/c20250601/251105016/project/dllm_test/PROJECT_PROCESS.md)，完整结果将随各档完成自动更新[summary](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/ab_v5_49000_pairing_iters_p0_20260916/summary.json)。生成与评分生产代码不改，不预填分数或更新p3主结果。
+
+## 2026-09-16 Pairing ESMC 反馈修复后完整结果验收
+
+- p0/p3 平台均 Success，各500×8的CSV、评分记录、协议身份及全部候选分母验收通过，细节见 [AB pairing §7 k](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/AB_LIGHT_CHAIN_PAIRING.md)。按用户简化要求，[RESULTS §0.6](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/RESULTS.md#ab-pairing) 只更新有前三残基前缀的49000修复后结果及论文对照；无前缀保留诊断产物，不恢复CFG表。旧产物未覆盖，未启动新推理／评分或submit/cancel；终态记录见 [PROJECT_PROCESS](/vepfs-mlp2/c20250601/251105016/project/dllm_test/PROJECT_PROCESS.md)。下方“已启动／尚无指标”为此前阶段。
+
+## 2026-09-16 本地 CDR iteration 对照完成
+
+- 用户授权本地试多个iter；完整SAb23H2六CDR、固定92000、iter1/2/4/8，协议见 [AB CDR §4.3](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/AB_CDR_INFILLING.md)。新增逐条预测及输入审计runner，37项CPU回归通过；24格／1,440条真实模型预测完成，逐条重算及反馈审计通过，iter1精确复现旧成绩。完整对照作为独立诊断写入 [RESULTS §0.5](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/RESULTS.md#ab-cdr)。模型只加载一次，本机常驻进程不动；未跑Kong、不替换单步主行、不按测试集挑最好步数。耗时／进程状态见 [PROJECT_PROCESS](/vepfs-mlp2/c20250601/251105016/project/dllm_test/PROJECT_PROCESS.md)。
+
+## 2026-09-16 修复 ESMC 逐轮生成反馈，pairing 重评已启动
+
+- 用户授权修复并重跑；[pairing §7 k](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/AB_LIGHT_CHAIN_PAIRING.md) 登记 v5 协议、防泄露测试及独立 p0/p3 执行入口，两组单卡非闲时已 Running。[RESULTS](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/RESULTS.md) 旧 Ours 行标为修复前、不作现行 headline，尚无新指标；仍不展示 CFG 消融。共享 sampler 的 T4 多步结果同步加历史协议提示，但没有启动 TCR 重评。作业状态统一见 [PROJECT_PROCESS](/vepfs-mlp2/c20250601/251105016/project/dllm_test/PROJECT_PROCESS.md)。
+
+## 2026-09-16 简化 AB pairing 展示
+
+- 按用户要求，[RESULTS](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/RESULTS.md) 只保留前三残基前缀的 Ophiuchus-Ab 论文值与 Ours v5 49000 单组对照。沿用已有默认 p3/cfg0 产物，移除 CFG 扫描、无前缀结果及历史采样消融章节；修正 CDR 历史引用。原始产物与协议文档保留，未重新采样。
+
+## 2026-09-16 m396 只展示原始按行划分结果
+
+- 按用户要求，从 [RESULTS](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/RESULTS.md) 移除 49000、92000 的序列分组结果及对应比较说明，保留原始按行划分结果与 baseline；方法名称仅展示模型、checkpoint 及出处标记，去掉额外划分标签。已确认 AirGen-Dev 原始代码按行抽样、seed=2023；原始评测产物保留。
+
+## 2026-09-16 RESULTS 写入 92000 非 pairing
+
+- 用户要求 pairing 先不管，其余 92000 结果写入 [RESULTS](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/RESULTS.md)。当前非 pairing Ours 主行为 v5 92000，49000 留作对照；pairing 主表不动。
+- 只读转录已有产物，没有新评测或提交。
+
+## 2026-09-15 本地 T1 others β-only 直接关系 token 完成
+
+- 用户授权本机测试，独立留存 49000 checkpoint、完整官方 AS 测试行、无训练头。推理完成 exit 0；55 项输入协议回归与产物复核通过。该实验不覆盖 MLP，且按用户决定不列入 `RESULTS.md` 正式结果；原始产物仅作诊断。协议见 [T1 §4.1a](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/TCR_T1_BINDING.md)。本次不包含大数据 cdr3b、CDR3αβ 或 LongAB。
+
+## 2026-09-15 补跑92000 Specificity 100轮
+
+- 用户确认补独立100轮，与200–500轮同协议；14项CPU测试及YAML语法检查通过。提交/状态见[PROJECT_PROCESS](/vepfs-mlp2/c20250601/251105016/project/dllm_test/PROJECT_PROCESS.md)，完整产物验收后自动填入[RESULTS](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/RESULTS.md)，未完成不填分数。
+## 2026-09-15 v5 92000 Specificity 长预算对照启动准备
+
+- 三项已提交；新增后台完整产物验收及限定范围的Markdown自动回填，发布器4项CPU测试通过。400轮已完成首次核验；其他预算只有全部五折完成且平台Success后才发布，数值统一见[RESULTS](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/RESULTS.md)。
+- 用户要求测试300/400/500 epoch；独立fresh heads、固定末轮、同92000缓存及五折，不从200轮续训、不重提骨干特征。配置/验收契约见[AB Native Probes §4.7](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/AB_NATIVE_PROBES.md)。
+- 新增三份独立单卡非闲时YAML；现有10项CPU回归通过，真实缓存及YAML检查后才提交。结果页保留待完成说明，不提前填写曲线中间分数；实际提交/终态见[PROJECT_PROCESS](/vepfs-mlp2/c20250601/251105016/project/dllm_test/PROJECT_PROCESS.md)。
+
+## 2026-09-15 结果页整理：AB 在前、TCR 在后
+
+- 用户要求逐任务汇总 baseline / checkpoint 及采样消融；[RESULTS](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/RESULTS.md) 已重排，保留 §0.x 引用编号。当前数字、旧 checkpoint 对照和诊断协议明确分层，不保留重复过程长文在主榜。
+- 补入此前漏填的大数据 T1 β-only 最终结果；当前 TCR 全矩阵来自已完成的 final comparison，不新增推理或复跑。原始数值/来源标记沿用既有结果，模型和协议缺项不拼补。
+- 整理前全文完整归档为 [RESULTS_ARCHIVE_20260915.md](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/RESULTS_ARCHIVE_20260915.md)，其中失效协议、冻结任务和旧“运行中”文字仅作历史证据，不恢复可引用性。执行终态与本次核验见 [PROJECT_PROCESS](/vepfs-mlp2/c20250601/251105016/project/dllm_test/PROJECT_PROCESS.md)，关键决定见 [TCR 审计 §9.28](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/TCR_BASELINE_EVALUATION_AUDIT.md)。
+
+## 2026-09-15 v5 step92000 Specificity 对照完成
+
+- 用户所称“最新89000”已不在v5训练目录：top-k清理后当前最新完整保存点为step92000。已在其被后续清理前冻结评测快照，权重SHA256=`2f003a5b42a15498a7d6f2fc51414cad717f96a9cb405dca2388fcef0de3039c`，源/快照一致，`trainer_state.global_step=92000`；不冒称step89000。
+- 单卡非抢占任务 `t-20260915132856-tlxtc` 已Success（477秒）。沿用step49000同协议并重新提取4398条表征，固定第200轮Accuracy/macro-F1/MCC=`0.643468/0.641730/0.466119`；相对step49000同协议提升`0.016143/0.015948/0.024426`。五折曲线、诊断头、OOF、LR归零与聚合独立复算通过；完整状态与验收见 [PROJECT_PROCESS](/vepfs-mlp2/c20250601/251105016/project/dllm_test/PROJECT_PROCESS.md) 最新条目，数值见RESULTS §0.6a。
+
+## 2026-09-15 Specificity 200轮独立诊断完成
+
+- 用户要求检查LR与收敛、对照Ophiuchus本地训练记录并尝试200轮；新增默认关闭的逐轮观测，固定末轮评分不变。协议与产物契约见 [AB Native Probes §4.5](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/AB_NATIVE_PROBES.md#45-specificity-200-epoch-学习曲线诊断2026-09-15)；10项CPU测试及真实缓存/YAML门禁通过。
+- 新非闲时单卡实验 `t-20260915103954-2sw2c` 已Success（02:39:55Z–02:47:04Z，429秒）。固定第200轮五折均值为 Accuracy 0.627325、macro-F1 0.625782、MCC 0.441693；平均留出折loss 0.838495，为该次200轮曲线最低。五折各200条记录、每折10个诊断头、末轮LR归零、OOF/折均值/曲线汇总均独立复算通过。原100轮结果不覆盖；基础模型与其他任务不动。
+- Ophiuchus已有50/100/200/300轮记录对照及局限只写入RESULTS §0.6a诊断段，明确不替代论文baseline，不将本地长训练结果冒称论文成绩。
+
+## 2026-09-15 AB 分类头与论文baseline核查
+
+- 头结构/宽度与训练配置差异、同参CPU前向核验见 [AB Native Probes §4.4](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/AB_NATIVE_PROBES.md#44-specificity-分类头对齐核查2026-09-15)，运行记录见 [PROJECT_PROCESS](/vepfs-mlp2/c20250601/251105016/project/dllm_test/PROJECT_PROCESS.md)。未改预测头或训练协议。
+- 按 [PROJGUIDE §0.2.2](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/PROJGUIDE.md) 用户规则，RESULTS当前AB各节携带论文baseline，缺少精确值明确留缺；历史复跑及Ours原值保持不变，无新模型性能或submit/cancel。
+
+## 2026-09-15 GDPa1 仅参考流程
+
+- 用户协议决定及入口/收数契约见 [AB Native Probes §4.2](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/AB_NATIVE_PROBES.md#42-预测头与协议切割线)；[RESULTS §0.6a](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/RESULTS.md) 使用已有结果调整当前/历史展示，未改数值或原始文件。
+- 原生探针8项CPU回归通过，验证范围与执行记录见 [PROJECT_PROCESS](/vepfs-mlp2/c20250601/251105016/project/dllm_test/PROJECT_PROCESS.md)。未加载权重或重跑正式任务，没有 submit/cancel；Specificity、m396、生成和TCR协议不变。
+
+## 2026-09-14 TCR 剩余执行与 baseline / 29k 比较收口
+
+- 继续既有 49000 本地队列/自动审计，新增只读分层收集及完成后汇总等待器；10 项 CPU 测试、真实身份核对、monitor plan check-only 通过。关键决定见 [审计 §9.27](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/TCR_BASELINE_EVALUATION_AUDIT.md)，精确运行状态见 [PROJECT_PROCESS](/vepfs-mlp2/c20250601/251105016/project/dllm_test/PROJECT_PROCESS.md)。不重复模型推理、不重跑 baseline，不做云端 submit/cancel 或生产参数修改。
+- 新增 others 出版社数据与分层比较，记录公开行集与论文不一致；核对 29k/49k 历史对照的逐行身份和源码差别。T3 论文 ESM2 显示名纠正，不改历史原值；出处和局限见任务 owner，数字仅进入 [RESULTS §0.1–§0.4](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/RESULTS.md)。当前主体仍只含 49000，旧模型对照单列，缺失不拼补。
+- 后续 held20 也完整执行、独立审计通过，数字补入 RESULTS §0.4；大数据 T1 已从原队列接续本地，尚待最终结果。当前完整矩阵没有提前标成完成；补充相关 CPU 回归与表格转录核对见任务账本。
+
+## 2026-09-14 TCR T4 写出修复与本地接续
+
+- 用户授权修复后，补 TCR 严格 JSON 边界与恢复入口，100 项 CPU 回归、新真实 GPU gate、benchmark14 完整重评分通过；详细契约/证据唯一见 [T4 §7.7](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/TCR_T4_GENERATION.md)，关键决策见 [审计 §9.26](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/TCR_BASELINE_EVALUATION_AUDIT.md)。旧失败产物保留，没有重采 1,400 个已完成候选。
+- 新增 49000 benchmark14 各完整视图数值至 [RESULTS §0.4](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/RESULTS.md)，未替换 baseline/历史 ckpt。剩余 held20 → 大数据 β-only 接续本地，持久监控恢复；精确进程/时间及原云端终态见 [PROJECT_PROCESS](/vepfs-mlp2/c20250601/251105016/project/dllm_test/PROJECT_PROCESS.md)。未做 submit/cancel、未改 AB/共享采样器/训练数据/评测预算。
+
+## 2026-09-14 Ours AB v5 49000全量收数
+
+- 只读查询11项正式任务均Success，原生CDR/pairing/探针数字已分别写入 [RESULTS](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/RESULTS.md) §0.5/§0.6/§0.6a；不是baseline重跑，不自动新增论文headline。
+- 六组pairing逐行完整性、前缀与声明长度、ANARCI匹配计数及跨组manifest一致性核对；Specificity保存预测五折均值/SD、GDPa1两协议OOF、m396十二档预测及序列重叠重算通过。CPU独立重载分类头的1条argmax差异已明确登记，未覆盖原GPU评分；CDR只保存聚合日志，不声称独立逐序列重评分。
+- 按规则从两张Active表移除本批终态任务并更新机器任务索引；终态/时间账本见 [PROJECT_PROCESS](/vepfs-mlp2/c20250601/251105016/project/dllm_test/PROJECT_PROCESS.md)。本轮未提交/取消任务、未重新运行模型生成或ImmunoMatch、未修改训练/原始产物。
+
+## 2026-09-14 TCR 查询确认队列因结果写出失败停止
+
+- 7 项已完成；benchmark14 已完成全部生成但写出评分失败，held20 / 大数据 T1 β-only 未启动，监控报 attention_required 后退出。具体缺陷及未完成验收见 [T4 §7.7](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/TCR_T4_GENERATION.md)，时间/运行状态见 [PROJECT_PROCESS](/vepfs-mlp2/c20250601/251105016/project/dllm_test/PROJECT_PROCESS.md)，关键记录见 [审计 §9.25](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/TCR_BASELINE_EVALUATION_AUDIT.md)。本次仅诊断及状态文档同步，未修代码、恢复任务或新增正式数字。
+
+## 2026-09-13 others 完成，剩余 TCR 接续本地
+
+- 后续快照：T3 deep 也已完整执行并通过覆盖/聚合核对，现为 7/10 完成；T4 benchmark14 在跑。已启动独立 30 秒周期监控，任务结束后自动 CPU 复核和收录 49000-only JSON；具体实时状态、初版监控检查修正和限制见 [审计 §9.24](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/TCR_BASELINE_EVALUATION_AUDIT.md) / [monitor_v2/status.json](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/tcr_v5_49000_20260913/monitor_v2/status.json)。
+
+- 六项短任务均完整执行；others 三轨的五折×三测试集逐样本/汇总复核通过。四项剩余云端 Queue 已逐项取消并确认 Killed；23:39:40Z 启动本地接续 T3 deep → T4 两数据集 → 大数据 T1 β-only，当前无本轮云端在途任务。完整参数/49000 不变，持续监控，不重跑已完成结果。
+- 决策、代码保护和验收证据见 [审计 §9.24](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/TCR_BASELINE_EVALUATION_AUDIT.md)；实时状态与 ID 见 [PROJECT_PROCESS](/vepfs-mlp2/c20250601/251105016/project/dllm_test/PROJECT_PROCESS.md)；数字仅入 [RESULTS §0.1](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/RESULTS.md)。以下“重任务保留云端/全部排队”为历史快照。
+
+## 2026-09-13 TCR 短任务迁移本地
+
+- 用户允许短任务本机运行；已将六项短任务从云端 Queue 取消并转为本地串行启动，较大任务保留云端；额外云端复验取消，既有本地验收保留。参数/数据/49000 权重不变，未新增或覆盖性能表。最新状态和关键实施记录见 [审计 §9.23](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/TCR_BASELINE_EVALUATION_AUDIT.md) / [PROJECT_PROCESS](/vepfs-mlp2/c20250601/251105016/project/dllm_test/PROJECT_PROCESS.md)，下方“11 项全部 Queue”是迁移前快照。
+
+## 2026-09-13 TCR 全任务评分复查与 v2 替换提交
+
+- 修复 T2 精度/比较锚点漏项；81 项回归和 T1–T4 真实 GPU 小样本完整执行评分验收通过。旧 T2/T3 四个排队作业精确取消，重新验收后以 v2 重提；T1/T4 六项保留，另提交独立云端验收。当前 10 正式＋1 复验均 Queue，尚无完整正式分数。
+- 关键改动、首版预检失败/重跑、证据和未关闭项见 [审计 §9.22](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/TCR_BASELINE_EVALUATION_AUDIT.md)；ID/时间/资源见 [PROJECT_PROCESS](/vepfs-mlp2/c20250601/251105016/project/dllm_test/PROJECT_PROCESS.md)。不修改历史 baseline 数字，不把预检结果写入成绩表，不动 AB/训练任务。
+
+## 2026-09-13 TCR 49000 当前任务实现与提交
+
+- 双链生成延后；已实施 T2/T3 runtime adapter、T3 本地多标签处理和 T4 β-only 生成，按专属 gate 提交当前矩阵。关键决定与各任务实现 owner 索引见 [审计 §9.21](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/TCR_BASELINE_EVALUATION_AUDIT.md)；ID/状态唯一见 [PROJECT_PROCESS](/vepfs-mlp2/c20250601/251105016/project/dllm_test/PROJECT_PROCESS.md)。
+- 原始数据与历史指标未覆盖；本轮新结果只允许指定 49000。输入/执行通过不等于论文复现、全部去污染或完整质量评测已完成，暂不新增性能数字。
+
+## 2026-09-13 已有生成模型的配对测试数据核查
+
+- 从表头候选推进到官方生成用途、全行数据、上游身份和结构子集规则核查；推荐与完整证据见 [T4 §7.6](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/TCR_T4_GENERATION.md)，用户方向见 [审计 §9.20](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/TCR_BASELINE_EVALUATION_AUDIT.md)。已登记本地数据SHA；无生产/源数据修改、GPU任务或新模型分数，未宣称新双链协议通过验收。
+
+## 2026-09-13 T4 β-only / 配对αβ baseline 调研
+
+- 已登记用户要求的两组候选、官方证据与接入缺口，见 [T4 §7.5](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/TCR_T4_GENERATION.md) / [总审计 §9.19](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/TCR_BASELINE_EVALUATION_AUDIT.md)。同步出处入口与RESULTS引用限制；本轮仅研究/静态检查/文档，无新生产实现、下载、GPU任务或性能结果，未建立新配对数据集。
+
+## 2026-09-13 benchmark14 数据形式与 TCRT5 任务定义
+
+- 复核实际文件、官方collator与论文Methods，字段映射和解释见 [T4 §7.4.2](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/TCR_T4_GENERATION.md) / [总审计 §9.18](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/TCR_BASELINE_EVALUATION_AUDIT.md)。仅文档，无数据、生产协议、任务或模型指标变更。
+
+## 2026-09-13 T4 生成区域确认与原始字段核查
+
+- 用户确认未知区域语义，完成现有评测JSON及上游CSV字段/非空信息只读核查；协议、证据和条件信息边界见 [T4 §7.4](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/TCR_T4_GENERATION.md) / [总审计 §9.17](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/TCR_BASELINE_EVALUATION_AUDIT.md)。同步官方单文件SHA记录；无生产实现、数据改写、GPU任务或新模型分数。
+
+## 2026-09-13 TCR 49000 全套重评的前置条件复核
+
+- 登记用户的指定 checkpoint、最新结果单独汇总与 others 长链/非长链覆盖要求，见 [总审计 §9.16](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/TCR_BASELINE_EVALUATION_AUDIT.md)。重新核验可用快照并运行现有 T1 CPU 回归，证据见 [PROJECT_PROCESS](/vepfs-mlp2/c20250601/251105016/project/dllm_test/PROJECT_PROCESS.md)。T2–T4 gate 尚未关闭，没有启动正式评测或产生新模型成绩；历史结果未覆盖。
+
+## 2026-09-13 T4 联合 αβ 生成提议
+
+- 静态核对多链采样与训练补全语义；用户提议及待澄清项见 [T4 §7.4](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/TCR_T4_GENERATION.md) / [总审计 §9.15](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/TCR_BASELINE_EVALUATION_AUDIT.md)。仅文档，无生产实现/任务/指标变更。
+
+## 2026-09-13 T4 对 v5 train / valid 的全量成员核查
+
+- 已完成实际启动metadata、prepared分片和TCRT5参考集合核查；详细结果及验收见 [T4 §7.3](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/TCR_T4_GENERATION.md)，关键解释见 [总审计 §9.14](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/TCR_BASELINE_EVALUATION_AUDIT.md)。新增只读诊断脚本与独立产物，同步RESULTS引用边界；无数据/权重/生产协议变更或GPU任务，没有新增模型分数。
+
+## 2026-09-13 T4 baseline 生成机制与条件核查
+
+- 原文/官方代码与本地 wrapper 只读核查，机制与新问题见 [T4 §7.2](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/TCR_T4_GENERATION.md)，关键日志见 [审计 §9.13](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/TCR_BASELINE_EVALUATION_AUDIT.md)。同步 RESULTS 引用边界，无代码变更、GPU任务或新分数。
+
+## 2026-09-13 T4 generation 当前链路初查
+
+- 用户询问当前生成任务；只读核对入口/共享 sampler/真实 eval JSON 与部分历史 metrics，发现及边界统一见 [T4 §7.1](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/TCR_T4_GENERATION.md) / [TCR 审计 §9.12](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/TCR_BASELINE_EVALUATION_AUDIT.md)。同步 RESULTS §0.4 引用警示；无生产代码修改、GPU 提交或新模型分数。
+
+## 2026-09-13 Ours 原生 AB 测评与 pairing CFG 接入
+
+- 用户批准原生 AB 探针与无轻链前缀/前三残基 × CFG 对照，按非闲时单卡拆分。原生输入、CV/split、产物和执行状态见 [AB_NATIVE_PROBES](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/AB_NATIVE_PROBES.md)；CFG 修复及 v4 语义见 [pairing §4.4](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/AB_LIGHT_CHAIN_PAIRING.md)。
+- 原生输入/分类头保存重评分/嵌套回归/分组拆分/作业矩阵与生成回归共30项 CPU 测试通过（已有 protenix_abtcr 环境）；pllm 缺回归依赖，不安装/升级共享环境。用户选择最新 v5 后，真实 GPU 门禁也已通过；门禁不作为质量成绩。
+- 11项正式非闲时单卡作业已提交，统一使用独立权重快照；尚未填写新性能数字。选择依据、SHA、具体 YAML、全部 task ID 和平台状态只在 [PROJECT_PROCESS](/vepfs-mlp2/c20250601/251105016/project/dllm_test/PROJECT_PROCESS.md) 的 `Submitted Ours AB v5 49000` 系列记录维护。
+
+## 2026-09-13 T3 原论文 baseline 复核
+
+- 按用户请求核对正式论文/补充方法、作者数据 notebook 与模型卡，并只读检查本地数据来源和既有 artifact；详细发现见 [T3 §7.2](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/TCR_T3_REPRESENTATION.md)，边界/身份见 [总审计 §9.11](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/TCR_BASELINE_EVALUATION_AUDIT.md)。同步撤回 RESULTS 历史校准及 README / BASELINE_VERIFICATION 的兼容判定；不改原数字、生产代码、数据或 registry，未启动 GPU，没有新性能指标。
+
+## 2026-09-13 T3 representation / few-shot 输入与评分审计
+
+- 完成入口参数隔离、support/query CPU 合成评分检查与四份数据全量身份核查；协议/缺陷唯一见 [T3 任务 §7.1](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/TCR_T3_REPRESENTATION.md)，验证身份及边界见 [TCR 审计 §9.10](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/TCR_BASELINE_EVALUATION_AUDIT.md)。同步 RESULTS §0.3 引用警示；未改生产源码或数据、未启动 GPU、无新增模型分数。
+
+## 2026-09-13 T2 clustering 输入/关系审计
+
+- 开始执行用户要求的专项审计；实际入口/原生 tokenizer-collator CPU 检查与发现统一见 [T2 任务 §7.1](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/TCR_T2_CLUSTERING.md)，关键记录/身份见 [TCR 审计 §9.9](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/TCR_BASELINE_EVALUATION_AUDIT.md)。仅诊断并同步 [RESULTS §0.2](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/RESULTS.md) 引用警示，未改生产源码、提交 GPU 或生成新指标。
+
+## 2026-09-13 T1 v5 同 others 数据的 LongAB 对照
+
+- 用户批准的长链输入版本已实现，CPU/全数据 gate 通过；非闲时单卡任务 **Success**，五折×三个测试集及逐行/重算指标复核完成。关键输入决策、验证及产物统一见 [TCR 审计 §9.7](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/TCR_BASELINE_EVALUATION_AUDIT.md)，任务账本见 [PROJECT_PROCESS](/vepfs-mlp2/c20250601/251105016/project/dllm_test/PROJECT_PROCESS.md)。新指标及三输入比较独立归入 [RESULTS §0.1c](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/RESULTS.md)，不覆盖旧 β-only/CDR3αβ 结果。
+
+## 2026-09-13 T1 v5 同 others 数据的 β-only 对照
+
+- 新增独立输入/数据选择模式，CPU gate 与 GPU 五折×三个测试集均完成，任务 Success；协议与产物核验见 [TCR 审计 §9.6](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/TCR_BASELINE_EVALUATION_AUDIT.md)，新指标/αβ 对比见 [RESULTS §0.1b](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/RESULTS.md)。不改原始数据，不与历史大 β-only 榜混排，不把 αβ 旧结果当作本次完成凭据。任务账本见 [PROJECT_PROCESS](/vepfs-mlp2/c20250601/251105016/project/dllm_test/PROJECT_PROCESS.md)。
+
+## 2026-09-13 T1 others 单卡非闲时独立复跑
+
+- 本地 GPU 有既有负载，按用户新授权提交非闲时单卡任务 `t-20260913192406-hxhfb`；平台确认 Preemptible=false，随后 **Success**。独立重跑的产物核验完成，协议/验证记录见 [TCR 审计 §9.5](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/TCR_BASELINE_EVALUATION_AUDIT.md)，任务账本见 [PROJECT_PROCESS](/vepfs-mlp2/c20250601/251105016/project/dllm_test/PROJECT_PROCESS.md)；复跑来源追加至 [RESULTS §0.1a](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/RESULTS.md)。不更换模型或训练方式，不以旧缓存命中冒充本次收数，不重复增加模型榜单行。
+
+## 2026-09-13 T1 others 取消闲时任务
+
+- 按用户最新要求取消 `t-20260913182826-c4pw2`，终态已确认 Killed；从未启动，无新增测试结果。改为本地测试的决定、资源占用与未执行边界统一见 [TCR 审计 §9.4](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/TCR_BASELINE_EVALUATION_AUDIT.md)，cancel 账本见 [PROJECT_PROCESS](/vepfs-mlp2/c20250601/251105016/project/dllm_test/PROJECT_PROCESS.md)。不自动重提，不改其他任务。
+
+## 2026-09-13 T1 others 闲时重评提交
+
+- 以下为历史提交状态：`t-20260913182826-c4pw2` 曾确认 `Preemptible=true`、初始 Queue，后按用户要求取消，见上方记录。资源/独立 tag/续跑边界与验证记录统一见 [TCR 审计 §9.3](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/TCR_BASELINE_EVALUATION_AUDIT.md)，提交账本见 [PROJECT_PROCESS](/vepfs-mlp2/c20250601/251105016/project/dllm_test/PROJECT_PROCESS.md)。没有闲时作业的新指标，不沿用旧结果冒充重评完成。
+
+## 2026-09-13 T1 others CDR3αβ 第一版
+
+- 文档跟进：用户要求再次确认关键改动写入指定审计；已补当前记录导航并修正过时状态标题，详见 [TCR 审计 §9.2 文档复核](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/TCR_BASELINE_EVALUATION_AUDIT.md)。本次无新代码、实验或指标。
+- 已实现、完成 CPU 回归与 GPU 五折评测，产物复核通过；协议、输入边界、缓存隔离和验收统一见 [TCR 审计 §9](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/TCR_BASELINE_EVALUATION_AUDIT.md)。任务 `t-20260913180748-44599` 已 Success，Volc 账本见 [PROJECT_PROCESS](/vepfs-mlp2/c20250601/251105016/project/dllm_test/PROJECT_PROCESS.md)；新结果独立写入 [RESULTS §0.1a](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/RESULTS.md)，旧结果不覆盖、不跨轨排名。
+
+## 2026-09-13 T1 运行时输入修正
+
+- 用户确认的输入决策、实现范围、CPU 验证与 NM2025 多特征数据核查统一记录在 [TCR baseline 审计 §9](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/TCR_BASELINE_EVALUATION_AUDIT.md)；未产生新模型指标，旧结果不覆盖。
+
+## 2026-09-13 AB pairing 生成器状态审计
+
+- 全量任务 **Success**，已完成生成、现有评分及完整性复核，结果独立写入 [RESULTS §0.6 全量](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/RESULTS.md)，取代 pilot 作为当前协议的性能依据，不覆盖历史产物。新协议验收、CPU 回归和单因素归因限制见 [任务 §7 h](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/AB_LIGHT_CHAIN_PAIRING.md)；终态见 [PROJECT_PROCESS](/vepfs-mlp2/c20250601/251105016/project/dllm_test/PROJECT_PROCESS.md)。下方“在途/未出分”为历史阶段记录。
+- pilot 已完成生成与评分、产物复核通过，完整 holdout500 已进入生成阶段；预检指标独立写入 [RESULTS §0.6](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/RESULTS.md)，不替换历史主表、不用小样本声称论文复现或单因素改善。平台状态见 [PROJECT_PROCESS](/vepfs-mlp2/c20250601/251105016/project/dllm_test/PROJECT_PROCESS.md)。
+- 用户授权运行后已完成实现与 CPU 验证，GPU 重评启动；权威实现/验证记录见 [任务 §7 h](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/AB_LIGHT_CHAIN_PAIRING.md)，submit 和实时状态见 PROJECT_PROCESS。下方仅文档条目是历史阶段，不代表当前代码仍未修复；完整新分数尚待产物。
+- 用户新增长度协议决定已写入 [AB 测评审计 §9](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/AB_BASELINE_EVALUATION_AUDIT.md)，任务 §4.3/§8 与入口、结果注释已同步；不改已有数字或来源层，不恢复历史失效产物。当前仅文档完成，新协议运行与 sampler 修复未执行。
+- 根据用户 PAD attention 追问，继续核对本地训练 attention 与 AirGen 训练尾部；已收紧未知长度窗口建议的适用边界，见 [AB pairing §7 i/j 第 5–7 点](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/AB_LIGHT_CHAIN_PAIRING.md)。本次只读源码并更新文档，无新模型实验或分数。
+- 追加 `<protd>`/padding 与 CFG 源码复核及双样本 CPU 检查；纠正“没有终止 token / 槽位数必然等于输出长度”的解释，细节只维护在 [AB pairing §7 i/j](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/AB_LIGHT_CHAIN_PAIRING.md)。没有改实现或产生新模型指标。
+- 在用户要求对照 AirGen CDR/pairing 的诊断中发现并用只读 CPU 最小例子确认共享 grammar sampler 的状态问题；证据、影响边界和关闭条件唯一登记在 [AB pairing §7 h](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/AB_LIGHT_CHAIN_PAIRING.md)。
+- 已给受影响的多步 Ours 结果加待复核/不作 headline 说明，并关联 CDR 任务；旧数字保留。本轮未修改 sampler、加载模型或提交 GPU 评测，性能影响尚未测量。
+
+## 2026-09-13 Ophiuchus-Ab baseline 探针纠错文档
+
+- 按用户要求建立 [AB baseline 测评审计与完善指南](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/AB_BASELINE_EVALUATION_AUDIT.md)，集中维护论文/源码证据、纠错方案、产物契约及验收条件。
+- 已同步相关入口与引用限制；本次仅修改文档，旧产物、headline 范围和排行榜数值不变，未修改实现或提交评测。
+
+## 2026-09-13 TCR baseline 输入与训练方式审计
+
+- 按用户要求建立 [TCR baseline 纠错记录](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/TCR_BASELINE_EVALUATION_AUDIT.md)。问题细节、证据和关闭条件由该文档集中维护。
+- 本轮已完成文档登记与静态审计；尚未修评测代码、重跑模型或提交 GPU 作业。
+- T1 旧结果已加引用限制，任务说明与方法指南已链接新记录；数值原样保留，纠正后的结果待后续验收。
+
+## 2026-09-11 Table 5 ESM head 再加长到 200/300 epoch（闲时）
+
+- 100 末轮已到 Acc 0.6778（论文 0.6796）。再提交闲时 `t-20260911190334-kpfsz`：同一份 cache，独立训 200 再训 300。
+- 产物：`output/downstream_generation/ophiuchus_ab/specificity_esm_ep{200,300}/`。不覆盖 50/100。不进 headline。
+
+## 2026-09-11 Table 5 ESM head 50/100 epoch 已跑完（不进 headline）
+
+- `t-20260911085733-5b727` **Success**（约 9 min）。复用 cached embedding，独立训 50 再训 100（warmup=总步数 10%，所以两条曲线前几轮不可直接和 5-epoch 作业逐点对齐）。
+- 末轮五折均值：
+
+| 设置 | Acc | F1 | MCC |
+|---|---:|---:|---:|
+| 5 epoch（此前作业） | 0.6085 | 0.6068 | 0.4139 |
+| 50 epoch 末轮 | 0.6651 | 0.6640 | 0.4982 |
+| 100 epoch 末轮 | 0.6778 | 0.6768 | 0.5171 |
+| 论文 Ophiuchus-Ab `[P]` | 0.6796 | 0.6790 | 0.5203 |
+
+- 100 epoch 最好一轮（ep94，**不是**协议末轮）Acc 0.6792 / F1 0.6784 / MCC 0.5196。~60 轮后 Acc 平台 0.67–0.68，test CE 平台 ~0.78，train CE 仍在降。不进 headline。
+
+## 2026-09-11 Table 5 划分审计：不是折切错了
+
+- Ophiuchus-Ab 论文只写「4398 条、5-fold stratified CV、frozen + linear head」，**没有放出折文件**。官方仓库 `Ophiuchus-Team/Ophiuchus-Ab` 只有 `extract.py`，无 specificity eval。
+- AirGen 脚本读的就是 CurrAb 的 `TTE/hd-0_flu-1_cov-2_{train,test}{i}.csv`。CurrAb 官方 notebook：`StratifiedKFold(n=5, shuffle=True, random_state=42)` 打在 `hd-0_flu-1_cov-2_clust99` 上。
+- 本地 TTE 与官方表按 name 的五折 Jaccard = **1.0**（五折全对上）。折内 train∩test = 0。不是划分问题。
+- 同 embedding 上：ESM head 5e-5/5ep Acc **0.6085**；logreg+scaler 最好是 **C=0.01 → Acc 0.6862 / F1 0.6857 / MCC 0.5295**（论文 0.6796 / 0.6790 / 0.5203）。C=0.03 为 0.6773。论文写的是 linear classification。不进 headline。
+
+## 2026-09-11 官方 Ophiuchus-Ab.ckpt 探针评测已跑完（不进 headline）
+
+- `t-20260911054553-jb7v5` **Success**（约 18 min）。产物：`output/downstream_generation/ophiuchus_ab/{specificity_hd_flu_cov,affinity_m396,developability_gdp_a1}_metrics.json`。
+- **Table 4 GDPa1**：变换空间 CV Spearman 对上论文四列（0.511 / 0.550 / 0.460 / 0.359）。协议对齐官方 `finetune_dev.py`（全标签 PowerTransformer + Ridge + 预定义折）。
+- **Table 5 CurrAb**：Acc 0.6085 / F1 0.6068 / MCC 0.4139，低于论文 0.6796 / 0.6790 / 0.5203。TTE 五折 + ESM head（5 epoch）。
+- **Fig 4 m396**：0.5%→20% train Spearman mean 0.930→0.971。论文是「优于 MINT/AbMAP」趋势图，本轮没跑那两条基线，不能对 `+6%` 做数字核对。
+- **不写入** `RESULTS.md` §0，也不解冻 headline 范围。
+
+## 2026-09-11 用官方 Ophiuchus-Ab.ckpt 复现 Table 4/5 / Fig 4
+
+- 本地权重已在：`dllm_test/model_weights/ophiuchus_ab/Ophiuchus-Ab/Ophiuchus-Ab.ckpt`（3.1G）与 `/c20250601/mj/model_weights/ophiuchus_ab/...` 同大小、前 8MiB SHA 一致。
+- 新增 `downstream/ophiuchus_eval/developability.py`（对齐官方 `finetune_dev.py`）。`run_probe.sh` 现跑 specificity + m396 + GDPa1。
+- 已提交闲时评测 `t-20260911054553-jb7v5`（`eval_jobs/eval_ophiuchus_ab_official_probe.yml`）。产物将写到 `output/downstream_generation/ophiuchus_ab/`。**不进 headline。**
+
+## 2026-09-11 抗体探针数据官方重拉 + 本地对照
+
+- 官方重拉 Desautels bioRxiv `media-1.zip` 与 RCSB 2G75；GDPa1 从 HF `ginkgo-datapoints/GDPa1` 落地。
+- CurrAb Zenodo 14661302 先前 403 是 **Chrome/120 User-Agent**，不是地址错、也不是 10808 没走通。换成 Chrome/144 后官方 tar 落地（md5 与登记一致）。评测表改为包内 `hd-0_flu-1_cov-2_clust99.csv`；旧表 4396/4398 相同，仅 Mab3.1 / 27F3 被截成 Fv，已按 name 补进原 TTE 折。
+- 对照：m396 CSV 与本地评测表**字节一致**；2G75 官方全长（245+213）替换失效 AirGen 软链，遗留 `*_vr.fasta` 仅为 Fv 前缀；GDPa1 246 行、244/246 PDB。
+- 权威文档新建 [`data/downstream/PROBE_DATA.md`](../../data/downstream/PROBE_DATA.md)；`prepare_probe_data.py` 改为官方优先；范围同步点去掉过时的「无数据 / 死链」，**headline 范围未解冻**。
+- 归档文档（`DOWNSTREAM_STATUS.md` / `downstream.md` / `AB_TCR_EVAL_SUMMARY.md`）未改。
+
 ## 2026-09-07 全链 151k / generated-only 44k 的 T4 + CDR 回填（本地单卡跑）
 
 - **为什么本地跑**：这两个 ckpt 的九条单卡评测先投 `c20250601` 闲时排 5 小时零起跑；改投 `queue012` + 非抢占后又排 41 分钟零起跑（该队列非终态 758 条里单卡 607 排队 / 106 Running，多卡排队仅 27 条，拥堵全在单卡档）。按实测耗时中位数 T4 12min < CDR 16min < repr 28min ≪ **pairing 165min**，保留两条 pairing 在队列、cancel 其余七条，并把四个 T4/CDR 阶段拿到本机 A100-80G 串行跑完（56 分钟，4/4 exit 0）。env 直接激活 eval YAML 里指定的 `/vepfs-mlp2/c20250601/251105016/conda/envs/protenix_abtcr`，`CDR_MAX_ITER=2`、batch `4 8` 与平台 entrypoint 逐行一致，故与平台跑同口径。Runner 与耗时表：`output/_local_runs/{run_local_t4_cdr.sh,local_run.log,status.tsv}`。

@@ -12,7 +12,7 @@ from types import SimpleNamespace
 import torch
 import torch.nn as nn
 
-from dllm.pipelines.qwen3_vl_arch.data import (
+from dllm.pipelines.immune_llada.data import (
     BioSeqChain,
     BioSeqRecord,
     GrammarBioSeqCollator,

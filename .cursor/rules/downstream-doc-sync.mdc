@@ -22,6 +22,7 @@ alwaysApply: true
 | 过程 changelog | `$ROOT/downstream/benchmark/PROGRESS.md` |
 | Volc submit/cancel | `$ROOT/PROJECT_PROCESS.md` |
 | 官方产物获取与 SHA256 | `$ROOT/downstream/benchmark/baselines/_download_manifest.tsv` |
+| 抗体探针数据（GDPa1 / Specificity / m396）落地、官方对照、SHA256 | `$ROOT/data/downstream/PROBE_DATA.md` |
 
 ## 2. 改了什么 → 必须同步什么
 
@@ -32,6 +33,7 @@ alwaysApply: true
 | 评测范围冻结/解冻 | `README.md` §0（唯一定义处，另四处同步点在该节内列明） |
 | baseline 出处层 / provenance 判定 | `README.md` §3.1 + `BASELINE_VERIFICATION.md` |
 | 官方产物新下载 / 重新校验 | `baselines/_download_manifest.tsv`（含 `sha256`） |
+| 抗体探针数据新下载 / 与本地对照 | `$ROOT/data/downstream/PROBE_DATA.md` + `baselines/_download_manifest.tsv` |
 | 提交/取消 Volc eval 作业 | `$ROOT/PROJECT_PROCESS.md`（规则见 `volc-train-task-log.mdc`） |
 | 发现口径错误 | 立即在 `RESULTS.md` 对应节标「不作 headline」+ 在任务文档 §7 登记 |
 

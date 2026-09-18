@@ -7,12 +7,9 @@ tasks?" with measurements rather than with a list of blocklists that are
 
 Two things make a naive check wrong, and both have burned this project before:
 
-  1. **Filter placement.** Some decontamination runs at corpus-build time
-     (tcr_native / tcr_papers / tcr_repertoire) and some at data-load time via
-     ``with_exclusion_filter`` (OTS / TRAIT / OAS / ASD). Only the load-time
-     path is visible in the CSV-to-record function. So this script pushes every
-     row through the *real* ``row_to_record`` returned by ``build_immune_specs``
-     and only audits rows that survive -- exactly what training sees.
+  1. **Prepared boundary.** Parsing, decontamination and quality filters run
+     once during offline preparation. This script reads the resulting semantic
+     JSONL records and only audits rows that survive -- exactly what training sees.
 
   2. **Anchor conventions.** A CDR3 can be stored as the full IMGT junction
      (``C..[FW]``) or as the anchor-free loop. Comparing the two forms directly
@@ -35,9 +32,10 @@ from pathlib import Path
 
 ROOT = Path("/vepfs-mlp2/c20250601/251105016/project/dllm_test")
 sys.path.insert(0, str(ROOT))
-sys.path.insert(0, str(ROOT / "examples" / "llada"))
-
-from dllm.pipelines.bioseq.datasets import _source_split_path  # noqa: E402
+from dllm.pipelines.immune_llada.data.preprocessing.validators import (
+    validate_manifest,
+    validate_prepared_row,
+)
 
 csv.field_size_limit(2**31 - 1)
 
@@ -171,12 +169,36 @@ def load_benchmarks() -> dict[str, set[str]]:
     return dict(b)
 
 
-def ots_beta(row: dict) -> str:
-    """OTS stores paired chains; beta is whichever chain ANARCI typed 'B'."""
-    for idx in ("1", "2"):
-        if str(row.get(f"chain{idx}_anarci_type", "")).strip().upper() == "B":
-            return row.get(f"chain{idx}_cdr3") or ""
-    return ""
+def _prepared_rows(dataset_dir: Path, split: str, source: str, limit: int | None):
+    """Yield validated semantic records from the selected prepared source shard(s)."""
+    manifest_path = dataset_dir / "dataset_manifest.json"
+    if not manifest_path.is_file():
+        raise FileNotFoundError(f"Prepared dataset manifest not found: {manifest_path}")
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    validate_manifest(manifest)
+    split_info = manifest["splits"].get(split)
+    if split_info is None:
+        raise KeyError(f"Prepared split {split!r} is not present in {manifest_path}")
+    seen = 0
+    for shard in split_info.get("shards", []):
+        if shard.get("source") != source:
+            continue
+        path = dataset_dir / str(shard["path"])
+        if not path.is_file():
+            raise FileNotFoundError(f"Prepared shard listed by manifest is missing: {path}")
+        with path.open("r", encoding="utf-8") as handle:
+            for line_number, line in enumerate(handle, 1):
+                if not line.strip():
+                    continue
+                yield validate_prepared_row(json.loads(line))
+                seen += 1
+                if limit is not None and seen >= limit:
+                    return
+
+
+def _prepared_cdr3b(record) -> str:
+    """Extract the canonical identifier used by the source adapter."""
+    return record.identifiers.get("cdr3b_core", "")
 
 
 def main() -> None:
@@ -184,10 +206,13 @@ def main() -> None:
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--limit", type=int, default=None, help="rows per source")
     ap.add_argument("--split", default="train")
-    ap.add_argument("--tcr-papers-dir", default=str(ROOT / "data/tcr_papers_v2/dataset"))
+    ap.add_argument(
+        "--prepared-data-dir",
+        default=str(ROOT / "data/prepared/immune_v3_heterotypic"),
+        help="Prepared semantic JSONL directory (created by preprocess_immune_dataset.py)",
+    )
     args = ap.parse_args()
-
-    from protein_pretrain_esmc import DataArguments, build_immune_specs  # noqa: E402
+    prepared_dir = Path(args.prepared_data_dir)
 
     bench = load_benchmarks()
     print("Protected CDR3b cores per downstream task:")
@@ -198,40 +223,29 @@ def main() -> None:
         universe |= v
     print(f"  {'UNION':24s} {len(universe):>7,}\n")
 
-    da = DataArguments(
-        dataset_args="oas+ots+asd_antibody+trait+tcr_native+tcr_papers+tcr_repertoire",
-        max_length=1024, max_protein_length=1024,
-        tcr_papers_dir=args.tcr_papers_dir,
-    )
-    specs = {s.name: s for s in build_immune_specs(da)}
-
     names = sorted(bench)
     hits: dict[str, dict[str, set[str]]] = {}
     kept_counts: dict[str, int] = {}
 
-    for sname, (col, has_anchors) in _SOURCES.items():
-        spec = specs.get(sname)
-        if spec is None:
-            continue
-        path = _source_split_path(spec, args.split)
-        if not path.is_file():
-            print(f"  SKIP {sname}: {path} missing")
-            continue
+    for sname, (_col_name, has_anchors) in _SOURCES.items():
         per: dict[str, set[str]] = {n: set() for n in names}
         kept = 0
-        for i, row in enumerate(_rows(path)):
-            if args.limit and i >= args.limit:
-                break
-            if spec.row_to_record(row) is None:
-                continue          # dropped by the load-time blocklist
-            kept += 1
-            raw = ots_beta(row) if col == "__ots__" else row.get(col)
-            c = core(raw, has_anchors=has_anchors)
-            if not c or c not in universe:
-                continue
-            for n in names:
-                if c in bench[n]:
-                    per[n].add(c)
+        try:
+            records = _prepared_rows(prepared_dir, args.split, sname, args.limit)
+            for record in records:
+                kept += 1
+                # Prepared identifiers are already in the canonical key space:
+                # trait has had anchors stripped offline; the other sources retain
+                # their historical loop convention in ``cdr3b_core``.
+                c = core(_prepared_cdr3b(record), has_anchors=False)
+                if not c or c not in universe:
+                    continue
+                for n in names:
+                    if c in bench[n]:
+                        per[n].add(c)
+        except (FileNotFoundError, KeyError, ValueError) as exc:
+            print(f"  SKIP {sname}: {exc}")
+            continue
         hits[sname] = per
         kept_counts[sname] = kept
         print(f"  scanned {sname:16s} kept={kept:>9,}")

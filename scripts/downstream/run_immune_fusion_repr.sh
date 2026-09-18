@@ -7,6 +7,10 @@ ROOT="/vepfs-mlp2/c20250601/251105016/project/dllm_test"
 CKPT="${1:?usage: $0 <fusion_ckpt_dir> <tag> [embed_bs]}"
 TAG="${2:?usage: $0 <fusion_ckpt_dir> <tag> [embed_bs]}"
 EMBED_BS="${3:-16}"
+T1_COMPLETION_MANIFEST="${T1_COMPLETION_MANIFEST:-${ROOT}/data/prepared/immune_v5_receptor_completion/dataset_manifest.json}"
+T1_CDR3_FORMAT="${T1_CDR3_FORMAT:-junction}"
+T1_TRACK="${T1_TRACK:-cdr3b}"
+T1_MAX_LENGTH="${T1_MAX_LENGTH:-1024}"
 SPEC="grammar:decoder:global:${CKPT}"
 BENCH="${ROOT}/downstream/benchmark"
 OUT="${ROOT}/output/downstream_generation"
@@ -34,9 +38,13 @@ python -u downstream/benchmark/tcr_binding/run_retrained_ours.py \
   --checkpoint "${CKPT}" \
   --tag "${TAG}" \
   --neg-source AS \
+  --track "${T1_TRACK}" \
   --fold all \
   --eval-set all \
   --seed 0 \
+  --completion-manifest "${T1_COMPLETION_MANIFEST}" \
+  --cdr3-format "${T1_CDR3_FORMAT}" \
+  --max-length "${T1_MAX_LENGTH}" \
   --embedding-batch-size "${EMBED_BS}" \
   --feature-chunk-size 2048 \
   --head-hidden 256 \

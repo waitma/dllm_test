@@ -1,10 +1,15 @@
 #!/usr/bin/env python3
-"""Data-path smoke test for --dataset_args oas+ots+tcr_native.
+"""Offline smoke test for prepared immune JSONL and grammar-v2 batching.
 
-Builds the immune source specs and datasets (small caps) and renders a few
-example rows. Does NOT construct the model / tokenizer / ESMC. Verifies the
-tcr_native wiring (token + tcr_native_row_to_record) and the TRAIT blocklist
-mechanism, without launching any training.
+Example::
+
+    python scripts/data/tcr_native/smoke_test.py \
+        --prepared-data-dir data/prepared/immune_v3_heterotypic \
+        --dataset-args tcr_native --max-rows 5
+
+The command reads only prepared semantic records, builds a real grammar batch,
+and never imports the trainer, parses raw CSV, loads model weights, or launches
+GPU work.
 """
 
 from __future__ import annotations
@@ -15,40 +20,67 @@ from pathlib import Path
 
 PROJECT = Path("/vepfs-mlp2/c20250601/251105016/project/dllm_test")
 sys.path.insert(0, str(PROJECT))
-sys.path.insert(0, str(PROJECT / "examples/llada"))
 
 
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--dataset-args", default="oas+ots+tcr_native")
-    ap.add_argument("--tcr-native-dir", default=str(PROJECT / "data/tcr_native/dataset"))
+    ap.add_argument(
+        "--prepared-data-dir",
+        default=str(PROJECT / "data/prepared/immune_v3_heterotypic"),
+        help="Prepared semantic JSONL directory",
+    )
     ap.add_argument("--max-rows", type=int, default=5)
     ap.add_argument("--split", default="train")
     args = ap.parse_args()
 
-    from protein_pretrain_esmc import DataArguments, build_immune_specs
-    from dllm.pipelines.bioseq.datasets import ImmuneCsvDataset
-
-    data_args = DataArguments(
-        dataset_args=args.dataset_args,
-        tcr_native_dir=args.tcr_native_dir,
+    from dllm.pipelines.immune_llada.data import (
+        GrammarBioSeqCollator,
+        GrammarTokenizer,
+        load_prepared_dataset,
     )
-    specs = build_immune_specs(data_args)
-    print(f"dataset_args={args.dataset_args!r} -> {len(specs)} specs: {[s.name for s in specs]}")
+    from dllm.pipelines.immune_llada.data.registry import parse_sources
 
-    for spec in specs:
+    if args.max_rows <= 0:
+        raise ValueError("--max-rows must be positive")
+    sources = parse_sources(args.dataset_args)
+    records = []
+    for source in sources:
         try:
-            ds = ImmuneCsvDataset(spec, split=args.split, max_rows=args.max_rows)
-        except Exception as exc:  # noqa: BLE001
-            print(f"  [{spec.name}] BUILD FAILED: {type(exc).__name__}: {exc}")
+            dataset = load_prepared_dataset(
+                args.prepared_data_dir,
+                split=args.split,
+                source=source,
+            )
+        except (FileNotFoundError, KeyError, ValueError) as exc:
+            print(f"  [{source}] BUILD FAILED: {type(exc).__name__}: {exc}")
             continue
-        print(f"  [{spec.name}] rows={len(ds)} task_type={spec.task_type}")
-        for i in range(min(2, len(ds))):
-            rec = ds[i]
-            roles = rec.get("roles") or [f"chain{j}" for j in range(len(rec["chains"]))]
-            shown = [(r, (c[:24] + "..." if len(c) > 24 else c)) for r, c in zip(roles, rec["chains"])]
-            print(f"      #{i} task={rec.get('task_type')} relation={rec.get('relation','-')} "
-                  f"source={rec.get('source')} chains={shown}")
+        selected = [dataset[i] for i in range(min(args.max_rows, len(dataset)))]
+        records.extend(selected)
+        print(f"  [{source}] rows={len(dataset)} selected={len(selected)}")
+        for i, record in enumerate(selected[:2]):
+            shown = [
+                (chain.role, (chain.sequence[:24] + "..." if len(chain.sequence) > 24 else chain.sequence))
+                for chain in record.chains
+            ]
+            print(
+                f"      #{i} task={record.task_type} relation={record.labels.get('relation', '-')} "
+                f"source={record.source} chains={shown}"
+            )
+
+    if not records:
+        raise RuntimeError("No prepared records selected; check --prepared-data-dir/--split/--dataset-args")
+    batch = GrammarBioSeqCollator(GrammarTokenizer())(records)
+    if batch["input_ids"].shape[0] != len(records):
+        raise AssertionError("grammar batch size does not match prepared records")
+    if not bool(batch["encoder_chain_mask"].any()):
+        raise AssertionError("grammar batch has no real encoder chains")
+    if not bool(batch["diffusion_eligible_mask"].any()):
+        raise AssertionError("grammar batch has no diffusion-eligible tokens")
+    print(
+        f"grammar_batch={tuple(batch['input_ids'].shape)} "
+        f"encoder={tuple(batch['encoder_input_ids'].shape)}"
+    )
     print("SMOKE_OK")
 
 

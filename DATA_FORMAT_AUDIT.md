@@ -2,6 +2,10 @@
 
 Date: 2026-09-12
 
+2026-09-14 TCR 生成结果 JSON 的 nullable novelty / availability 及恢复 provenance 契约见 [T4 §7.7](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/TCR_T4_GENERATION.md)。仅为评分产物边界；原始数据、训练布局与生成 MASK/X 语义不变。
+
+2026-09-13 TCR 下游运行时适配更新：原始评测 CSV/JSON 不改写，v5 表征补全与生成目标边界分别见 [T2 §8.0](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/TCR_T2_CLUSTERING.md)、[T3 §8.0](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/TCR_T3_REPRESENTATION.md)、[T4 执行手册](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/TCR_T4_GENERATION.md)。与离线训练数据准备不是同一阶段；新缓存/产物必须保留协议身份。决定索引见 [TCR 审计 §9.21](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/TCR_BASELINE_EVALUATION_AUDIT.md)。
+
 Root: `/vepfs-mlp2/c20250601/251105016/project/dllm_test/data`
 
 How to run preprocess:
@@ -13,6 +17,10 @@ Raw-corpus decontam accidents (PASS is not enough; `语料 ∩ benchmark`; key s
 Long-lived rules: [`PROJ_GUIDE.md`](PROJ_GUIDE.md).
 
 ## Current immune LLaDA data contract（2026-09-12）
+
+TCR 下游评测的输入转换与训练格式的衔接约定（含 others 真实 CDR3αβ 第一版）见 [TCR baseline 审计 §2 / §9](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/TCR_BASELINE_EVALUATION_AUDIT.md)；该约定不改变本节的预训练数据产物与离线流程。
+
+同 others 数据新增 LongA/LongB 运行时输入，复用完整链路径而非 CDR3 补全；字段、校验、池化和不做预处理副本的边界见 [TCR 审计 §9.7](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/TCR_BASELINE_EVALUATION_AUDIT.md)。没有改变官方原始 CSV 或预训练 prepared 格式。
 
 The only current immune data implementation is
 `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/immune_llada` and the formal
@@ -895,4 +903,3 @@ T1 / Track-A / TCRT5 output schemas and paper-correspondence rules are owned by
 `downstream/benchmark/` (`RESULTS.md`, `README.md`, task docs, and
 `outputs/tcrt5_full_eval/TCRT5_FULL_EVAL_REPORT.md`). Do not copy headline
 numbers or protocol tables into this file.
-

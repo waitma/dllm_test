@@ -6,7 +6,6 @@ from __future__ import annotations
 
 import csv
 import hashlib
-import importlib.util
 import sys
 from pathlib import Path
 from typing import Any
@@ -38,12 +37,10 @@ UNIFIED_COLUMNS = [
 
 
 def _load_records_module():
-    path = PROJECT_ROOT / "dllm/pipelines/qwen3_vl_arch/data/records.py"
-    spec = importlib.util.spec_from_file_location("_tcrnative_records", path)
-    assert spec and spec.loader
-    mod = importlib.util.module_from_spec(spec)
-    sys.modules["_tcrnative_records"] = mod
-    spec.loader.exec_module(mod)
+    root = str(PROJECT_ROOT)
+    if root not in sys.path:
+        sys.path.insert(0, root)
+    from dllm.pipelines.immune_llada.data import records as mod
     return mod
 
 

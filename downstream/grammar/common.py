@@ -1,21 +1,24 @@
-"""Shared helpers for grammar-v1 BioSeq downstream evaluation.
+"""Shared backend for current Immune LLaDA fusion evaluation.
 
-Run smoke checks:
+Representative smoke checks:
   python -m downstream.grammar.cdr_infill --smoke --device cuda
   python -m downstream.grammar.light_chain_pairing --smoke --device cuda
+
+Only current fusion checkpoint directories are supported; the standalone
+BioSeq grammar-v1/v2 trainer and its checkpoint format are retired.
 """
 
 from __future__ import annotations
 
 import sys
-from argparse import Namespace
+
 from pathlib import Path
 from typing import Any
 
 import torch
 import torch.nn as nn
 
-from dllm.pipelines.qwen3_vl_arch.data import (
+from dllm.pipelines.immune_llada.data import (
     BioSeqChain,
     BioSeqRecord,
     GrammarBioSeqCollator,
@@ -30,7 +33,9 @@ from dllm.pipelines.qwen3_vl_arch.modeling_bioseq import (
 from dllm.pipelines.qwen3_vl_arch.sampling_bioseq import BioSeqGenerateConfig, generate_bioseq
 
 PROJECT_ROOT = Path("/vepfs-mlp2/c20250601/251105016/project/dllm_test")
-DEFAULT_GRAMMAR_DATA_DIR = PROJECT_ROOT / "data" / "bioseq_grammar_v1"
+# Kept only for the optional record-fixture smoke path. Current evaluation
+# datasets are supplied explicitly by each retained evaluator.
+DEFAULT_GRAMMAR_DATA_DIR = PROJECT_ROOT / "data" / "prepared" / "immune_v3_heterotypic"
 
 
 def build_grammar_tokenizer() -> GrammarTokenizer:
@@ -84,22 +89,6 @@ def collate_records(records: list[BioSeqRecord], collator: GrammarBioSeqCollator
     return collator(records)
 
 
-def _namespace_from_checkpoint_args(raw: dict[str, Any]) -> Namespace:
-    from examples.bioseq.train_qwen3_vl_bioseq_ddp import parse_args
-
-    old_argv = sys.argv
-    try:
-        sys.argv = [old_argv[0]]
-        defaults = vars(parse_args())
-    finally:
-        sys.argv = old_argv
-
-    parsed = {**defaults, **raw}
-    for key in ("grammar_data_dir", "encoder_path", "tokenizer_path", "output_dir", "wandb_dir"):
-        if key in parsed and parsed[key] is not None:
-            parsed[key] = Path(parsed[key])
-    return Namespace(**parsed)
-
 
 def load_grammar_checkpoint(
     checkpoint_path: str | Path,
@@ -115,16 +104,12 @@ def load_grammar_checkpoint(
         model._fusion_eval_collator = bundle.collator
         return model, bundle.grammar_tokenizer
 
-    from examples.bioseq.train_qwen3_vl_bioseq_ddp import build_config, build_model, build_tokenizer
-
-    payload = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
-    args = _namespace_from_checkpoint_args(payload.get("args", {}))
-    tokenizer = build_tokenizer(args)
-    config = build_config(args, tokenizer)
-    model = build_model(args, config)
-    model.load_state_dict(payload["model_state_dict"])
-    model.eval()
-    return model.to(device), tokenizer
+    raise ValueError(
+        "Only Immune LLaDA fusion checkpoints are supported. "
+        "The historical BioSeq grammar-v1/v2 trainer and its .pt checkpoint loader "
+        "have been retired; pass a fusion checkpoint directory or model.safetensors. "
+        f"Received: {checkpoint_path}"
+    )
 
 
 def build_eval_collator(model: nn.Module, tokenizer: GrammarTokenizer) -> GrammarBioSeqCollator:
@@ -188,7 +173,7 @@ def load_sample_oas_record(
     index: int = 0,
     data_dir: Path | None = None,
 ) -> BioSeqRecord:
-    from dllm.pipelines.qwen3_vl_arch.data.grammar import GrammarArrowSource, GrammarArrowSourceConfig
+    from dllm.pipelines.immune_llada.data.grammar import GrammarArrowSource, GrammarArrowSourceConfig
 
     source = GrammarArrowSource(GrammarArrowSourceConfig(name="oas", path=data_dir or DEFAULT_GRAMMAR_DATA_DIR, split=split))
     for offset, record in enumerate(source.iter_records()):

@@ -12,10 +12,13 @@ from dllm.pipelines.immune_llada.data.sources import row_to_record
 from dllm.pipelines.immune_llada.data.preprocessing.filters import (
     BLOCKLIST_NAMES,
     build_filters,
+    constructed_filter_names,
     filter_reason,
     load_blocklists,
     union_filter_names,
 )
+from dllm.pipelines.immune_llada.data.preprocessing.pipeline import PreprocessConfig
+from dllm.pipelines.immune_llada.data.records import BioSeqChain
 
 
 def _pair() -> dict[str, str]:
@@ -136,3 +139,58 @@ def test_blocklist_paths_fail_loudly_and_disabled_values_work(tmp_path: Path) ->
     empty.write_text("\n")
     with pytest.raises(ValueError):
         load_blocklists({**disabled, "oas_benchmark": str(empty)})
+
+
+def _relation_record(relation: str, source: str = "asd_antibody") -> BioSeqRecord:
+    return BioSeqRecord(
+        [BioSeqChain("ACDEF", "antigen"), BioSeqChain("GHIKL", "antibody_heavy")],
+        "antibody_antigen",
+        source,
+        labels={"relation": relation},
+        metadata={"relation_supervised": relation in {"binding", "nonbinding"}},
+    )
+
+
+def test_binding_only_filter_is_opt_in_and_per_source() -> None:
+    blocklists = {name: set() for name in BLOCKLIST_NAMES}
+    off = build_filters("asd_antibody", ["asd_antibody"], blocklists, 0, 0)
+    assert "recipe.binding_only" not in constructed_filter_names(off)
+    assert filter_reason(_relation_record("nonbinding"), off) is None
+
+    on = build_filters("asd_antibody", ["asd_antibody"], blocklists, 0, 0, ["asd_antibody"])
+    assert constructed_filter_names(on) == ["recipe.binding_only"]
+    assert filter_reason(_relation_record("nonbinding"), on) == "recipe.binding_only"
+    assert filter_reason(_relation_record("binding"), on) is None
+
+    # A source absent from the list keeps its negatives.
+    other = build_filters("trait", ["trait", "asd_antibody"], blocklists, 0, 0, ["asd_antibody"])
+    assert "recipe.binding_only" not in constructed_filter_names(other)
+
+
+def test_binding_only_all_sentinel_spares_unknown_relations() -> None:
+    blocklists = {name: set() for name in BLOCKLIST_NAMES}
+    filters = build_filters("tcr_repertoire", ["tcr_repertoire"], blocklists, 0, 0, ["all"])
+    assert filter_reason(_relation_record("nonbinding", "tcr_repertoire"), filters) == "recipe.binding_only"
+    # tcr_repertoire labels all 2.1M rows "unknown": unlabeled pairs are not
+    # measured non-binders and must survive the binding-only recipe.
+    assert filter_reason(_relation_record("unknown", "tcr_repertoire"), filters) is None
+
+
+def test_drop_nonbinding_sources_config_is_validated() -> None:
+    base = {
+        "sources": {"asd_antibody": {"path": "/tmp/asd"}},
+        "blocklists": {name: None for name in BLOCKLIST_NAMES},
+    }
+    assert PreprocessConfig.from_mapping(base).drop_nonbinding_sources == ()
+    parsed = PreprocessConfig.from_mapping(
+        {**base, "recipe": {"drop_nonbinding_sources": ["asd_antibody", "trait"]}}
+    )
+    assert parsed.drop_nonbinding_sources == ("asd_antibody", "trait")
+    assert PreprocessConfig.from_mapping(
+        {**base, "recipe": {"drop_nonbinding_sources": ["all"]}}
+    ).drop_nonbinding_sources == ("all",)
+    # A bare string would silently iterate into characters.
+    with pytest.raises(TypeError):
+        PreprocessConfig.from_mapping({**base, "recipe": {"drop_nonbinding_sources": "asd_antibody"}})
+    with pytest.raises(ValueError):
+        PreprocessConfig.from_mapping({**base, "recipe": {"drop_nonbinding_sources": ["nope"]}})

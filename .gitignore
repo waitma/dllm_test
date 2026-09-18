@@ -147,7 +147,22 @@ dmypy.json
 # IRBench：只提交脚本，忽略 clone 的 baseline / 评测产物
 /downstream/benchmark/baselines/
 /downstream/benchmark/outputs/
-/downstream
+/downstream/*
+# Native AB adapter additions only; keep cloned baselines/data/outputs ignored.
+!/downstream/grammar/
+/downstream/grammar/*
+!/downstream/grammar/ab_features.py
+!/downstream/grammar/ab_probes.py
+!/downstream/grammar/tcr_features.py
+!/downstream/grammar/tcr_generation_v5.py
+!/downstream/benchmark/
+/downstream/benchmark/*
+!/downstream/benchmark/tcr_generation_bench/
+/downstream/benchmark/tcr_generation_bench/*
+!/downstream/benchmark/tcr_generation_bench/result_io.py
+!/downstream/tasks/
+/downstream/tasks/*
+!/downstream/tasks/AB_NATIVE_PROBES.md
 /baseline_models/
 *.ckpt 
 *.pt 
@@ -176,5 +191,3 @@ checkpoint-*/
 /train_jobs/
 /eval_jobs/
 /refactor_baseline/
-
-

@@ -9,6 +9,7 @@ reconstruction, and diffusion corruption remain in the training collator.
 """
 
 from .filters import (
+    ALL_SOURCES_SENTINEL,
     BLOCKLIST_NAMES,
     RecordFilter,
     build_filters,
@@ -21,6 +22,7 @@ from .pipeline import PreprocessConfig, preprocess_dataset
 from .validators import SCHEMA_VERSION
 
 __all__ = [
+    "ALL_SOURCES_SENTINEL",
     "BLOCKLIST_NAMES", "PreprocessConfig", "RecordFilter", "SCHEMA_VERSION",
     "build_filters", "constructed_filter_names", "filter_reason",
     "load_blocklists", "preprocess_dataset", "union_filter_names",

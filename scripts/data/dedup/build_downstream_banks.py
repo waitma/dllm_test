@@ -38,7 +38,7 @@ csv.field_size_limit(min(sys.maxsize, 2**31 - 1))
 
 
 def _load_normalizer():
-    path = PROJECT_ROOT / "dllm/pipelines/qwen3_vl_arch/data/records.py"
+    path = PROJECT_ROOT / "dllm/pipelines/immune_llada/data/records.py"
     name = "_dedup_records"
     spec = importlib.util.spec_from_file_location(name, path)
     assert spec and spec.loader

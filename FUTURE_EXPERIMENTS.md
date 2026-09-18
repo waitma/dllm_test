@@ -1,6 +1,6 @@
 # FUTURE_EXPERIMENTS
 
-后置的模型/目标/采样增强清单。本轮整合数据训练**不实现**这些；骨干（每链 ESMC/ESM2 encoder + LLaDA masked-diffusion decoder）保持不动，理解沿用 post-LLaDA global mean-pool。每项在真正启动时，按 `/vepfs-mlp2/c20250601/251105016/project/dllm_test/PROJECT_PROCESS.md` 的条目模板补 run 记录（原因/目的/效果）。
+后置的模型/目标/采样增强清单。本轮整合数据训练**不实现**这些；骨干（每链 ESMC/ESM2 encoder + LLaDA masked-diffusion decoder）保持不动，理解沿用 post-LLaDA global mean-pool。当前训练数据边界是 `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/immune_llada`，正式入口是 `/vepfs-mlp2/c20250601/251105016/project/dllm_test/examples/llada/protein_pretrain_esmc.py`。每项在真正启动时，按 `/vepfs-mlp2/c20250601/251105016/project/dllm_test/PROJECT_PROCESS.md` 的条目模板补 run 记录（原因/目的/效果）。
 
 相关现状锚点：`/vepfs-mlp2/c20250601/251105016/project/dllm_test/BIOSEQ_MODEL_PLAN.md`、`/vepfs-mlp2/c20250601/251105016/project/dllm_test/DATA_FORMAT_AUDIT.md`。
 
@@ -17,8 +17,8 @@
 ## L1 · 关系型位置特征（AF-Multimer relpos）
 
 - 原因：当前多链信号只有 `position_ids_chain`（链序号）+ `position_ids_inner`（链内位置），缺 `entity_id`/`same_entity`/相对链索引/跨链 bin。逐链独立 encoder 是多链关系学习的最大缺口之一。
-- 落地要点：在 `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/data/grammar.py` 的 collator 产出 `entity_id`（同序列/同实体）、相对链索引、"跨链" bin；在 LLaDA decoder 注入为 attention bias 或加性 embedding。破同源对称性，直接告诉模型两残基是否跨链/同实体。
-- 预期验证：PPI（MINT GeneralPPI）与 binding 表征、条件生成质量；relpos 开/关消融。
+- 落地要点：在 `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/immune_llada/data/grammar.py` 的 collator 产出 `entity_id`（同序列/同实体）、相对链索引、"跨链" bin；在 LLaDA decoder 注入为 attention bias 或加性 embedding。破同源对称性，直接告诉模型两残基是否跨链/同实体。
+- 预期验证：以保留的下游 PPI/MINT benchmark 与 binding 表征、条件生成质量为诊断；不把已删除的 PPI/MINT builders 或旧训练线恢复为 foundation-training 输入。relpos 开/关消融。
 - 成本：低（仅特征 + 注入），需重训。
 
 ## L2 · 理解目标进预训练
@@ -55,12 +55,16 @@
 
 ## 3.5 · BERT/GIDD 混合腐蚀
 
+> This experiment targets the retained BioSeq model layer and the current immune-fusion training entry; it does not restore the deleted qwen data/training pipeline.
+
 - 原因：现 `sample_bioseq_diffusion_noise`（`/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/modeling_bioseq.py` 约 254-312 行）是纯 absorbing-mask（腐蚀位一律置 `<mask>`）。文献里 absorbing-mask 只在大词表文本明显占优；小词表（grammar vocab ESM2=49 / ESMC=80，残基本体仅 20）下 UDLM/uniform-noise 与 mask 差距可忽略、部分数据反超。蛋白正是小词表。
 - 落地要点：加 `random_sub_ratio`（被腐蚀位里一部分替换为随机氨基酸而非 `<mask>`，一部分保持原样），`labels` 覆盖被替换/保持位；`compute_masked_cross_entropy` 的 loss mask 相应扩展；仅腐蚀 residue 位，结构/relation token 不动。
 - 预期验证：纯 mask vs 混合腐蚀 A/B——held-out 去噪 loss、生成 recovery/validity、下游表征。参考 GIDD、UDLM、DiffusionBERT。
 - 成本：中，需重训。
 
 ## 3.6 · Flexibility-Trap 采样与 remask（最易先试）
+
+> This experiment targets the retained sampling/model layer and retained fusion evaluation runners; it is not a request to recreate retired eval wrappers, sweeps, or retry jobs.
 
 - 原因：现 `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/sampling_bioseq.py` 是 `confidence-deterministic-linear`、严格单调不可回改。依据 ICML 2026 Outstanding Paper《The Flexibility Trap》（arXiv 2601.15165）：任意顺序/低置信度解码会绕开高熵"分叉 token"、过早坍缩解空间。映射到蛋白 = 系统性推迟 CDR3/paratope/TCR 特异性决定位。
 - 落地要点：做 semi-AR block/顺序约束、区域感知顺序（骨架先、CDR/界面后并升温）、可回改 remask（ReMDM）。**落地约束（已定）**：做成可控开关——在 `BioSeqGenerateConfig` 加 `sampling_mode`（或扩 `decoding_strategy`），**默认保持现有 `confidence-deterministic-linear`**，新模式仅显式开启时生效，绝不改动默认 baseline 行为。
@@ -70,7 +74,7 @@
 ## D1 · 全长五链 TCR-pMHC 数据重建（整合数据版待办）
 
 - 原因：当前两个 TCR 源都够不到 grammar 支持的完整 TCR-pMHC 布局（`<prots> MHC . B2M <protd> <binding> <prots> <pep> PEPTIDE <protd> <binding> <prots> <tcr> ALPHA . BETA <protd>`）。审计（见 `/vepfs-mlp2/c20250601/251105016/project/dllm_test/DATA_FORMAT_AUDIT.md` §"TCR / TCR-pMHC Data State Audit"）确认四个问题：**① CDR3-only 非全长；② 无 MHC+B2M（PISTE 仅 34aa HLA 伪序列）；③ 仅 β 无 α；④ PISTE binding/nonbinding 标签在渲染时被写死 `<binding>` 吞掉**。
-- 现状锚点（本地已有、可重建的原料）：VDJdb `data/tcr/vdjdb_full.txt`（α/β CDR3 + V/D/J 基因 + `mhc.a` 等位基因 + `mhc.b`=B2M + `mhc.class` + epitope）、McPAS `data/tcr/McPAS-TCR.csv`（同级信息）、OTS paired clean `data/ots_paired_clean/final`（2.1M 全长配对 α/β，但无 pMHC）。缺 IMGT/HLA 与 Stitchr 资源；STCRDab summary 下载损坏（HTML 错误页）需重下。
+- 现状锚点（本地已有、可重建的原料）：VDJdb `/vepfs-mlp2/c20250601/251105016/project/dllm_test/data/tcr/vdjdb_full.txt`（α/β CDR3 + V/D/J 基因 + `mhc.a` 等位基因 + `mhc.b`=B2M + `mhc.class` + epitope）、McPAS `/vepfs-mlp2/c20250601/251105016/project/dllm_test/data/tcr/McPAS-TCR.csv`（同级信息）、OTS paired clean `/vepfs-mlp2/c20250601/251105016/project/dllm_test/data/ots_paired_clean/final`（2.1M 全长配对 α/β，但无 pMHC）。缺 IMGT/HLA 与 Stitchr 资源；STCRDab summary 下载损坏（HTML 错误页）需重下。
 - 落地要点：
   1. **全长 α/β 重建**：用 Stitchr + IMGTgeneDL（`pip install stitchr IMGTgeneDL`，`stitchrdl -s human`，批量走 Thimble）把 VDJdb/McPAS 的 `V/J 基因 + CDR3` 拼成全长可变域，替换现在的 CDR3 片段。
   2. **全长 MHC 重建**：用 IMGT/HLA 把 `mhc.a` 等位基因名（如 `HLA-A*02:01`）映射成全长 MHC-I 重链序列，并补上人 B2M 常量序列 → 渲染成 `<prots> MHC . B2M <protd>` 双链固定上下文块。

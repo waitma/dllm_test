@@ -32,12 +32,6 @@ from .adapters import (
     write_jsonl,
 )
 from .data import BioSeqCollator, Esm2ProteinTokenizer, OphiuchusAbCollator, ProteinTokenizer
-from .datasets import (
-    ImmuneCsvDataset,
-    ImmuneSourceSpec,
-    build_mixed_immune_dataset,
-    default_immune_specs,
-)
 from .diffusion import BioSeqDiffusionConfig, BioSeqDiffusionTrainer, compute_diffusion_loss
 from .modeling import ESMCEncoderBioDiffusionModel, NoEncoderBioDiffusionModel
 from .ophiuchus import (
@@ -75,15 +69,11 @@ __all__ = [
     "BioSeqModelConfig",
     "ESMCEncoderBioDiffusionModel",
     "Esm2ProteinTokenizer",
-    "ImmuneCsvDataset",
-    "ImmuneSourceSpec",
     "NoEncoderBioDiffusionModel",
     "OphiuchusAbCollator",
     "ProteinTokenizer",
-    "build_mixed_immune_dataset",
     "compute_diffusion_loss",
     "compute_ophiuchus_ab_training_loss",
-    "default_immune_specs",
     "get_model_weights_root",
     "load_ophiuchus_checkpoint",
     "MultiChainDynamicCollator",

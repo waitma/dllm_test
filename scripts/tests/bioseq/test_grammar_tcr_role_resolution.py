@@ -7,12 +7,12 @@ Run:
 
 from __future__ import annotations
 
-from dllm.pipelines.qwen3_vl_arch.data.grammar import (
+from dllm.pipelines.immune_llada.data.grammar import (
     TOKEN_CLASS_RESIDUE,
     GrammarRenderer,
     GrammarTokenizer,
 )
-from dllm.pipelines.qwen3_vl_arch.data.records import BioSeqChain, BioSeqRecord
+from dllm.pipelines.immune_llada.data.records import BioSeqChain, BioSeqRecord
 
 
 TOKENIZER = GrammarTokenizer()
@@ -22,6 +22,11 @@ RENDERER = GrammarRenderer(TOKENIZER)
 def _render(record: BioSeqRecord) -> tuple[list[str], dict]:
     row = RENDERER.encode(record)
     return TOKENIZER.decode_tokens(row["input_ids"]), row
+
+
+# Unconditional records open with a fixed, residue-free no-context block so their
+# layout matches conditioned ones slot-for-slot.
+_NULL_PREFIX = ["<prots>", "<null>", "<protd>", "<unknown>"]
 
 
 def test_beta_peptide_record_does_not_duplicate_peptide_in_tcr_block() -> None:
@@ -80,16 +85,18 @@ def test_context_free_untyped_tcr_pair_keeps_legacy_positional_fallback() -> Non
 
     tokens, row = _render(record)
 
-    assert tokens == [
+    # Positional fallback maps chains[0]->beta, chains[1]->alpha, and the receptor
+    # block encodes beta before alpha (heavy-analog first).
+    assert tokens == _NULL_PREFIX + [
         "<prots>",
         "<tcr>",
-        "A",
-        "A",
-        "A",
+        "B",
+        "B",
+        "B",
         ".",
-        "B",
-        "B",
-        "B",
+        "A",
+        "A",
+        "A",
         "<protd>",
     ]
     assert row["grammar_name"] == "tcr_pair"

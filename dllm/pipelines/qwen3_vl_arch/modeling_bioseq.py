@@ -1,14 +1,17 @@
-"""BioSeq masked-diffusion model stack for grammar-v1 foundation training.
+"""Model components used by Immune LLaDA fusion and sampling.
 
-Run training with::
+Inspect the current training CLI with::
 
-    torchrun examples/bioseq/train_qwen3_vl_bioseq_ddp.py --model-type no_encoder ...
+    python -m examples.llada.protein_pretrain_esmc --help
+
+Data loading and collation live in ``dllm.pipelines.immune_llada.data``.
+The standalone BioSeq training stack has been retired.
 
 Tensor shape notation used throughout this module:
 
 - ``B``: batch size
 - ``S``: decoder sequence length (concatenated grammar record, padded)
-- ``C``: max chains per record (encoder path; grammar-v1 proxy uses ``C=1``)
+- ``C``: max chains per record (per-chain encoder path)
 - ``L``: per-chain encoder length
 - ``H``: decoder hidden size (``config.hidden_size``, e.g. 512)
 - ``E``: encoder hidden size (``config.condition_hidden_size``, e.g. 960 for ESMC-300M)
@@ -654,6 +657,21 @@ def apply_decoder_corruption_to_encoder(
     noised_encoder_input_ids : ``[B, C, L]`` — encoder ids with matching masks applied.
     """
 
+    return apply_decoder_values_to_encoder(batch, corruption_mask, int(mask_token_id))
+
+
+def apply_decoder_values_to_encoder(
+    batch: dict[str, Any],
+    update_mask: torch.Tensor,
+    encoder_token_values: torch.Tensor | int,
+) -> torch.Tensor:
+    """Copy decoder-aligned values to mapped encoder slots, without mutating batch.
+
+    Values must already be in the encoder vocabulary: either a scalar mask ID
+    or a ``[B, S]`` tensor. Both per-chain and single-proxy mappings are supported;
+    unmapped positions and encoder special/PAD slots are left untouched.
+    """
+
     encoder_input_ids = batch["encoder_input_ids"]
     encoder_position_ids = batch.get("encoder_position_ids")
     if encoder_position_ids is not None:
@@ -661,12 +679,13 @@ def apply_decoder_corruption_to_encoder(
         if max_chains != 1:
             raise ValueError("Direct encoder_position_ids mapping requires a single proxy stream")
         # Corrupt every decoder token that maps to a valid proxy position in one scatter.
-        valid = corruption_mask & encoder_position_ids.ge(0) & encoder_position_ids.lt(encoder_len)
+        valid = update_mask & encoder_position_ids.ge(0) & encoder_position_ids.lt(encoder_len)
         batch_index = (
             torch.arange(batch_size, device=encoder_input_ids.device).unsqueeze(1).expand_as(valid)
         )
         noised_encoder_input_ids = encoder_input_ids.clone()
-        noised_encoder_input_ids[batch_index[valid], 0, encoder_position_ids[valid]] = int(mask_token_id)
+        values = encoder_token_values[valid] if torch.is_tensor(encoder_token_values) else encoder_token_values
+        noised_encoder_input_ids[batch_index[valid], 0, encoder_position_ids[valid]] = values
         return noised_encoder_input_ids
 
     encoder_residue_mask = batch["encoder_residue_mask"]
@@ -680,7 +699,7 @@ def apply_decoder_corruption_to_encoder(
     safe_chain = chain_ids.clamp(min=0, max=max_chains - 1)
     token_residue_count = torch.gather(counts, 1, safe_chain)  # [B,S] residues in that chain
     valid = (
-        corruption_mask
+        update_mask
         & chain_ids.ge(0)
         & chain_ids.lt(max_chains)
         & position_ids_inner.ge(0)
@@ -694,7 +713,8 @@ def apply_decoder_corruption_to_encoder(
     encoder_pos = slot_pos_flat[row.reshape(-1), safe_inner.reshape(-1)].reshape(batch_size, -1)
 
     noised_flat = encoder_input_ids.clone().reshape(batch_size * max_chains, chain_len)
-    noised_flat[row[valid], encoder_pos[valid]] = int(mask_token_id)
+    values = encoder_token_values[valid] if torch.is_tensor(encoder_token_values) else encoder_token_values
+    noised_flat[row[valid], encoder_pos[valid]] = values
     return noised_flat.reshape(batch_size, max_chains, chain_len)
 
 

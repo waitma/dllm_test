@@ -6,7 +6,12 @@ from typing import Literal
 
 import torch
 
-from dllm.pipelines.qwen3_vl_arch.data import BioSeqChain, BioSeqRecord, GrammarTokenizer
+from dllm.pipelines.immune_llada.data import (
+    BioSeqChain,
+    BioSeqRecord,
+    GRAMMAR_NULL_CONTEXT_TOKEN,
+    GrammarTokenizer,
+)
 from dllm.pipelines.qwen3_vl_arch.sampling_bioseq import resolve_partial_mask
 
 
@@ -59,8 +64,15 @@ def chain_residue_positions(
         protd_id = tokenizer.special_id("<protd>")
         dot_id = tokenizer.chain_separator_id()
         type_marker_ids = {tokenizer.special_id(token) for token in ("<ab>", "<tcr>", "<nb>", "<pep>")}
+        # The fixed no-context prefix renders as a residue-free
+        # <prots> <null> <protd> block. Skip its marker, and on its closing
+        # <protd> keep scanning rather than breaking: bailing out there would
+        # return zero positions for every unconditional record.
+        skip_marker_ids = set(type_marker_ids)
+        skip_marker_ids.add(tokenizer.special_id(GRAMMAR_NULL_CONTEXT_TOKEN))
         target_span = 0 if chain == "heavy" else 1
         in_prots_block = False
+        block_has_residues = False
         current_span = -1
         for col in range(input_ids.size(1)):
             if not attention_mask[row, col]:
@@ -68,16 +80,21 @@ def chain_residue_positions(
             token_id = int(input_ids[row, col].item())
             if token_id == prots_id:
                 in_prots_block = True
+                block_has_residues = False
                 current_span = -1
                 continue
             if in_prots_block and token_id == protd_id:
-                break
-            if in_prots_block and token_id in type_marker_ids:
+                if block_has_residues:
+                    break
+                in_prots_block = False
+                continue
+            if in_prots_block and token_id in skip_marker_ids:
                 continue
             if in_prots_block and token_id == dot_id:
                 current_span += 1
                 continue
             if in_prots_block and residue_mask[row, col]:
+                block_has_residues = True
                 if current_span < 0:
                     current_span = 0
                 if current_span == target_span:

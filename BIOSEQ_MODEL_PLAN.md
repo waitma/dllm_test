@@ -2,6 +2,100 @@
 
 > **Current architecture boundary (2026-09-11):** The only current immune data implementation is `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/immune_llada`; the formal training entry is `/vepfs-mlp2/c20250601/251105016/project/dllm_test/examples/llada/protein_pretrain_esmc.py`. The active data flow is raw → adapter → `BioSeqRecord` → offline filter → prepared semantic JSONL → training-time grammar/padding/per-chain encoder reconstruction/masking, with no model-ready token cache. The deleted `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/data` alias tree, deleted `training` tree, deleted `GRAMMAR_V1.md`, and deleted legacy training/build/test/job files are historical deletion facts, not current dependencies. Retained model-layer files are `modeling_bioseq.py`, `sampling_bioseq.py`, and `relation_aux.py`; `downstream/grammar` remains active for fusion CDR/light-pairing/TCR-generation public implementations.
 
+## 2026-09-16 生成状态同步到 ESMC
+
+用户进一步要求检验pairing采样步数：固定已完成的49000／反馈修复协议，新增无前缀8/16/32/64/96/128步全量对照，保留124步参照；只改采样预算，不改训练或评分器。方法／seed解释及验收边界见 [AB pairing §4.5](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/AB_LIGHT_CHAIN_PAIRING.md)。六档独立非闲时单卡，所有档保留，不在测试集选最优后改主表。
+
+用户随后授权本地测试 CDR 多步效果：按 [AB CDR §4.3](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/AB_CDR_INFILLING.md) 执行SAb23H2完整六CDR的固定92000、iter1/2/4/8对照，其他条件保持一致。该实验是步数诊断，不更改单步主结果选取规则；保存逐条预测与真实ESMC反馈检查，Kong本轮未启动。
+
+按用户要求修复共享多步 sampler：ESMC 每轮读取当前已接受的模型生成残基，pending 保持 MASK；必须转换 decoder／encoder 词表，不能从原始 encoder buffer 恢复隐藏参考答案。实现、CFG 边界、防泄露验收与本轮 pairing 同权重对照见 [AB pairing §7 k](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/AB_LIGHT_CHAIN_PAIRING.md)。这是 inference 状态修复，不修改训练 loss 或 checkpoint；旧多步指标不自动升级为修复后结果。
+
+## 2026-09-15 T1 直接关系 token 测试
+
+用户授权本地验证 frozen checkpoint 的原生 recognition 预测能力，作为现有 frozen+MLP 的独立方法行，不覆盖表征探针。默认无 CFG、单步关系 MASK 预测，不微调；完整输入及评分契约见 [TCR T1 §4.1a](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/TCR_T1_BINDING.md)。
+
+## 2026-09-15 Foundation eval 改为来源等权均值
+
+用户明确先实施均值，不排除任何来源。[FusionTrainer.evaluate](/vepfs-mlp2/c20250601/251105016/project/dllm_test/examples/llada/protein_pretrain_esmc.py:228) 对来源字典输出 `eval_loss = sum(source_losses) / number_of_sources`，替代按验证样本数加权；各来源自己的 loss、训练目标和数据保持不变。聚合以本次实际评估的来源字典为准，必须所有来源均返回 loss 才发布，并继续记录到 `state.log_history` 供 Top-K 选模。单一/拼接 Dataset 原生评估路径保持原状；正式多来源任务默认 `eval_per_source=True`。
+
+CPU 回归：[test_eval_source_mean.py](/vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/tests/immune_llada/test_eval_source_mean.py) 7 项通过（生产训练环境 `protenix_abtcr`，未加载权重/数据）；覆盖不等样本数、指标发布、缺失来源、显式来源子集/前缀、单来源和原生返回值。`pllm` 导入训练入口缺少 accelerate，未改环境。新代码需新进程加载，已运行任务不会热更新；未重启任务或重排旧 checkpoint。历史 row-weighted loss 不可直接与 macro loss 比较。
+
+Antigen→抗体的现有测评缺口、MAGE/PALM-H3/结构设计参考和分层验证建议见 [初步调研](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/ANTIGEN_CONDITIONED_AB_RESEARCH.md)。本轮只调研，尚未建立新生成基准。
+
+## 2026-09-15 Specificity 训练预算与收敛诊断
+
+用户要求的LR核查、Ophiuchus本地长轮数记录对照及Ours独立200轮实验，按 [AB Native Probes §4.5](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/AB_NATIVE_PROBES.md#45-specificity-200-epoch-学习曲线诊断2026-09-15) 执行；该段优先于旧默认100轮的描述，但不覆盖历史结果。只新增可观测性及独立头实验，不改变基础模型、pooling、其他AB任务或GDPa1参考CV规则。
+
+用户后续要求使用最新训练点复测；所称step89000已被top-k清理，当前实际最新完整点step92000按 [AB Native Probes §4.6](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/AB_NATIVE_PROBES.md#46-v5-step92000-同协议对照2026-09-15) 冻结并完成同协议Specificity对照。比较只改变基础模型checkpoint，特征重新提取，头训练、数据、pooling与fixed-last口径不变；第200轮Accuracy从step49000的0.627325提高到0.643468，但仍低于论文baseline 0.6796。
+
+## 2026-09-15 AB Specificity 分类头核查
+
+分类头结构与实际宽度、训练参数及论文选模证据边界见 [AB Native Probes §4.4](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/AB_NATIVE_PROBES.md#44-specificity-分类头对齐核查2026-09-15)。仅诊断，不据头容量差异认定性能差距的唯一原因，不修改原生global pooling或增加训练实验。
+
+## 2026-09-15 GDPa1 用户协议收窄
+
+最新用户决定及代码/产物契约以 [AB Native Probes §4.2](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/AB_NATIVE_PROBES.md#42-预测头与协议切割线) 为准；其优先级高于下方09-13双协议回归的历史描述。当前展示见 [RESULTS §0.6a](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/RESULTS.md)。不修改预训练、模型权重或其他下游任务。
+
+## 2026-09-13 Ours 原生 AB 探针与 prompt/CFG 单卡矩阵
+
+用户明确本轮要测我们的 ESMC+LLaDA，而非套用 Ophiuchus token窗口/pooling；原生 AB 表征适配、分类头及双协议回归实现/验收见 [AB_NATIVE_PROBES](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/AB_NATIVE_PROBES.md)。pairing 的 prompt0/prompt3 与 CFG 条件删除定义、非零分支修复及状态见 [pairing §4.4](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/AB_LIGHT_CHAIN_PAIRING.md)。用户进一步指定最新 v5，采用查询时最新完整保存点的独立评测快照，矩阵内不追逐后续保存；真实 GPU 门禁通过，11项正式单卡任务已提交，状态以 [PROJECT_PROCESS](/vepfs-mlp2/c20250601/251105016/project/dllm_test/PROJECT_PROCESS.md) 为准。未改预训练或 baseline 权重；下方旧“未接 CFG/仅文档”描述仅对应此前阶段。
+
+## 2026-09-13 AB pairing 多步解码诊断
+
+**实施更新**：reference-length v3 完整生成、现有评分及产物验收已完成；实现、CPU 验证与单因素归因边界见 [AB pairing §7 h](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/AB_LIGHT_CHAIN_PAIRING.md)，数值与结论见 [RESULTS §0.6 全量](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/RESULTS.md)。本次联合修正不支持将旧训练失配假说升级为唯一根因；下方“仅文档/未修复”是此前阶段记录，不再描述当前实现状态。未改训练 recipe，也未重评当前 v5。
+
+**最新用户决定优先**：现行 Ours pairing 长度协议的选择见 [AB 测评审计 §9](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/AB_BASELINE_EVALUATION_AUDIT.md)，实施与验收见 [任务文档 §4.3](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/AB_LIGHT_CHAIN_PAIRING.md)。本次仅同步文档；不把协议决定当成代码默认切换或新结果完成。
+
+用户追问的 `<protd>`/padding、generated-only 与 all-chains 监督区别，以及未知长度生成建议、AirGen CFG 源码核对，见同一任务文档 §7 i/j；本轮仅 CPU 协议检查与解释纠正，不代表新长度协议或 CFG 已实现。
+
+后续 attention 复核进一步收紧“最大 MASK 窗口”建议：其与现有训练的兼容性约束、AirGen 训练尾部的源码依据及不重训/适配两条路径的边界统一维护在同节第 5–7 点；不能当作现有 checkpoint 已验证的直接修复。
+
+共享 grammar sampler 的已复现状态问题、与 AirGen 的差异及修正前后受控对照要求见
+[AB pairing §7 h](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/AB_LIGHT_CHAIN_PAIRING.md)。先排除生成器混杂，再判断训练失配贡献；本轮仅诊断与留档，未实施修复或重训。
+
+## 2026-09-13 Ophiuchus-Ab baseline 探针测评纠错
+
+用户确定的五折选模/聚合要求、论文与源码证据边界、三个表征探针的修正方案及验收条件统一见
+[AB baseline 测评审计与完善指南](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/AB_BASELINE_EVALUATION_AUDIT.md)。当前仅完成文档登记，未修改测评实现或执行新实验；不据此变更 headline 范围。
+
+## 2026-09-13 TCR 下游评测纠错
+
+最新执行决定优先：双链生成推迟，先实施/提交指定 49000 的当前 TCR 评测；关键决定和输入/工程 gate、论文可引用 gate 的区别见 [审计 §9.21](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/TCR_BASELINE_EVALUATION_AUDIT.md)。单任务实现由相应 task owner 维护；不修改预训练目标、既有 baseline 权重或 AB 共享 sampler。
+
+已有生成模型使用的配对数据来源及复用建议见 [T4 §7.6](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/TCR_T4_GENERATION.md) / [审计 §9.20](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/TCR_BASELINE_EVALUATION_AUDIT.md)。已核查数据实物与原生实验用途；不是新评测实现、训练调整或全部去污染通过。
+
+生成任务按β-only / 配对αβ登记候选，原始方法、可用性证据、接入顺序与数据/预算边界见 [T4 §7.5](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/TCR_T4_GENERATION.md) / [审计 §9.19](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/TCR_BASELINE_EVALUATION_AUDIT.md)。这是调研与计划登记，尚未实施双链评测或修改模型/训练方案。
+
+benchmark14的目标级数据结构、参考与作者预测的区分，以及TCRT5发表版本的输出范围见 [T4 §7.4.2](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/TCR_T4_GENERATION.md) / [审计 §9.18](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/TCR_BASELINE_EVALUATION_AUDIT.md)。本轮仅核查解释，不改变任务输入或评分协议。
+
+本轮指定 checkpoint 的全套 TCR 重评条件、others 输入档及只汇总本轮 Ours 的呈现要求见 [审计 §9.16](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/TCR_BASELINE_EVALUATION_AUDIT.md)。任务专属 gate 未通过前不提交旧 wrapper；本轮仅复核与登记，未实施新协议。
+
+用户已确认T4条件联合αβ生成的未知区域语义，协议及评测输入/上游受体信息的边界见 [T4 §7.4](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/TCR_T4_GENERATION.md) / [审计 §9.17](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/TCR_BASELINE_EVALUATION_AUDIT.md)。区域语义不再待确认；生产实现与验收尚未完成，不将上游参考受体字段擅自升级为生成条件。
+
+TCRT5 held20 / benchmark14 对v5实际数据的精确成员核查已完成，结果与后续已见/未见分层建议见 [T4 §7.3](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/TCR_T4_GENERATION.md) / [审计 §9.14](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/TCR_BASELINE_EVALUATION_AUDIT.md)。这是数据审计，不代表新模型重评或训练方案变更。
+
+T4 baseline 原生生成机制与条件对齐问题见 [T4 §7.2](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/TCR_T4_GENERATION.md) / [审计 §9.13](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/TCR_BASELINE_EVALUATION_AUDIT.md)；本轮仅研究与记录，不改变生产实现或新增实验。
+
+T4 当前生成条件/目标与历史成绩边界初查见 [T4 §7.1](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/TCR_T4_GENERATION.md) / [总审计 §9.12](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/TCR_BASELINE_EVALUATION_AUDIT.md)。仅静态诊断与文档同步；生成期望关系、参考相似度的解释须遵循任务专属边界，未实施新适配或重评。
+
+用户要求将 T3 关键理解直接固化在总审计中；解释及后续比较准则集中见 [TCR 审计 §9.11.1](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/TCR_BASELINE_EVALUATION_AUDIT.md)。本次仅整理已核实结论的使用边界，不新增实验执行或改训练授权。
+
+T3 原论文复核更新：旧“本地 recipe 与论文兼容”的判断撤回；正式原文、作者代码/模型卡与本地产物的差异及后续分臂要求统一见 [T3 §7.2](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/TCR_T3_REPRESENTATION.md)，关键日志见 [总审计 §9.11](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/TCR_BASELINE_EVALUATION_AUDIT.md)。仅研究与引用纠错，未改变训练方式或实施新的下游协议。
+
+T3 专项初查及支持集标签的合法用途见 [T3 任务 §7.1](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/TCR_T3_REPRESENTATION.md) / [TCR 审计 §9.10](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/TCR_BASELINE_EVALUATION_AUDIT.md)。仅审计，不改模型/训练；后续 v5 输入适配需遵守该任务 gate，不能把 T1 带表位的查询模板套入无条件表征。
+
+T2 专项审计已启动；无条件表征与 T1 关系查询的区别、当前 v5 输入适配缺口及 CPU 检查边界见 [T2 任务 §7.1](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/TCR_T2_CLUSTERING.md) / [TCR 审计 §9.9](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/TCR_BASELINE_EVALUATION_AUDIT.md)。本轮仅诊断，不修改训练范式或直接把所有 relation 改成 mask。
+
+用户再次确认希望覆盖全部已构建 TCR 任务 T1–T4，并要求持续遵守审计准则；任务清单、任务特定关系/目标信息边界及后续验收要求统一见 [TCR 审计 §9.8](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/TCR_BASELINE_EVALUATION_AUDIT.md)。本次仅登记要求与入口盘点，不改变任务协议或声明全套重评已完成。
+
+批准并接入同 others 行集的 LongA/LongB 版本：直接复用训练完整链路径，关系 mask；具体校验、上下文/池化同时变化的解释边界及验收见 [TCR 审计 §9.7](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/TCR_BASELINE_EVALUATION_AUDIT.md)。本次不改预训练或 head recipe，不宣称复现 TCRconv-fullAB。
+
+新增同 others 行集、同 v5 checkpoint 的 β-only 控制；数据选择与模型可见输入分离，补全 seed 的消融边界及验收以 [TCR 审计 §9.6](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/TCR_BASELINE_EVALUATION_AUDIT.md) 为准。未改预训练架构或训练 recipe。
+
+用户确定的 T1 输入约束、baseline 训练范围审计及冻结/全参数/关系预测对照建议统一见
+[TCR baseline 纠错记录](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/TCR_BASELINE_EVALUATION_AUDIT.md)。用户确认的运行时输入决策、已实现范围与测试边界以该文档 §2 / §9 为准；
+不要将历史 T1 frozen-probe 数字当作纠正后 v5 的结果。others 第一版的字段取舍及当前训练方式同样只维护在该记录 §9。
+
 ## Goal
 
 Build a diffusion-model-based immune-receptor foundation model in
@@ -415,3 +509,7 @@ paired TCR α/β, antibody-antigen recognition, and TCR-epitope/pMHC recognition
 - Evidence is three-tiered: (1) independently recomputed and checked against released sequences; (2) definition-complete but blocked from exact paper comparison by missing greedy hypotheses, likelihoods or final figure aggregation; (3) explicit extensions such as Hit@K/rank distributions. Reports must never collapse these tiers into a single “reproduced” label.
 - OLGA biological plausibility requires both the positive fraction and the positive `log10 Pgen` distribution. In the current all-14 run, BioSeq-7L-step117000 has `0.979786` positive Pgen but mean positive log10 Pgen `-17.925285`, compared with TCRT5 `1.0/-6.950375`; therefore a non-zero-only validity claim is insufficient.
 - The canonical comparison report is `/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/outputs/tcrt5_full_eval/TCRT5_FULL_EVAL_REPORT.md`. Its explicit non-reproducible boundaries—main-table mAP and Fig.4 Pgen moments—are part of the method contract, not missing implementation work.
+
+### 2026-09-13 TCR scoring re-audit
+
+T2A now preserves exact cosine edge thresholds through clustering and artifact serialization, uses the audited per-method Fig 3A retention anchors, and records unreachable/mismatched retention points instead of calling every nearest point aligned. The predeclared local tolerance is 0.02 retention, not a paper-native criterion or proof of identical inputs. T1–T4 receive a separate reduced GPU execution/scoring gate, distinct from input-only gates, scientific decontamination, and quality evaluation. Protocol owner: [T2 §8.0](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/TCR_T2_CLUSTERING.md); current decisions/status: [TCR audit §9.22](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/TCR_BASELINE_EVALUATION_AUDIT.md). No checkpoint, training corpus, shared AB sampler, or baseline performance result is changed.
