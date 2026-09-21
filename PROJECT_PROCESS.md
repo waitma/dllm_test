@@ -16,7 +16,7 @@
 
 ## 2026-09-21 变长生成 v2：固定 encoder 画布 + 变长 decoder
 
-**代码状态：已实现并提交，未训练。** 合同细节见
+**代码状态：已实现、已提交、已跑通 CPU 端到端 smoke 训练；尚未做真实规模训练。** 合同细节见
 [VARIABLE_LENGTH_GENERATION_V2.md](/vepfs-mlp2/c20250601/251105016/project/dllm_test/examples/llada/VARIABLE_LENGTH_GENERATION_V2.md)。
 改动前的基线快照是 `c234b07`（"Pre-variable-length-generation snapshot"），**已 push 到 `origin/main`**，
 可随时整体回退；本轮 v2 落在其之后的提交里。全部 v2 行为由单一开关
@@ -48,42 +48,80 @@
    换成纯布局推导的 `chain_slot_mask` / `encoder_slot_mask`——干净的 AA/EOS mask 是 label，
    不能当成"隐藏长度"的条件信息。encoder attention mask 在定长链上恒为全 1（实测 `[168, 136]`），
    不会从 attention 形状里泄长度。ref 后缀在任何模式下都不渲染。
+7. 定长画布装不下的行：**用户 2026-09-21 拍板「丢弃并计数」，已实现**，见下一节。
 
-本轮实测（CPU，2026-09-21）：
+### 定长画布装不下的行：丢弃并计数
 
-- `scripts/tests/immune_llada/` 全量 **385 passed / 20 failed**；20 条失败**全部是既有问题**，
-  用 `git stash` 退回基线代码后逐条复现：17 条是环境缺 `nltk`（`test_tcr_generation_result_io`
-  / `test_tcr_scoring_audit`），3 条是 `test_full_parity` 的 legacy↔canonical 渲染差异，
-  基线同样失败。不是 v2 引入的回归。
-- 其中 v2 专项 **75 passed**（`test_v2_inference_adapters.py` + `test_v2_checkpoint_policy.py`）。
-- 画布布局冒烟：抗体 / TCR 成对样本都得到 `encoder_input_ids=[B,2,168]`、
-  每行槽位 `{heavy:167, light:135}`、`<chainsep>` 唯一。
-
-**⚠️ 两个已知会让训练直接崩的数据缺口（尚未修，需要用户拍板）。** 只读全量审计脚本
+只读全量审计脚本
 [audit_v2_canvas_data.py](/vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/debug/audit_v2_canvas_data.py)
-已对 `immune_v6_binding_only`（7,381,499 行）与 `immune_v3_heterotypic`（7,997,971 行）
+对 `immune_v6_binding_only`（7,381,499 行）与 `immune_v3_heterotypic`（7,997,971 行）
 逐行跑完，报告在 `logs/v2_canvas_data_audit/audit.json`（`status=complete`，
-`code_unchanged_during_scan=true`）：
+`code_unchanged_during_scan=true`，`renderer_mapping_issue_rows=0`，即角色映射本身没问题）。
+两类行渲染不出来：
 
 - **超长受体链**：v6 里 5 行（oas 1 / ots 2 / tcr_repertoire 1 / trait 1）残基数超过定长画布，
   最极端的是一条 186 残基的 `antibody_heavy` 和一条 148 残基的 `tcr_alpha`。
-  renderer 现在直接 `raise ValueError`，而 renderer 是在 **collator 里**跑的、没有跳过机制，
-  所以这 5 行一旦被采到就会中断训练。
 - **grammar 总长超 1024**：v6 里 train 4,289 行 + valid 286 行超过 `--max_length 1024`，
-  全部在 `asd_antibody`（长抗原 + 现在被补到 167/135 的受体画布）。v3_heterotypic 对应
-  5,008 + 2,033 行。原因是 prepared shards 的 `budget.max_length` 过滤是按**旧的变长**
-  grammar 估的，定长画布把长度抬上去了。collator 同样是 `raise ValueError` 而非丢弃。
-- 两项合计 v6 4,580 行 / 7.38M（0.062%），v3_heterotypic 7,044 行 / 8.0M（0.088%）。
-  `renderer_mapping_issue_rows` 为 0，说明角色映射本身没问题。
+  **全部在 `asd_antibody`**（长抗原 + 现在被补到 167/135 的受体画布）；v3_heterotypic 对应
+  5,008 + 2,033 行。根因是 prepared shards 的 `budget.max_length` 过滤是按**旧的变长**
+  grammar 估的，定长画布把长度抬上去了，旧过滤不再成立。
+- 合计 v6 4,580 / 7,381,499（0.062%），v3_heterotypic 7,044 / 7,997,971（0.088%）。
+
+renderer 是在 **collator 里**跑的、原先没有跳过机制，这两类行一旦被采到就会中断训练。
+现在 `GrammarBioSeqCollator(drop_overflow_records=True)` 丢弃并计数，
+`protein_pretrain_esmc.py` 只在 `--fixed_receptor_lengths` 打开时启用它，legacy 路径仍然报错。
+
+- 计数落在 `collator.drop_counts` / `drop_counts_by_source`，键为
+  `canvas.receptor_overflow` 和 `budget.max_length`——后者**特意复用**预处理的过滤名，
+  方便和 `filter_report.json` 对照。`CanvasDropLogCallback` 把它们写进 Trainer 日志的
+  `canvas_drop/*`，collator 自己按指数退避打 warning。计数是**每进程**的、只覆盖该 rank
+  实际读到的 shard，是监控信号而不是全语料过滤报告。
+- 整批全被丢弃时**直接报错**，不让空 batch 静默变成 no-op（按实测比例，batch=4 时约 1e-13/批）。
+- 超长受体链单独定义了 `ReceptorCanvasOverflow(ValueError)`，避免靠字符串匹配区分错误类型。
+- ⚠️ 被丢的 4,289 条 over-budget 行占 `asd_antibody` train 的 **1.9%**（不是全语料的 0.06%），
+  丢的是最长抗原那一尾。抗原条件生成在超长抗原上的指标值得盯一下。
+
+本轮实测（CPU，2026-09-21）：
+
+- `scripts/tests/immune_llada/` 全量 **394 passed / 20 failed**；20 条失败**全部是既有问题**，
+  用 `git stash` 退回基线代码后逐条复现：17 条是环境缺 `nltk`（`test_tcr_generation_result_io`
+  / `test_tcr_scoring_audit`），3 条是 `test_full_parity` 的 legacy↔canonical 渲染差异，
+  基线同样失败。不是 v2 引入的回归。
+- 其中 v2 专项 **84 passed**（`test_v2_inference_adapters` + `test_v2_checkpoint_policy`
+  + 本轮新增的 `test_v2_canvas_overflow`）。
+- 画布布局冒烟：抗体 / TCR 成对样本都得到 `encoder_input_ids=[B,2,168]`、
+  每行槽位 `{heavy:167, light:135}`、`<chainsep>` 唯一、encoder attention 在定长链上全 1。
+- 丢弃逻辑在真实语料行上验证：把审计点名的三行（`oas-00017:8523` 186 残基重链、
+  `ots-00008:69012` 148 残基 α 链、`asd_antibody-00000:1695` grammar 1029）拼进一个
+  223 行的 smoke 语料，开丢弃则保留 220 行、账本为
+  `{canvas.receptor_overflow: 2, budget.max_length: 1}` 且来源归属正确；关丢弃则恰好 3 个 batch 报错。
+- **端到端 CPU smoke 训练跑通**（`logs/v2_fixed_canvas_smoke/`，`rc=0`）：缩小 decoder
+  （d256/L2/h4）在七个源上跑 12 步，`--fixed_receptor_lengths True --residue_cond_mode add
+  --freeze_encoder False`。loss 4.22 → 约 3.1，grad_norm 有限，七个源的 per-source eval 都出数，
+  6/12/final 三个 checkpoint 都写出。`fusion_config.json` 里
+  `fixed_receptor_lengths=true`、`predict_eos=true`、`residue_cond_mode="add"`、
+  `decoder_chain_eos_policy="chain_eos"`、`decoder_chain_eos_token_id=126389`
+  （与 pad/eos `126081`、mask `126336` 都不同）、六个画布常数齐全。
+- 该 checkpoint 经 `load_fusion_for_eval` 重新加载后策略无损，
+  `resolve_light_length_mode(model, "auto")` 返回 `fixed_v2`，collator 给出
+  `[1,2,168]` + `encoder_slot_mask`，对 135 个轻链槽位全量去噪后**输出变长链**
+  （抗体 fixture 18 残基、TCR fixture 2 残基），由模型自己生成的 EOS 截断。
+  12 步的序列内容当然是噪声，这里要证的是**长度由模型决定，不再来自 ref 或先验**。
+- 本地 A100 用不了：torch `2.11.0+cu130` 要求的驱动比机器上的 `535.129.03`（CUDA 12.2）新，
+  所以 smoke 只能走 CPU；vendored 的 `LLaDAModelLM.__init__` 还硬编码了
+  `init_device = "cuda"`，在临时 harness 里 monkey-patch 掉，**没有改仓库代码**。
 
 其他未做项：
 
-- 尚未创建 v2 的 train job yml，v2 从未做过 GPU 前反向或 smoke 训练，没有 loss 曲线。
+- 尚未创建 v2 的 train job yml；v2 没有真实规模（d768/L8）的 GPU 训练和 loss 曲线。
 - `tcr_generation_v5`（CDR3-only）与 `tcr_generation` 的 CDR3-only 模式对 v2 checkpoint
   **主动报错拒绝**——这两条下游评测在 v2 下暂不可用，需要改成 full-length 协议。
 - ESMC 原生 prediction-head 辅助 loss 仍是 follow-up，未实现。
 - `downstream/grammar/tcr_generation.py` 原先被 `.gitignore` 的 `/downstream/grammar/*`
   规则挡在版本控制外，但它带着 v2 改动、又被 v2 测试 import，本轮已加进 allowlist 并提交。
+- ⚠️ 根盘（overlay 20G）本轮一度写到 98%：第一次 smoke 把 `--output_dir` 放在 `/tmp`，
+  最后一次 save 报 `No space left on device`。已清掉并把 smoke 产物挪到
+  `conda/cache/tmp/v2_smoke`。这正是 2026-09-19 记过的 TMPDIR 坑，再记一次。
 
 ## 2026-09-19 ASD 去污染对称化与 immune_v6 语料重建
 

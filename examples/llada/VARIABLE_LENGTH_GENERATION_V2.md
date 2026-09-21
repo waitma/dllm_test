@@ -1,10 +1,10 @@
 # Variable-length generation v2
 
-> Status (2026-09-21): **implemented and committed, never trained.** Everything
-> below is gated behind `--fixed_receptor_lengths` (default `False`); legacy
-> checkpoints are byte-for-byte unaffected. CPU validation passed; two data
-> gaps in "Known gaps" will abort a real training run and are still open.
-> Baseline before this work: commit `c234b07`, pushed to `origin/main`.
+> Status (2026-09-21): **implemented, CPU smoke-trained end to end, not yet
+> trained for real.** Everything below is gated behind
+> `--fixed_receptor_lengths` (default `False`); legacy checkpoints are
+> byte-for-byte unaffected. Baseline before this work: commit `c234b07`,
+> pushed to `origin/main`.
 
 ## Scope
 
@@ -109,13 +109,41 @@ Both ids and the policy string are persisted in `fusion_config.json` and are
 re-checked on resume and on eval load; a mismatch is a hard error rather than a
 silent reinterpretation of the terminator.
 
+## Rows the fixed canvas cannot render
+
+Padding both receptor chains to `167 + 135` slots makes a small tail of the
+prepared corpus unrenderable, in two ways:
+
+- a receptor chain longer than its canvas (`ReceptorCanvasOverflow`), and
+- a row whose padded grammar length now exceeds `max_sequence_length`, even
+  though it passed the build-time `budget.max_length` filter under the old
+  variable-length estimate.
+
+The prepared shards cannot be re-filtered without rebuilding the 13 GB corpus,
+and the renderer runs inside the collator, which has no per-record skip path.
+`GrammarBioSeqCollator(drop_overflow_records=True)` therefore drops and counts
+these rows; `protein_pretrain_esmc.py` enables it exactly when
+`--fixed_receptor_lengths` is on, so legacy runs still raise.
+
+Counts land in `collator.drop_counts` / `collator.drop_counts_by_source`, keyed
+by `canvas.receptor_overflow` and `budget.max_length` — the latter deliberately
+reuses the preprocessing filter name so the runtime ledger is comparable with
+`filter_report.json`. `CanvasDropLogCallback` mirrors them into the Trainer logs
+as `canvas_drop/*`, and the collator logs a warning with exponential backoff.
+Counts are per-process and cover only the shards a rank actually read, so they
+are a monitoring signal, not a corpus-wide filter report.
+
+A batch in which *every* record was dropped raises rather than reaching the
+model as a silent no-op. At the measured rate this is ~1e-13 per batch of four.
+
 ## Verification performed (2026-09-21, CPU)
 
-- `scripts/tests/immune_llada/` — 385 passed, 20 failed. All 20 failures
+- `scripts/tests/immune_llada/` — 394 passed, 20 failed. All 20 failures
   reproduce on the baseline code after `git stash`, so none is a v2 regression:
   17 are `ModuleNotFoundError: nltk` in the TCR scoring/result-IO tests, 3 are
   the pre-existing legacy-vs-canonical mismatch in `test_full_parity.py`.
-- `test_v2_inference_adapters.py` + `test_v2_checkpoint_policy.py` — 75 passed.
+- `test_v2_inference_adapters.py`, `test_v2_checkpoint_policy.py`, and
+  `test_v2_canvas_overflow.py` — 84 passed.
 - Canvas layout smoke on antibody and TCR pair fixtures: `encoder_input_ids` is
   `[B, 2, 168]`, per-row decoder slots are `{chain 0: 167, chain 1: 135}`,
   `<chainsep>` appears exactly once between the two canvases, and the encoder
@@ -125,41 +153,51 @@ silent reinterpretation of the terminator.
   `immune_v3_heterotypic` (7,997,971 rows) via
   `scripts/debug/audit_v2_canvas_data.py`; report in
   `logs/v2_canvas_data_audit/audit.json` (`status=complete`,
-  `code_unchanged_during_scan=true`, `renderer_mapping_issue_rows=0`).
+  `code_unchanged_during_scan=true`, `renderer_mapping_issue_rows=0`). Overflow
+  counts: 5 receptor-canvas rows and 4,575 over-budget rows in v6
+  (4,580 / 7,381,499 = 0.062%); 7,044 / 7,997,971 (0.088%) in v3_heterotypic.
+  All over-budget rows are `asd_antibody` with long antigens.
+- Drop path against real corpus rows: a 223-row smoke corpus spliced with the
+  three offending rows the audit named (`oas-00017:8523`, a 186-residue heavy;
+  `ots-00008:69012`, a 148-residue alpha; `asd_antibody-00000:1695`, grammar
+  length 1029) keeps 220 / 223 with
+  `{canvas.receptor_overflow: 2, budget.max_length: 1}` attributed to the right
+  sources, and aborts exactly 3 batches with the flag off.
+- **End-to-end CPU smoke training** (`logs/v2_fixed_canvas_smoke/`, `rc=0`):
+  12 steps on a shrunken decoder (d256/L2/h4) over all seven sources with
+  `--fixed_receptor_lengths True --residue_cond_mode add --freeze_encoder False`.
+  Loss 4.22 → ~3.1 with finite grad norms, per-source eval on all seven sources,
+  checkpoints at 6/12/final. The written `fusion_config.json` carries
+  `fixed_receptor_lengths=true`, `predict_eos=true`, `residue_cond_mode="add"`,
+  `decoder_chain_eos_policy="chain_eos"`, `decoder_chain_eos_token_id=126389`
+  (distinct from pad/eos `126081` and mask `126336`), and the six canvas
+  constants.
+- Reloading that checkpoint through `load_fusion_for_eval` restores the policy,
+  `resolve_light_length_mode(model, "auto")` returns `fixed_v2`, the collator
+  emits `[1, 2, 168]` with `encoder_slot_mask`, and denoising all 135 light
+  canvas slots yields a variable-length chain (18 residues for the antibody
+  fixture, 2 for the TCR fixture) terminated by a generated EOS. The sequences
+  are meaningless after 12 steps; what this shows is that output length is set
+  by the model, not by a reference or a sampled prior.
 
-No GPU forward/backward, no smoke training run, and no loss curve exist for v2.
+The smoke ran on CPU because the local A100 is unusable: torch `2.11.0+cu130`
+needs a newer driver than the installed `535.129.03` (CUDA 12.2). The vendored
+`LLaDAModelLM.__init__` also hard-codes `init_device = "cuda"`, which was
+monkey-patched in the temporary harness rather than changed in the repo. No
+real-scale (d768/L8) GPU run or loss curve exists yet.
 
 ## Known gaps
 
-Two of these will abort a real training run and are deliberately left open
-pending a policy decision, because each possible fix changes what the model is
-trained on:
-
-1. **Receptor chains longer than the canvas.** 5 rows in `immune_v6_binding_only`
-   exceed the fixed canvas (oas 1, ots 2, tcr_repertoire 1, trait 1; worst cases
-   a 186-residue `antibody_heavy` and a 148-residue `tcr_alpha`). The renderer
-   raises `ValueError`, and it runs inside the collator, which has no
-   per-record skip path — so hitting one of these rows kills the job.
-2. **Grammar length over `--max_length 1024`.** Padding both receptor chains to
-   `167 + 135` slots inflates total grammar length, so 4,289 train and 286 valid
-   rows in `immune_v6_binding_only` (5,008 + 2,033 in `immune_v3_heterotypic`)
-   now exceed 1024; all of them are `asd_antibody` rows with long antigens. The
-   prepared shards were filtered by `budget.max_length` under the *old*
-   variable-length estimate, so the filter no longer holds. The collator raises
-   `ValueError` rather than dropping the row.
-
-   Combined: 4,580 / 7,381,499 rows (0.062%) for v6, 7,044 / 7,997,971 (0.088%)
-   for v3_heterotypic.
-
-Non-blocking follow-ups:
-
-3. No v2 train job yml exists yet.
-4. `tcr_generation_v5` (CDR3-only) and the CDR3-only mode of `tcr_generation`
+1. No v2 train job yml exists yet, and v2 has never run at real scale on GPU.
+2. `tcr_generation_v5` (CDR3-only) and the CDR3-only mode of `tcr_generation`
    explicitly raise on a `fixed_receptor_lengths` checkpoint. Those two
    downstream evals are unavailable for v2 until they are ported to the
    full-length protocol.
-5. Repeated EOS runs of a chain whose residues are partly synthetic (`X`
+3. Repeated EOS runs of a chain whose residues are partly synthetic (`X`
    completion, e.g. `tcr_repertoire` alpha) are marked synthetic wholesale and
    therefore excluded from EOS supervision, since a completed synthetic chain
    carries no observed termination label.
-6. The ESMC native prediction-head auxiliary loss is still not implemented.
+4. The ESMC native prediction-head auxiliary loss is still not implemented.
+5. Dropping over-budget `asd_antibody` rows removes the longest-antigen tail
+   from training. It is 1.9% of that source rather than 0.06% of the corpus, so
+   antigen-conditioned metrics on very long antigens are worth watching.

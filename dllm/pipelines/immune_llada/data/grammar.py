@@ -14,7 +14,9 @@ Inspect one encoded batch with::
 
 from __future__ import annotations
 
+import logging
 import random
+from collections import Counter
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Iterator
@@ -86,6 +88,25 @@ FIXED_HEAVY_ENCODER_LENGTH = 168
 FIXED_LIGHT_ENCODER_LENGTH = 136
 FIXED_HEAVY_DECODER_SLOTS = FIXED_HEAVY_ENCODER_LENGTH - 1
 FIXED_LIGHT_DECODER_SLOTS = FIXED_LIGHT_ENCODER_LENGTH - 1
+
+logger = logging.getLogger(__name__)
+
+# Runtime drop reasons. ``budget.max_length`` reuses the preprocessing filter
+# name on purpose: the fixed canvas lengthens receptor blocks, so rows that the
+# build-time budget filter passed under the old variable-length estimate can
+# exceed ``max_sequence_length`` now. Counting them under the same key keeps the
+# runtime ledger comparable with ``filter_report.json``.
+DROP_RECEPTOR_CANVAS_OVERFLOW = "canvas.receptor_overflow"
+DROP_BUDGET_MAX_LENGTH = "budget.max_length"
+
+
+class ReceptorCanvasOverflow(ValueError):
+    """A receptor chain does not fit its fixed decoder canvas.
+
+    Subclasses ``ValueError`` so existing callers that catch ``ValueError``
+    (and the read-only canvas audit, which matches on the message) are
+    unaffected.
+    """
 
 # Process-local cache: load_from_disk is very slow on multi-million-row grammar shards.
 _GRAMMAR_ARROW_DATASET_CACHE: dict[str, object] = {}
@@ -352,7 +373,7 @@ def _encode_chain_from_residue_ids(
     encoded_mask = [0] + [1] * len(residue_token_ids) + [0]
     if fixed_length is not None:
         if len(encoded_ids) > fixed_length:
-            raise ValueError(
+            raise ReceptorCanvasOverflow(
                 f"chain has {len(residue_token_ids)} residues, exceeding fixed encoder canvas {fixed_length}"
             )
         extra = fixed_length - len(encoded_ids)
@@ -431,7 +452,7 @@ class GrammarRenderer:
                 fixed_slots = FIXED_LIGHT_DECODER_SLOTS
             if fixed_slots is not None:
                 if len(residue_ids) >= fixed_slots:
-                    raise ValueError(
+                    raise ReceptorCanvasOverflow(
                         f"{chain_role} chain has {len(residue_ids)} residues; "
                         f"fixed decoder canvas {fixed_slots} requires one EOS slot"
                     )
@@ -819,6 +840,13 @@ class GrammarBioSeqCollator:
     max_protein_length: int = DEFAULT_MAX_PROTEIN_LENGTH
     task_type_to_id: dict[str, int] = field(default_factory=lambda: dict(TASK_TYPE_TO_ID))
     fixed_receptor_lengths: bool = False
+    # The fixed canvas pads every receptor chain to 167/135 slots, which both
+    # rejects a handful of over-long chains and pushes some long-antigen rows
+    # past ``max_sequence_length``. Prepared shards were budgeted under the old
+    # variable-length estimate, so those rows cannot be re-filtered at build
+    # time without rebuilding the corpus. Dropping and counting them here keeps
+    # the run alive; legacy (``False``) behavior still raises.
+    drop_overflow_records: bool = False
 
     def __post_init__(self) -> None:
         self.renderer = GrammarRenderer(
@@ -826,12 +854,58 @@ class GrammarBioSeqCollator:
             ppi_max_protein_length=self.max_protein_length,
             fixed_receptor_lengths=self.fixed_receptor_lengths,
         )
+        self.drop_counts: Counter[str] = Counter()
+        self.drop_counts_by_source: dict[str, Counter[str]] = {}
+        self._next_drop_log_at = 1
+
+    def _count_drop(self, reason: str, record: BioSeqRecord) -> None:
+        self.drop_counts[reason] += 1
+        source = str(getattr(record, "source", "") or "unknown")
+        self.drop_counts_by_source.setdefault(reason, Counter())[source] += 1
+        total = sum(self.drop_counts.values())
+        # Exponential backoff: surface the first drops immediately, then keep
+        # the ledger visible without flooding a multi-hundred-thousand-step run.
+        if total >= self._next_drop_log_at:
+            self._next_drop_log_at = max(total + 1, total * 2)
+            logger.warning(
+                "Fixed-canvas collator dropped %d record(s) so far: %s (by source: %s)",
+                total,
+                dict(self.drop_counts),
+                {key: dict(value) for key, value in self.drop_counts_by_source.items()},
+            )
+
+    def _render_rows(self, records: list[BioSeqRecord | dict[str, Any]]) -> list[dict[str, Any]]:
+        rows: list[dict[str, Any]] = []
+        for record in records:
+            if isinstance(record, dict) and "input_ids" in record:
+                rows.append(record)
+                continue
+            try:
+                row = self.renderer.encode(record)
+            except ReceptorCanvasOverflow:
+                if not self.drop_overflow_records:
+                    raise
+                self._count_drop(DROP_RECEPTOR_CANVAS_OVERFLOW, record)
+                continue
+            if len(row["input_ids"]) > self.max_sequence_length:
+                if not self.drop_overflow_records:
+                    raise ValueError(
+                        f"Grammar record length {len(row['input_ids'])} exceeds "
+                        f"max_sequence_length {self.max_sequence_length}; "
+                        "records are never grammar-truncated"
+                    )
+                self._count_drop(DROP_BUDGET_MAX_LENGTH, record)
+                continue
+            rows.append(row)
+        return rows
 
     def __call__(self, records: list[BioSeqRecord | dict[str, Any]]) -> dict[str, Any]:
-        rows = [
-            record if isinstance(record, dict) and "input_ids" in record else self.renderer.encode(record)
-            for record in records
-        ]
+        rows = self._render_rows(records)
+        if not rows:
+            raise ValueError(
+                f"All {len(records)} record(s) in this batch overflowed the fixed canvas; "
+                f"drop ledger={dict(self.drop_counts)}"
+            )
         if any(bool(row.get("fixed_receptor_lengths", False)) != self.fixed_receptor_lengths for row in rows):
             raise ValueError("Rendered row canvas policy does not match collator; re-render semantic records")
         lengths = [len(row["input_ids"]) for row in rows]

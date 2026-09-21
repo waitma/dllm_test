@@ -473,6 +473,16 @@ class RemapCollator:
         self.base_collator = base_collator
         self.lookup = lookup_tensor.long()
 
+    @property
+    def drop_counts(self) -> Any:
+        """Expose the base collator's runtime drop ledger through the wrapper."""
+
+        return getattr(self.base_collator, "drop_counts", None)
+
+    @property
+    def drop_counts_by_source(self) -> Any:
+        return getattr(self.base_collator, "drop_counts_by_source", None)
+
     def _remap(self, values: torch.Tensor, *, preserve_ignore_index: bool) -> torch.Tensor:
         if preserve_ignore_index:
             ignored = values.eq(-100)

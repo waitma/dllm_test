@@ -337,6 +337,28 @@ class RelationAuxLogCallback(transformers.TrainerCallback):
         logs["relation_aux_loss"] = float(value)
 
 
+class CanvasDropLogCallback(transformers.TrainerCallback):
+    """Surface the fixed-canvas collator's runtime drop ledger in the logs.
+
+    Counts are per-process and only cover the shards this rank actually read,
+    so they are a monitoring signal, not a corpus-wide filter report. A sudden
+    rise means the canvas no longer fits the data being fed in.
+    """
+
+    def __init__(self, collator: Any) -> None:
+        self.collator = collator
+
+    def on_log(self, args, state, control, logs=None, **kwargs):  # noqa: ANN001
+        if not logs:
+            return
+        counts = getattr(self.collator, "drop_counts", None)
+        if not counts:
+            return
+        for reason, value in counts.items():
+            logs[f"canvas_drop/{reason}"] = int(value)
+        logs["canvas_drop/total"] = int(sum(counts.values()))
+
+
 # Resume-only artefacts written by HF Trainer + FSDP when save_only_model=False.
 # Dropping them keeps model.safetensors (~32GB) and cuts a ckpt from ~125GB to ~32GB.
 _BULKY_CKPT_FILES = (
@@ -787,6 +809,11 @@ def train() -> None:
         max_sequence_length=data_args.max_length,
         max_protein_length=data_args.max_protein_length,
         fixed_receptor_lengths=bool(training_args.fixed_receptor_lengths),
+        # Prepared shards were budgeted under the old variable-length grammar,
+        # so the fixed canvas makes a small tail unrenderable. Auditing
+        # immune_v6_binding_only found 4,580 / 7,381,499 such rows (0.062%);
+        # drop and count them rather than aborting the run.
+        drop_overflow_records=bool(training_args.fixed_receptor_lengths),
     )
     collator = RemapCollator(base_collator, lookup)
 
@@ -999,6 +1026,8 @@ def train() -> None:
     trainer.eval_source_rows = eval_source_rows
     # Aux scalar must land in ``logs`` before WandbCallback.on_log reads it.
     trainer.callback_handler.callbacks.insert(0, RelationAuxLogCallback())
+    if bool(training_args.fixed_receptor_lengths):
+        trainer.callback_handler.callbacks.insert(0, CanvasDropLogCallback(collator))
     # The sidecar is independent of top-k retention: every Trainer checkpoint
     # gets its policy metadata before any later retention callback runs.
     trainer.add_callback(FusionConfigCheckpointCallback(tokenizer=tok))
