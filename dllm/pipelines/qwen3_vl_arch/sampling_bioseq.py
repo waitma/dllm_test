@@ -136,7 +136,9 @@ def _encoder_input_from_output_tokens(
     Thus shrinking the pending mask cannot reveal the original clean targets.
     """
 
-    accepted = generation_mask & output_tokens.ne(mask_token_id) & batch["residue_mask"].bool()
+    fixed_canvas = "encoder_slot_mask" in batch
+    slots = batch["chain_slot_mask"] if fixed_canvas else batch["residue_mask"]
+    accepted = generation_mask & output_tokens.ne(mask_token_id) & slots.bool()
     inverse = getattr(model, "llada_to_grammar_ids", None)
     if inverse is not None:
         # Fusion uses LLaDA <res_A> IDs in the decoder but ESMC A IDs in
@@ -146,7 +148,13 @@ def _encoder_input_from_output_tokens(
         residue_ids = getattr(model, "_residue_token_ids", None)
         if residue_ids is None:
             raise ValueError("Remapped fusion inference requires decoder residue token IDs")
-        accepted = accepted & valid_ids & mapped.ge(0) & torch.isin(output_tokens, residue_ids)
+        supported = torch.isin(output_tokens, residue_ids)
+        if fixed_canvas:
+            eos_id = getattr(model.config, "decoder_chain_eos_token_id", None)
+            if eos_id is None:
+                raise ValueError("v2 fusion inference requires decoder_chain_eos_token_id")
+            supported = supported | output_tokens.eq(int(eos_id))
+        accepted = accepted & valid_ids & mapped.ge(0) & supported
     else:
         # Native BioSeq models share their residue vocabulary with the encoder.
         mapped = output_tokens
@@ -185,20 +193,24 @@ def _model_logits(
         )
         forward_kwargs.update(
             {
-                "residue_mask": batch.get("residue_mask"),
+                "residue_mask": batch.get("chain_slot_mask", batch.get("residue_mask")) if "encoder_slot_mask" in batch else batch.get("residue_mask"),
                 "encoder_input_ids": noised_encoder_input_ids,
                 "encoder_attention_mask": batch.get("encoder_attention_mask"),
-                "encoder_residue_mask": batch.get("encoder_residue_mask"),
+                "encoder_residue_mask": batch.get("encoder_slot_mask", batch.get("encoder_residue_mask")),
                 "encoder_chain_mask": batch.get("encoder_chain_mask"),
                 "encoder_position_ids": batch.get("encoder_position_ids"),
                 "chain_ids": batch.get("chain_ids"),
             }
         )
+        if "encoder_slot_mask" in batch:
+            forward_kwargs["encoder_slot_mask"] = batch["encoder_slot_mask"]
+            forward_kwargs["chain_slot_mask"] = batch["chain_slot_mask"]
         if cfg_scale > 0.0:
             # Residue-condition CFG: remove the observed sequence condition in
             # both streams, not grammar/type/termination/relation tokens or PAD.
             # The current generated state is identical in the two passes.
-            condition_mask = partial_mask & batch["residue_mask"].bool()
+            visible_slots = batch["chain_slot_mask"] if "encoder_slot_mask" in batch else batch["residue_mask"]
+            condition_mask = partial_mask & visible_slots.bool()
             unmasked_tokens = output_tokens.clone()
             unmasked_tokens[condition_mask] = int(mask_token_id)
             un_encoder_batch = {**batch, "encoder_input_ids": noised_encoder_input_ids}

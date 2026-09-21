@@ -121,6 +121,17 @@ def build_eval_collator(model: nn.Module, tokenizer: GrammarTokenizer) -> Gramma
     return build_grammar_collator(tokenizer)
 
 
+def collator_fixed_receptor_lengths(collator: Any) -> bool | None:
+    """Read the canvas policy through evaluation wrappers such as RemapCollator."""
+
+    while collator is not None:
+        marker = getattr(collator, "fixed_receptor_lengths", None)
+        if marker is not None:
+            return bool(marker)
+        collator = getattr(collator, "base_collator", None)
+    return None
+
+
 def load_untrained_no_encoder(vocab_size: int, **overrides: Any) -> BioSeqNoEncoderDiffusionModel:
     config = BioSeqDiffusionTransformerConfig(
         vocab_size=vocab_size,
@@ -146,6 +157,8 @@ def run_grammar_generate(
     temperature: float = 1.0,
     cfg_scale: float = 0.0,
 ) -> tuple[torch.Tensor, torch.Tensor]:
+    """Generate with model-space inputs, returning grammar-space tokens and scores."""
+
     config = BioSeqGenerateConfig(
         max_iter=max_iter,
         sampling_strategy=sampling_strategy,
@@ -156,6 +169,16 @@ def run_grammar_generate(
         model, batch, partial_mask=partial_mask, config=config
     )
     return _inverse_remap_llada_tokens(model, output_tokens), scores
+
+
+def labels_to_grammar(model: nn.Module, labels: torch.Tensor) -> torch.Tensor:
+    """Match run_grammar_generate's vocabulary without changing labels or -100.
+
+    Fusion eval collators emit LLaDA-space labels; models without an inverse
+    mapping already use grammar-space labels.
+    """
+
+    return _inverse_remap_llada_tokens(model, labels).masked_fill(labels.eq(-100), -100)
 
 
 def _inverse_remap_llada_tokens(model: nn.Module, tokens: torch.Tensor) -> torch.Tensor:

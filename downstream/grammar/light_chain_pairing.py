@@ -14,13 +14,9 @@ The grammar record preallocates light residue slots and fixes a trailing
 ``<protd>``. The parser may truncate earlier if a generated slot emits another
 ``<protd>``; this adapter does not implement unconstrained length generation.
 
-``reference`` (default; user-approved 2026-09-13)
-    Known-reference-length conditional generation: allocate len(reference_light)
-    slots, retain only the declared prompt, and replace the remaining reference
-    residues with placeholders before collation. Both streams initially mask
-    the generated region, then share only committed generated residues each step.
-    Disclose the length condition when comparing with an
-    Ophiuchus native-EOS baseline. See docs/AB_BASELINE_EVALUATION_AUDIT.md section 9.
+``auto`` (default)
+    Selects ``fixed_v2`` for fixed-canvas checkpoints and ``reference`` for
+    legacy checkpoints. The resolved mode is recorded in generation metadata.
 
 ``prior`` (optional diagnostic)
     Draw the light-chain length from a reference-independent prior histogram
@@ -49,7 +45,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 import torch
-from torch.utils.data import DataLoader, Dataset
+from torch.utils.data import Dataset
 from tqdm import tqdm
 
 PROJECT_ROOT = Path("/vepfs-mlp2/c20250601/251105016/project/dllm_test")
@@ -74,9 +70,10 @@ if str(PROJECT_ROOT) not in sys.path:
 from downstream.grammar.common import (
     antibody_pair_record,
     build_eval_collator,
-    build_grammar_collator,
+
     build_grammar_tokenizer,
     collate_records,
+    collator_fixed_receptor_lengths,
     load_grammar_checkpoint,
     load_sample_oas_record,
     load_untrained_no_encoder,
@@ -84,6 +81,74 @@ from downstream.grammar.common import (
 )
 from downstream.grammar.masks import light_chain_generation_partial_mask
 from downstream.grammar.metrics import extract_chain_sequence
+
+
+def _model_uses_fixed_v2(model: Any) -> bool:
+    """Return the checkpoint contract bit without assuming a model class."""
+
+    config = getattr(model, "config", None)
+    marker = getattr(config, "fixed_receptor_lengths", None)
+    if marker is not None:
+        return bool(marker)
+    marker = getattr(model, "fixed_receptor_lengths", None)
+    if marker is not None:
+        return bool(marker)
+    # Fusion checkpoints expose the same contract through their eval collator;
+    # this fallback keeps older composite model wrappers usable while the model
+    # config remains the canonical source for newly loaded checkpoints.
+    collator = getattr(model, "_fusion_eval_collator", None)
+    marker = collator_fixed_receptor_lengths(collator)
+    if marker is not None:
+        return marker
+    return bool(getattr(model, "_predict_eos", False))
+
+
+def resolve_light_length_mode(model: Any, requested: str) -> str:
+    """Resolve and validate the pairing canvas contract for a checkpoint.
+
+    ``auto`` is intentionally the CLI default: fixed-canvas v2 checkpoints use
+    their 134-residue light canvas, while legacy checkpoints retain the
+    reference-length protocol. Explicitly selecting the other contract is an
+    error rather than a silent change in conditioning semantics.
+    """
+
+    requested = str(requested).lower()
+    if requested not in {"auto", "fixed_v2", "reference", "prior"}:
+        raise ValueError(f"unknown light_length_mode={requested!r}")
+    fixed_v2 = _model_uses_fixed_v2(model)
+    if requested == "auto":
+        return "fixed_v2" if fixed_v2 else "reference"
+    if fixed_v2 and requested != "fixed_v2":
+        raise ValueError(
+            f"light_length_mode={requested!r} is incompatible with a fixed_receptor_lengths v2 checkpoint; "
+            "use fixed_v2 or auto"
+        )
+    if not fixed_v2 and requested == "fixed_v2":
+        raise ValueError(
+            "light_length_mode='fixed_v2' requires a checkpoint with "
+            "model.config.fixed_receptor_lengths=True; use reference or auto for legacy checkpoints"
+        )
+    return requested
+
+
+def _validate_pairing_collator(collator: Any, mode: str) -> None:
+    """Reject a legacy canvas before collating for a fixed-v2 checkpoint."""
+
+    if mode == "fixed_v2" and not collator_fixed_receptor_lengths(collator):
+        raise ValueError(
+            "Fixed-v2 pairing requires collator.fixed_receptor_lengths=True; "
+            "a legacy collator is incompatible with the checkpoint's fixed canvas"
+        )
+
+
+def _length_condition_label(mode: str) -> str:
+    if mode == "fixed_v2":
+        return "fixed_canvas_eos"
+    if mode == "reference":
+        return "reference"
+    if mode == "prior":
+        return "train_prior"
+    raise ValueError(f"unresolved light-length mode: {mode!r}")
 
 
 class HeavyLightCsvDataset(Dataset):
@@ -140,7 +205,7 @@ class LightLengthPrior:
 
 
 def build_placeholder_light(reference_light: str, target_length: int, prompt_residues: int) -> str:
-    """Prompt residues from the reference, remaining slots filled and later masked."""
+    """Prompt residues from the reference; all remaining slots are filler."""
 
     prompt_residues = max(int(prompt_residues), 0)
     target_length = max(int(target_length), prompt_residues, 1)
@@ -281,6 +346,8 @@ def generate_for_batch(
     length_prior: LightLengthPrior | None,
     cfg_scale: float = 0.0,
 ) -> list[dict]:
+    effective_length_mode = resolve_light_length_mode(model, light_length_mode)
+    _validate_pairing_collator(collator, effective_length_mode)
     records = []
     metadata_rows: list[tuple[str, str, int, dict, int]] = []
     if not math.isfinite(cfg_scale) or cfg_scale < 0:
@@ -288,7 +355,7 @@ def generate_for_batch(
     if light_prompt_tokens < 0:
         raise ValueError("light_prompt_tokens must be nonnegative")
 
-    if light_length_mode == "prior":
+    if effective_length_mode == "prior":
         if length_prior is None:
             raise ValueError("light_length_mode='prior' requires a length prior")
         drawn = length_prior.sample(len(samples) * num_seqs)
@@ -298,11 +365,25 @@ def generate_for_batch(
     cursor = 0
     for heavy, light, metadata in samples:
         for variant_idx in range(num_seqs):
-            if len(light) <= max(int(light_prompt_tokens), 0):
+            if effective_length_mode == "reference" and len(light) <= max(int(light_prompt_tokens), 0):
                 raise ValueError("Reference light must contain residues beyond the declared prompt")
-            if drawn is not None:
+            if len(light) < max(int(light_prompt_tokens), 0):
+                raise ValueError("Reference light is shorter than the declared prompt")
+            if effective_length_mode == "fixed_v2":
+                if light_prompt_tokens > 134:
+                    raise ValueError("fixed_v2 light canvas has 134 amino-acid slots; prompt exceeds the canvas")
+                # 134 amino-acid placeholders plus the renderer's EOS slot make
+                # the complete 135-slot light canvas. The reference suffix is
+                # never rendered, so neither its length nor its residues enter
+                # the model condition.
+                target_length = 134
+            elif effective_length_mode == "prior":
+                if drawn is None:
+                    raise RuntimeError("prior mode did not produce sampled lengths")
                 target_length = int(drawn[cursor])
             else:
+                if len(light) <= max(int(light_prompt_tokens), 0):
+                    raise ValueError("Reference light must contain residues beyond the declared prompt")
                 target_length = len(light)
             # Never render the hidden reference suffix, even in reference-length
             # mode. The clean answer is kept only in the scoring metadata.
@@ -330,12 +411,20 @@ def generate_for_batch(
 
     rows: list[dict] = []
     for row_idx, (heavy, light, variant_idx, metadata, target_length) in enumerate(metadata_rows):
+        position_ids_chain = batch.get("position_ids_chain")
+        chain_slot_mask = batch.get("chain_slot_mask")
         generated_light = extract_chain_sequence(
             output_tokens[row_idx],
             batch["attention_mask"][row_idx],
             batch["residue_mask"][row_idx],
             tokenizer,
             chain="light",
+            position_ids_chain=(
+                position_ids_chain[row_idx] if position_ids_chain is not None else None
+            ),
+            chain_slot_mask=(
+                chain_slot_mask[row_idx] if chain_slot_mask is not None else None
+            ),
         )
         result = {
             "h_sequence": heavy,
@@ -343,14 +432,14 @@ def generate_for_batch(
             "raw_l_sequence": light,
             "variant_idx": variant_idx,
             # Audit trail for the length-leakage fix: where the slot count came from.
-            "light_length_mode": light_length_mode,
+            "light_length_mode": effective_length_mode,
             "target_light_length": int(target_length),
             "ref_light_length": len(light),
             "generated_light_length": len(generated_light),
             "generation_protocol_version": GENERATION_PROTOCOL_VERSION,
             "light_prompt_tokens": int(light_prompt_tokens),
             "cfg_scale": float(cfg_scale),
-            "length_condition": "reference" if light_length_mode == "reference" else "train_prior",
+            "length_condition": _length_condition_label(effective_length_mode),
         }
         for key, value in metadata.items():
             if key not in result:
@@ -405,7 +494,7 @@ def _write_run_manifest(args, saved_path: Path, signature: dict[str, Any]) -> No
     payload = {
         **signature,
         "protocol_id": f"ab_pairing_{args.light_length_mode}_length_prompt{args.light_prompt_tokens}_cfg{args.cfg_scale:g}_v{GENERATION_PROTOCOL_VERSION}",
-        "length_condition": "reference" if args.light_length_mode == "reference" else "train_prior",
+        "length_condition": _length_condition_label(args.light_length_mode),
         "sampler_state": "committed_tokens_only_v1",
         "cfg_scale": float(args.cfg_scale),
         "cfg_formula": "cond + scale * (cond - uncond)",
@@ -414,8 +503,13 @@ def _write_run_manifest(args, saved_path: Path, signature: dict[str, Any]) -> No
         "input_csv_sha256": _file_sha256(Path(args.csv_path)),
         "source_sha256": signature["implementation_sha256"],
         "torch_version": torch.__version__,
-        "known_deviations": ["known reference length; not native-EOS protocol"]
-        if args.light_length_mode == "reference" else ["length sampled from training prior"],
+        "known_deviations": (
+            ["known reference length; not native-EOS protocol"]
+            if args.light_length_mode == "reference"
+            else ["length sampled from training prior"]
+            if args.light_length_mode == "prior"
+            else []
+        ),
     }
     manifest_path = saved_path.with_name(saved_path.stem + "_manifest.json")
     manifest_path.parent.mkdir(parents=True, exist_ok=True)
@@ -435,12 +529,25 @@ def run_generation(args) -> Path:
         np.random.seed(args.seed)
         random.seed(args.seed)
 
+    if args.checkpoint_path:
+        model, tokenizer = load_grammar_checkpoint(args.checkpoint_path, device=device)
+    else:
+        tokenizer = build_grammar_tokenizer()
+        model = load_untrained_no_encoder(tokenizer.vocab_size, mask_token_id=tokenizer.mask_token_id).to(device)
+    args.light_length_mode = resolve_light_length_mode(model, args.light_length_mode)
+
     length_prior: LightLengthPrior | None = None
     if args.light_length_mode == "prior":
         length_prior = LightLengthPrior(Path(args.length_prior_json))
         print(
             f"Light-length prior: {length_prior.signature()} "
             f"(reference-independent; target length is NOT taken from the reference)",
+            flush=True,
+        )
+    elif args.light_length_mode == "fixed_v2":
+        print(
+            "Fixed-v2 light canvas: 134 amino-acid slots plus renderer EOS; "
+            "hidden reference suffix is not rendered.",
             flush=True,
         )
     else:
@@ -450,13 +557,8 @@ def run_generation(args) -> Path:
             flush=True,
         )
 
-    if args.checkpoint_path:
-        model, tokenizer = load_grammar_checkpoint(args.checkpoint_path, device=device)
-    else:
-        tokenizer = build_grammar_tokenizer()
-        model = load_untrained_no_encoder(tokenizer.vocab_size, mask_token_id=tokenizer.mask_token_id).to(device)
-
     collator = build_eval_collator(model, tokenizer)
+    _validate_pairing_collator(collator, args.light_length_mode)
     end_index = None if args.max_samples is None else args.start_index + args.max_samples
     dataset = HeavyLightCsvDataset(
         args.csv_path,
@@ -527,7 +629,7 @@ def run_generation(args) -> Path:
     return saved_path
 
 
-def smoke_eval(device: str = "cpu") -> dict[str, float | list[str]]:
+def smoke_eval(device: str = "cpu") -> dict[str, list[str]]:
     tokenizer = build_grammar_tokenizer()
     record = load_sample_oas_record(split="valid", index=0)
     batch = collate_records([record])
@@ -573,11 +675,11 @@ def main() -> None:
     parser.add_argument(
         "--light-length-mode",
         type=str,
-        default="reference",
-        choices=("prior", "reference"),
+        default="auto",
+        choices=("auto", "fixed_v2", "prior", "reference"),
         help=(
-            "reference (default): known-length conditional generation; disclose reference "
-            "length as input. prior: optional training-length-prior diagnostic."
+            "auto selects fixed_v2 for model.config.fixed_receptor_lengths=True and "
+            "reference for legacy checkpoints; explicit mismatches are rejected."
         ),
     )
     parser.add_argument("--length-prior-json", type=str, default=str(DEFAULT_LENGTH_PRIOR_JSON))

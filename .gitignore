@@ -154,6 +154,7 @@ dmypy.json
 !/downstream/grammar/ab_features.py
 !/downstream/grammar/ab_probes.py
 !/downstream/grammar/tcr_features.py
+!/downstream/grammar/tcr_generation.py
 !/downstream/grammar/tcr_generation_v5.py
 !/downstream/benchmark/
 /downstream/benchmark/*

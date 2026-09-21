@@ -16,7 +16,24 @@ Raw-corpus decontam accidents (PASS is not enough; `语料 ∩ benchmark`; key s
 [`examples/llada/DATA_PIPELINE_README.md`](examples/llada/DATA_PIPELINE_README.md).
 Long-lived rules: [`PROJ_GUIDE.md`](PROJ_GUIDE.md).
 
-## Current immune LLaDA data contract（2026-09-12）
+## v2 fixed-canvas / variable-length decoder contract (2026-09-21)
+
+For the second model version, grammar rendering remains semantic and runtime, but
+receptor chains use fixed ESMC canvases: heavy/beta `168` including `<cls>` and
+light/alpha `136` including `<cls>`, uniformly for antibody and TCR. The decoder
+has respectively `167` and `135` slots. Real amino acids are followed by repeated
+EOS tokens; one EOS slot is kept available for termination (practical residue
+maxima `166` and `134`). EOS is visible to attention and loss, while PAD remains
+an attention/padding concern. See
+[`examples/llada/VARIABLE_LENGTH_GENERATION_V2.md`](examples/llada/VARIABLE_LENGTH_GENERATION_V2.md).
+
+The batch now distinguishes `residue_mask`, `chain_eos_mask`, and
+`chain_slot_mask`; ESMC `encoder_residue_mask` still contains only real amino
+acids. This prevents EOS padding from shifting decoder-to-ESMC amino-acid
+alignment. The decoder condition path uses additive fusion and the sampler keeps
+pending positions masked, so reference suffixes are not fed back to ESMC. Output
+extraction truncates each chain at its first EOS.
+
 
 TCR 下游评测的输入转换与训练格式的衔接约定（含 others 真实 CDR3αβ 第一版）见 [TCR baseline 审计 §2 / §9](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/TCR_BASELINE_EVALUATION_AUDIT.md)；该约定不改变本节的预训练数据产物与离线流程。
 
@@ -209,8 +226,16 @@ Still-true format pitfalls (do not drop):
   `decontam_mode` / `blocklist_provenance`).
 - **`TCR_PAPERS_DEFAULT_DIR` points at `data/tcr_papers_v2/dataset`**
   (fixed 2026-08-29). Pre-fix stats may silently have measured v1 (−274k rows).
-- **ASD valid loss is not a model-selection signal**: same blocklist, train
-  drop 67.5% vs valid drop 5.0%. Detail: DATA_PIPELINE_README §6.4.
+- **ASD valid loss is not a model-selection signal** for v5 and earlier: same
+  blocklist, train drop 67.5% vs valid drop 5.0%. Root cause found 2026-09-19 --
+  the blocklist is generated *from the split's own train.csv*
+  (`decontam_extra.py:52`), so its `H:` keys are exact train heavy chains and a
+  cluster-disjoint split structurally cannot hit them on valid. Fixed by
+  decontaminating before splitting (`downstream/asd/scripts/step6_symmetric.py`,
+  corpus `downstream/asd/step6_symmetric/`, config
+  `configs/data/immune_v6_binding_only.yaml`); post-rebuild hit rate is 0.00% on
+  all three splits. Detail: DATA_PIPELINE_README §6.4 and
+  `downstream/asd/README.md`.
 - **Layout shares must be reservoir-sampled**, never a prefix.
   `tcr_papers_v2` is seven corpora concatenated; the first 30k rows are 100%
   `tcr_peptide`, the full set is 80.3% `tcr_pmhc`.

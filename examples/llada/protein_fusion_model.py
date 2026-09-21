@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import json
 import logging
+from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
@@ -11,6 +13,10 @@ import torch.nn as nn
 import transformers
 
 from dllm.pipelines.immune_llada.data import GRAMMAR_TOKENS, GrammarTokenizer
+from dllm.pipelines.immune_llada.data.grammar import (
+    FIXED_HEAVY_ENCODER_LENGTH, FIXED_LIGHT_ENCODER_LENGTH,
+    FIXED_HEAVY_DECODER_SLOTS, FIXED_LIGHT_DECODER_SLOTS,
+)
 from dllm.pipelines.qwen3_vl_arch.modeling_bioseq import (
     BioSeqDiffusionOutput,
     BioSeqEncoderDiffusionModel,
@@ -51,6 +57,88 @@ class _FusionConfig(SimpleNamespace):
 
     def to_dict(self) -> dict[str, Any]:
         return dict(vars(self))
+
+
+FUSION_CONFIG_FILENAME = "fusion_config.json"
+
+
+def _unwrap_fusion_module(model: nn.Module) -> nn.Module:
+    """Return the underlying fusion module through DDP/FSDP-style wrappers."""
+
+    seen: set[int] = set()
+    current = model
+    while id(current) not in seen:
+        seen.add(id(current))
+        if hasattr(current, "config") and hasattr(current, "condition_proj"):
+            return current
+        next_module = getattr(current, "module", None)
+        if next_module is None:
+            next_module = getattr(current, "_fsdp_wrapped_module", None)
+        if next_module is None or next_module is current:
+            break
+        current = next_module
+    return current
+
+
+def fusion_config_path(directory: str | Path) -> Path:
+    """Return the sidecar configuration path for a fusion Trainer directory."""
+
+    return Path(directory) / FUSION_CONFIG_FILENAME
+
+
+def load_fusion_config(directory: str | Path) -> dict[str, Any]:
+    """Read ``fusion_config.json``; old checkpoints intentionally default to ``{}``."""
+
+    path = fusion_config_path(directory)
+    if not path.is_file():
+        return {}
+    with path.open(encoding="utf-8") as handle:
+        payload = json.load(handle)
+    if not isinstance(payload, dict):
+        raise ValueError(f"fusion config must be a JSON object: {path}")
+    return payload
+
+
+def save_fusion_config(
+    directory: str | Path,
+    model: nn.Module,
+    *,
+    tokenizer: Any | None = None,
+) -> Path:
+    """Serialize fusion-only architecture/policy metadata beside checkpoint weights.
+
+    HF's generic ``config.json`` is owned by the decoder.  This sidecar preserves
+    the composite model's fixed-canvas and decoder-chain-EOS policy, including for
+    Trainer checkpoints whose model class cannot be reconstructed by HF alone.
+    """
+
+    module = _unwrap_fusion_module(model)
+    config = getattr(module, "config", None)
+    payload = config.to_dict() if hasattr(config, "to_dict") else dict(vars(config))
+    payload.setdefault("fusion_config_version", 2)
+    payload.setdefault("fixed_receptor_lengths", False)
+    payload.setdefault("fixed_heavy_encoder_length", FIXED_HEAVY_ENCODER_LENGTH)
+    payload.setdefault("fixed_light_encoder_length", FIXED_LIGHT_ENCODER_LENGTH)
+    payload.setdefault("fixed_heavy_decoder_slots", FIXED_HEAVY_DECODER_SLOTS)
+    payload.setdefault("fixed_light_decoder_slots", FIXED_LIGHT_DECODER_SLOTS)
+    payload.setdefault("fixed_heavy_residue_max", FIXED_HEAVY_DECODER_SLOTS - 1)
+    payload.setdefault("fixed_light_residue_max", FIXED_LIGHT_DECODER_SLOTS - 1)
+    payload.setdefault("predict_eos", False)
+    if tokenizer is not None:
+        for key, attr in (
+            ("decoder_chain_eos_token_id", "_fusion_decoder_chain_eos_token_id"),
+            ("decoder_chain_eos_policy", "_fusion_decoder_chain_eos_policy"),
+        ):
+            value = getattr(tokenizer, attr, None)
+            if value is not None:
+                payload[key] = value
+
+    path = fusion_config_path(directory)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8") as handle:
+        json.dump(payload, handle, indent=2, sort_keys=True)
+        handle.write("\n")
+    return path
 
 
 def sample_bioseq_bert_noise(
@@ -108,6 +196,9 @@ def sample_bioseq_bert_noise(
         if residue_mask is None:
             raise KeyError("all_chain_targets=True requires residue_mask")
         eligible_mask = residue_mask.bool()
+        eos_target_mask = batch.get("chain_eos_mask")
+        if eos_target_mask is not None:
+            eligible_mask = eligible_mask | eos_target_mask.bool()
         # synthetic X 是补全占位符，不是真实残基；renderer 的
         # diffusion_eligible_mask 已排除，all-chains 路径必须自己再排一次
         synthetic = batch.get("synthetic_residue_mask")
@@ -198,7 +289,12 @@ def all_residue_eligible_mask(batch: dict[str, Any]) -> torch.Tensor:
     residue_mask = batch.get("residue_mask")
     if residue_mask is None:
         raise KeyError("diffusion_all_chains=True requires residue_mask")
+    # EOS canvas positions are valid decoder targets but are intentionally not
+    # amino-acid residue slots, so they use a separate mask.
     eligible_mask = residue_mask.bool()
+    eos_target_mask = batch.get("chain_eos_mask")
+    if eos_target_mask is not None:
+        eligible_mask = eligible_mask | eos_target_mask.bool()
     # synthetic X 是补全占位符，不是真实残基；renderer 的
     # diffusion_eligible_mask 已排除，all-chains 路径必须自己再排一次
     synthetic = batch.get("synthetic_residue_mask")
@@ -250,14 +346,59 @@ def _base_id_to_token(base: Any) -> dict[int, str]:
 def expand_llada_tokenizer_for_esmc_grammar(
     tok: transformers.PreTrainedTokenizer,
     gtok_esmc: GrammarTokenizer,
+    *,
+    allow_chain_eos_token: bool = False,
 ) -> tuple[dict[int, int], int]:
-    """Add <res_*>/grammar tokens to LLaDA tok; build ESMC-grammar id -> LLaDA id remap."""
+    """Build the ESMC-grammar -> LLaDA remap, including grammar ``<eos>``.
+
+    Legacy callers keep the historical aliasing behavior and do not grow the
+    vocabulary. Fixed-canvas v2 callers may opt into ``<chain_eos>`` only when
+    the native decoder EOS is unsafe because it aliases padding or masking.
+    When the native EOS is distinct, it is reused and no vocabulary growth is
+    needed for the chain terminator.
+    """
 
     residue_tokens = [f"<res_{aa}>" for aa in RESIDUES]
     new_tokens = residue_tokens + list(GRAMMAR_TOKENS) + ["<chainsep>"]
     n_added = tok.add_tokens(new_tokens)
+
+    native_eos = getattr(tok, "eos_token_id", None)
+    if native_eos is None:
+        raise RuntimeError("LLaDA tokenizer must expose eos_token_id")
+    native_eos = int(native_eos)
+    pad_id = getattr(tok, "pad_token_id", None)
+    mask_id = getattr(tok, "mask_token_id", None)
+    eos_is_safe = native_eos != (None if pad_id is None else int(pad_id)) and native_eos != (
+        None if mask_id is None else int(mask_id)
+    )
+    chain_eos_policy = "native_eos"
+    chain_eos_id = native_eos
+    if not eos_is_safe and allow_chain_eos_token:
+        chain_eos_token = "<chain_eos>"
+        added_chain_eos = tok.add_special_tokens(
+            {"additional_special_tokens": [chain_eos_token]}
+        )
+        n_added += int(added_chain_eos)
+        chain_eos_id = int(tok.convert_tokens_to_ids(chain_eos_token))
+        if chain_eos_id < 0:
+            raise RuntimeError("failed to add <chain_eos> to the LLaDA tokenizer")
+        chain_eos_policy = "chain_eos"
+    elif not eos_is_safe:
+        # This is deliberately retained for old checkpoints. Their pad/eos alias
+        # is ambiguous on inverse conversion, but changing the vocabulary would
+        # make old weights unusable.
+        chain_eos_policy = "legacy_eos_alias"
+
+    setattr(tok, "_fusion_decoder_chain_eos_token_id", int(chain_eos_id))
+    setattr(tok, "_fusion_decoder_chain_eos_policy", chain_eos_policy)
     logger.info(
-        "Added %d new tokens to LLaDA tokenizer (requested %d)", n_added, len(new_tokens)
+        "Decoder chain EOS: policy=%s id=%d (native=%d, pad=%s, mask=%s, added=%d)",
+        chain_eos_policy,
+        chain_eos_id,
+        native_eos,
+        pad_id,
+        mask_id,
+        n_added,
     )
 
     remap: dict[int, int] = {}
@@ -272,7 +413,11 @@ def expand_llada_tokenizer_for_esmc_grammar(
         )
 
     remap[int(gtok_esmc.chain_separator_id())] = int(tok.convert_tokens_to_ids("<chainsep>"))
-    remap[int(gtok_esmc.pad_token_id)] = int(tok.pad_token_id)
+    grammar_pad_id = int(gtok_esmc.pad_token_id)
+    remap[grammar_pad_id] = int(tok.pad_token_id if tok.pad_token_id is not None else native_eos)
+    # ESM-family grammar uses id 2 for EOS. It must be legal as a supervised
+    # decoder target in the fixed canvas, rather than being treated as padding.
+    remap[int(gtok_esmc.eos_token_id)] = int(chain_eos_id)
 
     unk_id = getattr(tok, "unk_token_id", None)
     if unk_id is not None:
@@ -283,6 +428,32 @@ def expand_llada_tokenizer_for_esmc_grammar(
             )
 
     return remap, n_added
+
+
+def build_inverse_remap(
+    remap: dict[int, int],
+    *,
+    preferred_source_ids: tuple[int, ...] = (),
+    size: int | None = None,
+) -> torch.Tensor:
+    """Build LLaDA -> grammar ids with deterministic pad/EOS collision handling.
+
+    ``preferred_source_ids`` selects which source wins an alias collision; it
+    does not remove the underlying ambiguity. Callers must explicitly choose
+    their policy when integrating this helper into checkpoint loading.
+    """
+
+    max_destination = max((int(dst) for dst in remap.values()), default=-1)
+    inverse_size = max(int(size or 0), max_destination + 1)
+    inverse = torch.full((inverse_size,), -1, dtype=torch.long)
+    preferred = set(int(value) for value in preferred_source_ids)
+    for source, destination in remap.items():
+        destination = int(destination)
+        if destination < 0 or destination >= inverse_size:
+            continue
+        if int(inverse[destination]) < 0 or int(source) in preferred:
+            inverse[destination] = int(source)
+    return inverse
 
 
 def build_remap_lookup(remap: dict[int, int]) -> torch.Tensor:
@@ -296,26 +467,42 @@ def build_remap_lookup(remap: dict[int, int]) -> torch.Tensor:
 
 
 class RemapCollator:
-    """Remap decoder ``input_ids`` (ESMC/grammar space) into LLaDA ids; leave encoder as-is."""
+    """Remap decoder ids and labels from grammar space into LLaDA space."""
 
     def __init__(self, base_collator: Any, lookup_tensor: torch.Tensor) -> None:
         self.base_collator = base_collator
         self.lookup = lookup_tensor.long()
 
+    def _remap(self, values: torch.Tensor, *, preserve_ignore_index: bool) -> torch.Tensor:
+        if preserve_ignore_index:
+            ignored = values.eq(-100)
+            source = values.masked_fill(ignored, 0)
+        else:
+            ignored = torch.zeros_like(values, dtype=torch.bool)
+            source = values
+        source_cpu = source.cpu().long()
+        ignored_cpu = ignored.cpu()
+        if source_cpu.numel() and (
+            int(source_cpu.min().item()) < 0
+            or int(source_cpu.max().item()) >= int(self.lookup.numel())
+        ):
+            raise IndexError(
+                f"decoder ids must be in [0, {int(self.lookup.numel())}); "
+                f"got min={int(source_cpu.min())}, max={int(source_cpu.max())}"
+            )
+        remapped = self.lookup[source_cpu]
+        if not bool((remapped[~ignored_cpu] >= 0).all()):
+            bad = remapped.lt(0) & ~ignored_cpu
+            bad_src = source_cpu[bad][:8].tolist()
+            raise AssertionError(f"unmapped decoder grammar ids (sample): {bad_src}")
+        remapped = remapped.to(device=values.device)
+        return remapped.masked_fill(ignored.to(device=values.device), -100)
+
     def __call__(self, records: list[Any]) -> dict[str, Any]:
         batch = self.base_collator(records)
-        input_ids = batch["input_ids"]
-        if int(input_ids.max().item()) >= int(self.lookup.numel()):
-            raise IndexError(
-                f"decoder input_ids max={int(input_ids.max())} exceeds lookup size "
-                f"{int(self.lookup.numel())}"
-            )
-        remapped = self.lookup[input_ids.cpu().long()]
-        if not bool((remapped >= 0).all()):
-            bad = remapped.lt(0)
-            bad_src = input_ids.cpu()[bad][:8].tolist()
-            raise AssertionError(f"unmapped decoder grammar ids (sample): {bad_src}")
-        batch["input_ids"] = remapped.to(device=input_ids.device)
+        batch["input_ids"] = self._remap(batch["input_ids"], preserve_ignore_index=False)
+        if "labels" in batch and batch["labels"] is not None:
+            batch["labels"] = self._remap(batch["labels"], preserve_ignore_index=True)
         return batch
 
 
@@ -357,6 +544,10 @@ class LLaDAEsmcFusion(BioSeqEncoderDiffusionModel):
         relation_aux: str = "none",
         relation_aux_weight: float = 0.1,
         relation_aux_temperature: float = 0.07,
+        predict_eos: bool = False,
+        fixed_receptor_lengths: bool = False,
+        decoder_chain_eos_token_id: int | None = None,
+        decoder_chain_eos_policy: str | None = None,
     ) -> None:
         nn.Module.__init__(self)
         if residue_cond_mode not in {"token", "feature", "add"}:
@@ -401,9 +592,20 @@ class LLaDAEsmcFusion(BioSeqEncoderDiffusionModel):
 
         self.encoder = encoder
         self.decoder = decoder
+        if fixed_receptor_lengths and (residue_cond_mode != "add" or not predict_eos):
+            raise ValueError("fixed-canvas v2 requires additive fusion and predict_eos=True")
+        if fixed_receptor_lengths and (
+            decoder_chain_eos_token_id is None
+            or decoder_chain_eos_token_id in {
+                decoder_mask_token_id,
+                getattr(getattr(decoder, "config", None), "pad_token_id", None),
+            }
+        ):
+            raise ValueError("v2 requires a chain EOS distinct from decoder PAD/MASK")
         self.residue_cond_mode = str(residue_cond_mode)
         self._decoder_mask_token_id = int(decoder_mask_token_id)
         self._encoder_mask_token_id = int(encoder_mask_token_id)
+        self._predict_eos = bool(predict_eos)
         self._time_epsilon = float(time_epsilon)
         self._loss_norm = str(loss_norm)
         self._train_objective = str(train_objective)
@@ -443,6 +645,13 @@ class LLaDAEsmcFusion(BioSeqEncoderDiffusionModel):
         # encode/gather/build_mask do not read self.config; stub satisfies Trainer
         # special-token alignment (eos/pad/bos) plus our training knobs.
         dec_cfg = getattr(decoder, "config", None)
+        if fixed_receptor_lengths and decoder_chain_eos_policy is None:
+            native_eos_id = getattr(dec_cfg, "eos_token_id", None)
+            if native_eos_id is not None:
+                # Eval reconstruction passes the resolved chain EOS ID without a tokenizer.
+                decoder_chain_eos_policy = (
+                    "native_eos" if decoder_chain_eos_token_id == native_eos_id else "chain_eos"
+                )
         self.config = _FusionConfig(
             mask_token_id=self._decoder_mask_token_id,
             time_epsilon=self._time_epsilon,
@@ -477,8 +686,28 @@ class LLaDAEsmcFusion(BioSeqEncoderDiffusionModel):
             pad_token_id=int(getattr(dec_cfg, "pad_token_id", 1) or 1),
             eos_token_id=getattr(dec_cfg, "eos_token_id", None),
             bos_token_id=getattr(dec_cfg, "bos_token_id", None),
+            predict_eos=self._predict_eos,
             forbidden_target_token_ids=None,
+            fixed_receptor_lengths=bool(fixed_receptor_lengths),
+            fixed_heavy_encoder_length=FIXED_HEAVY_ENCODER_LENGTH,
+            fixed_light_encoder_length=FIXED_LIGHT_ENCODER_LENGTH,
+            fixed_heavy_decoder_slots=FIXED_HEAVY_DECODER_SLOTS,
+            fixed_light_decoder_slots=FIXED_LIGHT_DECODER_SLOTS,
+            fixed_heavy_residue_max=FIXED_HEAVY_DECODER_SLOTS - 1,
+            fixed_light_residue_max=FIXED_LIGHT_DECODER_SLOTS - 1,
+            decoder_chain_eos_token_id=decoder_chain_eos_token_id,
+            decoder_chain_eos_policy=decoder_chain_eos_policy,
         )
+        if fixed_receptor_lengths:
+            if self._residue_token_ids is None:
+                raise ValueError("v2 requires decoder residue_token_ids")
+            self.register_buffer(
+                "_canvas_token_ids",
+                torch.cat([self._residue_token_ids, torch.tensor([decoder_chain_eos_token_id])]),
+                persistent=False,
+            )
+        else:
+            self._canvas_token_ids = self._residue_token_ids
         if freeze_encoder:
             for parameter in self.encoder.parameters():
                 parameter.requires_grad_(False)
@@ -496,6 +725,8 @@ class LLaDAEsmcFusion(BioSeqEncoderDiffusionModel):
         encoder_input_ids: torch.Tensor | None = None,
         encoder_attention_mask: torch.Tensor | None = None,
         encoder_residue_mask: torch.Tensor | None = None,
+        encoder_slot_mask: torch.Tensor | None = None,
+        chain_slot_mask: torch.Tensor | None = None,
         encoder_chain_mask: torch.Tensor | None = None,
         encoder_position_ids: torch.Tensor | None = None,
         encoder_kwargs: dict[str, Any] | None = None,
@@ -505,6 +736,14 @@ class LLaDAEsmcFusion(BioSeqEncoderDiffusionModel):
         _ = diffusion_state, position_ids_chain, timesteps
         if input_ids is None:
             raise ValueError("LLaDAEsmcFusion requires input_ids")
+
+        if self.config.fixed_receptor_lengths:
+            if encoder_slot_mask is None or chain_slot_mask is None:
+                raise ValueError("v2 requires length-independent encoder_slot_mask and chain_slot_mask")
+            # Use only layout-derived masks for features. Clean AA/EOS masks are
+            # labels, not permissible conditioning information about hidden length.
+            encoder_residue_mask = encoder_slot_mask
+            residue_mask = chain_slot_mask
 
         word_embeddings = self.decoder.get_input_embeddings()
         inputs_embeds = word_embeddings(input_ids)
@@ -562,12 +801,13 @@ class LLaDAEsmcFusion(BioSeqEncoderDiffusionModel):
                 cond = self.condition_norm(cond)
             cond_h = self.condition_proj(cond).to(dtype=inputs_embeds.dtype)
             m = condition_mask.to(dtype=inputs_embeds.dtype).unsqueeze(-1)
-            if self.residue_cond_mode == "add":
-                inputs_embeds = inputs_embeds + cond_h * m
-            elif self.residue_cond_mode == "feature":
+            # v2 additive fusion preserves both LLaDA token identity and ESMC
+            # condition. ``m`` limits the condition to mapped receptor residue
+            # positions; it never changes the base wte at special/pad tokens.
+            if self.residue_cond_mode == "feature":  # legacy checkpoints only
                 inputs_embeds = inputs_embeds * (1.0 - m) + cond_h * m
             else:
-                raise ValueError(f"unexpected residue_cond_mode={self.residue_cond_mode!r}")
+                inputs_embeds = inputs_embeds + cond_h * m
 
         out = self.decoder(
             inputs_embeds=inputs_embeds,
@@ -575,12 +815,22 @@ class LLaDAEsmcFusion(BioSeqEncoderDiffusionModel):
             output_hidden_states=output_hidden_states,
             use_cache=False,
         )
+        logits = out.logits
+        if self.config.fixed_receptor_lengths:
+            # AA/EOS slots cannot emit text, grammar delimiters, PAD or MASK.
+            allowed = torch.zeros(logits.size(-1), device=logits.device, dtype=torch.bool)
+            allowed[self._canvas_token_ids.to(device=logits.device)] = True
+            if chain_slot_mask is not None:
+                logits = logits.masked_fill(
+                    chain_slot_mask.bool().unsqueeze(-1) & ~allowed,
+                    torch.finfo(logits.dtype).min,
+                )
         hidden = None
         if output_hidden_states and getattr(out, "hidden_states", None):
             hidden = out.hidden_states[-1]
         return BioSeqDiffusionOutput(
             loss=None,
-            logits=out.logits,
+            logits=logits,
             hidden_states=hidden,
             encoder_condition=None,
         )
@@ -624,6 +874,8 @@ class LLaDAEsmcFusion(BioSeqEncoderDiffusionModel):
         return self.compute_loss(batch)
 
     def compute_loss(self, batch: dict[str, Any]) -> BioSeqDiffusionOutput:
+        if (batch.get("encoder_slot_mask") is not None) != self.config.fixed_receptor_lengths:
+            raise ValueError("Batch/model fixed-canvas policies differ")
         # Pair roles are defined on *generated* receptor residues. Snapshot
         # before ``diffusion_all_chains`` widens eligibility, otherwise antigen
         # / MHC / peptide would become "heavy" and the pairing aux would score
@@ -696,6 +948,8 @@ class LLaDAEsmcFusion(BioSeqEncoderDiffusionModel):
             encoder_input_ids=noised_encoder_input_ids,
             encoder_attention_mask=batch.get("encoder_attention_mask"),
             encoder_residue_mask=batch.get("encoder_residue_mask"),
+            encoder_slot_mask=batch.get("encoder_slot_mask"),
+            chain_slot_mask=batch.get("chain_slot_mask"),
             encoder_chain_mask=batch.get("encoder_chain_mask"),
             encoder_position_ids=batch.get("encoder_position_ids"),
             output_hidden_states=want_aux,

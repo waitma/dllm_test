@@ -17,6 +17,10 @@ from .collator import GrammarBioSeqCollator
 from .esm_encoding import Esm2SequenceTokenizer, HuggingFaceEsmTokenizerAdapter
 from .grammar import (
     DEFAULT_GRAMMAR_DATA_DIR,
+    FIXED_HEAVY_ENCODER_LENGTH,
+    FIXED_HEAVY_DECODER_SLOTS,
+    FIXED_LIGHT_ENCODER_LENGTH,
+    FIXED_LIGHT_DECODER_SLOTS,
     GRAMMAR_NULL_CONTEXT_TOKEN,
     GRAMMAR_RELATIONS,
     GRAMMAR_TOKENS,
@@ -34,6 +38,10 @@ __all__ = [
     "BioSeqRecord",
     "PreparedImmuneDataset",
     "DEFAULT_GRAMMAR_DATA_DIR",
+    "FIXED_HEAVY_ENCODER_LENGTH",
+    "FIXED_HEAVY_DECODER_SLOTS",
+    "FIXED_LIGHT_ENCODER_LENGTH",
+    "FIXED_LIGHT_DECODER_SLOTS",
     "Esm2SequenceTokenizer",
     "GRAMMAR_NULL_CONTEXT_TOKEN",
     "GRAMMAR_RELATIONS",

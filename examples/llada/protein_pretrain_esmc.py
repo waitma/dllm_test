@@ -49,9 +49,19 @@ from examples.llada.protein_fusion_model import (
     build_remap_lookup,
     decoder_mask_token_id as _decoder_mask_token_id,
     expand_llada_tokenizer_for_esmc_grammar,
+    load_fusion_config,
+    save_fusion_config,
 )
 
 logger = dllm.utils.get_default_logger(__name__)
+
+
+FIXED_HEAVY_ENCODER_LENGTH = 168
+FIXED_LIGHT_ENCODER_LENGTH = 136
+FIXED_HEAVY_DECODER_SLOTS = 167
+FIXED_LIGHT_DECODER_SLOTS = 135
+FIXED_HEAVY_RESIDUE_MAX = 166
+FIXED_LIGHT_RESIDUE_MAX = 134
 
 
 # Defined locally (not imported from protein_pretrain) so this entry does not pull
@@ -178,6 +188,10 @@ class TrainingArguments(transformers.TrainingArguments):
     )
     relation_aux_weight: float = 0.1
     relation_aux_temperature: float = 0.07
+    # One switch controls the complete fixed-canvas v2 policy. In particular,
+    # v2 automatically enables EOS prediction and the separate chain-EOS token
+    # when the native decoder EOS aliases padding.
+    fixed_receptor_lengths: bool = False
     freeze_encoder: bool = True
     condition_norm: bool = True
     # Enable LLaDA's own activation checkpointing on the decoder. We call it
@@ -355,6 +369,29 @@ def slim_checkpoint_dir(ckpt_dir: str) -> list[str]:
             os.remove(os.path.join(ckpt_dir, name))
             removed.append(name)
     return removed
+
+
+class FusionConfigCheckpointCallback(transformers.TrainerCallback):
+    """Write fusion policy metadata for every Trainer checkpoint on rank zero."""
+
+    def __init__(self, tokenizer: Any | None = None) -> None:
+        self.tokenizer = tokenizer
+
+    def on_save(self, args, state, control, **kwargs):  # noqa: ANN001
+        if not state.is_world_process_zero:
+            return
+        checkpoint_dir = Path(args.output_dir) / f"checkpoint-{int(state.global_step)}"
+        if not checkpoint_dir.is_dir():
+            return
+        model = kwargs.get("model")
+        if model is None:
+            raise RuntimeError("Trainer save callback did not receive the fusion model")
+        tokenizer = (
+            kwargs.get("processing_class")
+            or kwargs.get("tokenizer")
+            or self.tokenizer
+        )
+        save_fusion_config(checkpoint_dir, model, tokenizer=tokenizer)
 
 
 class TopKValLossCheckpointCallback(transformers.TrainerCallback):
@@ -581,6 +618,98 @@ def dry_run_check(
         raise RuntimeError(f"dry_run missing task types; seen={seen}")
     print("\nDRY RUN OK")
 
+def _resume_checkpoint_dir(resume_ckpt: bool | str | None, output_dir: str) -> Path | None:
+    """Resolve the checkpoint whose policy must match this training invocation."""
+
+    if resume_ckpt is True:
+        candidates = [
+            path
+            for path in Path(output_dir).glob("checkpoint-*")
+            if path.is_dir() and path.name.removeprefix("checkpoint-").isdigit()
+        ]
+        return (
+            max(candidates, key=lambda path: int(path.name.split("-")[-1]))
+            if candidates
+            else None
+        )
+    if not resume_ckpt:
+        return None
+    path = Path(str(resume_ckpt))
+    if path.name == "model.safetensors":
+        path = path.parent
+    return path
+
+
+def _validate_resume_policy(
+    resume_ckpt: bool | str | None,
+    output_dir: str,
+    fixed_receptor_lengths: bool,
+    *,
+    decoder_chain_eos_token_id: int | None = None,
+    decoder_chain_eos_policy: str | None = None,
+) -> None:
+    """Reject legacy/v2 or fixed-canvas tokenizer policy changes before resume."""
+
+    checkpoint_dir = _resume_checkpoint_dir(resume_ckpt, output_dir)
+    if checkpoint_dir is None or not checkpoint_dir.is_dir():
+        return
+    config = load_fusion_config(checkpoint_dir)
+    saved_fixed = bool(config.get("fixed_receptor_lengths", False))
+    if saved_fixed != bool(fixed_receptor_lengths):
+        raise ValueError(
+            "resume checkpoint policy mismatch: checkpoint has "
+            f"fixed_receptor_lengths={saved_fixed}, but this run requests "
+            f"{bool(fixed_receptor_lengths)} ({checkpoint_dir}). Refusing to "
+            "resume across legacy and fixed-canvas v2 policies."
+        )
+    if saved_fixed:
+        expected = {
+            "fixed_heavy_encoder_length": FIXED_HEAVY_ENCODER_LENGTH,
+            "fixed_light_encoder_length": FIXED_LIGHT_ENCODER_LENGTH,
+            "fixed_heavy_decoder_slots": FIXED_HEAVY_DECODER_SLOTS,
+            "fixed_light_decoder_slots": FIXED_LIGHT_DECODER_SLOTS,
+            "fixed_heavy_residue_max": FIXED_HEAVY_RESIDUE_MAX,
+            "fixed_light_residue_max": FIXED_LIGHT_RESIDUE_MAX,
+        }
+        for key, value in expected.items():
+            if int(config.get(key, -1)) != value:
+                raise ValueError(
+                    f"resume checkpoint has incompatible {key}={config.get(key)!r}; "
+                    f"expected {value}: {checkpoint_dir}"
+                )
+        if not bool(config.get("predict_eos", False)):
+            raise ValueError(
+                f"fixed-canvas resume checkpoint does not enable predict_eos: {checkpoint_dir}"
+            )
+        if config.get("decoder_chain_eos_token_id") is None or config.get(
+            "decoder_chain_eos_policy"
+        ) in (None, "legacy_eos_alias"):
+            raise ValueError(
+                "fixed-canvas resume checkpoint is missing a safe decoder chain "
+                f"EOS policy: {checkpoint_dir}"
+            )
+        if decoder_chain_eos_token_id is None or decoder_chain_eos_policy in (
+            None, "legacy_eos_alias"
+        ):
+            raise ValueError(
+                "fixed-canvas resume requires a safe decoder chain EOS ID/policy "
+                f"from the current tokenizer: {checkpoint_dir}"
+            )
+        saved_eos_id = int(config["decoder_chain_eos_token_id"])
+        if saved_eos_id != int(decoder_chain_eos_token_id):
+            raise ValueError(
+                "decoder chain EOS id mismatch between resume checkpoint and current tokenizer: "
+                f"sidecar={saved_eos_id}, tokenizer={decoder_chain_eos_token_id} "
+                f"({checkpoint_dir})"
+            )
+        saved_eos_policy = str(config["decoder_chain_eos_policy"])
+        if saved_eos_policy != str(decoder_chain_eos_policy):
+            raise ValueError(
+                "decoder chain EOS policy mismatch between resume checkpoint and current tokenizer: "
+                f"sidecar={saved_eos_policy!r}, tokenizer={decoder_chain_eos_policy!r} "
+                f"({checkpoint_dir})"
+            )
+
 
 def train() -> None:
     parser = transformers.HfArgumentParser(
@@ -594,6 +723,11 @@ def train() -> None:
         raise ValueError(
             f"residue_cond_mode must be token|feature|add, got "
             f"{training_args.residue_cond_mode!r}"
+        )
+    if training_args.fixed_receptor_lengths and training_args.residue_cond_mode != "add":
+        raise ValueError(
+            "fixed_receptor_lengths=True requires residue_cond_mode='add'; "
+            "v2 does not support replacement/token fusion"
         )
     if training_args.train_objective not in {"diffusion", "bert"}:
         raise ValueError(
@@ -623,7 +757,9 @@ def train() -> None:
         esmc_path, local_files_only=True
     )
     gtok_esmc = GrammarTokenizer(base_esmc)
-    remap, n_added = expand_llada_tokenizer_for_esmc_grammar(tok, gtok_esmc)
+    remap, n_added = expand_llada_tokenizer_for_esmc_grammar(
+        tok, gtok_esmc, allow_chain_eos_token=bool(training_args.fixed_receptor_lengths)
+    )
     lookup = build_remap_lookup(remap)
     logger.info(
         "Tokenizer vocab: %d -> %d (added %d; remap covers %d ids)",
@@ -650,12 +786,28 @@ def train() -> None:
         tokenizer=gtok_esmc,
         max_sequence_length=data_args.max_length,
         max_protein_length=data_args.max_protein_length,
+        fixed_receptor_lengths=bool(training_args.fixed_receptor_lengths),
     )
     collator = RemapCollator(base_collator, lookup)
 
     if training_args.dry_run:
         dry_run_check(tok, train_ds, collator)
         return
+
+    resume_ckpt = getattr(training_args, "resume_from_checkpoint", None)
+    if resume_ckpt in (None, "", "False", "false", "0"):
+        resume_ckpt = None
+    elif resume_ckpt in (True, "True", "true", "1"):
+        resume_ckpt = True
+    else:
+        resume_ckpt = str(resume_ckpt)
+    _validate_resume_policy(
+        resume_ckpt,
+        training_args.output_dir,
+        bool(training_args.fixed_receptor_lengths),
+        decoder_chain_eos_token_id=int(getattr(tok, "_fusion_decoder_chain_eos_token_id")),
+        decoder_chain_eos_policy=str(getattr(tok, "_fusion_decoder_chain_eos_policy")),
+    )
 
     # ----- Model ------------------------------------------------------------------
     with (esmc_path / "config.json").open() as handle:
@@ -737,18 +889,33 @@ def train() -> None:
         relation_aux=str(training_args.relation_aux),
         relation_aux_weight=float(training_args.relation_aux_weight),
         relation_aux_temperature=float(training_args.relation_aux_temperature),
+        fixed_receptor_lengths=bool(training_args.fixed_receptor_lengths),
+        predict_eos=bool(training_args.fixed_receptor_lengths),
+        decoder_chain_eos_token_id=(
+            int(getattr(tok, "_fusion_decoder_chain_eos_token_id"))
+            if bool(training_args.fixed_receptor_lengths)
+            else None
+        ),
     )
     # Decoder is bf16 (from_pretrained) while ESMC/condition heads default to fp32;
     # unify to bf16 so the FSDP root flat-param group has a single dtype.
+    fixed_receptor_lengths = bool(training_args.fixed_receptor_lengths)
     model = model.to(torch.bfloat16)
-
-    resume_ckpt = getattr(training_args, "resume_from_checkpoint", None)
-    if resume_ckpt in (None, "", "False", "false", "0"):
-        resume_ckpt = None
-    elif resume_ckpt in (True, "True", "true", "1"):
-        resume_ckpt = True
-    else:
-        resume_ckpt = str(resume_ckpt)
+    model._fixed_receptor_lengths = fixed_receptor_lengths
+    model.config.fixed_receptor_lengths = fixed_receptor_lengths
+    model.config.fixed_heavy_encoder_length = FIXED_HEAVY_ENCODER_LENGTH
+    model.config.fixed_light_encoder_length = FIXED_LIGHT_ENCODER_LENGTH
+    model.config.fixed_heavy_decoder_slots = FIXED_HEAVY_DECODER_SLOTS
+    model.config.fixed_light_decoder_slots = FIXED_LIGHT_DECODER_SLOTS
+    model.config.fixed_heavy_residue_max = FIXED_HEAVY_RESIDUE_MAX
+    model.config.fixed_light_residue_max = FIXED_LIGHT_RESIDUE_MAX
+    model.config.decoder_chain_eos_token_id = int(
+        getattr(tok, "_fusion_decoder_chain_eos_token_id")
+    )
+    model.config.decoder_chain_eos_policy = str(
+        getattr(tok, "_fusion_decoder_chain_eos_policy")
+    )
+    model.config.predict_eos = fixed_receptor_lengths
 
     init_weights = getattr(training_args, "init_fusion_weights", None)
     if init_weights in (None, "", "False", "false", "0"):
@@ -832,6 +999,9 @@ def train() -> None:
     trainer.eval_source_rows = eval_source_rows
     # Aux scalar must land in ``logs`` before WandbCallback.on_log reads it.
     trainer.callback_handler.callbacks.insert(0, RelationAuxLogCallback())
+    # The sidecar is independent of top-k retention: every Trainer checkpoint
+    # gets its policy metadata before any later retention callback runs.
+    trainer.add_callback(FusionConfigCheckpointCallback(tokenizer=tok))
     # Retain the K lowest eval_loss checkpoints (bioseq top-k semantics). Needs a
     # metric, so only active when eval runs; otherwise HF keeps everything.
     save_top_k = int(getattr(training_args, "save_top_k", 0))
@@ -894,7 +1064,9 @@ def train() -> None:
 
     final_dir = os.path.join(training_args.output_dir, "checkpoint-final")
     trainer.save_model(final_dir)
-    tok.save_pretrained(final_dir)
+    if trainer.is_world_process_zero():
+        tok.save_pretrained(final_dir)
+        save_fusion_config(final_dir, model, tokenizer=tok)
     logger.info("Saved final checkpoint + tokenizer to %s", final_dir)
 
 

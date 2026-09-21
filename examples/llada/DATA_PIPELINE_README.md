@@ -424,7 +424,7 @@ checkpoint 不兼容 —— 属于建模决策，未做。
 见 §1：`tcr_pmhc` + `tcr_peptide` 三源合计仅 **1.79%** 的待预测残基。
 prepared `BioSeqRecord` 保留 source weight，但 collator 和 loss 计算目前仍不读它；七源默认权重为 `1.0`，所以这是尚未决策的 loss-budget 功能，不是动态 loader 遗留。
 
-### 6.4 加载期过滤在 train / valid 上的丢弃率严重不对称
+### 6.4 加载期过滤在 train / valid 上的丢弃率严重不对称（ASD 根因已查清并修复，2026-09-19）
 
 同一份黑名单、同一个 `row_to_record`，只是 split 不同（2026-09-07 全量实测）：
 
@@ -438,8 +438,23 @@ prepared `BioSeqRecord` 保留 source weight，但 collator 和 loss 计算目�
 被从 train 里剥掉的抗体家族（Kong 基准的 CDRH3 0.8 相似簇），即 valid 在测一个训练时被
 刻意屏蔽掉的分布；它还占 valid 70% 的残基，会主导整体 `eval_loss`。`trait` 对称说明这不
 是通病。没有泄漏风险（valid 是训练期验证集，不是 Kong 基准本身），但拿它做 early-stopping
-会误导。机制未查清，可能是 ASD 的簇级切分让 Kong 相似簇集中落在 train。**待决策**：重建
-ASD 语料使两个 split 去污一致，或在监控里把 ASD valid loss 标注为不可比。
+会误导。
+
+**根因（2026-09-19）：blocklist 的输入就是切分的输出，循环依赖。**
+`scripts/data/tcr_native/decontam_extra.py:52` 只读 `step6_final/antibody/train.csv`
+生成名单，所以 52 万条 `H:` 键装的是 train 行的**精确重链**；而 step6 按 0.90 整簇装箱，
+train/valid **共享 0 条精确重链**——valid 那个近 0 的命中率结构上不可能非零，
+它那 3% 全部来自 963 条 `h3:` 键（唯一能跨簇命中的桶）。
+此前「机制未查清 / 可能是簇级切分」的猜测**已作废**。
+
+**修复：`downstream/asd/scripts/step6_symmetric.py` 先去污染再切分**，名单从切分的输入
+变成副产物。重建后用真实 loader + `build_filters` 实测，train/valid/holdout
+三侧去污染命中率均为 **0.00%**。新语料 `downstream/asd/step6_symmetric/`，
+新配置 `configs/data/immune_v6_binding_only.yaml`；`step6_final/` 与 v5 配置保持不动。
+
+细节与代价（含 binding-only、抗原 20aa 下限、标签冲突整组丢弃）见
+[`downstream/asd/README.md`](../../downstream/asd/README.md)。
+**注意 `eval_asd_antibody_loss` 与任何 v5 run 不可横向比**（valid 也被过滤且 split 重建）。
 
 ---
 

@@ -27,6 +27,23 @@ REGIONS = ("FR1", "CDR1", "FR2", "CDR2", "FR3", "CDR3", "FR4")
 AA = set("ACDEFGHIKLMNPQRSTVWY")
 
 
+def _model_is_fixed_v2(model) -> bool:
+    """Return whether a loaded checkpoint uses the fixed-canvas contract."""
+
+    config = getattr(model, "config", None)
+    marker = getattr(config, "fixed_receptor_lengths", None)
+    if marker is not None:
+        return bool(marker)
+    marker = getattr(model, "fixed_receptor_lengths", None)
+    if marker is not None:
+        return bool(marker)
+    collator = getattr(model, "_fusion_eval_collator", None)
+    marker = getattr(collator, "fixed_receptor_lengths", None)
+    if marker is not None:
+        return bool(marker)
+    return bool(getattr(model, "_predict_eos", False))
+
+
 def residue_lookup(tokenizer):
     """Invert actual residue encoding, independent of tokenizer adapter internals."""
     mapping = {}
@@ -107,6 +124,10 @@ class V5BetaSampler:
     def __init__(self, checkpoint, device="cuda"):
         self.device = torch.device(device)
         self.model, self.tokenizer = load_grammar_checkpoint(checkpoint, device=self.device)
+        if _model_is_fixed_v2(self.model):
+            raise ValueError(
+                "tcr_generation_v5 is CDR3-only and incompatible with fixed_receptor_lengths v2"
+            )
         self.collator = build_eval_collator(self.model, self.tokenizer)
         self.protocol = BetaGenerationProtocol()
         self.residue_tokens = residue_lookup(self.tokenizer)

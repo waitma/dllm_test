@@ -1,6 +1,6 @@
 # Project Process
 
-> Last updated: 2026-09-17T15:56:31Z
+> Last updated: 2026-09-21
 >
 > 本页保留历史任务账本；顶部最新条目描述当前代码清理和文档同步状态。除明确标注为“本轮已验证”的项目外，历史测试、吞吐和任务数字不能被解释为本轮验证通过。
 >
@@ -13,6 +13,94 @@
 > **92000 矩阵（历史对照）**：非 pairing 产物仍保留在 RESULTS。AB pairing 49000 修复后 p3 行仍在主表；92000 pairing 不入主表。
 >
 > **49000 矩阵终态（对照）**：指定 v5 49000 的 AB 11/11 与 TCR 10/10 已完成并通过各自结果核对。结果见 [RESULTS](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/RESULTS.md)。
+
+## 2026-09-21 变长生成 v2：固定 encoder 画布 + 变长 decoder
+
+**代码状态：已实现并提交，未训练。** 合同细节见
+[VARIABLE_LENGTH_GENERATION_V2.md](/vepfs-mlp2/c20250601/251105016/project/dllm_test/examples/llada/VARIABLE_LENGTH_GENERATION_V2.md)。
+改动前的基线快照是 `c234b07`（"Pre-variable-length-generation snapshot"），**已 push 到 `origin/main`**，
+可随时整体回退；本轮 v2 落在其之后的提交里。全部 v2 行为由单一开关
+`--fixed_receptor_lengths` 控制，默认 `False`，legacy checkpoint 路径逐字不变。
+
+已落地的七条（与用户 2026-09-21 需求一一对应）：
+
+1. 基线 `c234b07` 已 push（`git ls-remote origin main` 核对一致）。走的是本机已有代理
+   `127.0.0.1:18089`，没用到 10808。
+2. 下游 light-chain pairing 不再需要 ref 长度或采样先验：`--light-length-mode` 默认改为
+   `auto`，v2 checkpoint 解析成 `fixed_v2`，legacy 仍走 `reference`；显式选错组合直接报错。
+3. 固定长度：重链 / β 的 ESMC 画布 `168`（含 `<cls>`），轻链 / α `136`。**TCR 复用抗体的这套长度**，
+   不再用 TCR 自己统计的长度。decoder 槽位 = 画布 − 1，即 `167` / `135`。
+4. 每条链按"真实残基 + 重复 EOS 补到定长"渲染，EOS 是注意力可见 token 而非 padding，
+   由 `chain_eos_mask` 单独标记，并在 `predict_eos=True` 时作为正常的 diffusion/MLM
+   监督目标——模型要自己学"什么时候结束"。留一个 EOS 槽，所以实际最长残基数是 `166` / `134`。
+   **LLaDA decoder 确实新加了 token**：本地 LLaDA tokenizer 的原生 `<|endoftext|>`(126081)
+   同时被当成 EOS 和 PAD（实测 `eos_token_id == pad_token_id`），直接复用会和 padding 混淆，
+   所以 v2 新增 `<chain_eos>` 并 `resize_token_embeddings`；policy 与 id 写进
+   `fusion_config.json`，legacy checkpoint 保留旧的 alias 行为不动。
+5. ESMC feature **不再替换** `wte`，改为相加：`inputs_embeds = wte(x_t) + condition_proj(ESMC) * mask`。
+   旧的替换语义降级为 `residue_cond_mode="feature"`，只给 legacy checkpoint 用；
+   `fixed_receptor_lengths=True` 时强制 `add`，构造期就 assert。
+   重链 / 轻链之间的 `<chainsep>` split token 保持不变（实测抗体对布局：
+   6 个前缀 special + 重链 167 槽 + `<chainsep>` + 轻链 135 槽 + `<protd>` = 310 token）。
+6. 泄漏审查：训练期被 corrupt 的 decoder 槽在送进 ESMC 前一律镜像成 encoder MASK；
+   推理期未 commit 的槽保持 MASK，只有已 commit 的生成残基才写回 ESMC 流。
+   forward 里 `fixed_receptor_lengths` 分支把 `residue_mask` / `encoder_residue_mask`
+   换成纯布局推导的 `chain_slot_mask` / `encoder_slot_mask`——干净的 AA/EOS mask 是 label，
+   不能当成"隐藏长度"的条件信息。encoder attention mask 在定长链上恒为全 1（实测 `[168, 136]`），
+   不会从 attention 形状里泄长度。ref 后缀在任何模式下都不渲染。
+
+本轮实测（CPU，2026-09-21）：
+
+- `scripts/tests/immune_llada/` 全量 **385 passed / 20 failed**；20 条失败**全部是既有问题**，
+  用 `git stash` 退回基线代码后逐条复现：17 条是环境缺 `nltk`（`test_tcr_generation_result_io`
+  / `test_tcr_scoring_audit`），3 条是 `test_full_parity` 的 legacy↔canonical 渲染差异，
+  基线同样失败。不是 v2 引入的回归。
+- 其中 v2 专项 **75 passed**（`test_v2_inference_adapters.py` + `test_v2_checkpoint_policy.py`）。
+- 画布布局冒烟：抗体 / TCR 成对样本都得到 `encoder_input_ids=[B,2,168]`、
+  每行槽位 `{heavy:167, light:135}`、`<chainsep>` 唯一。
+
+**⚠️ 两个已知会让训练直接崩的数据缺口（尚未修，需要用户拍板）。** 只读全量审计脚本
+[audit_v2_canvas_data.py](/vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/debug/audit_v2_canvas_data.py)
+已对 `immune_v6_binding_only`（7,381,499 行）与 `immune_v3_heterotypic`（7,997,971 行）
+逐行跑完，报告在 `logs/v2_canvas_data_audit/audit.json`（`status=complete`，
+`code_unchanged_during_scan=true`）：
+
+- **超长受体链**：v6 里 5 行（oas 1 / ots 2 / tcr_repertoire 1 / trait 1）残基数超过定长画布，
+  最极端的是一条 186 残基的 `antibody_heavy` 和一条 148 残基的 `tcr_alpha`。
+  renderer 现在直接 `raise ValueError`，而 renderer 是在 **collator 里**跑的、没有跳过机制，
+  所以这 5 行一旦被采到就会中断训练。
+- **grammar 总长超 1024**：v6 里 train 4,289 行 + valid 286 行超过 `--max_length 1024`，
+  全部在 `asd_antibody`（长抗原 + 现在被补到 167/135 的受体画布）。v3_heterotypic 对应
+  5,008 + 2,033 行。原因是 prepared shards 的 `budget.max_length` 过滤是按**旧的变长**
+  grammar 估的，定长画布把长度抬上去了。collator 同样是 `raise ValueError` 而非丢弃。
+- 两项合计 v6 4,580 行 / 7.38M（0.062%），v3_heterotypic 7,044 行 / 8.0M（0.088%）。
+  `renderer_mapping_issue_rows` 为 0，说明角色映射本身没问题。
+
+其他未做项：
+
+- 尚未创建 v2 的 train job yml，v2 从未做过 GPU 前反向或 smoke 训练，没有 loss 曲线。
+- `tcr_generation_v5`（CDR3-only）与 `tcr_generation` 的 CDR3-only 模式对 v2 checkpoint
+  **主动报错拒绝**——这两条下游评测在 v2 下暂不可用，需要改成 full-length 协议。
+- ESMC 原生 prediction-head 辅助 loss 仍是 follow-up，未实现。
+- `downstream/grammar/tcr_generation.py` 原先被 `.gitignore` 的 `/downstream/grammar/*`
+  规则挡在版本控制外，但它带着 v2 改动、又被 v2 测试 import，本轮已加进 allowlist 并提交。
+
+## 2026-09-19 ASD 去污染对称化与 immune_v6 语料重建
+
+- 问题：v5 run 的 `eval_asd_antibody_loss` 从 0.6359@43k 涨到 0.7413@159k，其余六源只动 +0.001~+0.02。定位到两条原因：切分两侧去污染不对称（去污染名单读的是切分后的 `step6_final/train.csv`，构成循环依赖，见 [decontam_extra.py](/vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/data/tcr_native/decontam_extra.py) 第 52 行），以及非结合样本被当成条件生成的目标。**ASD 没有做序列去重**——它是深度突变扫描库，去重等于删监督信号；按 0.90 对重链聚类会把 buzz 的 89k 行压成 31 簇。
+- 四项改动：抗原长度下限 20 残基（abbd 里那条 14 残基肽 `PDVDLGDISGINAS` 带来的 17,585 行被划出，该短肽是上游原生数据，不是本项目切碎的）；标签不可判定的行直接丢弃（`bool` 解析失败、`fuzzy` 未知分箱、未识别 `affinity_type`、`ic_50` 一律不再猜成 binding）；标签冲突的三元组整组丢弃（原先保留 binding）；切分重建改为**先去污染 → 再删非结合 → 再整簇装箱 90/5/5**，打破循环依赖，脚本 [step6_symmetric.py](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/asd/scripts/step6_symmetric.py)。
+- 行数流水（抗体库）：1,147,962 →（长度下限）1,122,776 →（不可判定）1,056,039 →（冲突整组）926,084 →（去污染）343,620 →（删非结合 88,954）254,666 → train 229,008 / valid 12,842 / holdout 12,816。纳米抗体 128,395 →（去污染 6 行）128,389 → train 115,593 / valid 6,417 / holdout 6,379，本来全是结合数据，binding-only 删 0 行。
+- 删掉的非结合行按来源：buzz 60,250 / covid-19 12,656 / met 12,420 / hiv 3,628。TCR 三源（trait / tcr_native / tcr_papers）不重建语料，由配置里 `recipe.drop_nonbinding_sources` 在加载时删，train 侧合计约 29.6 万行；`tcr_repertoire` 的 210 万行标签是 unknown，不等于非结合，不动。
+- 验证（走真实 loader 与 `build_filters`，未手工复刻键）：去污染名单在 train/valid/holdout 三侧命中率均 0.00%，旧语料对照为 67.23% / 2.99% / 3.12%；三侧 relation 全为 binding，只剩 `budget.max_length` 的正常丢弃。冗余顺带改善：最大那条抗原占比 32.33% → 20.91%，比之前的配额脚本（23.27%）更干净，[step7_cap.py](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/asd/scripts/step7_cap.py) 大概率不再需要。
+- 产物：[step6_symmetric](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/asd/step6_symmetric)（抗体 / 纳米抗体各三侧 csv + stats.json + 聚类缓存）、两份对称去污染名单 `asd_{antibody,nanobody}_symmetric_blocklist.txt`（519,555 / 3 键）、新数据配置 [immune_v6_binding_only.yaml](/vepfs-mlp2/c20250601/251105016/project/dllm_test/configs/data/immune_v6_binding_only.yaml)。与 v5 配置只差三处：ASD 路径、两个名单路径、新增 `recipe` 段。**`step6_final/` 和 v5 配置一行未动**，v5 训练语料可原样回退；备份在 `downstream/asd/backup_20260919/`（613M）。
+- prepared shards 已生成：[immune_v6_binding_only](/vepfs-mlp2/c20250601/251105016/project/dllm_test/data/prepared/immune_v6_binding_only)，13G / 78 个 shard / 7,381,499 行，`validation_report.json` 为 `passed`，与 v5 结构一致。manifest 里 `recipe.drop_nonbinding_sources` 字段已写入。加载时删掉的非结合行：tcr_papers 200,457 / tcr_native 43,742 / trait 20,681，合计 264,880；asd_antibody 删 0（语料重建时已删）。四个目标源的 `labels.relation` 在 train/valid 两侧**全为 binding**（逐行读 shard 核对）；tcr_repertoire 保持 210 万行 `unknown` 未动。与 v5 的 `filter_report.json` 逐源对照：`filter_reasons` 除新增 `recipe.binding_only` 一项外**逐位相同**，oas / ots / tcr_repertoire 保留行数 delta 为 **+0**，证明过滤器没有泄到不应作用的源上。ASD 三侧去污染命中为 0，只剩 `budget.max_length` 的正常丢弃（train 3,095 / valid 291）。
+- 交接时留的 `tcr_papers` 疑点已消：小量 dry run 里该源 `dropped_filters=0`，原因是文件是七个语料拼接的、前缀 100% 是 `tcr_peptide`（已知偏置）；全量跑出现 198,134 行被删，符合预期，不是 bug。
+- 已告知并接受的代价：`relation` 参与 loss，删负样本后 `<nonbinding>` 学不到，[relation 判别基准](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/tcr_binding/run_relation_token.py) 失效；过滤同时作用于 valid 且切分重建，**`eval_loss` 与历史 run 不可横向比**（四件事一起做，只断一次）；patents 占比 26.7% → 37.2%，它是全语料唯一 `confidence=medium`（来自专利声称）且零负样本，等于用冗余下降换标签质量稀释，用户确认不再分层。建议评测按 dataset 拆开报。
+- ASD valid 从 44,866 降到 12,551（语料重建所致，非过滤器），再确认一次 `eval_asd_antibody_loss` 与历史 run 不可横向比。
+- ⚠️ **现阶段只用常规抗体库，纳米抗体不进训练**：上面报的纳米抗体行数（train 115,593 / valid 6,417 / holdout 6,379）是**已构建但未被消费**的产物——`immune_v6_binding_only.yaml`（以及前身 v5）的源列表里只有 `asd_antibody`，没有 `asd_nanobody`，prepared shards 的七个源里也没有它。配置里 `asd_nanobody_benchmark` 那行 blocklist 路径会被读取但永不生效（`build_filters` 只在 `source == asd_nanobody` 时查它）。本轮已在 [asd/README.md](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/asd/README.md) 顶部加了同样的提示，因为那份文档每张表都把两库并列报，容易误认为两边都在训练里。
+- 本地长任务约定（用户要求，2026-09-19）：一律进 tmux，通用 runner [run_in_tmux.sh](/vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/run_in_tmux.sh)。用法 `bash scripts/run_in_tmux.sh <任务名> <命令...>`，日志落 `logs/<任务名>/run.log`，带 `started/done/failed` + `exit_code` 哨兵、`flock` 单实例互斥、`remain-on-exit` 保留 pane、`stdbuf -oL` 解开块缓冲。已冒烟验过正常/失败/同名拒绝/flock 四条路径。本轮 shards 是 `nohup` 跑的（已完成且核对通过，不重跑），后续重跑与本地评测走 runner。
+- ⚠️ TMPDIR 坑：真实值是 `conda/cache/tmp`，**`/vepfs-mlp2/c20250601/251105016/tmp` 并不存在**（本轮启动预处理时误传了后者）。`TMPDIR` 指向不存在的目录时 Python 的 `tempfile` **静默回退到 `/tmp`、不报错**，而 `/` 是 overlay（20G，长期 95% 满，仅剩 1.2G），写量大的任务会把根盘写爆。本次未出事（产物 13G 完整、`validation_report` 为 `passed`、行数与 `filter_report` 对得上），所以不重跑；runner 里已改为 `mkdir -p` 后再断言存在。
+- 未做：新 train job yml 尚未创建（需从 [v5 8gpu spot](/vepfs-mlp2/c20250601/251105016/project/dllm_test/train_jobs/protein_esmc_llada270m_diffusion_immune_v5_8gpu_spot.yml) 复制并改 `PREPARED_DATA_DIR`，不改 v5 的）；重建后的训练与评测未跑，曲线是否走平尚未验证。
 
 ## 2026-09-17 v5 159000 TCR 评测
 

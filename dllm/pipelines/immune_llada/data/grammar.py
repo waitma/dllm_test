@@ -68,15 +68,24 @@ TOKEN_CLASS_PAD = 0
 TOKEN_CLASS_RESIDUE = 1
 TOKEN_CLASS_STRUCTURE = 2
 TOKEN_CLASS_RELATION = 3
+TOKEN_CLASS_CHAIN_EOS = 4
 TOKEN_CLASS_NAMES = {
     TOKEN_CLASS_RESIDUE: "residue",
     TOKEN_CLASS_STRUCTURE: "structure",
     TOKEN_CLASS_RELATION: "relation",
+    TOKEN_CLASS_CHAIN_EOS: "chain_eos",
 }
 
 DEFAULT_GRAMMAR_DATA_DIR = Path(
     "/vepfs-mlp2/c20250601/251105016/project/dllm_test/data/bioseq_grammar_v1"
 )
+
+# Fixed ESMC canvas lengths include the leading <cls>. Decoder slots are the
+# remaining positions and contain residues followed by repeated EOS targets.
+FIXED_HEAVY_ENCODER_LENGTH = 168
+FIXED_LIGHT_ENCODER_LENGTH = 136
+FIXED_HEAVY_DECODER_SLOTS = FIXED_HEAVY_ENCODER_LENGTH - 1
+FIXED_LIGHT_DECODER_SLOTS = FIXED_LIGHT_ENCODER_LENGTH - 1
 
 # Process-local cache: load_from_disk is very slow on multi-million-row grammar shards.
 _GRAMMAR_ARROW_DATASET_CACHE: dict[str, object] = {}
@@ -194,7 +203,7 @@ def _grammar_position_ids(
 
     for token_id, class_id in zip(input_ids, classes):
         token = tokenizer.token(token_id)
-        if class_id == TOKEN_CLASS_RESIDUE:
+        if class_id == TOKEN_CLASS_RESIDUE or class_id == TOKEN_CLASS_CHAIN_EOS:
             position_ids_chain.append(chain_index)
             position_ids_inner.append(inner_index)
             inner_index += 1
@@ -231,6 +240,7 @@ def _build_per_chain_encoder_inputs(
     position_ids_chain: list[int],
     position_ids_inner: list[int],
     tokenizer: GrammarTokenizer,
+    chain_role_map: dict[int, str] | None = None,
 ) -> tuple[list[list[int]], list[list[int]], list[int], list[int]]:
     """Build per-chain ``<cls> seq <eos>`` encoder streams and decoder ``chain_ids``."""
 
@@ -249,7 +259,16 @@ def _build_per_chain_encoder_inputs(
 
     for encoder_index, logical_id in enumerate(sorted_chain_ids):
         residue_tokens = [token_id for _, token_id in sorted(residue_groups[logical_id], key=lambda item: item[0])]
-        encoded_ids, encoded_mask = _encode_chain_from_residue_ids(residue_tokens, tokenizer)
+        fixed_length = None
+        if chain_role_map is not None:
+            role = chain_role_map.get(logical_id)
+            if role == "heavy":
+                fixed_length = FIXED_HEAVY_ENCODER_LENGTH
+            elif role == "light":
+                fixed_length = FIXED_LIGHT_ENCODER_LENGTH
+        encoded_ids, encoded_mask = _encode_chain_from_residue_ids(
+            residue_tokens, tokenizer, fixed_length=fixed_length
+        )
         encoder_chains.append([int(token_id) for token_id in encoded_ids])
         encoder_residue_masks.append([int(value) for value in encoded_mask])
         logical_to_encoder[logical_id] = encoder_index
@@ -259,6 +278,12 @@ def _build_per_chain_encoder_inputs(
     for index, (class_id, chain_id, inner_id) in enumerate(
         zip(classes, position_ids_chain, position_ids_inner)
     ):
+        if class_id == TOKEN_CLASS_CHAIN_EOS and chain_id >= 0:
+            encoder_chain = logical_to_encoder.get(chain_id)
+            if encoder_chain is not None:
+                decoder_chain_ids[index] = encoder_chain
+                decoder_inner_ids[index] = inner_id
+            continue
         if class_id != TOKEN_CLASS_RESIDUE or chain_id < 0:
             continue
         encoder_chain = logical_to_encoder.get(chain_id)
@@ -310,6 +335,7 @@ def _residue_ids_to_sequence(residue_ids: list[int], tokenizer: GrammarTokenizer
 def _encode_chain_from_residue_ids(
     residue_ids: list[int],
     tokenizer: GrammarTokenizer,
+    fixed_length: int | None = None,
 ) -> tuple[list[int], list[int]]:
     """Wrap decoder residue ids as ``<cls> residues <eos>`` for the encoder.
 
@@ -324,6 +350,14 @@ def _encode_chain_from_residue_ids(
     residue_token_ids = [int(token_id) for token_id in residue_ids]
     encoded_ids = [int(base.cls_token_id)] + residue_token_ids + [int(base.eos_token_id)]
     encoded_mask = [0] + [1] * len(residue_token_ids) + [0]
+    if fixed_length is not None:
+        if len(encoded_ids) > fixed_length:
+            raise ValueError(
+                f"chain has {len(residue_token_ids)} residues, exceeding fixed encoder canvas {fixed_length}"
+            )
+        extra = fixed_length - len(encoded_ids)
+        encoded_ids += [int(base.eos_token_id)] * extra
+        encoded_mask += [0] * extra
     return encoded_ids, encoded_mask
 
 
@@ -334,6 +368,8 @@ class GrammarRenderer:
     tokenizer: GrammarTokenizer
     ppi_max_protein_length: int = 1024
     rng: random.Random | None = None
+
+    fixed_receptor_lengths: bool = False
 
     def encode(self, record: BioSeqRecord) -> dict[str, Any]:
         if self.ppi_max_protein_length > 0 and not record_within_max_protein_length(
@@ -349,6 +385,17 @@ class GrammarRenderer:
         synthetic_residue: list[int] = []
         relation_target: list[int] = []
         separator_id = self.tokenizer.chain_separator_id()
+
+        chain_role_map: dict[int, str] = {}
+        next_chain_index = 0
+
+        def _receptor_role(role: str) -> str | None:
+            normalized = str(role).strip().lower()
+            if normalized in {"antibody_heavy", "tcr_beta", "nanobody_vhh"}:
+                return "heavy"
+            if normalized in {"antibody_light", "tcr_alpha"}:
+                return "light"
+            return None
 
         def special(token: str, is_fixed: bool = False, relation_target_token: bool = False) -> None:
             ids.append(self.tokenizer.special_id(token))
@@ -371,9 +418,28 @@ class GrammarRenderer:
             is_fixed: bool = False,
             cap: int | None = None,
             synthetic_mask: list[int] | None = None,
+            chain_role: str | None = None,
         ) -> None:
+            nonlocal next_chain_index
             normalized = sequence_value[:cap] if cap is not None else sequence_value
             residue_ids = self.tokenizer.encode_residues(normalized)
+            role = _receptor_role(chain_role or "")
+            fixed_slots = None
+            if self.fixed_receptor_lengths and role == "heavy":
+                fixed_slots = FIXED_HEAVY_DECODER_SLOTS
+            elif self.fixed_receptor_lengths and role == "light":
+                fixed_slots = FIXED_LIGHT_DECODER_SLOTS
+            if fixed_slots is not None:
+                if len(residue_ids) >= fixed_slots:
+                    raise ValueError(
+                        f"{chain_role} chain has {len(residue_ids)} residues; "
+                        f"fixed decoder canvas {fixed_slots} requires one EOS slot"
+                    )
+                chain_role_map[next_chain_index] = role
+            else:
+                chain_role_map[next_chain_index] = role or "context"
+            next_chain_index += 1
+
             ids.extend(residue_ids)
             fixed.extend([int(is_fixed)] * len(residue_ids))
             classes.extend([TOKEN_CLASS_RESIDUE] * len(residue_ids))
@@ -382,6 +448,15 @@ class GrammarRenderer:
             else:
                 synthetic_residue.extend([int(value) for value in synthetic_mask[: len(residue_ids)]])
             relation_target.extend([0] * len(residue_ids))
+
+            if fixed_slots is not None:
+                eos_count = fixed_slots - len(residue_ids)
+                ids.extend([self.tokenizer.eos_token_id] * eos_count)
+                fixed.extend([int(is_fixed)] * eos_count)
+                classes.extend([TOKEN_CLASS_CHAIN_EOS] * eos_count)
+                # A completed synthetic chain has no observed termination label.
+                synthetic_residue.extend([int(bool(synthetic_mask and any(synthetic_mask)))] * eos_count)
+                relation_target.extend([0] * eos_count)
 
         def append_protein_block(
             chains: list[BioSeqChain],
@@ -405,6 +480,14 @@ class GrammarRenderer:
                     is_fixed=is_fixed,
                     cap=cap,
                     synthetic_mask=chain.metadata.get("synthetic_residue_mask"),
+                    chain_role=(
+                        chain.role if _receptor_role(chain.role) is not None
+                        else ("antibody_heavy" if chain_index == 0 else "antibody_light")
+                        if type_marker == "<ab>" and len(chains) == 2
+                        else ("tcr_beta" if chain_index == 0 else "tcr_alpha")
+                        if type_marker == "<tcr>" and len(chains) == 2
+                        else chain.role
+                    ),
                 )
             special("<protd>", is_fixed=is_fixed)
 
@@ -595,6 +678,9 @@ class GrammarRenderer:
             "token_class_ids": classes,
             "position_ids_chain": position_ids_chain,
             "position_ids_inner": position_ids_inner,
+            "fixed_receptor_lengths": self.fixed_receptor_lengths,
+            "chain_role_map": chain_role_map,
+            "chain_eos_mask": [int(value == TOKEN_CLASS_CHAIN_EOS) for value in classes],
             "task_type": record.task_type,
             "source": record.source,
             "grammar_name": grammar_name,
@@ -732,15 +818,22 @@ class GrammarBioSeqCollator:
     max_sequence_length: int = 2112
     max_protein_length: int = DEFAULT_MAX_PROTEIN_LENGTH
     task_type_to_id: dict[str, int] = field(default_factory=lambda: dict(TASK_TYPE_TO_ID))
+    fixed_receptor_lengths: bool = False
 
     def __post_init__(self) -> None:
-        self.renderer = GrammarRenderer(self.tokenizer, ppi_max_protein_length=self.max_protein_length)
+        self.renderer = GrammarRenderer(
+            self.tokenizer,
+            ppi_max_protein_length=self.max_protein_length,
+            fixed_receptor_lengths=self.fixed_receptor_lengths,
+        )
 
     def __call__(self, records: list[BioSeqRecord | dict[str, Any]]) -> dict[str, Any]:
         rows = [
             record if isinstance(record, dict) and "input_ids" in record else self.renderer.encode(record)
             for record in records
         ]
+        if any(bool(row.get("fixed_receptor_lengths", False)) != self.fixed_receptor_lengths for row in rows):
+            raise ValueError("Rendered row canvas policy does not match collator; re-render semantic records")
         lengths = [len(row["input_ids"]) for row in rows]
         if max(lengths) > self.max_sequence_length:
             raise ValueError(
@@ -767,6 +860,8 @@ class GrammarBioSeqCollator:
                 "position_ids_inner",
                 "position_ids_chain",
                 "chain_ids",
+                "chain_eos_mask",
+                "chain_slot_mask",
             )
         }
         encoder_ids: list[list[list[int]]] = []
@@ -781,12 +876,14 @@ class GrammarBioSeqCollator:
             pad_len = max_len - len(input_ids)
             position_ids_chain = list(row["position_ids_chain"])
             position_ids_inner = list(row["position_ids_inner"])
+            chain_role_map = row.get("chain_role_map") if self.fixed_receptor_lengths else None
             chain_enc, chain_residue_masks, decoder_chain_ids, decoder_inner_ids = _build_per_chain_encoder_inputs(
                 input_ids,
                 classes,
                 position_ids_chain,
                 position_ids_inner,
                 self.tokenizer,
+                chain_role_map=chain_role_map,
             )
 
             batch["input_ids"].append(input_ids + [pad_id] * pad_len)
@@ -813,6 +910,13 @@ class GrammarBioSeqCollator:
             batch["token_class_ids"].append(classes + [TOKEN_CLASS_PAD] * pad_len)
             batch["position_ids_inner"].append(decoder_inner_ids + [-1] * pad_len)
             batch["position_ids_chain"].append(position_ids_chain + [-1] * pad_len)
+            batch["chain_eos_mask"].append(
+                list(row.get("chain_eos_mask", [0] * len(input_ids))) + [0] * pad_len
+            )
+            batch["chain_slot_mask"].append(
+                [int(class_id in {TOKEN_CLASS_RESIDUE, TOKEN_CLASS_CHAIN_EOS}) for class_id in classes]
+                + [0] * pad_len
+            )
             batch["chain_ids"].append(decoder_chain_ids + [-1] * pad_len)
 
             max_chain_len = max((len(chain) for chain in chain_enc), default=2)
@@ -871,6 +975,8 @@ class GrammarBioSeqCollator:
             "relation_token_mask",
             "relation_target_mask",
             "synthetic_residue_mask",
+            "chain_eos_mask",
+            "chain_slot_mask",
         ):
             result[key] = result[key].bool()
         result["task_type_ids"] = torch.tensor(
@@ -881,6 +987,16 @@ class GrammarBioSeqCollator:
         result["encoder_attention_mask"] = torch.tensor(padded_encoder_attention, dtype=torch.bool)
         result["encoder_residue_mask"] = torch.tensor(padded_encoder_residue, dtype=torch.bool)
         result["encoder_chain_mask"] = torch.tensor(padded_encoder_chain_mask, dtype=torch.bool)
+        if self.fixed_receptor_lengths:
+            # Map every decoder canvas slot, including EOS, independently of the
+            # clean sequence length. Context chains exclude their terminal EOS.
+            slots = torch.zeros_like(result["encoder_attention_mask"])
+            valid = result["chain_ids"].ge(0) & result["position_ids_inner"].ge(0)
+            rows_index = torch.arange(len(rows)).unsqueeze(1).expand_as(valid)
+            safe_chain = result["chain_ids"].clamp(min=0, max=slots.shape[1] - 1)
+            safe_inner = result["position_ids_inner"].clamp(min=0, max=slots.shape[2] - 2)
+            slots[rows_index[valid], safe_chain[valid], safe_inner[valid] + 1] = True
+            result["encoder_slot_mask"] = slots
         result["grammar_names"] = [str(row["grammar_name"]) for row in rows]
         result["view_names"] = ["grammar_v2"] * len(rows)
         result["task_groups"] = [str(row["task_type"]) for row in rows]

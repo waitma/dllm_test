@@ -18,9 +18,14 @@ from dllm.pipelines.qwen3_vl_arch.sampling_bioseq import resolve_partial_mask
 ChainRole = Literal["heavy", "light"]
 
 
-def _target_chain_index(position_ids_chain: torch.Tensor, chain: ChainRole) -> int:
-    """Resolve logical chain index for heavy/light in v2 records."""
+def _target_chain_index(
+    position_ids_chain: torch.Tensor,
+    chain: ChainRole | int,
+) -> int:
+    """Resolve a logical chain index, retaining the legacy heavy/light rules."""
 
+    if isinstance(chain, int):
+        return int(chain)
     unique = sorted(
         {
             int(value)
@@ -34,43 +39,27 @@ def _target_chain_index(position_ids_chain: torch.Tensor, chain: ChainRole) -> i
     return unique[-1]
 
 
-def chain_residue_positions(
+def _legacy_chain_residue_positions(
     input_ids: torch.Tensor,
     attention_mask: torch.Tensor,
     residue_mask: torch.Tensor,
     tokenizer: GrammarTokenizer,
-    chain: ChainRole,
-    *,
-    position_ids_chain: torch.Tensor | None = None,
+    chain: ChainRole | int,
 ) -> list[list[int]]:
-    """Map each batch row to residue token indices for one chain (heavy or light)."""
+    """Parse legacy streams that predate position IDs on every slot."""
 
     batch_positions: list[list[int]] = []
     for row in range(input_ids.size(0)):
         positions: list[int] = []
-        if position_ids_chain is not None:
-            target_index = _target_chain_index(position_ids_chain[row], chain)
-            for col in range(input_ids.size(1)):
-                if not attention_mask[row, col]:
-                    continue
-                if not residue_mask[row, col]:
-                    continue
-                if int(position_ids_chain[row, col].item()) == target_index:
-                    positions.append(col)
-            batch_positions.append(positions)
-            continue
-
         prots_id = tokenizer.special_id("<prots>")
         protd_id = tokenizer.special_id("<protd>")
         dot_id = tokenizer.chain_separator_id()
-        type_marker_ids = {tokenizer.special_id(token) for token in ("<ab>", "<tcr>", "<nb>", "<pep>")}
-        # The fixed no-context prefix renders as a residue-free
-        # <prots> <null> <protd> block. Skip its marker, and on its closing
-        # <protd> keep scanning rather than breaking: bailing out there would
-        # return zero positions for every unconditional record.
+        type_marker_ids = {
+            tokenizer.special_id(token) for token in ("<ab>", "<tcr>", "<nb>", "<pep>")
+        }
         skip_marker_ids = set(type_marker_ids)
         skip_marker_ids.add(tokenizer.special_id(GRAMMAR_NULL_CONTEXT_TOKEN))
-        target_span = 0 if chain == "heavy" else 1
+        target_span = int(chain) if isinstance(chain, int) else (0 if chain == "heavy" else 1)
         in_prots_block = False
         block_has_residues = False
         current_span = -1
@@ -103,19 +92,151 @@ def chain_residue_positions(
     return batch_positions
 
 
+def chain_residue_positions(
+    input_ids: torch.Tensor,
+    attention_mask: torch.Tensor,
+    residue_mask: torch.Tensor,
+    tokenizer: GrammarTokenizer,
+    chain: ChainRole | int,
+    *,
+    position_ids_chain: torch.Tensor | None = None,
+) -> list[list[int]]:
+    """Map each batch row to amino-acid token indices for one chain.
+
+    EOS slots are deliberately excluded. Use :func:`chain_slot_positions` for
+    full-chain inference masks, where EOS is a generated slot rather than an
+    amino-acid encoder residue.
+    """
+
+    batch_positions: list[list[int]] = []
+    for row in range(input_ids.size(0)):
+        positions: list[int] = []
+        if position_ids_chain is not None:
+            target_index = _target_chain_index(position_ids_chain[row], chain)
+            for col in range(input_ids.size(1)):
+                if not attention_mask[row, col]:
+                    continue
+                if not residue_mask[row, col]:
+                    continue
+                if int(position_ids_chain[row, col].item()) == target_index:
+                    positions.append(col)
+            batch_positions.append(positions)
+        else:
+            batch_positions.append(
+                _legacy_chain_residue_positions(
+                    input_ids[row : row + 1],
+                    attention_mask[row : row + 1],
+                    residue_mask[row : row + 1],
+                    tokenizer,
+                    chain,
+                )[0]
+            )
+    return batch_positions
+
+
+def chain_slot_positions(
+    input_ids: torch.Tensor,
+    attention_mask: torch.Tensor,
+    chain_slot_mask: torch.Tensor | None,
+    tokenizer: GrammarTokenizer,
+    chain: ChainRole | int,
+    *,
+    position_ids_chain: torch.Tensor | None = None,
+    residue_mask: torch.Tensor | None = None,
+) -> list[list[int]]:
+    """Map rows to all decoder slots for one chain, including decoder EOS.
+
+    ``chain_slot_mask`` is the inference canvas: unlike ``chain_eos_mask`` it is
+    independent of the clean target and remains valid after generation changes
+    token values. The fallback is intentionally residue-only for legacy batches.
+    """
+
+    attention_mask = attention_mask.bool()
+    if chain_slot_mask is None:
+        if residue_mask is None:
+            raise ValueError("residue_mask is required when chain_slot_mask is absent")
+        return chain_residue_positions(
+            input_ids,
+            attention_mask,
+            residue_mask.bool(),
+            tokenizer,
+            chain,
+            position_ids_chain=position_ids_chain,
+        )
+
+    slots = chain_slot_mask.bool()
+    if position_ids_chain is not None:
+        result: list[list[int]] = []
+        for row in range(input_ids.size(0)):
+            target_index = _target_chain_index(position_ids_chain[row], chain)
+            result.append(
+                [
+                    col
+                    for col in range(input_ids.size(1))
+                    if attention_mask[row, col]
+                    and slots[row, col]
+                    and int(position_ids_chain[row, col].item()) == target_index
+                ]
+            )
+        return result
+
+    # Without position IDs, parse the fixed grammar delimiters while selecting
+    # all slots, not clean residues or token-value-dependent EOS positions.
+    return _legacy_chain_residue_positions(
+        input_ids, attention_mask, slots, tokenizer, chain
+    )
+
+
+def chain_slot_positions_by_chain(
+    batch: dict[str, torch.Tensor],
+) -> list[dict[int, list[int]]]:
+    """Return all attention-visible decoder slots grouped by chain index."""
+
+    attention = batch["attention_mask"].bool()
+    slots = batch.get("chain_slot_mask")
+    if slots is None:
+        slots = batch.get("residue_mask")
+    if slots is None:
+        raise KeyError("batch requires chain_slot_mask or residue_mask")
+    chain = batch.get("position_ids_chain", batch.get("chain_ids"))
+    if chain is None:
+        raise KeyError("batch requires position_ids_chain or chain_ids")
+    rows: list[dict[int, list[int]]] = []
+    for row in range(chain.size(0)):
+        by_chain: dict[int, list[int]] = {}
+        for col in range(chain.size(1)):
+            if not attention[row, col] or not slots[row, col]:
+                continue
+            idx = int(chain[row, col].item())
+            if idx >= 0:
+                by_chain.setdefault(idx, []).append(col)
+        rows.append(by_chain)
+    return rows
+
+
 def light_chain_generation_partial_mask(
     batch: dict[str, torch.Tensor],
     tokenizer: GrammarTokenizer,
     *,
     prompt_residues: int = 0,
 ) -> torch.Tensor:
-    """Keep heavy chain, structure, relation, and fixed context visible."""
+    """Generate every light-chain decoder slot, retaining only the prompt."""
 
     input_ids = batch["input_ids"]
     attention = batch["attention_mask"].bool()
     residue = batch["residue_mask"].bool()
+    slots = batch.get("chain_slot_mask")
     partial = attention.clone()
-    light_positions = chain_residue_positions(
+    light_slots = chain_slot_positions(
+        input_ids,
+        attention,
+        slots,
+        tokenizer,
+        chain="light",
+        position_ids_chain=batch.get("position_ids_chain"),
+        residue_mask=residue,
+    )
+    light_residues = chain_residue_positions(
         input_ids,
         attention,
         residue,
@@ -124,11 +245,11 @@ def light_chain_generation_partial_mask(
         position_ids_chain=batch.get("position_ids_chain"),
     )
     prompt_residues = max(int(prompt_residues), 0)
-    for row, positions in enumerate(light_positions):
+    for row, positions in enumerate(light_slots):
+        partial[row, positions] = False
+        prompt = set(light_residues[row][:prompt_residues])
         for position in positions:
-            partial[row, position] = False
-        if prompt_residues > 0:
-            for position in positions[:prompt_residues]:
+            if position in prompt:
                 partial[row, position] = True
     return resolve_partial_mask(batch, partial)
 
@@ -172,20 +293,13 @@ def cdr_generation_partial_mask(
 def residue_positions_by_chain(
     batch: dict[str, torch.Tensor],
 ) -> list[dict[int, list[int]]]:
-    """Per row, map each rendered chain index -> its residue token columns.
-
-    Chain indices follow ``position_ids_chain`` from the grammar renderer, which
-    numbers residue chains 0,1,2,... in render order. TCR records render as:
-      * ``[tcr_beta]``                 -> beta = chain 0
-      * ``[antigen, tcr_beta]``        -> antigen = 0, beta = 1
-      * ``[antigen, tcr_alpha, beta]`` -> antigen = 0, alpha = 1, beta = 2
-      * ``[tcr_alpha, tcr_beta]``      -> alpha = 0, beta = 1
-    so the caller (which builds the records) knows the target index deterministically.
-    """
+    """Per row, map each rendered chain index to amino-acid token columns."""
 
     attention = batch["attention_mask"].bool()
     residue = batch["residue_mask"].bool()
-    chain = batch["position_ids_chain"]
+    chain = batch.get("position_ids_chain", batch.get("chain_ids"))
+    if chain is None:
+        raise KeyError("batch requires position_ids_chain or chain_ids")
     rows: list[dict[int, list[int]]] = []
     for row in range(chain.size(0)):
         by_chain: dict[int, list[int]] = {}
@@ -206,13 +320,7 @@ def tcr_generation_partial_mask(
     *,
     prompt_residues: int = 0,
 ) -> torch.Tensor:
-    """Mask (generate) the residues of the given TCR chain index/indices.
-
-    Everything else -- structure tokens, relation tokens, fixed context (e.g. a
-    conditioning epitope / MHC), and all non-target chains -- stays visible.
-    ``prompt_residues`` keeps that many leading residues of each target chain
-    visible (e.g. a fixed ``C`` anchor for CDR3b).
-    """
+    """Generate all slots of the target TCR chains, including decoder EOS."""
 
     if isinstance(target_chain_indices, int):
         targets = {target_chain_indices}
@@ -222,13 +330,16 @@ def tcr_generation_partial_mask(
     attention = batch["attention_mask"].bool()
     partial = attention.clone()
     prompt_residues = max(int(prompt_residues), 0)
-    for row, by_chain in enumerate(residue_positions_by_chain(batch)):
+    by_chain = chain_slot_positions_by_chain(batch)
+    residues_by_chain = residue_positions_by_chain(batch)
+    for row, slots in enumerate(by_chain):
         for idx in targets:
-            positions = by_chain.get(idx, [])
+            positions = slots.get(idx, [])
             for position in positions:
                 partial[row, position] = False
-            if prompt_residues > 0:
-                for position in positions[:prompt_residues]:
+            prompt = set(residues_by_chain[row].get(idx, [])[:prompt_residues])
+            for position in positions:
+                if position in prompt:
                     partial[row, position] = True
     return resolve_partial_mask(batch, partial)
 
@@ -238,16 +349,7 @@ def cdr3b_span_partial_mask(
     chain_index: int,
     span: tuple[int, int] | list[tuple[int, int]],
 ) -> torch.Tensor:
-    """Mask a residue span ``[start, end)`` within one TCR chain (infill style).
-
-    ``span`` is measured in within-chain residue coordinates (0-based). Use for
-    CDR3b infilling inside a full-length beta chain while keeping the framework
-    and (optionally) the epitope/MHC context fixed.
-
-    Pass a single tuple to apply the same span to every row, or a list of one
-    tuple per row when the rows differ in length (e.g. a centred window whose
-    offset depends on each sequence's own length).
-    """
+    """Mask a residue span ``[start, end)`` within one TCR chain (infill style)."""
 
     attention = batch["attention_mask"].bool()
     partial = attention.clone()
@@ -257,9 +359,7 @@ def cdr3b_span_partial_mask(
     else:
         spans = list(span)
         if len(spans) != len(rows):
-            raise ValueError(
-                f"got {len(spans)} spans for {len(rows)} batch rows"
-            )
+            raise ValueError(f"got {len(spans)} spans for {len(rows)} batch rows")
     for row, by_chain in enumerate(rows):
         positions = by_chain.get(int(chain_index), [])
         start, end = spans[row]
@@ -300,12 +400,7 @@ def framework_generation_partial_mask(
     *,
     light_keep_c_terminal: int = 3,
 ) -> torch.Tensor:
-    """Mask FR residues on heavy+light; keep CDRs (and optional light C-term) visible.
-
-    Matches the Ophiuchus-Ab / AirGen humanization protocol: regenerate framework
-    while preserving CDR identity, and keep the last ``light_keep_c_terminal``
-    light-chain Fv residues native.
-    """
+    """Mask FR residues on heavy+light; keep CDRs (and optional light C-term) visible."""
 
     attention = batch["attention_mask"].bool()
     residue = batch["residue_mask"].bool()

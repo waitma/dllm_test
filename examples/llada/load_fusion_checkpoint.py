@@ -50,6 +50,69 @@ def fusion_weight_file(path: str | Path) -> Path:
     return resolve_fusion_dir(path) / "model.safetensors"
 
 
+_FIXED_POLICY_CONSTANTS = {
+    "fixed_heavy_encoder_length": 168,
+    "fixed_light_encoder_length": 136,
+    "fixed_heavy_decoder_slots": 167,
+    "fixed_light_decoder_slots": 135,
+    "fixed_heavy_residue_max": 166,
+    "fixed_light_residue_max": 134,
+}
+
+
+def _read_fusion_policy(config: dict[str, Any], checkpoint_dir: Path) -> dict[str, Any]:
+    """Normalize sidecar metadata, retaining sidecar-less legacy defaults."""
+
+    fixed = bool(config.get("fixed_receptor_lengths", False))
+    for key, expected in _FIXED_POLICY_CONSTANTS.items():
+        if key in config and int(config[key]) != expected:
+            raise ValueError(
+                f"fusion checkpoint has incompatible {key}={config[key]!r}; "
+                f"expected {expected}: {checkpoint_dir}"
+            )
+        if fixed and key not in config:
+            raise ValueError(
+                f"fixed-canvas checkpoint is missing {key}: {checkpoint_dir}"
+            )
+
+    predict_eos = bool(config.get("predict_eos", False))
+    if fixed and not predict_eos:
+        raise ValueError(
+            f"fixed-canvas checkpoint must enable predict_eos: {checkpoint_dir}"
+        )
+    if not fixed and predict_eos:
+        raise ValueError(
+            f"legacy checkpoint cannot enable predict_eos without fixed_receptor_lengths: {checkpoint_dir}"
+        )
+
+    eos_id = config.get("decoder_chain_eos_token_id")
+    eos_policy = config.get("decoder_chain_eos_policy")
+    if fixed and (eos_id is None or eos_policy is None):
+        raise ValueError(
+            "fixed-canvas checkpoint is missing decoder_chain_eos_token_id/policy: "
+            f"{checkpoint_dir}"
+        )
+
+    residue_cond_mode = str(config.get("residue_cond_mode", "add"))
+    if fixed and residue_cond_mode != "add":
+        raise ValueError(
+            "fixed-canvas checkpoint must use residue_cond_mode='add': "
+            f"{checkpoint_dir}"
+        )
+    return {
+        "fixed_receptor_lengths": fixed,
+        "predict_eos": predict_eos,
+        "decoder_chain_eos_token_id": (
+            None if eos_id is None else int(eos_id)
+        ),
+        "decoder_chain_eos_policy": (
+            None if eos_policy is None else str(eos_policy)
+        ),
+        "condition_norm": bool(config.get("condition_norm", True)),
+        "residue_cond_mode": residue_cond_mode,
+    }
+
+
 @dataclass
 class FusionEvalBundle:
     """Everything downstream eval needs for a fusion checkpoint."""
@@ -221,8 +284,10 @@ def load_fusion_for_eval(
         RemapCollator,
         RESIDUES,
         build_remap_lookup,
+        build_inverse_remap,
         decoder_mask_token_id,
         expand_llada_tokenizer_for_esmc_grammar,
+        load_fusion_config,
     )
 
     ckpt_dir = resolve_fusion_dir(checkpoint)
@@ -236,6 +301,15 @@ def load_fusion_for_eval(
         if not torch.cuda.is_available():
             device = "cpu"
     device = torch.device(device)
+
+    config = load_fusion_config(ckpt_dir)
+    policy = _read_fusion_policy(config, ckpt_dir)
+    fixed_receptor_lengths = bool(policy["fixed_receptor_lengths"])
+    saved_eos_id = policy["decoder_chain_eos_token_id"]
+    saved_eos_policy = policy["decoder_chain_eos_policy"]
+    condition_norm = bool(policy["condition_norm"])
+    residue_cond_mode = str(policy["residue_cond_mode"])
+    allow_chain_eos_token = fixed_receptor_lengths or saved_eos_policy == "chain_eos"
 
     shape = _infer_decoder_shape(weights)
     logger.info(
@@ -261,9 +335,27 @@ def load_fusion_for_eval(
         esmc_dir, local_files_only=True
     )
     gtok = GrammarTokenizer(base_esmc)
-    remap, n_added = expand_llada_tokenizer_for_esmc_grammar(llada_tok, gtok)
+    remap, n_added = expand_llada_tokenizer_for_esmc_grammar(
+        llada_tok, gtok, allow_chain_eos_token=allow_chain_eos_token
+    )
     lookup = build_remap_lookup(remap)
-    logger.info("Fusion tokenizer remap covers %d ids (added %d)", len(remap), n_added)
+    actual_eos_id = int(getattr(llada_tok, "_fusion_decoder_chain_eos_token_id"))
+    actual_eos_policy = str(getattr(llada_tok, "_fusion_decoder_chain_eos_policy"))
+    if saved_eos_id is not None and actual_eos_id != int(saved_eos_id):
+        raise ValueError(
+            "decoder chain EOS id mismatch between checkpoint sidecar and tokenizer: "
+            f"sidecar={saved_eos_id}, tokenizer={actual_eos_id}"
+        )
+    if saved_eos_policy is not None and actual_eos_policy != str(saved_eos_policy):
+        raise ValueError(
+            "decoder chain EOS policy mismatch between checkpoint sidecar and tokenizer: "
+            f"sidecar={saved_eos_policy!r}, tokenizer={actual_eos_policy!r}"
+        )
+    if fixed_receptor_lengths and actual_eos_policy == "legacy_eos_alias":
+        raise ValueError(
+            "fixed-canvas checkpoint resolves chain EOS through the legacy pad/EOS "
+            f"alias instead of a safe policy: {ckpt_dir}"
+        )
 
     decoder = _build_empty_decoder(shape, torch_dtype, init_device=str(device))
     embed_rows = int(decoder.get_input_embeddings().weight.shape[0])
@@ -285,11 +377,16 @@ def load_fusion_for_eval(
         encoder_hidden_size=encoder_hidden,
         decoder_mask_token_id=decoder_mask_token_id(llada_tok),
         encoder_mask_token_id=int(gtok.mask_token_id),
-        residue_cond_mode="add",
-        condition_norm=True,
+        residue_cond_mode=residue_cond_mode,
+        condition_norm=condition_norm,
         freeze_encoder=True,
         train_objective="diffusion",
         residue_token_ids=residue_token_ids,
+        fixed_receptor_lengths=fixed_receptor_lengths,
+        predict_eos=bool(policy["predict_eos"]),
+        decoder_chain_eos_token_id=(
+            actual_eos_id if fixed_receptor_lengths else None
+        ),
     )
     model = model.to(dtype=torch_dtype)
 
@@ -313,12 +410,16 @@ def load_fusion_for_eval(
             missing[:12],
         )
 
-    inv_size = max(int(lookup.max().item()) + 1, embed_rows)
-    inverse = torch.full((inv_size,), -1, dtype=torch.long)
-    for grammar_id, llada_id in remap.items():
-        lid = int(llada_id)
-        if 0 <= lid < inv_size:
-            inverse[lid] = int(grammar_id)
+    inverse = build_inverse_remap(
+        remap,
+        # In legacy checkpoints native pad and EOS may alias. Preserve the
+        # historical inverse mapping by preferring grammar pad; v2 has a
+        # dedicated chain-EOS id and therefore has no such collision.
+        preferred_source_ids=(int(gtok.pad_token_id),)
+        if not fixed_receptor_lengths
+        else (),
+        size=embed_rows,
+    )
     model.register_buffer("llada_to_grammar_ids", inverse, persistent=False)
 
     model.eval()
@@ -330,6 +431,7 @@ def load_fusion_for_eval(
         tokenizer=gtok,
         max_sequence_length=int(max_length),
         max_protein_length=int(max_length),
+        fixed_receptor_lengths=fixed_receptor_lengths,
     )
     collator = RemapCollator(base_collator, lookup)
 
@@ -342,5 +444,5 @@ def load_fusion_for_eval(
         d_model=int(shape["d_model"]),
         n_layers=int(shape["n_layers"]),
         encoder_hidden=int(encoder_hidden),
-        residue_cond_mode="add",
+        residue_cond_mode=residue_cond_mode,
     )

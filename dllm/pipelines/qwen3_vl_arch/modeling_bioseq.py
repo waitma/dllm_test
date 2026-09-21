@@ -66,6 +66,7 @@ class BioSeqDiffusionTransformerConfig:
     pad_token_id: int = 1
     mask_token_id: int = 32
     forbidden_target_token_ids: tuple[int, ...] | None = None
+    predict_eos: bool = False
     qk_norm: bool = False
     time_epsilon: float = 1e-3
     loss_norm: str = "token"
@@ -378,7 +379,7 @@ def sample_bioseq_diffusion_noise(
         labels = input_ids.masked_fill(~corruption_mask, -100)  # targets only at masked sites [B,S]
         return noised_input_ids, labels, corruption_mask, timesteps
 
-    residue_mask = batch.get("residue_mask")
+    residue_mask = batch.get("chain_slot_mask", batch.get("residue_mask")) if "encoder_slot_mask" in batch else batch.get("residue_mask")
     residue_eligible = (
         eligible_mask & residue_mask.bool()
         if residue_mask is not None
@@ -514,6 +515,8 @@ def sample_chain_conditioned_timesteps(
     # Chain roles are defined on generated residues only.
     role_eligible = _diffusion_eligible_mask(batch, require_residue=True)
     eligible = _diffusion_eligible_mask(batch, require_residue=False)
+    if "encoder_slot_mask" in batch:
+        role_eligible = eligible & batch["chain_slot_mask"].bool()
 
     chain_ids = batch.get("chain_ids")
     heavy_mask = torch.zeros(batch_size, seq_len, dtype=torch.bool, device=device)
@@ -688,7 +691,9 @@ def apply_decoder_values_to_encoder(
         noised_encoder_input_ids[batch_index[valid], 0, encoder_position_ids[valid]] = values
         return noised_encoder_input_ids
 
-    encoder_residue_mask = batch["encoder_residue_mask"]
+    # v2 mirrors AA and EOS canvas slots; never infer this mapping from clean
+    # residue counts, which would reveal the hidden sequence length.
+    encoder_residue_mask = batch.get("encoder_slot_mask", batch["encoder_residue_mask"])
     chain_ids = batch["chain_ids"]
     position_ids_inner = batch["position_ids_inner"]
 
@@ -731,10 +736,11 @@ def forbidden_diffusion_target_token_ids(config: BioSeqDiffusionTransformerConfi
     forbidden = {
         0,  # <cls>
         int(config.pad_token_id),
-        2,  # <eos>
         3,  # <unk>
         int(config.mask_token_id),
     }
+    if not bool(getattr(config, "predict_eos", False)):
+        forbidden.add(2)
     return tuple(sorted(token_id for token_id in forbidden if 0 <= token_id < config.vocab_size))
 
 

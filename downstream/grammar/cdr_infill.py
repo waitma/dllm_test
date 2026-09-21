@@ -1,4 +1,7 @@
-"""CDR infilling eval adapter for grammar-v1 BioSeq models."""
+"""CDR infilling eval adapter for grammar BioSeq / LLaDA-fusion models.
+
+Run: python -m downstream.grammar.cdr_infill --smoke --device cpu
+"""
 
 from __future__ import annotations
 
@@ -22,6 +25,7 @@ from downstream.grammar.common import (
     build_eval_collator,
     build_grammar_collator,
     build_grammar_tokenizer,
+    labels_to_grammar,
     load_grammar_checkpoint,
     load_untrained_no_encoder,
     run_grammar_generate,
@@ -125,13 +129,13 @@ def evaluate_record(
     target_subsequence: str | None = None,
 ) -> float:
     tokenizer = build_grammar_tokenizer()
-    collator = build_grammar_collator(tokenizer)
+    collator = build_eval_collator(model, tokenizer)
     chain_role, cdr_name = _chain_role_for_mode(mode)
     record = antibody_pair_record(heavy, light)
     batch = collator([record])
     batch = {key: value.to(device) if torch.is_tensor(value) else value for key, value in batch.items()}
     partial_mask = _build_cdr_partial_mask(batch, tokenizer, record, chain_role, cdr_name, target_subsequence)
-    labels = batch["labels"]
+    labels = labels_to_grammar(model, batch["labels"])
     generation_mask = partial_mask.logical_not() & batch["attention_mask"] & batch["residue_mask"]
     output_tokens, _ = run_grammar_generate(
         model,
@@ -166,7 +170,7 @@ def smoke_eval(device: str = "cpu") -> float:
     batch = build_grammar_collator(tokenizer)([record])
     batch = {key: value.to(device) if torch.is_tensor(value) else value for key, value in batch.items()}
     partial_mask = cdr_generation_partial_mask(batch, tokenizer, heavy, "heavy", "CDR3")
-    labels = batch["labels"]
+    labels = labels_to_grammar(model, batch["labels"])
     generation_mask = partial_mask.logical_not() & batch["attention_mask"] & batch["residue_mask"]
     output_tokens, _ = run_grammar_generate(
         model,
@@ -224,7 +228,7 @@ def evaluate(args) -> None:
                 cdr_name,
                 target_str,
             )
-            labels = batch["labels"]
+            labels = labels_to_grammar(model, batch["labels"])
             generation_mask = partial_mask.logical_not() & batch["attention_mask"] & batch["residue_mask"]
             output_tokens, _ = run_grammar_generate(
                 model,
