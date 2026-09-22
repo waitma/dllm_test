@@ -669,8 +669,9 @@ def _validate_resume_policy(
     *,
     decoder_chain_eos_token_id: int | None = None,
     decoder_chain_eos_policy: str | None = None,
+    residue_cond_mode: str | None = None,
 ) -> None:
-    """Reject legacy/v2 or fixed-canvas tokenizer policy changes before resume."""
+    """Reject architecture or fixed-canvas tokenizer policy changes before resume."""
 
     checkpoint_dir = _resume_checkpoint_dir(resume_ckpt, output_dir)
     if checkpoint_dir is None or not checkpoint_dir.is_dir():
@@ -684,6 +685,18 @@ def _validate_resume_policy(
             f"{bool(fixed_receptor_lengths)} ({checkpoint_dir}). Refusing to "
             "resume across legacy and fixed-canvas v2 policies."
         )
+    if residue_cond_mode is not None:
+        saved_mode = str(config.get("residue_cond_mode", "add"))
+        if saved_mode != residue_cond_mode:
+            raise ValueError(
+                f"resume residue_cond_mode mismatch: saved={saved_mode!r}, "
+                f"requested={residue_cond_mode!r} ({checkpoint_dir})"
+            )
+        if residue_cond_mode == "token" and config.get("condition_hidden_size") != 0:
+            raise ValueError(
+                "Cannot resume an encoder-bearing legacy token checkpoint into the "
+                f"encoder-free architecture: {checkpoint_dir}"
+            )
     if saved_fixed:
         expected = {
             "fixed_heavy_encoder_length": FIXED_HEAVY_ENCODER_LENGTH,
@@ -733,6 +746,21 @@ def _validate_resume_policy(
             )
 
 
+def _load_training_encoder(
+    esmc_path: Path, residue_cond_mode: str,
+) -> tuple[torch.nn.Module | None, int]:
+    """Token ablations share the vocabulary, never the pretrained encoder weights."""
+
+    if residue_cond_mode == "token":
+        logger.info("Token-only training: no ESMC encoder or feature projection will be loaded")
+        return None, 0
+    from dllm.pipelines.qwen3_vl_arch.modeling_bioseq import load_local_esmc_encoder
+
+    with (esmc_path / "config.json").open() as handle:
+        encoder_hidden = int(json.load(handle)["d_model"])
+    return load_local_esmc_encoder(esmc_path), encoder_hidden
+
+
 def train() -> None:
     parser = transformers.HfArgumentParser(
         (ModelArguments, DataArguments, TrainingArguments)
@@ -746,10 +774,10 @@ def train() -> None:
             f"residue_cond_mode must be token|feature|add, got "
             f"{training_args.residue_cond_mode!r}"
         )
-    if training_args.fixed_receptor_lengths and training_args.residue_cond_mode != "add":
+    if training_args.fixed_receptor_lengths and training_args.residue_cond_mode == "feature":
         raise ValueError(
-            "fixed_receptor_lengths=True requires residue_cond_mode='add'; "
-            "v2 does not support replacement/token fusion"
+            "fixed_receptor_lengths=True requires residue_cond_mode='add' or 'token'; "
+            "v2 does not support replacement fusion"
         )
     if training_args.train_objective not in {"diffusion", "bert"}:
         raise ValueError(
@@ -769,7 +797,7 @@ def train() -> None:
         raise ValueError("protein_pretrain_esmc does not support load_in_4bit")
 
     esmc_path = _resolve_esmc_path(data_args.esmc_path)
-    if not (esmc_path / "config.json").is_file():
+    if training_args.residue_cond_mode != "token" and not (esmc_path / "config.json").is_file():
         raise FileNotFoundError(f"ESMC config not found under {esmc_path}")
 
     # ----- Tokenizers + remap -----------------------------------------------------
@@ -834,15 +862,10 @@ def train() -> None:
         bool(training_args.fixed_receptor_lengths),
         decoder_chain_eos_token_id=int(getattr(tok, "_fusion_decoder_chain_eos_token_id")),
         decoder_chain_eos_policy=str(getattr(tok, "_fusion_decoder_chain_eos_policy")),
+        residue_cond_mode=training_args.residue_cond_mode,
     )
 
     # ----- Model ------------------------------------------------------------------
-    with (esmc_path / "config.json").open() as handle:
-        esmc_cfg = json.load(handle)
-    encoder_hidden = int(esmc_cfg["d_model"])
-
-    from dllm.pipelines.qwen3_vl_arch.modeling_bioseq import load_local_esmc_encoder
-
     decoder = _load_llada_decoder(
         model_args.model_name_or_path,
         dtype=getattr(model_args, "dtype", "bfloat16"),
@@ -881,7 +904,7 @@ def train() -> None:
         if getattr(decoder, "config", None) is not None:
             decoder.config.use_cache = False
         logger.info("Enabled LLaDA decoder gradient checkpointing")
-    encoder = load_local_esmc_encoder(esmc_path)
+    encoder, encoder_hidden = _load_training_encoder(esmc_path, training_args.residue_cond_mode)
     # LLaDA-space ids of the <res_*> tokens, for the BERT "10% random" replacement.
     residue_token_ids = [int(tok.convert_tokens_to_ids(f"<res_{aa}>")) for aa in RESIDUES]
     model = LLaDAEsmcFusion(

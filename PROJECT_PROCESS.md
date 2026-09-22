@@ -1,6 +1,6 @@
 # Project Process
 
-> Last updated: 2026-09-21
+> Last updated: 2026-09-22
 >
 > 本页保留历史任务账本；顶部最新条目描述当前代码清理和文档同步状态。除明确标注为“本轮已验证”的项目外，历史测试、吞吐和任务数字不能被解释为本轮验证通过。
 >
@@ -13,6 +13,25 @@
 > **92000 矩阵（历史对照）**：非 pairing 产物仍保留在 RESULTS。AB pairing 49000 修复后 p3 行仍在主表；92000 pairing 不入主表。
 >
 > **49000 矩阵终态（对照）**：指定 v5 49000 的 AB 11/11 与 TCR 10/10 已完成并通过各自结果核对。结果见 [RESULTS](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/RESULTS.md)。
+
+## 2026-09-22 v2 无 ESMC 对照配置（代码配置已纳入提交，训练未提交）
+
+- 用户要求增加与 v2 相同的无 ESMC encoder 版本并延长训练；新增 [decoder-only YAML](/vepfs-mlp2/c20250601/251105016/project/dllm_test/train_jobs/protein_llada270m_noesmc_diffusion_v2_immune_v6_2node4gpu_1m.yml)。沿用 2 节点 × 4 GPU、c20250601 非抢占、immune_v6_binding_only、decoder d768/L8/h12 scratch、generated-only diffusion、global batch 256、LR 1e-4、warmup 2,000；建议预算设为 1,000,000 steps（5 倍），cosine horizon 同步延长。55 天 runtime cap 为上限，不是耗时预测；步数建议尚未提交执行。
+- `token` 新训练不加载 ESMC 权重，模型和 checkpoint 均无 encoder/projection/norm 参数；只保留同一词表 tokenizer 资产。仍使用固定 decoder 167/135 槽和 EOS 监督，旧融合模型不受影响。代码同时放开 v2 token policy 并补齐 checkpoint 恢复；拒绝跨 token/add 或 encoder-bearing→encoder-free 直接 resume。
+- 独立任务、W&B run 和输出目录，不与融合版本共用。旧 token checkpoint 仍可评估加载；旧 token 训练恢复到新结构需显式处理，不能直接续跑。
+- 首轮 pllm 验证：5 个 v2 测试文件 **128 passed**（含新增 44 项），覆盖 EOS loss/backward、CFG 采样、无 encoder 特征依赖、真实 fusion 类 FP32/BF16 checkpoint roundtrip。YAML 解析、bash 语法、参数名及 2×4/1M/token 开关检查通过。
+- 用户追问后的复核：专项 **131 passed**。新增真实 `LLaDAModelLM`（CPU、d32/L2）前向及仅 EOS 位置 loss 的反向传播测试，确认 backbone 获得有限非零梯度，state_dict 全为 decoder 参数。新测试最初的 swiglu 与 llama block 不兼容，已将测试配置改为 silu；未修改生产 LLaDA 实现。这里不是 d768/L8 或分布式训练实测。
+- 复核发现 no-ESMC YAML 的 `--eval_steps` 后有空行截断续行命令（`bash -n` 无法检测）；已删除空行，并新增两份 YAML 的实际 Shell 参数捕获测试（用函数代替 accelerate，不执行训练），确认 output_dir/save_top_k 等末尾参数与 2×4、mode、steps 一并传入。
+- 全量 `scripts/tests/immune_llada/` 为 **453 passed / 5 failed**：3 条已知 parity（KeyError prepared / StopIteration），2 条 profiler 的 Accelerate 全局状态冲突；后两条单独运行 **2 passed**。未修改无关测试，未运行真实大模型/GPU/FSDP 训练，未 submit/cancel，无新任务 ID。
+- 更正配置说明：`max_eval_rows_per_source` 是当前入口不读取的兼容字段，实际评估使用完整 prepared valid split；新 YAML 不再写这个无效旗标，但评估行为与融合版相同。
+- `train_jobs/` 受仓库既有 `.gitignore` 规则忽略；两份新 YAML 将通过强制添加纳入本轮代码提交，未改忽略规则。训练任务本身仍未 submit。
+
+## 2026-09-22 v2 两节点四卡训练配置（代码配置已纳入提交，训练未提交）
+
+- 按用户要求新增 [训练 YAML](/vepfs-mlp2/c20250601/251105016/project/dllm_test/train_jobs/protein_esmc_llada270m_diffusion_v2_immune_v6_2node4gpu.yml)：2 × `ml.pni2.14xlarge`，每节点 4 GPU，总计 8 GPU；沿用最近主训练的 `c20250601` 非抢占队列。多节点 Accelerate/FSDP 使用平台注入的 rank、master 地址与端口。
+- 启用 `fixed_receptor_lengths=True`、`residue_cond_mode=add`，使用 `immune_v6_binding_only`；ESMC 可训练，decoder d768/L8/h12 从零初始化。每卡 batch 4 × 累积 8 × 8 GPU，丢弃超长行前 global batch 256；200,000 steps，LR 1e-4，cosine，warmup 2,000。
+- 独立任务名和输出目录 `protein_esmc_llada270m_diffusion_v2_immune_v6_2node4gpu`，只恢复该目录内完整 checkpoint（含 fusion_config.json），不续跑旧 v5。当前长度定义仍为包含 CLS 的 encoder 168/136，未修改模型协议。
+- 验证：pllm 环境 YAML 解析、Entrypoint 的 `bash -n`、2×4 资源配置和 v2 开关检查通过；prepared 数据 train/valid 目录存在。未运行跨节点/GPU 训练，未 submit/cancel，无新 task ID。下文 9 月 21 日“尚无 YAML”为历史状态。
 
 ## 2026-09-21 变长生成 v2：固定 encoder 画布 + 变长 decoder
 

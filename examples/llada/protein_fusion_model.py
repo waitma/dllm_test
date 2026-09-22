@@ -1,4 +1,7 @@
-"""ESMC-conditioned LLaDA-8B fusion model (residue conditioning ablations)."""
+"""LLaDA with optional ESMC conditioning.
+
+Run regressions: python -m pytest scripts/tests/immune_llada/test_v2_token_model.py -q
+"""
 
 from __future__ import annotations
 
@@ -522,7 +525,7 @@ class LLaDAEsmcFusion(BioSeqEncoderDiffusionModel):
     def __init__(
         self,
         decoder: nn.Module,
-        encoder: nn.Module,
+        encoder: nn.Module | None,
         encoder_hidden_size: int,
         decoder_mask_token_id: int,
         encoder_mask_token_id: int,
@@ -602,8 +605,13 @@ class LLaDAEsmcFusion(BioSeqEncoderDiffusionModel):
 
         self.encoder = encoder
         self.decoder = decoder
-        if fixed_receptor_lengths and (residue_cond_mode != "add" or not predict_eos):
-            raise ValueError("fixed-canvas v2 requires additive fusion and predict_eos=True")
+        if encoder is None:
+            if residue_cond_mode != "token":
+                raise ValueError("encoder=None requires residue_cond_mode='token'")
+            encoder_hidden_size = 0
+            condition_norm = False
+        if fixed_receptor_lengths and (residue_cond_mode == "feature" or not predict_eos):
+            raise ValueError("fixed-canvas v2 requires add/token mode and predict_eos=True")
         if fixed_receptor_lengths and (
             decoder_chain_eos_token_id is None
             or decoder_chain_eos_token_id in {
@@ -651,7 +659,12 @@ class LLaDAEsmcFusion(BioSeqEncoderDiffusionModel):
         self.condition_norm = (
             nn.LayerNorm(encoder_hidden_size) if condition_norm else None
         )
-        self.condition_proj = nn.Linear(encoder_hidden_size, decoder_d_model, bias=False)
+        # Retain conditioning parameters only when restoring a model that has an
+        # encoder (including legacy token-only checkpoints that saved unused ESMC).
+        self.condition_proj = (
+            nn.Linear(encoder_hidden_size, decoder_d_model, bias=False)
+            if encoder is not None else None
+        )
         # encode/gather/build_mask do not read self.config; stub satisfies Trainer
         # special-token alignment (eos/pad/bos) plus our training knobs.
         dec_cfg = getattr(decoder, "config", None)
@@ -718,7 +731,7 @@ class LLaDAEsmcFusion(BioSeqEncoderDiffusionModel):
             )
         else:
             self._canvas_token_ids = self._residue_token_ids
-        if freeze_encoder:
+        if freeze_encoder and self.encoder is not None:
             for parameter in self.encoder.parameters():
                 parameter.requires_grad_(False)
 

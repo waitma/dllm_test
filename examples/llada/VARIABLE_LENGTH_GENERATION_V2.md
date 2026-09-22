@@ -8,6 +8,26 @@
 > byte-for-byte unaffected. Baseline before this work: commit `c234b07`,
 > pushed to `origin/main`.
 
+## Decoder-only ablation (2026-09-22)
+
+v2 also supports `--residue_cond_mode token`: new training skips ESMC weight
+loading and constructs no encoder, feature projection, or condition norm. The
+same tokenizer assets, grammar, fixed decoder canvases, EOS targets, corruption,
+and loss remain; the decoder receives only `wte(x_t)`. This is not merely a frozen
+or bypassed encoder occupying the checkpoint. Feature replacement is still
+forbidden in v2. Existing encoder-bearing token checkpoints remain loadable for
+evaluation, but cannot be resumed into the new encoder-free training architecture.
+
+Both 2-node × 4-GPU configs now exist (not submitted):
+
+- [Fusion, 200k steps](/vepfs-mlp2/c20250601/251105016/project/dllm_test/train_jobs/protein_esmc_llada270m_diffusion_v2_immune_v6_2node4gpu.yml).
+- [Decoder-only, proposed 1M steps](/vepfs-mlp2/c20250601/251105016/project/dllm_test/train_jobs/protein_llada270m_noesmc_diffusion_v2_immune_v6_2node4gpu_1m.yml).
+
+The latter extends the cosine horizon without changing peak LR or warmup steps.
+A longer schedule does not guarantee matching pretrained-encoder performance;
+comparisons must report both step and compute budgets. The historical validation
+and gaps below refer to the initial September 21 implementation.
+
 ## Scope
 
 The v2 recipe uses a fixed encoder canvas while retaining variable-length decoder
@@ -195,7 +215,7 @@ real-scale (d768/L8) GPU run or loss curve exists yet.
 
 ## Known gaps
 
-1. No v2 train job yml exists yet, and v2 has never run at real scale on GPU.
+1. v2 train YAMLs now exist (see above); real-scale GPU training has not been validated.
 2. `tcr_generation_v5` (CDR3-only) and the CDR3-only mode of `tcr_generation`
    explicitly raise on a `fixed_receptor_lengths` checkpoint. Those two
    downstream evals are unavailable for v2 until they are ported to the

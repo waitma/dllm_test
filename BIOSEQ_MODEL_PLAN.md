@@ -2,6 +2,13 @@
 
 > **Current architecture boundary (2026-09-11):** The only current immune data implementation is `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/immune_llada`; the formal training entry is `/vepfs-mlp2/c20250601/251105016/project/dllm_test/examples/llada/protein_pretrain_esmc.py`. The active data flow is raw → adapter → `BioSeqRecord` → offline filter → prepared semantic JSONL → training-time grammar/padding/per-chain encoder reconstruction/masking, with no model-ready token cache. The deleted `/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/qwen3_vl_arch/data` alias tree, deleted `training` tree, deleted `GRAMMAR_V1.md`, and deleted legacy training/build/test/job files are historical deletion facts, not current dependencies. Retained model-layer files are `modeling_bioseq.py`, `sampling_bioseq.py`, and `relation_aux.py`; `downstream/grammar` remains active for fusion CDR/light-pairing/TCR-generation public implementations.
 
+## 2026-09-22 v2 decoder-only 对照
+
+- 用户要求在当前 v2 上增加无 ESMC encoder、训练更久的对照。`fixed_receptor_lengths=True` 现在允许 `residue_cond_mode=token`，仍禁止 feature replacement；保留原词表、固定 167/135 decoder 槽、chain EOS、split token、generated-only diffusion 和数据处理。
+- token 新训练完全不加载 encoder 权重、不创建 condition projection/norm，输入仅为 `wte(x_t)`；仍读取 ESMC tokenizer 文件以保持与融合模型同一 grammar/remap，这不使用预训练特征。decoder 仍从零初始化，未以增加层数补偿 encoder 参数量。
+- checkpoint loader 支持真实 encoder-free state；旧 token checkpoint 如保存了 encoder 参数，仍按原结构完整加载供评估。resume 校验 mode 和 encoder-free metadata，拒绝把旧 encoder-bearing token 或 add 任务直接恢复到新结构。
+- 新 YAML 的建议预算为 1M steps（融合版 200k 的 5 倍），LR/warmup 不变、cosine horizon 延长；这不是效果保证，也不是等步数/等算力的单因素对照。队列资源与正式提交尚未执行，状态见 [PROJECT_PROCESS.md](/vepfs-mlp2/c20250601/251105016/project/dllm_test/PROJECT_PROCESS.md)。
+
 ## 2026-09-16 生成状态同步到 ESMC
 
 用户进一步要求检验pairing采样步数：固定已完成的49000／反馈修复协议，新增无前缀8/16/32/64/96/128步全量对照，保留124步参照；只改采样预算，不改训练或评分器。方法／seed解释及验收边界见 [AB pairing §4.5](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/AB_LIGHT_CHAIN_PAIRING.md)。六档独立非闲时单卡，所有档保留，不在测试集选最优后改主表。

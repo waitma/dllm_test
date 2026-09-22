@@ -4,6 +4,9 @@ Training writes HuggingFace Trainer dirs (`model.safetensors` + tokenizer),
 not the old grammar_v2 ``best.pt`` blobs. This loader rebuilds
 ``LLaDAEsmcFusion`` from tensor shapes, loads weights, and returns a
 grammar-v2 collator that remaps decoder ids into LLaDA space.
+
+Use ``load_fusion_for_eval(checkpoint, device="cpu")`` from Python after
+activating the ``pllm`` environment.
 """
 
 from __future__ import annotations
@@ -94,9 +97,9 @@ def _read_fusion_policy(config: dict[str, Any], checkpoint_dir: Path) -> dict[st
         )
 
     residue_cond_mode = str(config.get("residue_cond_mode", "add"))
-    if fixed and residue_cond_mode != "add":
+    if fixed and residue_cond_mode not in {"add", "token"}:
         raise ValueError(
-            "fixed-canvas checkpoint must use residue_cond_mode='add': "
+            "fixed-canvas checkpoint must use residue_cond_mode='add' or 'token': "
             f"{checkpoint_dir}"
         )
     return {
@@ -145,7 +148,7 @@ def _infer_decoder_shape(safetensors_path: Path) -> dict[str, int]:
         mlp_hidden = int(handle.get_tensor(ff).shape[1]) if ff in handle.keys() else d_model * 4
         proj = "condition_proj.weight"
         encoder_hidden = (
-            int(handle.get_tensor(proj).shape[1]) if proj in handle.keys() else 960
+            int(handle.get_tensor(proj).shape[1]) if proj in handle.keys() else 0
         )
     if d_model == 768:
         n_heads = 12
@@ -271,6 +274,7 @@ def load_fusion_for_eval(
         sys.path.insert(0, str(PROJECT_ROOT))
 
     import transformers
+    from safetensors import safe_open
     from safetensors.torch import load_file
 
     from dllm.pipelines.immune_llada.data import (
@@ -293,8 +297,6 @@ def load_fusion_for_eval(
     ckpt_dir = resolve_fusion_dir(checkpoint)
     weights = fusion_weight_file(ckpt_dir)
     esmc_dir = Path(esmc_path) if esmc_path is not None else DEFAULT_ESMC
-    if not (esmc_dir / "config.json").is_file():
-        raise FileNotFoundError(f"ESMC config missing: {esmc_dir}")
 
     torch_dtype = getattr(torch, dtype) if isinstance(dtype, str) else dtype
     if device == "cuda" or (isinstance(device, str) and device.startswith("cuda")):
@@ -312,6 +314,13 @@ def load_fusion_for_eval(
     allow_chain_eos_token = fixed_receptor_lengths or saved_eos_policy == "chain_eos"
 
     shape = _infer_decoder_shape(weights)
+    with safe_open(str(weights), framework="pt", device="cpu") as handle:
+        has_encoder_weights = any(key.startswith("encoder.") for key in handle.keys())
+    # Old token checkpoints still own conditioning parameters. Rebuild and
+    # validate them rather than silently dropping their saved weights.
+    needs_encoder = residue_cond_mode != "token" or has_encoder_weights
+    if needs_encoder and not (esmc_dir / "config.json").is_file():
+        raise FileNotFoundError(f"ESMC config missing: {esmc_dir}")
     logger.info(
         "Fusion ckpt %s: d_model=%d n_layers=%d n_heads=%d mlp=%d enc_h=%d",
         ckpt_dir,
@@ -365,9 +374,14 @@ def load_fusion_for_eval(
     if getattr(decoder, "config", None) is not None:
         decoder.config.use_cache = False
 
-    encoder = load_local_esmc_encoder(esmc_dir)
-    with (esmc_dir / "config.json").open() as handle:
-        encoder_hidden = int(json.load(handle)["d_model"])
+    encoder = None
+    encoder_hidden = 0
+    if needs_encoder:
+        encoder = load_local_esmc_encoder(esmc_dir)
+        with (esmc_dir / "config.json").open() as handle:
+            encoder_hidden = int(json.load(handle)["d_model"])
+    else:
+        condition_norm = False
     residue_token_ids = [
         int(llada_tok.convert_tokens_to_ids(f"<res_{aa}>")) for aa in RESIDUES
     ]
