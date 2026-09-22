@@ -24,7 +24,8 @@
 - 复核发现 no-ESMC YAML 的 `--eval_steps` 后有空行截断续行命令（`bash -n` 无法检测）；已删除空行，并新增两份 YAML 的实际 Shell 参数捕获测试（用函数代替 accelerate，不执行训练），确认 output_dir/save_top_k 等末尾参数与 2×4、mode、steps 一并传入。
 - 全量 `scripts/tests/immune_llada/` 为 **453 passed / 5 failed**：3 条已知 parity（KeyError prepared / StopIteration），2 条 profiler 的 Accelerate 全局状态冲突；后两条单独运行 **2 passed**。未修改无关测试，未运行真实大模型/GPU/FSDP 训练，未 submit/cancel，无新任务 ID。
 - 更正配置说明：`max_eval_rows_per_source` 是当前入口不读取的兼容字段，实际评估使用完整 prepared valid split；新 YAML 不再写这个无效旗标，但评估行为与融合版相同。
-- `train_jobs/` 受仓库既有 `.gitignore` 规则忽略；两份新 YAML 将通过强制添加纳入本轮代码提交，未改忽略规则。训练任务本身仍未 submit。
+- 代码、测试及两份训练 YAML 已在 `745c5d7` 提交并 push 到 `origin/main`；`train_jobs/` 受既有 `.gitignore` 规则忽略，此次只强制添加这两份 YAML，未改忽略规则，未包含无关的 `base_model/Qwen3-VL` 子模块工作区内容。10808 代理查询与 push 超时，最终使用此前可用的 `127.0.0.1:18089` HTTP 代理完成，未修改全局代理配置。
+- 提交前再次执行五文件专项：**131 passed**；`git diff --check` / staged diff 检查通过。训练任务本身仍未 submit/cancel。
 
 ## 2026-09-22 v2 两节点四卡训练配置（代码配置已纳入提交，训练未提交）
 
