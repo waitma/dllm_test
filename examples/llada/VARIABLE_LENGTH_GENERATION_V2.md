@@ -1,6 +1,8 @@
 # Variable-length generation v2
 
-> Status (2026-09-21): **implemented, CPU smoke-trained end to end, not yet
+> Status (2026-09-21): **implemented, committed (`cf36477` + `955a1ec` on
+> `origin/main`), CPU smoke-trained end to end, retested in
+> `conda/envs/protenix_abtcr` (411 passed / 3 pre-existing failed), not yet
 > trained for real.** Everything below is gated behind
 > `--fixed_receptor_lengths` (default `False`); legacy checkpoints are
 > byte-for-byte unaffected. Baseline before this work: commit `c234b07`,
@@ -138,12 +140,17 @@ model as a silent no-op. At the measured rate this is ~1e-13 per batch of four.
 
 ## Verification performed (2026-09-21, CPU)
 
-- `scripts/tests/immune_llada/` — 394 passed, 20 failed. All 20 failures
-  reproduce on the baseline code after `git stash`, so none is a v2 regression:
-  17 are `ModuleNotFoundError: nltk` in the TCR scoring/result-IO tests, 3 are
-  the pre-existing legacy-vs-canonical mismatch in `test_full_parity.py`.
+- Retest in the requested env
+  `/vepfs-mlp2/c20250601/251105016/conda/envs/protenix_abtcr`
+  (Python 3.12.12, torch 2.8.0, nltk 3.9.4): `scripts/tests/immune_llada/`
+  **411 passed / 3 failed** (`logs/v2_abtcr_pytest/`, 25s). The remaining 3
+  are `test_full_parity.py` (`KeyError: 'prepared'` / `StopIteration`); they
+  fail on the pre-v2 baseline too.
+- First test pass was **not** in this env and reported 394 passed / 20 failed:
+  17 extra failures were `ModuleNotFoundError: nltk` in the TCR
+  scoring/result-IO tests. Those 17 pass in `protenix_abtcr`.
 - `test_v2_inference_adapters.py`, `test_v2_checkpoint_policy.py`, and
-  `test_v2_canvas_overflow.py` — 84 passed.
+  `test_v2_canvas_overflow.py` — 84 passed in `protenix_abtcr`.
 - Canvas layout smoke on antibody and TCR pair fixtures: `encoder_input_ids` is
   `[B, 2, 168]`, per-row decoder slots are `{chain 0: 167, chain 1: 135}`,
   `<chainsep>` appears exactly once between the two canvases, and the encoder

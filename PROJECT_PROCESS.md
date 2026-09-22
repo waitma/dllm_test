@@ -16,11 +16,14 @@
 
 ## 2026-09-21 变长生成 v2：固定 encoder 画布 + 变长 decoder
 
-**代码状态：已实现、已提交、已跑通 CPU 端到端 smoke 训练；尚未做真实规模训练。** 合同细节见
+**代码状态：已实现、已提交并 push 到 `origin/main`、已跑通 CPU 端到端 smoke 训练；尚未做真实规模训练。** 合同细节见
 [VARIABLE_LENGTH_GENERATION_V2.md](/vepfs-mlp2/c20250601/251105016/project/dllm_test/examples/llada/VARIABLE_LENGTH_GENERATION_V2.md)。
-改动前的基线快照是 `c234b07`（"Pre-variable-length-generation snapshot"），**已 push 到 `origin/main`**，
-可随时整体回退；本轮 v2 落在其之后的提交里。全部 v2 行为由单一开关
-`--fixed_receptor_lengths` 控制，默认 `False`，legacy checkpoint 路径逐字不变。
+改动前的基线快照是 `c234b07`（"Pre-variable-length-generation snapshot"），**已 push**，可随时整体回退。
+v2 两笔提交也已在远端：`cf36477`（变长生成合同）→ `955a1ec`（超长行丢弃并计数，当前 `origin/main` HEAD）。
+全部 v2 行为由单一开关 `--fixed_receptor_lengths` 控制，默认 `False`，legacy checkpoint 路径逐字不变。
+
+**测试环境（2026-09-21 复测）**：`/vepfs-mlp2/c20250601/251105016/conda/envs/protenix_abtcr`
+（Python 3.12.12 / torch 2.8.0 / pytest 7.4.4 / nltk 3.9.4）。第一次跑测试用的不是这个环境，缺 `nltk`。
 
 已落地的七条（与用户 2026-09-21 需求一一对应）：
 
@@ -81,14 +84,15 @@ renderer 是在 **collator 里**跑的、原先没有跳过机制，这两类行
 - ⚠️ 被丢的 4,289 条 over-budget 行占 `asd_antibody` train 的 **1.9%**（不是全语料的 0.06%），
   丢的是最长抗原那一尾。抗原条件生成在超长抗原上的指标值得盯一下。
 
-本轮实测（CPU，2026-09-21）：
+本轮实测（2026-09-21）：
 
-- `scripts/tests/immune_llada/` 全量 **394 passed / 20 failed**；20 条失败**全部是既有问题**，
-  用 `git stash` 退回基线代码后逐条复现：17 条是环境缺 `nltk`（`test_tcr_generation_result_io`
-  / `test_tcr_scoring_audit`），3 条是 `test_full_parity` 的 legacy↔canonical 渲染差异，
-  基线同样失败。不是 v2 引入的回归。
-- 其中 v2 专项 **84 passed**（`test_v2_inference_adapters` + `test_v2_checkpoint_policy`
-  + 本轮新增的 `test_v2_canvas_overflow`）。
+- **`protenix_abtcr` 复测（用户指定环境）**：`scripts/tests/immune_llada/` 全量
+  **411 passed / 3 failed**（`logs/v2_abtcr_pytest/`，25s，CPU）。v2 专项三文件
+  **84 passed**。剩下 3 条全部是 `test_full_parity.py`（`KeyError: 'prepared'` /
+  `StopIteration`），是预处理审计工具的既有问题，不是 v2 回归。
+- 第一次跑测试不在这个环境里，当时是 **394 passed / 20 failed**：多出来的 17 条是缺
+  `nltk`（`test_tcr_generation_result_io` / `test_tcr_scoring_audit`）。`protenix_abtcr`
+  自带 nltk 3.9.4，这 17 条已过。用 `git stash` 退回基线后，parity 那 3 条同样失败。
 - 画布布局冒烟：抗体 / TCR 成对样本都得到 `encoder_input_ids=[B,2,168]`、
   每行槽位 `{heavy:167, light:135}`、`<chainsep>` 唯一、encoder attention 在定长链上全 1。
 - 丢弃逻辑在真实语料行上验证：把审计点名的三行（`oas-00017:8523` 186 残基重链、
