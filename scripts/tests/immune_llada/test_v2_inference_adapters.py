@@ -519,18 +519,16 @@ def test_tcr_sampler_reads_policy_from_real_remap_collator(
     sampler = BioSeqTcrSampler("in-memory", device="cpu")
     assert sampler.collator is collator
     assert sampler.fixed_v2 is fixed
-    if fixed:
-        with pytest.raises(ValueError, match="incompatible"):
-            sampler.infill_cdr3b(["CASSF"], 1)
 
 
 @pytest.mark.parametrize("remapped", [False, True])
+@pytest.mark.parametrize("fixed", [False, True])
 def test_tcr_infill_perfect_copy_window_aar_is_one(
-    monkeypatch: pytest.MonkeyPatch, copy_generation, remapped: bool
+    monkeypatch: pytest.MonkeyPatch, copy_generation, remapped: bool, fixed: bool
 ) -> None:
     import downstream.grammar.tcr_generation as tcr
 
-    model, tokenizer, _ = _eval_bundle(fixed=False, remapped=remapped)
+    model, tokenizer, _ = _eval_bundle(fixed=fixed, remapped=remapped)
     monkeypatch.setattr(tcr, "load_grammar_checkpoint", lambda *args, **kwargs: (model, tokenizer))
     sampler = BioSeqTcrSampler("in-memory", device="cpu")
     rows = sampler.infill_cdr3b(["CASSF", "CAVRDSF"], mask_width=3)
@@ -540,16 +538,3 @@ def test_tcr_infill_perfect_copy_window_aar_is_one(
     total = sum(len(row["truth_window"]) for row in rows)
     assert total > 0
     assert hit / total == 1.0
-
-
-def test_legacy_tcr_cdr3_apis_reject_fixed_v2() -> None:
-    sampler = BioSeqTcrSampler.__new__(BioSeqTcrSampler)
-    sampler.fixed_v2 = True
-    with pytest.raises(ValueError, match="incompatible"):
-        sampler.unconditional_cdr3b(1)
-    with pytest.raises(ValueError, match="incompatible"):
-        sampler.conditional_cdr3b("GILGFVFTL", 1)
-    with pytest.raises(ValueError, match="incompatible"):
-        sampler.infill_cdr3b(["CAAF"], 1)
-    with pytest.raises(ValueError, match="incompatible"):
-        sampler.infill_cdr3b_in_pair([("A", "CASS", "AS")], 1)

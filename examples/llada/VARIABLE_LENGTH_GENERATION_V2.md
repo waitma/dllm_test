@@ -216,10 +216,10 @@ real-scale (d768/L8) GPU run or loss curve exists yet.
 ## Known gaps
 
 1. v2 train YAMLs now exist (see above); real-scale GPU training has not been validated.
-2. `tcr_generation_v5` (CDR3-only) and the CDR3-only mode of `tcr_generation`
-   explicitly raise on a `fixed_receptor_lengths` checkpoint. Those two
-   downstream evals are unavailable for v2 until they are ported to the
-   full-length protocol.
+2. TCR adapters were ported on 2026-09-24: conditional/unconditional CDR3
+   generation now generates the full beta canvas through EOS and then extracts
+   CDR3; single/pair infill remains explicitly reference-window-conditioned.
+   See the TCR adapter section below. Real-checkpoint GPU quality is unvalidated.
 3. Repeated EOS runs of a chain whose residues are partly synthetic (`X`
    completion, e.g. `tcr_repertoire` alpha) are marked synthetic wholesale and
    therefore excluded from EOS supervision, since a completed synthetic chain
@@ -228,3 +228,43 @@ real-scale (d768/L8) GPU run or loss curve exists yet.
 5. Dropping over-budget `asd_antibody` rows removes the longest-antigen tail
    from training. It is 1.9% of that source rather than 0.06% of the corpus, so
    antigen-conditioned metrics on very long antigens are worth watching.
+
+
+## TCR downstream adapters (2026-09-24)
+
+[Sampler](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/grammar/tcr_generation.py)
+now accepts v2 checkpoints for `uncond`, `conditional`, and `infill` as well as
+`fulllength`. `V5BetaSampler` also dispatches by checkpoint policy; its legacy
+length-prior protocol remains available for old checkpoints. The experiment
+runner pinned to the historical v5 checkpoint is still a historical experiment;
+use the checkpoint-selectable sampler CLI for a new v2 run.
+
+- **Generation:** allocate all 167 beta decoder slots, mask them in both streams,
+  and let the model emit EOS. Neither a reference CDR3 nor a sampled CDR3 length
+  sets the target budget. An unknown alpha partner is fixed X on the 136-token
+  encoder canvas. Peptide and optional MHC remain observed context.
+- **Extraction:** use the existing benchmark ANARCI/regex-fallback extractor on
+  the generated beta chain. CDR3 validity here is the benchmark's syntactic
+  criterion, not a binding or structural validity claim.
+- **Failures:** keep every requested attempt, with raw beta IDs, beta sequence,
+  `terminated_by_eos`, `valid`, and `failure_reason`. No EOS, empty/invalid beta,
+  or failed extraction produces an empty CDR3 entry, not a successful full chain
+  mislabeled as CDR3. Conditional JSONL embeds `candidates`; unconditional text
+  has a `.candidates.jsonl` sidecar. Score the raw candidate budget rather than
+  dropping blank entries from the legacy text representation.
+- **Infill:** a known window is reconstructed at its supplied length. This is
+  not variable-length loop insertion/deletion. Single-CDR3 inputs use the training
+  completion profile to place C/F/W anchors and unknown X frameworks; paired
+  inputs retain their observed alpha/beta frameworks. Only the requested window
+  is hidden, and canonical-AA-only decoding blocks EOS during denoising and
+  optional editing/self-correction. Output declares `length_condition=reference_window`.
+  Failed-length rows remain in the CLI AAR denominator.
+
+Example (substitute an existing v2 checkpoint and output destination):
+
+```bash
+python /vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/grammar/tcr_generation.py \
+  --mode conditional --checkpoint /absolute/path/to/v2-checkpoint \
+  --eval-json /absolute/path/to/eval_conditional.json --with-mhc \
+  --out /absolute/path/to/v2-conditional.jsonl --smoke
+```

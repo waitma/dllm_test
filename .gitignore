@@ -192,3 +192,6 @@ checkpoint-*/
 /train_jobs/
 /eval_jobs/
 /refactor_baseline/
+
+# Fixed-canvas TCR downstream adapter
+!/downstream/grammar/tcr_generation_v2.py

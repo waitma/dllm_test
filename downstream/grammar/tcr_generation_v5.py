@@ -1,8 +1,9 @@
-"""Runtime-v5 pMHC-conditioned CDR3beta generation; paired generation is deferred.
+"""pMHC-conditioned CDR3beta generation with checkpoint-specific protocols.
 
 Run through scripts/downstream/run_tcr_native_generation.py --task preflight.
-Only the beta CDR3 core is generated; universal C/F junction anchors are fixed.
+Legacy: only the beta CDR3 core is generated; C/F junction anchors are fixed.
 Unknown FR/CDR1/2 and the entire alpha partner remain X throughout sampling.
+V2: generate the full beta canvas through EOS, then extract CDR3; alpha stays X.
 No reference receptor sequence or reference length is accepted by this API.
 """
 from __future__ import annotations
@@ -25,23 +26,6 @@ from downstream.grammar.common import (
 
 REGIONS = ("FR1", "CDR1", "FR2", "CDR2", "FR3", "CDR3", "FR4")
 AA = set("ACDEFGHIKLMNPQRSTVWY")
-
-
-def _model_is_fixed_v2(model) -> bool:
-    """Return whether a loaded checkpoint uses the fixed-canvas contract."""
-
-    config = getattr(model, "config", None)
-    marker = getattr(config, "fixed_receptor_lengths", None)
-    if marker is not None:
-        return bool(marker)
-    marker = getattr(model, "fixed_receptor_lengths", None)
-    if marker is not None:
-        return bool(marker)
-    collator = getattr(model, "_fusion_eval_collator", None)
-    marker = getattr(collator, "fixed_receptor_lengths", None)
-    if marker is not None:
-        return bool(marker)
-    return bool(getattr(model, "_predict_eos", False))
 
 
 def residue_lookup(tokenizer):
@@ -124,15 +108,16 @@ class V5BetaSampler:
     def __init__(self, checkpoint, device="cuda"):
         self.device = torch.device(device)
         self.model, self.tokenizer = load_grammar_checkpoint(checkpoint, device=self.device)
-        if _model_is_fixed_v2(self.model):
-            raise ValueError(
-                "tcr_generation_v5 is CDR3-only and incompatible with fixed_receptor_lengths v2"
-            )
+        from downstream.grammar.tcr_generation import _model_is_fixed_v2
+        from downstream.grammar.tcr_generation_v2 import FixedBetaGenerationProtocol
+        self.fixed_v2 = _model_is_fixed_v2(self.model)
         self.collator = build_eval_collator(self.model, self.tokenizer)
-        self.protocol = BetaGenerationProtocol()
+        self.protocol = FixedBetaGenerationProtocol() if self.fixed_v2 else BetaGenerationProtocol()
         self.residue_tokens = residue_lookup(self.tokenizer)
 
     def sample_records(self, records, *, seed, max_iter=32, strategy="gumbel_argmax"):
+        if max_iter <= 0:
+            raise ValueError("max_iter must be positive")
         batch, target = self.protocol.collate(records, self.collator)
         batch = {k: v.to(self.device) if torch.is_tensor(v) else v for k, v in batch.items()}
         target = target.to(self.device)
@@ -151,6 +136,11 @@ class V5BetaSampler:
         if tokens[target].eq(self.model.config.mask_token_id).any():
             raise ValueError("unfinished generation")
         grammar_tokens = _inverse_remap_llada_tokens(self.model, tokens)
+        if self.fixed_v2:
+            from downstream.grammar.tcr_generation_v2 import decode_beta_candidates
+            results = decode_beta_candidates(grammar_tokens, batch, target, self.tokenizer)
+            return results, {"steps": len(history) - 1, "context_invariant": True,
+                "initial_targets_masked": True, "target_tokens": target.sum(1).tolist()}
         results = []
         for row in range(len(records)):
             ids = grammar_tokens[row][target[row]].tolist()
@@ -164,6 +154,8 @@ class V5BetaSampler:
             "initial_targets_masked": True, "target_tokens": target.sum(1).tolist()}
 
     def generate(self, epitope, mhc, target_key, *, k=100, batch_size=8, seed=42):
+        if k < 0 or batch_size <= 0:
+            raise ValueError("k must be nonnegative and batch_size must be positive")
         lengths = self.protocol.lengths(seed, target_key, k)
         results = []
         for start in range(0, k, batch_size):

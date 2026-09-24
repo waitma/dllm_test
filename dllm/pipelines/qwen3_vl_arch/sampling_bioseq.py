@@ -42,6 +42,8 @@ class BioSeqGenerateConfig:
     max_post_steps: int = 16
     self_correct: bool = False
     self_correct_temperature: float = 0.1
+    # Decoder-space allowlist for fixed-window infilling (EOS is not a residue).
+    allowed_token_ids: tuple[int, ...] | None = None
 
 
 def resolve_partial_mask(
@@ -448,6 +450,17 @@ def generate_bioseq(
     partial_mask = resolve_partial_mask(batch, partial_mask)
     generation_mask = build_generation_mask(batch, partial_mask)
 
+    allowed = config.allowed_token_ids
+    if allowed is not None and (not allowed or min(allowed) < 0 or max(allowed) >= model.config.vocab_size):
+        raise ValueError("allowed_token_ids must be a nonempty decoder-vocabulary subset")
+
+    def constrain(logits):
+        if allowed is None:
+            return logits
+        keep = torch.zeros(logits.size(-1), dtype=torch.bool, device=logits.device)
+        keep[list(allowed)] = True
+        return logits.masked_fill(generation_mask.unsqueeze(-1) & ~keep, float("-inf"))
+
     output_tokens, output_scores = initialize_output_tokens(input_ids, generation_mask, mask_token_id)
     still_masked = generation_mask.clone()
     history = [output_tokens.clone()]
@@ -464,6 +477,7 @@ def generate_bioseq(
             cfg_scale=config.cfg_scale,
             partial_mask=partial_mask,
         )
+        logits = constrain(logits)
         sampled_tokens, sampled_scores = _sample_tokens(logits, config.sampling_strategy, config.temperature)
         # Keep the committed state separate from this step's proposals. Pending
         # sites must remain MASK in the actual next forward, not merely in the
@@ -502,6 +516,7 @@ def generate_bioseq(
                     cfg_scale=config.cfg_scale,
                     partial_mask=partial_mask,
                 )
+                logits = constrain(logits)
                 sampled_tokens, sampled_scores = _sample_tokens(
                     logits, config.sampling_strategy, config.temperature
                 )
@@ -532,6 +547,7 @@ def generate_bioseq(
                     cfg_scale=config.cfg_scale,
                     partial_mask=partial_mask,
                 )
+                logits = constrain(logits)
                 pred, pred_prob = _self_correct_prediction(
                     logits, config.self_correct_temperature
                 )

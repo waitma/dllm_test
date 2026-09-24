@@ -520,3 +520,10 @@ paired TCR α/β, antibody-antigen recognition, and TCR-epitope/pMHC recognition
 ### 2026-09-13 TCR scoring re-audit
 
 T2A now preserves exact cosine edge thresholds through clustering and artifact serialization, uses the audited per-method Fig 3A retention anchors, and records unreachable/mismatched retention points instead of calling every nearest point aligned. The predeclared local tolerance is 0.02 retention, not a paper-native criterion or proof of identical inputs. T1–T4 receive a separate reduced GPU execution/scoring gate, distinct from input-only gates, scientific decontamination, and quality evaluation. Protocol owner: [T2 §8.0](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/TCR_T2_CLUSTERING.md); current decisions/status: [TCR audit §9.22](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/TCR_BASELINE_EVALUATION_AUDIT.md). No checkpoint, training corpus, shared AB sampler, or baseline performance result is changed.
+
+
+## 2026-09-24 TCR v2 downstream protocol
+
+- [Implementation](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/grammar/tcr_generation_v2.py): unconditional / peptide / pMHC-conditioned CDR3 generation uses a full 167-slot beta canvas, EOS termination, then the existing benchmark ANARCI/regex-fallback extractor. Alpha is an explicitly unknown fixed-X partner. No CDR3 length prior or reference receptor enters generation.
+- Single/pair CDR3 infill is a distinct known-length window task. Single inputs reuse the training completion profile; paired inputs use supplied frameworks. Decoder-space canonical-AA allowlists prohibit internal chain EOS in all sampling phases.
+- Every generation attempt is retained, including termination/extraction failures. These outputs must not be compared as the old v5 core-only length-prior protocol. The historical pinned v5 experiment runner remains pinned; new runs use the checkpoint-selectable TCR CLI.

@@ -156,6 +156,7 @@ def run_grammar_generate(
     sampling_strategy: str = "gumbel_argmax",
     temperature: float = 1.0,
     cfg_scale: float = 0.0,
+    allowed_token_ids: tuple[int, ...] | None = None,
 ) -> tuple[torch.Tensor, torch.Tensor]:
     """Generate with model-space inputs, returning grammar-space tokens and scores."""
 
@@ -164,6 +165,7 @@ def run_grammar_generate(
         sampling_strategy=sampling_strategy,
         temperature=temperature,
         cfg_scale=cfg_scale,
+        allowed_token_ids=allowed_token_ids,
     )
     output_tokens, scores = generate_bioseq(
         model, batch, partial_mask=partial_mask, config=config

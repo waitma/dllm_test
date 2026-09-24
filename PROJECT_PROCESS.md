@@ -3426,3 +3426,11 @@ H1 任意步数精确命中、H2 稳定高 0.5、H3 最好仍差 1.55 pp。**同
   - `t-20260917205538-r2ldn` tcr-v5-159000-20260917-t1-others-cdr3b：Success，End=`2026-09-17T12:58:51Z`。
   - `t-20260917205534-878fc` tcr-v5-159000-20260917-t1-cdr3ab：Success，End=`2026-09-17T12:58:47Z`。
   - `t-20260917205531-55dxp` tcr-v5-159000-20260917-t1-cdr3b：Success，End=`2026-09-17T13:46:38Z`。
+
+
+## 2026-09-24 TCR v2 downstream adaptation
+
+- Completed checkpoint-aware unconditional / peptide / pMHC CDR3 generation via full beta EOS generation and benchmark CDR3 extraction; V5BetaSampler dispatches to the same v2 protocol. Known-window single and paired infill now supports v2 with canonical-AA decoding and explicit reference-window metadata.
+- [Adapter](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/grammar/tcr_generation_v2.py) retains missing-EOS / invalid-beta / extraction failures and raw candidate budgets. Added full-beta placeholder invariance and single-infill target invariance checks across decoder and encoder inputs.
+- Validation: activated pllm, used the existing protenix_abtcr Python because pllm lacks accelerate. Focused suite: **109 passed** (v2 TCR, v5 legacy, inference adapters, token model, result IO, generic sampling). Includes actual tiny-decoder denoising, editing/self-correction EOS exclusion, and V5 adapter generation with failed attempts retained. No real-checkpoint GPU quality evaluation, training submission, or cancellation in this task.
+- Protocol, usage and limitations: [v2 notes](/vepfs-mlp2/c20250601/251105016/project/dllm_test/examples/llada/VARIABLE_LENGTH_GENERATION_V2.md). Infill remains known-length window reconstruction, not variable-length loop insertion/deletion.

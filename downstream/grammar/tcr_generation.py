@@ -1,11 +1,11 @@
-"""Immune LLaDA masked-diffusion TCR sampling adapters -- 3 modes.
+"""Immune LLaDA masked-diffusion TCR sampling adapters.
 
 Run with::
 
     python -m downstream.grammar.tcr_generation --mode fulllength --checkpoint CHECKPOINT --out OUTPUT.jsonl
 
-Legacy CDR3-only modes are retained for legacy checkpoints. Fixed-canvas v2
-checkpoints use ``fulllength`` for full-chain generation instead.
+V2 generates EOS-terminated full beta chains before extracting CDR3. Infill is
+a length-conditioned fixed-window reconstruction task, including for v2.
 """
 
 from __future__ import annotations
@@ -119,12 +119,29 @@ class BioSeqTcrSampler:
     def _to_device(self, batch):
         return {k: (v.to(self.device) if torch.is_tensor(v) else v) for k, v in batch.items()}
 
-    def _require_legacy_cdr3_semantics(self, operation: str) -> None:
-        if self.fixed_v2:
-            raise ValueError(
-                f"{operation} is a legacy CDR3-only sampler and is incompatible with "
-                "fixed_receptor_lengths v2; use fulllength_pairs for fixed-canvas generation"
-            )
+    def _generate_v2_beta(self, n, batch_size, max_iter, temperature, sampling_strategy,
+                          epitope=None, mhc=None):
+        from downstream.grammar.tcr_generation_v2 import beta_record, beta_targets, decode_beta_candidates
+        if n < 0 or batch_size <= 0 or max_iter <= 0:
+            raise ValueError("n must be nonnegative; batch_size and max_iter must be positive")
+        candidates = []
+        for start in range(0, n, batch_size):
+            records = [beta_record(epitope, mhc) for _ in range(min(batch_size, n - start))]
+            batch = self._to_device(self.collator(records))
+            targets = beta_targets(batch, records)
+            tokens, _ = run_grammar_generate(self.model, batch, partial_mask=~targets,
+                max_iter=max_iter, temperature=temperature, sampling_strategy=sampling_strategy)
+            candidates.extend(decode_beta_candidates(tokens, batch, targets, self.tokenizer))
+        self.last_candidates = [dict(row, index=i) for i, row in enumerate(candidates)]
+        # Preserve the requested candidate budget. Failed extraction is an empty
+        # entry, not a silently dropped attempt or a full chain labelled CDR3.
+        return [row["sequence"] for row in self.last_candidates]
+
+    def _infill_options(self):
+        if not self.fixed_v2:
+            return {}
+        from downstream.grammar.tcr_generation_v2 import residue_allowlist
+        return {"allowed_token_ids": residue_allowlist(self.model, self.tokenizer)}
 
     # -- Setting B: epitope-conditioned CDR3b -------------------------------
     def conditional_cdr3b(
@@ -137,9 +154,11 @@ class BioSeqTcrSampler:
         sampling_strategy: str = "gumbel_argmax",
         mhc_pseudo: str | None = None,
     ) -> list[str]:
-        """Sample legacy variable-length CDR3b designs for ``epitope``."""
+        """Sample CDR3b; v2 generates full beta chains before extraction."""
 
-        self._require_legacy_cdr3_semantics("conditional_cdr3b")
+        if self.fixed_v2:
+            return self._generate_v2_beta(k, batch_size, max_iter, temperature,
+                sampling_strategy, epitope, mhc_pseudo)
         out: list[str] = []
         lengths = _sample_lengths(k, self.rng)
         # Chain indices follow grammar emission order (MHC block, then peptide,
@@ -182,9 +201,10 @@ class BioSeqTcrSampler:
         temperature: float = 1.0,
         sampling_strategy: str = "gumbel_argmax",
     ) -> list[str]:
-        """Sample an unconditional legacy variable-length CDR3b repertoire."""
+        """Sample unconditional CDR3b; v2 uses full-chain EOS generation."""
 
-        self._require_legacy_cdr3_semantics("unconditional_cdr3b")
+        if self.fixed_v2:
+            return self._generate_v2_beta(n, batch_size, max_iter, temperature, sampling_strategy)
         out: list[str] = []
         lengths = _sample_lengths(n, self.rng)
         for start in range(0, n, batch_size):
@@ -222,9 +242,17 @@ class BioSeqTcrSampler:
         temperature: float = 1.0,
         sampling_strategy: str = "gumbel_argmax",
     ) -> list[dict]:
-        """Re-fill a legacy variable-length CDR3b window, with no epitope."""
+        """Reconstruct a known-length CDR3 window; v2 completes unknown frameworks."""
 
-        self._require_legacy_cdr3_semantics("infill_cdr3b")
+        if batch_size <= 0 or max_iter <= 0:
+            raise ValueError("batch_size and max_iter must be positive")
+        if any(len(seq) < 3 or not seq.startswith("C") or not seq.endswith(("F", "W")) for seq in sequences):
+            raise ValueError("CDR3 infill requires anchored C...F/W junctions")
+        if self.fixed_v2:
+            from downstream.benchmark.tcr_binding.query_protocol import TCRBindingQueryProtocol
+            from dllm.pipelines.immune_llada.data.sources import complete_tcr_chain
+            from downstream.grammar.tcr_generation_v2 import ALPHA_AA
+            profile = TCRBindingQueryProtocol().profile
         out: list[dict] = []
         for start in range(0, len(sequences), batch_size):
             chunk = sequences[start:start + batch_size]
@@ -241,8 +269,21 @@ class BioSeqTcrSampler:
                 )
                 for seq in chunk
             ]
+            offsets = [0] * len(chunk)
+            if self.fixed_v2:
+                completed = []
+                for row, seq in enumerate(chunk):
+                    beta = complete_tcr_chain("tcr_beta", profile=profile,
+                        source="tcr_v2_infill", row_index=0, core=seq[1:-1],
+                        leading_anchor=seq[0], trailing_anchor=seq[-1])
+                    offsets[row] = sum(len(beta.regions[r]) for r in ("FR1", "CDR1", "FR2", "CDR2", "FR3")) - 1
+                    alpha = BioSeqChain("X" * ALPHA_AA, "tcr_alpha",
+                        metadata={"synthetic_residue_mask": [1] * ALPHA_AA})
+                    completed.append(BioSeqRecord([beta, alpha], task_type="tcr", source="tcr_v2_infill"))
+                records = completed
             batch = self._to_device(self.collator(records))
-            partial = cdr3b_span_partial_mask(batch, chain_index=0, span=spans)
+            mapped_spans = [(lo + offset, hi + offset) for (lo, hi), offset in zip(spans, offsets)]
+            partial = cdr3b_span_partial_mask(batch, chain_index=0, span=mapped_spans)
             tokens, _ = run_grammar_generate(
                 self.model,
                 batch,
@@ -250,9 +291,12 @@ class BioSeqTcrSampler:
                 max_iter=max_iter,
                 sampling_strategy=sampling_strategy,
                 temperature=temperature,
+                **self._infill_options(),
             )
             for row, seq in enumerate(chunk):
                 pred = _decode_chain(tokens[row], batch, row, 0, self.tokenizer)
+                if self.fixed_v2:
+                    pred = pred[offsets[row]:offsets[row] + len(seq)]
                 lo, hi = spans[row]
                 out.append({
                     "index": start + row,
@@ -262,6 +306,7 @@ class BioSeqTcrSampler:
                     "truth_window": seq[lo:hi],
                     "pred_window": pred[lo:hi] if len(pred) == len(seq) else "",
                     "length_ok": len(pred) == len(seq),
+                    "length_condition": "reference_window",
                 })
         return out
 
@@ -274,9 +319,10 @@ class BioSeqTcrSampler:
         temperature: float = 1.0,
         sampling_strategy: str = "gumbel_argmax",
     ) -> list[dict]:
-        """Re-fill a legacy CDR3b window inside a full-length pair."""
+        """Reconstruct a known-length CDR3b window inside an observed pair."""
 
-        self._require_legacy_cdr3_semantics("infill_cdr3b_in_pair")
+        if batch_size <= 0 or max_iter <= 0:
+            raise ValueError("batch_size and max_iter must be positive")
         out: list[dict] = []
         for start in range(0, len(pairs), batch_size):
             chunk = pairs[start:start + batch_size]
@@ -287,7 +333,7 @@ class BioSeqTcrSampler:
                 width = (anchored_len - 2) if mask_width <= 0 else min(int(mask_width), anchored_len - 2)
                 lo_anchored = (anchored_len - width) // 2
                 offset = beta_fv.find(core)
-                if offset < 1:
+                if not core or offset < 1 or beta_fv.count(core) != 1:
                     raise ValueError("could not map CDR3b core into the beta full-length sequence")
                 lo = offset + (lo_anchored - 1)
                 spans.append((lo, lo + width))
@@ -309,6 +355,7 @@ class BioSeqTcrSampler:
                 max_iter=max_iter,
                 sampling_strategy=sampling_strategy,
                 temperature=temperature,
+                **self._infill_options(),
             )
             for row, (_, beta_fv, core) in enumerate(chunk):
                 pred = _decode_chain(tokens[row], batch, row, 0, self.tokenizer)
@@ -322,6 +369,7 @@ class BioSeqTcrSampler:
                     "truth_window": windows[row],
                     "pred_window": pred[lo:hi] if len(pred) == len(beta_fv) else "",
                     "length_ok": len(pred) == len(beta_fv),
+                    "length_condition": "reference_window",
                 })
         return out
 
@@ -415,6 +463,9 @@ def main():
             temperature=args.temperature, sampling_strategy=args.sampling_strategy,
         )
         out_path.write_text("\n".join(seqs) + "\n")
+        if sampler.fixed_v2:
+            out_path.with_suffix(out_path.suffix + ".candidates.jsonl").write_text(
+                "".join(json.dumps(row) + "\n" for row in sampler.last_candidates))
         print(f"[uncond] wrote {len(seqs)} CDR3b -> {out_path}")
 
     elif args.mode == "infill":
@@ -467,7 +518,7 @@ def main():
                 handle.write(json.dumps(row) + "\n")
         ok = [row for row in rows if row["length_ok"]]
         hit = sum(sum(a == b for a, b in zip(row["truth_window"], row["pred_window"])) for row in ok)
-        total = sum(len(row["truth_window"]) for row in ok)
+        total = sum(len(row["truth_window"]) for row in rows)
         print(f"[infill] source {src_name}, n={len(rows)}/{n_src}, mask_width={args.mask_width}")
         print(f"  length preserved {len(ok)}/{len(rows)}")
         print(f"  window AAR = {hit}/{total} = {hit / max(1, total) * 100:.2f}%")
@@ -503,6 +554,8 @@ def main():
                     "epitope": entry["epitope"],
                     "layout": "tcr_pmhc" if args.with_mhc else "tcr_peptide",
                     "sequences": sequences,
+                    **({"protocol": "tcr_v2_full_beta_eos_then_cdr3",
+                        "candidates": sampler.last_candidates} if sampler.fixed_v2 else {}),
                 }) + "\n")
                 handle.flush()
                 print(f"  [{index + 1}/{len(items)}] {pmhc}: {len(sequences)} CDR3b")

@@ -928,3 +928,10 @@ T1 / Track-A / TCRT5 output schemas and paper-correspondence rules are owned by
 `downstream/benchmark/` (`RESULTS.md`, `README.md`, task docs, and
 `outputs/tcrt5_full_eval/TCRT5_FULL_EVAL_REPORT.md`). Do not copy headline
 numbers or protocol tables into this file.
+
+
+## 2026-09-24 TCR v2 generation outputs
+
+- [TCR sampler](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/grammar/tcr_generation.py): v2 conditional JSONL retains `sequences` and adds `protocol` plus one `candidates` row per requested attempt. Unconditional text gains a `.candidates.jsonl` sidecar; use the sidecar to preserve failed attempts.
+- Candidates carry `index`, `sequence` (CDR3 or empty on failure), `beta_sequence`, raw `beta_token_ids`, `terminated_by_eos`, `valid_beta_tokens`, `valid`, `failure_reason`, `extraction_method`, and `protocol`. Failures are not silently filtered. `valid` is syntactic benchmark validity, not biological validation.
+- Infill rows add `length_condition=reference_window`; CDR3-only coordinates remain junction-relative after framework completion, while paired coordinates remain full-beta-relative. Training record/shard format is unchanged.
