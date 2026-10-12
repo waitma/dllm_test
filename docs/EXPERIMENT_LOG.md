@@ -627,3 +627,8 @@ CPU实例化参数268,590,112；16层/d1024/head16/FFN4096。独立270M门禁的
 
 
 2026-10-12：启动270M验证最佳32000步的37项下游评测，四个非闲时单卡组；沿用75.6M修复后协议，CDR Kong iter4、SAb iter2，不按测试分数选点。真实权重CPU门禁通过。结果唯一维护于 /vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/RESULTS.md；证据 /vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/v5_native_270m_best32000_20261012 。
+
+
+2026-10-12：按用户要求先提交当前代码快照e8ad5fb（未push），再准备相同270M checkpoint32000的旧CDR入口对照。旧run_v5_cdr_eval及六个依赖SHA与45000历史manifest一致；原V7评测共用argmax和评分器，输入适配不同。协议差异见 /vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/AB_CDR_INFILLING.md 。不更改运行中AirGen源码与成绩。
+
+2026-10-12：旧入口对照已提交两个非闲时单卡任务，九类CDR完整评测；Kong H3十折小样本、SAb六模式CPU预检通过。任务与状态见PROJECT_PROCESS.md，结果自动回填RESULTS.md独立“旧版CDR入口对照”表。

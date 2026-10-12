@@ -1,6 +1,6 @@
 # 项目进度
 
-Last updated: 2026-10-12T09:37:27.804870+00:00
+Last updated: 2026-10-12T09:40:31.716357+00:00
 
 ## 当前决定
 
@@ -9,7 +9,7 @@ Last updated: 2026-10-12T09:37:27.804870+00:00
 | 工作 | 当前状态 | 下一步 |
 |---|---|---|
 | 75.6M正式训练 | 300000/300000完成；最终完整保存核对通过，退出码0；八卡standby已恢复 | 原产物保留 |
-| 270M新训练 | 容器Running；synthetic 8/8；正式61516/300000步；训练running | 核实已保存产物，并监督62000步验证/保存 |
+| 270M新训练 | 容器Running；synthetic 8/8；正式61581/300000步；训练running | 核实已保存产物，并监督62000步验证/保存 |
 | 新模型全下游评测 | best45000本地修复已终态；详见repair_final_20261009.json | [新状态](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/v5_native_best_20261008/dedicated_status_check.json) |
 | 新训练数据 | V5全量7,729,193条通过；302容量覆盖；启动绑定通过 | [启动参数与回执](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/v5_full_binding_20261007/launch_v3/README.md) |
 | V7 f011正式训练 | 已完成两轮，checkpoint-50082 | 保留历史结果，不重跑 |
@@ -22,11 +22,13 @@ Last updated: 2026-10-12T09:37:27.804870+00:00
 
 | 任务 | ID | 最后记录 | 证据 |
 |---|---|---|---|
+| 270M legacy CDR32000 g1 | t-20261012174026-thrps | 2026-10-12T09:40:53.223713+00:00 Queue；非闲时 | [提交记录](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/v5_native_270m_legacycdr32000_20261012/submissions.json) |
+| 270M legacy CDR32000 g0 | t-20261012174021-jrcbb | 2026-10-12T09:40:53.223713+00:00 Staging；非闲时 | [提交记录](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/v5_native_270m_legacycdr32000_20261012/submissions.json) |
 | 270M best32000 下游 g3 | t-20261012172749-tx78f | 2026-10-12T09:28:12.757870+00:00 Staging；非闲时 | [提交记录](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/v5_native_270m_best32000_20261012/submissions.json) |
 | 270M best32000 下游 g2 | t-20261012172745-kxt5s | 2026-10-12T09:28:12.757870+00:00 Staging；非闲时 | [提交记录](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/v5_native_270m_best32000_20261012/submissions.json) |
 | 270M best32000 下游 g1 | t-20261012172742-pbvpt | 2026-10-12T09:28:12.757870+00:00 Staging；非闲时 | [提交记录](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/v5_native_270m_best32000_20261012/submissions.json) |
 | 270M best32000 下游 g0 | t-20261012172738-sfpmb | 2026-10-12T09:28:12.757870+00:00 Staging；非闲时 | [提交记录](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/v5_native_270m_best32000_20261012/submissions.json) |
-| immune-v5-devpool-8gpu-20261007 | t-20261007153431-vhx2f | 2026-10-12T09:37:27.804870+00:00 容器Running；synthetic 8/8；正式61516/300000步；训练running | [状态证据](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/immune_v5_270m_noesmc_300k_b512_supervision/latest.json) |
+| immune-v5-devpool-8gpu-20261007 | t-20261007153431-vhx2f | 2026-10-12T09:40:31.716357+00:00 容器Running；synthetic 8/8；正式61581/300000步；训练running | [状态证据](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/immune_v5_270m_noesmc_300k_b512_supervision/latest.json) |
 
 
 原消融仍使用它原先冻结的数据／源码，不因新版本改用V5而切换。完成状态以实际退出及产物为准；不将单次进度观察当终态。
@@ -437,3 +439,16 @@ v5_270m_scratch_bs64_20261010.json已发布到原持续容器，未平台submit/
 
 
 2026-10-12：270M 首次下游固定验证最佳32000步（epoch 2.14823，eval_loss 1.993467），四组37任务已提交，CPU真实权重CDR门禁通过；独立结果见 /vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/RESULTS.md 。选点与平台状态见 /vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/v5_native_270m_best32000_20261012 。
+
+
+2026-10-12：按用户要求先提交当前代码快照e8ad5fb（未push），再准备相同270M checkpoint32000的旧CDR入口对照。旧run_v5_cdr_eval及六个依赖SHA与45000历史manifest一致；原V7评测共用argmax和评分器，输入适配不同。协议差异见 /vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/AB_CDR_INFILLING.md 。不更改运行中AirGen源码与成绩。
+
+
+## 2026-10-12T09:40:19.756460+00:00 270M 下游提交 g0
+
+操作 submit；task_id=['t-20261012174021-jrcbb']；YAML=/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/v5_native_270m_legacycdr32000_g0_20261012.yml；returncode=0；初始状态 submitted_pending_platform_query；Preemptible=false。固定验证最佳32000步，9类CDR分两组，独立评测快照为硬链接；训练不受影响。
+
+
+## 2026-10-12T09:40:23.536049+00:00 270M 下游提交 g1
+
+操作 submit；task_id=['t-20261012174026-thrps']；YAML=/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/v5_native_270m_legacycdr32000_g1_20261012.yml；returncode=0；初始状态 submitted_pending_platform_query；Preemptible=false。固定验证最佳32000步，9类CDR分两组，独立评测快照为硬链接；训练不受影响。

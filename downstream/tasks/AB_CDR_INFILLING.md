@@ -1,5 +1,22 @@
 # AB CDR Infilling
 
+## 2026-10-12 原入口与 AirGen 对齐入口对照
+
+修改前快照 commit `e8ad5fb`（本地提交，未推送）。此前 HEAD 为2026-09-24的 `7574875`，十月原生评测脚本此前未入库；旧入口身份由历史预测产物 manifest 的六份源码 SHA256 核对，全部一致，不能将上一个 Git commit 当作十月评测版本。
+
+| 项目 | 对齐前原生入口 | AirGen 对齐入口 |
+|---|---|---|
+| 入口 | scripts/downstream/run_v5_cdr_eval.py | 当前评测包 airgen_evaluate.py |
+| 解码 | 一次前向 argmax，iter1 | 官方迭代方法，Kong4/SAb2，logits置信度填充 |
+| Kong目标 | CDR序列首次子串定位 | JSON位置字段，end inclusive |
+| SAb23H2目标 | 转换后的CDR序列及连续子串 | 原始design FASTA全部X位置，可非连续 |
+| 推理 | 逐样本；GPU bf16 autocast | batch64；Kong bf16，SAb fp32 |
+| 评分 | CDRResultWriter，逐序列再逐折均值 | Kong逐折宏均值；SAb先round4再乘100 |
+
+旧V7 f011入口 scripts/downstream/run_v7_cdr_eval.py 与上述旧V5原生入口共用单步argmax和评分器；加载器及输入布局分别适配A4与V5 object302。新对照使用同一个270M 32000权重，保留其训练布局，仅切回对齐前评测流程；不能通过旧A4加载器强行改变新模型输入。
+
+完整对照为Kong三个CDR与SAb23H2六个CDR，沿用旧入口，不修改正在运行的对齐版或共享源码。原件及六文件核对：[历史源码审计](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/v5_native_270m_legacycdr32000_20261012/historical_code_audit.json)。结果仍唯一维护在RESULTS.md，属于多项协议变化的整体对照，不归因于单个改动。
+
 ## 2026-10-12 CDR 评测验收目标（用户确认）
 
 以 Ophiuchus-Ab 官方权重能否复现论文 CDR 结果来验证评测流程，不能仅以复用 AirGen 函数或代码形式相同作为验收。覆盖 Kong 三个重链 CDR 与 SAb23H2 六个 CDR；统一数据、掩码、可见上下文、解码设置和 AAR 聚合，再替换为我们模型的 forward 适配。模型自身输入布局不强行改成另一模型的训练布局。

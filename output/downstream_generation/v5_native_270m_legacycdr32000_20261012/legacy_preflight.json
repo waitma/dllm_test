@@ -1,0 +1,23 @@
+{
+  "cpu_kong": {
+    "status": "passed",
+    "scope": "partial diagnostic, not final score",
+    "modes": [
+      "cdrh3"
+    ],
+    "summary_sha256": "d0f092f31e31d16c301cc6ead37192cfb5bac044ac6f8c66dcdee3c28536ca71"
+  },
+  "cpu_sab23": {
+    "status": "passed",
+    "scope": "partial diagnostic, not final score",
+    "modes": [
+      "cdrl1",
+      "cdrl2",
+      "cdrl3",
+      "cdrh1",
+      "cdrh2",
+      "cdrh3"
+    ],
+    "summary_sha256": "3a2122cd17d54c26d98bfb3a2844cee6e5c0bc0b293ad1f5a4f9a44deab67689"
+  }
+}

@@ -1,5 +1,19 @@
 # AB / TCR 下游评测结果
 
+<!-- v5_native_270m_legacycdr32000_20261012:start -->
+## 270M 旧版 CDR 入口对照 checkpoint 32000 下游评测
+
+固定选点：2026-10-12T09:26:24.333933+00:00；268.59M，无ESMC，V5数据；epoch 2.14823，eval_loss 1.993467。按训练验证集最低eval_loss选取，与已完成的75.6M三组权重独立对照；本次为训练中期选点。
+
+固定与对齐版相同的270M 32000权重。旧入口run_v5_cdr_eval.py，iter1 argmax、旧转换数据及首次子串定位；Kong三CDR十折、SAb23H2六CDR。仅作历史协议对照，不覆盖AirGen对齐版，也不宣称官方论文复现已验收。
+更新：2026-10-12T09:40:19.716639+00:00；状态：`{'pending': 2}`。选点及SHA：[selection](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/v5_native_270m_legacycdr32000_20261012/selection.json)。
+
+| 任务 | 状态 | 结果／说明 | 证据 |
+|---|---|---|---|
+| cdr-kong | pending | 待执行 | [产物](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/v5_native_270m_legacycdr32000_20261012/cdr-kong) |
+| cdr-sab23 | pending | 待执行 | [产物](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/v5_native_270m_legacycdr32000_20261012/cdr-sab23) |
+<!-- v5_native_270m_legacycdr32000_20261012:end -->
+
 <!-- v5_native_270m_best32000_20261012:start -->
 ## 270M 验证最佳 checkpoint 32000 下游评测
 
