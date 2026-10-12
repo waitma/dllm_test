@@ -1,0 +1,23 @@
+{
+  "schema": "immune_architecture.factorial.v1",
+  "factor_order": [
+    "G",
+    "S",
+    "L"
+  ],
+  "variant": "cv_segment_global",
+  "options": {
+    "segment_global": true
+  },
+  "base": {
+    "ablation": "V5",
+    "d_model": 768,
+    "n_layers": 8,
+    "n_heads": 12,
+    "mlp_hidden_size": 3072,
+    "max_length": 2048,
+    "full_capacity": 302,
+    "fragment_capacity": 64,
+    "schema_version": "immune_llada.noesmc.v3"
+  }
+}

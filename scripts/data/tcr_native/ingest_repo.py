@@ -2,7 +2,7 @@
 """Ingest repo-local TCR recognition sources into unified tier rows.
 
   PISTE  -> tier B  (CDR3b + peptide + HLA pseudo)     [no ANARCI]
-  full   -> tier A  (ANARCI-extracted alpha/beta Fv + peptide + HLA pseudo)
+  full   -> tier A  (ANARCI-extracted alpha/beta Fv + peptide + supplied MHC chains)
 
 Outputs one unified CSV per source under ``data/tcr_native/unified/``.
 
@@ -32,6 +32,7 @@ from common import (
     normalize_sequence,
     record_id,
 )
+from dllm.pipelines.immune_llada.data.mhc import chain_entry, POLICY, PseudoTable, resolve_mhc
 
 OUT_DIR = DATA / "tcr_native/unified"
 PISTE_DIR = DATA / "ppi_task_raw/raw/piste_tcr_epitope_hla/PISTE/data/random"
@@ -152,7 +153,7 @@ def ingest_fulllength(*, batch_size: int = 4000, ncpu: int = 8) -> tuple[list[di
     _sys.path.insert(0, str(Path(__file__).parent))
     from anarci_fv import segment_batch
 
-    hla = load_hla_pseudo()
+    pseudo_table = PseudoTable(DATA / "mhc_sequence_v1/reference/MHC_pseudo.dat")
     stats = Counter()
 
     # Load records, collect chains to segment.
@@ -178,6 +179,14 @@ def ingest_fulllength(*, batch_size: int = 4000, ncpu: int = 8) -> tuple[list[di
                 if ro == "peptide":
                     peptide = normalize_sequence(se)
             meta = rec.get("metadata", {})
+            # Keep available context chains instead of replacing them with a
+            # pseudo lookup. The legacy file's heavy chain was allele-resolved;
+            # B2M came from a fixed reference, not experimental observations.
+            context = [se for ro, se in zip(roles, chains) if ro == "mhc"]
+            mhc_entries = [chain_entry(se, representation="provided_sequence",
+                origin="legacy_imgt_allele_resolution" if j == 0 else "legacy_B2M_reference",
+                component="mhc_heavy" if j == 0 else "b2m", scope="full")
+                for j, se in enumerate(context)]
             records.append(
                 {
                     "idx": i,
@@ -187,6 +196,7 @@ def ingest_fulllength(*, batch_size: int = 4000, ncpu: int = 8) -> tuple[list[di
                     "allele": meta.get("mhc_a", ""),
                     "relation": rec.get("labels", {}).get("relation", "binding"),
                     "origin": meta.get("origin", ""),
+                    "mhc_entries": mhc_entries,
                 }
             )
     stats["read"] = len(records)
@@ -213,7 +223,14 @@ def ingest_fulllength(*, batch_size: int = 4000, ncpu: int = 8) -> tuple[list[di
             stats["drop_no_peptide"] += 1
             continue
         allele = norm_allele(r["allele"])
-        mhc_seq = hla.get(allele, "")
+        mhc_entries = r["mhc_entries"]
+        if mhc_entries:
+            resolution = {"policy": POLICY, "status": "provided_sequence_kept",
+                "restored_from": str(FULL_JSONL), "restored_source_row": r["idx"], "allele": r["allele"]}
+        else:
+            proposal = resolve_mhc(provided=[], allele=r["allele"], table=pseudo_table)
+            mhc_entries, resolution = proposal["chains"], proposal["resolution"]
+        mhc_seq = mhc_entries[0]["sequence"] if mhc_entries else ""
 
         # beta is required (it is the primary receptor chain)
         beta_fv = beta_cdr3 = ""
@@ -274,6 +291,8 @@ def ingest_fulllength(*, batch_size: int = 4000, ncpu: int = 8) -> tuple[list[di
             mhc_seq=mhc_seq,
             mhc_allele_norm=allele,
             provenance=f"fulllength:{r['origin']}",
+            mhc_chains_json=json.dumps(mhc_entries),
+            mhc_resolution_json=json.dumps(resolution),
         )
         kept.append(out)
 

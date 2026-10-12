@@ -1,0 +1,18 @@
+{
+  "version": "v5_noesmc_270m_20261010",
+  "parameter_count": 268590112,
+  "nominal_size": "270M",
+  "data_dir": "/vepfs-mlp2/c20250601/251105016/project/dllm_test/data/prepared/immune_v5_receptor_completion",
+  "baseline_parameters": 75601176,
+  "only_model_dimensions_changed": true,
+  "global_batch": 512,
+  "micro_batch_candidate": 64,
+  "grad_accum_candidate": 1,
+  "training_status": "running",
+  "launch_bundle": "/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/v5_full_binding_20261007/launch_270m_train_bs64_20261010",
+  "formal_training_started": true,
+  "formal_steps": 67,
+  "status_updated_at": "2026-10-10T08:14:43.885827+00:00",
+  "status": "running",
+  "runtime_status_source": "/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/immune_v5_270m_noesmc_300k_b512_supervision/latest.json"
+}

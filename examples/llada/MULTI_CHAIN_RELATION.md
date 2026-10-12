@@ -1,5 +1,7 @@
 # 多链关系学习：现状、文献与对照实验
 
+> 2026-09-30 历史作业配置整理：已归档 YAML 的位置见 [归档索引](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/archive/job_yamls_20260930/README.md)；文中的旧提交命令及原路径文字保留作历史记录，复用配置前请先按索引定位。
+
 用户确认走**实验路径**，不只留调研。本文件是设计记录 + 落地说明。
 **不要改正在跑的 2M all-chains**（`protein_esmc_llada270m_diffusion_allchains_immune_v3_8gpu_2m`）。
 关系实验是**新 OUTPUT_DIR、from-scratch（或本目录自续）**的 generated-only diffusion 对照臂。

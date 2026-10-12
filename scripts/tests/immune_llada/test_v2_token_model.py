@@ -235,10 +235,32 @@ def test_local_job_launch_keeps_all_arguments(job, mode, steps):
     for flag, value in {
         "--num_machines": "2", "--num_processes": "8", "--machine_rank": "1",
         "--fixed_receptor_lengths": "True", "--residue_cond_mode": mode,
+        "--source_balanced_training": "True",
         "--max_steps": steps, "--save_top_k": "3", "--output_dir": "/test/output",
     }.items():
         assert argv[argv.index(flag) + 1] == value
     assert argv[-2:] == ["--output_dir", "/test/output"]
+
+
+def test_source_weights_reach_fusion_loss_without_changing_eval():
+    tokenizer = GrammarTokenizer()
+    batch = GrammarBioSeqCollator(tokenizer, fixed_receptor_lengths=True)([
+        antibody_pair_record("ACDE", "FGH"), antibody_pair_record("ACDEF", "GHIK")
+    ])
+    model = make_model(tokenizer)
+    weights = torch.tensor([0.2, 0.8])
+    torch.manual_seed(11)
+    result = model(**batch, source_loss_weights=weights)
+    expected = modeling_bioseq.compute_masked_cross_entropy(result.logits, result.labels, sequence_weights=weights)
+    torch.testing.assert_close(result.loss, expected)
+    result.loss.backward()
+    assert torch.isfinite(model.decoder.head.weight.grad).all()
+    model.eval()
+    torch.manual_seed(11)
+    plain = model(**batch)
+    torch.manual_seed(11)
+    weighted_input = model(**batch, source_loss_weights=weights)
+    torch.testing.assert_close(plain.loss, weighted_input.loss)
 
 
 def test_feature_replacement_remains_forbidden_in_v2():

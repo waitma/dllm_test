@@ -1,0 +1,15 @@
+# CPU evaluation/report checks, validated with Python 3.12 and CPU-visible torch 2.8.0.
+# Install torch separately from https://download.pytorch.org/whl/cpu first.
+# This is an evaluation environment; do not install the training pyproject over it.
+numpy==2.1.3
+pandas==2.3.3
+scipy==1.17.1
+scikit-learn==1.7.1
+rapidfuzz==3.14.5
+PyYAML==6.0.2
+pytest==7.4.4
+transformers==4.48.1
+accelerate==1.14.0
+datasets==5.0.0
+safetensors==0.7.0
+biopython==1.84

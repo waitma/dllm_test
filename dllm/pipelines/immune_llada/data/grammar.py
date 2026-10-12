@@ -896,10 +896,15 @@ class GrammarBioSeqCollator:
                     )
                 self._count_drop(DROP_BUDGET_MAX_LENGTH, record)
                 continue
+            # Attach shard membership only to retained rows, without changing
+            # record.source (provenance also seeds deterministic rendering).
+            row["source_group"] = getattr(record, "source_group", None)
             rows.append(row)
         return rows
 
     def __call__(self, records: list[BioSeqRecord | dict[str, Any]]) -> dict[str, Any]:
+        before = self.drop_counts.copy()
+        before_sources = {reason: counts.copy() for reason, counts in self.drop_counts_by_source.items()}
         rows = self._render_rows(records)
         if not rows:
             raise ValueError(
@@ -1076,8 +1081,18 @@ class GrammarBioSeqCollator:
         result["task_groups"] = [str(row["task_type"]) for row in rows]
         result["task_types"] = [str(row["task_type"]) for row in rows]
         result["sources"] = [str(row["source"]) for row in rows]
+        result["source_groups"] = [row.get("source_group") for row in rows]
         result["weights"] = torch.tensor(
             [float(row.get("weight", 1.0)) for row in rows],
             dtype=torch.float32,
         ).unsqueeze(-1)
+        if self.drop_overflow_records:
+            # Per-batch deltas travel back from DataLoader workers with the
+            # batch. Never read a worker-local cumulative Counter in Trainer.
+            result["_canvas_drop_counts"] = dict(self.drop_counts - before)
+            result["_canvas_drop_counts_by_source"] = {
+                reason: dict(counts - before_sources.get(reason, Counter()))
+                for reason, counts in self.drop_counts_by_source.items()
+                if counts - before_sources.get(reason, Counter())
+            }
         return result

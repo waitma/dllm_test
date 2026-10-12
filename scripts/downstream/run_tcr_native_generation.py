@@ -104,7 +104,7 @@ def overlap_flags(pmhc):
         for split in ("train", "valid") for field in ("epitope_targets", "beta_references", "pair_references")}
 
 
-def score_result(task, designs, greedy, entries, ident):
+def score_result(task, designs, greedy, entries, ident, *, report_empty_candidates=False):
     from downstream.benchmark.tcr_generation_bench import scoring
     result = scoring.score_conditional(designs, entries, k=100, greedy_map=greedy)
     for key in list(result["summary"]):
@@ -125,7 +125,8 @@ def score_result(task, designs, greedy, entries, ident):
         interpretation="sequence_similarity_not_experimental_binding_validation")
     conditioning = scoring.load_conditioning_by_epitope()
     missing = {k for k, e in entries.items() if not conditioning.get(e["epitope"])}
-    return prepare_metrics_for_json(result, missing)
+    counts={key:sum(bool(s) for s in designs.get(key, [])) for key in entries} if report_empty_candidates else None
+    return prepare_metrics_for_json(result, missing, candidate_counts=counts)
 
 
 def verify_recovery_identity(source_identity, current_identity):

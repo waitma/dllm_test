@@ -1,5 +1,7 @@
 # LLaDA
 
+> 2026-09-30 历史作业配置整理：已归档 YAML 的位置见 [归档索引](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/archive/job_yamls_20260930/README.md)；文中的旧提交命令及原路径文字保留作历史记录，复用配置前请先按索引定位。
+
 > 📄 Paper: [Large Language Diffusion Models](https://arxiv.org/abs/2502.09992) | 💻 Code: [github.com/ML-GSAI/LLaDA](https://github.com/ML-GSAI/LLaDA)
 
 Resources and examples for training (finetuning & pretraining) and evaluating diffusion language models **LLaDA**.
@@ -49,7 +51,7 @@ ESMC 条件融合预训练。历史工作线支持 `diffusion` 与 `bert` 两种
 
 **v4 正式训练入口（仅一个 diffusion 版本，尚未提交）**：
 
-- 配置：[`train_jobs/protein_esmc_llada270m_diffusion_immune_v4_4gpu.yml`](../../train_jobs/protein_esmc_llada270m_diffusion_immune_v4_4gpu.yml)
+- 配置：[`train_jobs/protein_esmc_llada270m_diffusion_immune_v4_4gpu.yml`](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/archive/job_yamls_20260930/train_jobs/protein_esmc_llada270m_diffusion_immune_v4_4gpu.yml)
 - prepared data：`data/prepared/immune_v4_beta_relation`
 - output：`output/protein_esmc_llada270m_diffusion_immune_v4_4gpu`
 - 数据语义（补全、all-X、null 前缀、relation target）不要在此复述：
@@ -57,7 +59,7 @@ ESMC 条件融合预训练。历史工作线支持 `diffusion` 与 `bert` 两种
   与 [`docs/PLAN_TCR_BETA_ONLY_RELATION_DIFFUSION.md`](../../docs/PLAN_TCR_BETA_ONLY_RELATION_DIFFUSION.md)。
 - **v5 已发布**：`configs/data/immune_v5_receptor_completion.yaml` →
   `data/prepared/immune_v5_receptor_completion/`。行数 / v4 对照：plan §4.2。
-- **v5 8-GPU 已提交**（Queue）：账本 [`PROJECT_PROCESS.md`](../../PROJECT_PROCESS.md) 2026-09-12 条。配置 [`train_jobs/protein_esmc_llada270m_diffusion_immune_v5_8gpu.yml`](../../train_jobs/protein_esmc_llada270m_diffusion_immune_v5_8gpu.yml)。
+- **v5 8-GPU 已提交**（Queue）：账本 [`PROJECT_PROCESS.md`](../../PROJECT_PROCESS.md) 2026-09-12 条。配置 [`train_jobs/protein_esmc_llada270m_diffusion_immune_v5_8gpu.yml`](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/archive/job_yamls_20260930/train_jobs/protein_esmc_llada270m_diffusion_immune_v5_8gpu.yml)。
 - **wandb `online`**，节点不可达则自动回退 offline（egress 未在计算节点验证）。
 - 提交前：smoke/full preprocess、manifest/profile 审计、residue alphabet、corpus freshness。
 

@@ -105,6 +105,7 @@ Entrypoint: |
           --max_protein_length 1024 \
           --per_device_train_batch_size 4 \
           --gradient_accumulation_steps 8 \
+          --source_balanced_training True \
           --per_device_eval_batch_size 4 \
           --max_steps 200000 \
           --learning_rate 1e-4 \

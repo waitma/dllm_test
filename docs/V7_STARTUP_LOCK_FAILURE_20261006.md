@@ -1,0 +1,79 @@
+# V7 50050段启动锁故障记录
+
+更新时间：2026-10-06T21:22:17.810232+00:00。原Goal身份01a0f245-4559-7b62-9dc2-0917a8ed2267，目标“开始监督跑正式版本的实验”，仍active；累计两轮50082、之后9项CDR及完整消融未完成。
+
+## 当前真实状态
+
+最后完整训练/验证/原生保存45050（epoch1.7990495587）；最佳主loss是45000的1.863106227。best3为45000/44000/45050，latest重合，三份均为完整恢复状态。/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/v7_formal_eight_gpu_20261002/epoch2_continuation_20261006/segment45050_root_review.json证明40050→45050的8成功退出/清理及24项原生恢复；下段失败与前段成功明确分开。
+
+50050段20:38Z单次入队后启动失败，8个pool实际失败结果和8个训练child退出/进程组清理已核实。原训练监督PID226559于20:38:22Z rc1退出，生成监督PID234066于20:38:24Z因上游停止rc1退出，两PID实际缺席。8个既有worker仍待命、新鲜心跳；本地f010/42 PID80642/start2452750909继续运行，最新3450/3750、验证3250。不能把generation state.json旧waiting快照当作存活。
+
+## 原始证据
+
+- 故障观察：/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/v7_formal_eight_gpu_20261002/epoch2_continuation_20261006/segment50050_failure_root_observation.json，SHA924be9700a4b49ae6e6893fd158f031152b8ff0daca1293ebed1a580c823e250。
+- 实际锁分析：/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/v7_formal_eight_gpu_20261002/epoch2_continuation_20261006/segment50050_lock_diagnosis.json，SHAb11ce534bfb665ce547d5204c0baa054dfd5d5bce2b5529e15d5befe2a70a158。
+- 不可逆中止请求：/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/v7_formal_eight_gpu_20261002/epoch2_continuation_20261006/launches_v1/segment_50050/meeting/coordinator/abort-request.json。
+- 原八rank清理记录与日志：/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/v7_formal_eight_gpu_20261002/epoch2_continuation_20261006/launches_v1/segment_50050/meeting/coordinator。
+- 训练监督停线：/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/v7_formal_eight_gpu_20261002/epoch2_continuation_20261006/SUPERVISION_STOPPED.json；生成监督停线：/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/v7_formal_eight_gpu_20261002/epoch2_continuation_20261006/generation_pool_v1/SUPERVISION_STOPPED.json。
+- 冻结协调器：/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/generic_eight_worker_group_integration_20261002/actual_gpu_original_Trainer_v4/eight_rank_coordinator_v2.py（SHAdbaf3e8536370309a42fd2c33d23b020224b62d981451b2038387a21009e4001）。
+
+## 已证实的故障机制和证据边界
+
+474条完整计时记录显示，两个heartbeat临界区依次持锁2.364763秒、2.350461秒，超过固定2秒获取锁等待阈值。最长一次的commit_seconds为2.362406秒，占持锁时间99.9003%；该计时覆盖中止请求合并、JSON序列化、状态写入/fsync等完整提交阶段，未隔离具体系统调用。3个heartbeat调用锁超时；rank7首次提交持久中止请求，随后整组退出。父进程group_status的观察锁超时保持abort_on_lock_timeout=false，并不是首个中止来源。
+
+8rank已完成注册并认领元数据启动token；这些token不是数据/GPU/训练准入。全部parent记录real_training_started=false，正式计时没有超过45050。现有证据能证明临界区延迟和锁超时传播；不能断言具体某个fsync、共享文件系统故障或进程调度停顿，更不能把它解释成模型CUDA计算慢、OOM或数据审核失败。
+
+## 下一步允许的工程工作
+
+先检查锁内状态提交及启动心跳时序，设计只使用人工元数据的独立CPU故障注入，用于隔离延迟来源与验证候选修复。没有新实际训练重试计划被发布；不得以“延长超时”或删除abort作为未经验证的修复。任何源码改动只能在独立候选副本完成，当前冻结源和失败原件不改，且不据一次合成通过宣称真实八卡恢复已完成。
+
+原容器、worker、监听和监督不重启，失败作业不重放；原数据审核门禁、全部安全停线、序列注释分支停止和独立CUDA专项暂停保持。两轮完成/实际退出和原9项生成终态之前，不发布后续消融任务。不用其他无关验证填充Goal。若后续事项全依赖外部状态/授权，应如实报告阻断，不能伪造接续成功。
+
+## 2026-10-06T20:59:34.081590+00:00 心跳落盘候选完成独立CPU故障对照，尚未部署
+
+独立候选 /vepfs-mlp2/c20250601/251105016/project/dllm_test/output/v7_formal_eight_gpu_20261002/epoch2_continuation_20261006/coordinator_candidate_v1/eight_rank_coordinator_v2.py（SHAba3c595803974e47ee0a8a23cf8a5cc88f6f8d3eddeb4bc98a66fe9b81e7b724）仅对完成启动后的认证单rank纯心跳时间变化省去fsync；仍flush＋原子替换。注册、token/barrier、退出、中止请求和中止状态继续同步保存；固定2秒锁期限、30秒心跳期限、身份/过期检查和两道中止合并保持。冻结生产协调器未改。
+
+新增人工元数据测试 /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/research/test_v7_heartbeat_persistence_candidate.py，只读复用旧工具，不重跑旧验收。一次实际执行736762 rc0，3.392433秒：两组各8个真实独立CPU进程；原实现注入2.35秒状态fsync延迟，竞争心跳2.004106秒锁超时且整组中止。候选两个纯心跳4.621/3.453毫秒、无fsync，随后另一真实子进程在心跳写入与最终检查之间发布中止；写入durable标志由false转true，请求和中止状态各实际fsync一次，后来调用仍拒绝。两组初始化各2次、退出各8次fsync；16个实际rc0/退出清理与临时目录删除均核实。证据 /vepfs-mlp2/c20250601/251105016/project/dllm_test/output/v7_formal_eight_gpu_20261002/epoch2_continuation_20261006/coordinator_candidate_v1/cpu_evidence_v1/result.json（SHAe77f1b3c6058ccdc22be3740b7c27f13f7edbd044658bd0ed71f420625595984），根只读复核af0309 rc0。
+
+此证据仅支持人工慢fsync场景及中止竞态；实际故障的具体系统调用仍未隔离，没有八卡修复部署或真实训练恢复结论。正式仍45050/50082停止，差5032步，两个监督已退出；8原worker新鲜待命。生成9项未开始。本地f010/42当前3450/3750、最新完整验证3250，下一3500。候选未绑定生产transport/launcher，没有提交/重启/重放。原Goal active，本轮progress，原完整范围、数据门禁、序列注释停线、独立CUDA暂停保持。
+
+故障修复边界：候选没有消除共享锁和其他文件访问延迟，启动阶段的状态更新仍需fsync，也未进行存储断电测试。丢失最新纯心跳快照应造成旧时间或缺失元数据而拒绝继续，不能把未测断电恢复称作通过。后续若准备接续，必须独立版本、明确绑定本候选与45050原生恢复状态、保留失败stage与两个STOP原件；本轮没有发布任何实际恢复包或改变准入。
+
+
+## 2026-10-06T21:02:02.926187+00:00 候选依赖衔接核查完成，正式恢复尚未发布
+
+未部署副本 /vepfs-mlp2/c20250601/251105016/project/dllm_test/output/v7_formal_eight_gpu_20261002/epoch2_continuation_20261006/coordinator_candidate_v1/transport_candidate_v1/formal_pool_transport.py 只把固定协调器依赖换成本候选SHA；全部transport函数AST与原件一致，cold/bootstrap仍固定原SHA。真实冷导入三个依赖通过、无ML导入、未执行launcher/Trainer/GPU。只读原生元数据确认45050恢复点和50082预算保持；原launcher仍绑定旧transport，两个旧监督保持退出。证据 /vepfs-mlp2/c20250601/251105016/project/dllm_test/output/v7_formal_eight_gpu_20261002/epoch2_continuation_20261006/coordinator_candidate_v1/transport_dependency_review.json（SHA6f51b8cba01fc5c2c81383c5b361fed0a36df58bed575c7373fff281c20084d6，87f570 rc0）。
+
+若后续形成独立恢复版本，可按45050→45058（8步恢复验收）→50058（5000步）→50082（24步）的提案接续；这不是已发布任务，不复用失败50050的stage/group/ticket，不重启原监督、不删除中止记录。仍缺独立恢复入口/监督接续及其一次实际恢复验收；生成监督也已停止，不能以旧waiting快照承诺自动开始。现有scope只完成通用工程候选，不声称训练恢复。不得绕过原安全停线或数据门禁。
+
+本轮顺便修正根状态JSON的worker心跳年龄：worker文件实际时间字段是time，旧根快照误读不存在的heartbeat得到了无效的大数；原只读实时命令已正确使用fallback，因此此前“新鲜待命”的依据未变。当前正式仍45050停止、8原worker待命，本地f010/42为3475/3750、最新完整验证3250。全部自有CPU临时fixture已清理，正式三份完整checkpoint保留。
+
+
+## 2026-10-06T21:13:43.071416+00:00 独立恢复入口/监督冻结完成，真实元数据预检通过，尚未启动
+
+独立执行包 /vepfs-mlp2/c20250601/251105016/project/dllm_test/output/v7_formal_eight_gpu_20261002/epoch2_continuation_20261006/recovery_v1/package_v1.json（SHA4181c9e15cd210895a63420522b4fd0dd0165f42ab68d8032981573f861497f9）绑定46项源码/原失败证据；新入口 /vepfs-mlp2/c20250601/251105016/project/dllm_test/output/v7_formal_eight_gpu_20261002/epoch2_continuation_20261006/recovery_v1/source_v1/launch_v7_recovery_segment.py，新监督 /vepfs-mlp2/c20250601/251105016/project/dllm_test/output/v7_formal_eight_gpu_20261002/epoch2_continuation_20261006/recovery_v1/source_v1/supervise_v7_recovery.py。只允许45050→45058→50058→50082，总新增5032步；先8步实际原生恢复验收，后5000＋24步。原失败50050段、两个已停监督、abort与STOP记录保留，不在原目录重放，不恢复被停止的序列注释分支。
+
+新人工元数据检查5组/14项拒绝通过（841227 rc0）：不完整清理、未知退出、失败段已经训练、重复rank、非法预算边及未写完计时尾行均拒绝/隔离。证据 /vepfs-mlp2/c20250601/251105016/project/dllm_test/output/v7_formal_eight_gpu_20261002/epoch2_continuation_20261006/recovery_v1/cpu_metadata_controls_v1.json（SHA61d09ba8cb3239e250718977edc3a746e1d277e9bfd2a6e7d6ae3a2c9015024a）。真实只读预检973d6d rc0核实46项绑定、原615项冻结源码/迁移、8失败rank清理、旧监督缺席及45050原生JSON；证据 /vepfs-mlp2/c20250601/251105016/project/dllm_test/output/v7_formal_eight_gpu_20261002/epoch2_continuation_20261006/recovery_v1/root_preflight_v1.json（SHA0fe4deea89806819cc04f8698494008576f1e571290f95c20168b17fbbc29b30）。training_ready当前true、两证书存在且原SHA绑定通过；没有新证书或降低门禁。
+
+此时没有新supervisor_launch、没有新stage/job入队、没有GPU恢复结果；正式仍45050后停止。模型f011/where/math、DDP8卡micro32/GA1/global256、50082日程和best3＋latest全状态保持。新监督首次真实成功后才接下一段，失败即停且不自动重放；生成衔接仍需适配独立恢复的终态，本轮未启动下游。原Goal active，上轮/本轮progress，完整22格/两轮/生成范围保持，独立CUDA专项暂停。
+
+
+## 2026-10-06T21:15:37.822412+00:00 独立恢复首段已在原八卡单次入队，等待实际恢复验收
+
+在既有“继续训练累计两轮”的授权下，独立版本一次启动（1c9897 rc0），没有重新申请/重启原GPU容器，也未重放原50050失败stage或重启旧监督。新监督PID319218/start2458293575已由/proc核实；tmux v7_epoch2_recovery_20261006，日志 /vepfs-mlp2/c20250601/251105016/project/dllm_test/logs/v7_epoch2_recovery_20261006/run.log。新段45050→45058的8个唯一票据已入队，原worker实际running；当前最新计时45050，phase=started、abort=None。这仅证明已入队与进程存活，8步原生恢复/保存/退出尚未验收。
+
+新状态唯一源 /vepfs-mlp2/c20250601/251105016/project/dllm_test/output/v7_formal_eight_gpu_20261002/epoch2_continuation_20261006/recovery_v1/supervision_state.json；绑定执行包 /vepfs-mlp2/c20250601/251105016/project/dllm_test/output/v7_formal_eight_gpu_20261002/epoch2_continuation_20261006/recovery_v1/package_v1.json（SHA4181c9e15cd210895a63420522b4fd0dd0165f42ab68d8032981573f861497f9），首段票据 /vepfs-mlp2/c20250601/251105016/project/dllm_test/output/v7_formal_eight_gpu_20261002/epoch2_continuation_20261006/recovery_v1/launches_v1/segment_45058/enqueue_receipt.json。旧 /vepfs-mlp2/c20250601/251105016/project/dllm_test/output/v7_formal_eight_gpu_20261002/epoch2_continuation_20261006/supervision_state.json 继续保留真实aborted状态，不能覆盖或把它当当前新段。旧训练/生成监督仍缺席；下游9项CDR未启动，需适配新恢复终态。首段真实通过才继续50058、50082，不自动开始第三轮。模型/批量/日程及best3＋latest保持。
+
+本地f010/42当前3525/3750、3500新对照已核查，下一3750。完整22格9产物/1运行/12未启动，固定图PARTIAL。原Goal active，本轮progress，完整目标与全部安全停线、原数据门禁、独立CUDA暂停保持。无volc提交或取消；新恢复版本的启动不作为原失败段成功证据。
+
+
+## 2026-10-06T21:22:17.810232+00:00 新八卡恢复验收通过并继续训练，生成等待监督已接入新终态
+
+45050→45058实际8更新、八个pool成功退出/child清理、24项optimizer/scheduler/各rank RNG恢复均已根核查（e43403 rc0）。证据 /vepfs-mlp2/c20250601/251105016/project/dllm_test/output/v7_formal_eight_gpu_20261002/epoch2_continuation_20261006/recovery_v1/segment45058_root_review.json（SHAa5cb727997d22ca0a807c0ccc8eec78439f7acfc29984bffaa75615132e2cbc6）；45058的17项原生文件、615源码绑定、参数摘要与固定验证112计数/70聚合/26结束指标均通过833ade rc0：/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/v7_formal_eight_gpu_20261002/epoch2_continuation_20261006/checkpoint45058_root_review.json（SHAf2ef99d3eccc2276169b1d3b5fa9056a9c689e8b38793a6762ba499fe279e337）。真实恢复通过不等于完整轨迹位级等价或下游能力通过；原50050失败仍保留，具体慢系统调用仍未独立定位。
+
+原八卡已单次接续45058→50058，当前45349/50082、abort=null，恢复监督PID319218/start2458293575存活。best3为45000/44000/45058、latest重合，3份完整状态；45050权重已由原保留策略正常轮替，JSON/恢复证据保留，不另复制测试权重。首段含初始化/恢复/验证/保存/退出共140.671275秒，是8步恢复验收，不拿17.5839秒/更新当稳态速度；真实新长段吞吐另从已产生的训练计时观察。
+
+独立生成等待监督PID320497/start2458326416已由/proc核实，tmux v7_recovery_generation_20261006（13657a rc0）。新包 /vepfs-mlp2/c20250601/251105016/project/dllm_test/output/v7_formal_eight_gpu_20261002/epoch2_continuation_20261006/recovery_v1/generation_pool_v1/package_v1.json（SHAfb377e6af4b72c4b5ed23888e1f161b0eeeb07c399a6d6720fe70e2ee084d9bd）；原生成监督234066仍退出。新生命周期冷核查5项通过（0a677c rc0），原解码/评分函数未改、公开入口和registry未发布；实际在训练监督仍活着时提前发布被明确拒绝，未创建队列或改公开源码。证据 /vepfs-mlp2/c20250601/251105016/project/dllm_test/output/v7_formal_eight_gpu_20261002/epoch2_continuation_20261006/recovery_v1/generation_pool_v1/root_cold_review_v1.json（SHA499cf8f9c8037d24df30b2f5d24c9ecfc7bbc03f999434bc2a42caccd83f11fe）。固定50082真实完成/退出后才准入9项CDR，当前没有生成结果；原轻链/T4适配缺项与22格消融未完成。
+
+本地f010/42当前3550/3750、3500同曝光验证已归档，下一3750；完整22格9产物/1运行/12未启动。原Goal active，本轮progress；原数据门禁、序列注释停线和独立CUDA暂停保持，无新资源提交/容器重启或旧stage重放。当前源：/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/v7_formal_eight_gpu_20261002/epoch2_continuation_20261006/recovery_v1/supervision_state.json、/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/v7_formal_eight_gpu_20261002/epoch2_continuation_20261006/recovery_v1/generation_pool_v1/state.json。
+

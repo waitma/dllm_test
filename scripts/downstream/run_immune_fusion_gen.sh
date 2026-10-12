@@ -56,6 +56,7 @@ run_cdr_sabdab() {
     --num-folds 10 \
     --sampling-strategy argmax \
     --max-iter "${CDR_MAX_ITER}" \
+    --output-dir "${log%.log}" \
     > "${log}" 2>&1
   grep -E "Average AAR|Standard deviation" "${log}" | tee -a "${LOG}" || true
 }
@@ -72,6 +73,7 @@ run_cdr_sab23() {
     --num-folds 1 \
     --sampling-strategy argmax \
     --max-iter "${CDR_MAX_ITER}" \
+    --output-dir "${log%.log}" \
     > "${log}" 2>&1
   grep -E "Average AAR|Standard deviation" "${log}" | tee -a "${LOG}" || true
 }

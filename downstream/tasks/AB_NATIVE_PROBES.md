@@ -1,5 +1,7 @@
 # AB Native Frozen Probes — 我们的 ESMC + LLaDA 模型
 
+> 2026-09-30 历史作业配置整理：已归档 YAML 的位置见 [归档索引](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/archive/job_yamls_20260930/README.md)；文中的旧提交命令及原路径文字保留作历史记录，复用配置前请先按索引定位。
+
 > 先读 [PROJGUIDE](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/PROJGUIDE.md)。本文件管理 Ours 的三个 AB 表征任务；Ophiuchus baseline 的原脚本、历史结果与审计保持独立。
 
 ## 0. 元信息
@@ -88,7 +90,7 @@ NbBench、FLAb、TCR、humanization 不由本轮授权解冻。本文件不修�
 
 ### 4.5 Specificity 200 epoch 学习曲线诊断（2026-09-15）
 
-- 用户要求检查LR、对照Ophiuchus本地记录，并尝试200轮。独立实验仍固定v5 49000快照、同一4398条/TTE五折、768维头、batch8、lr峰值5e-5、AdamW、seed42+fold；只训练分类头，不动基础模型或现有100轮结果。正式实验YAML：[eval_ab_v5_49000_specificity_ep200_20260915.yml](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_ab_v5_49000_specificity_ep200_20260915.yml)。
+- 用户要求检查LR、对照Ophiuchus本地记录，并尝试200轮。独立实验仍固定v5 49000快照、同一4398条/TTE五折、768维头、batch8、lr峰值5e-5、AdamW、seed42+fold；只训练分类头，不动基础模型或现有100轮结果。正式实验YAML：[eval_ab_v5_49000_specificity_ep200_20260915.yml](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/archive/job_yamls_20260930/eval_jobs/eval_ab_v5_49000_specificity_ep200_20260915.yml)。
 - 从头初始化，不从100轮末尾续训。10% warmup+linear decay保持同一策略，但完整预算由100变200，warmup由约10轮变20轮，LR在200轮末归零；新实验第100轮不是旧100轮实验的同一优化状态，不能当作完全一致前缀的续训比较。
 - 新增 `--log-epoch-metrics`，仅Specificity可用，默认关闭，不改变其他任务。每折逐轮保存训练loss、留出折test_loss/Accuracy/macro-F1/MCC与该轮首/末/下一步LR，文件为 `epoch_metrics.json`；每20轮及最后一轮保存 `diagnostic_head_epoch_*.pt`。五折全部完成后写 `epoch_mean.json`。每折只以固定第200轮的 `selected_head.pt` 生成正式OOF与metrics，曲线不用于early stopping、选学习率或选最好轮次，也不跨epoch平均正式成绩。
 - 这里的“验证曲线”实际为原TTE留出折诊断，没有新增nested或内部validation split；由于查看过历史结果，不称新盲评。原100轮仅有train_history及末轮预测，不能据此声称留出折已收敛。
@@ -103,17 +105,17 @@ NbBench、FLAb、TCR、humanization 不由本轮授权解冻。本文件不修�
 - 用户要求用“最新89000”测试。磁盘与训练日志核对表明step89000已被训练top-k清理，当前最新完整保存点为step92000；因此按用户“最新”意图执行step92000，并在全部产物中保留真实步数，不标成89000。
 - 冻结快照：[ab_v5_92000_llada_20260915](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/ab_eval_checkpoints/ab_v5_92000_llada_20260915)，`trainer_state.global_step=92000`，权重SHA256=`2f003a5b42a15498a7d6f2fc51414cad717f96a9cb405dca2388fcef0de3039c`，与源文件一致。只复制评测需要的权重/tokenizer/JSON，不复制optimizer；训练任务继续运行不受影响。
 - 比较协议与§4.5完全相同，只替换冻结基础模型checkpoint：同一4398条/TTE五折、完整H/L原生输入、post-LLaDA有效残基global mean、768维、fresh classification heads、200轮、batch8、lr5e-5、seed42+fold、fixed-last；曲线仅诊断。因checkpoint改变，必须重新提取特征，严禁复用49000缓存。
-- 任务 `t-20260915132856-tlxtc` 已Success（477秒）；YAML：[eval_ab_v5_92000_specificity_ep200_20260915.yml](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_ab_v5_92000_specificity_ep200_20260915.yml)，输出：[step92000目录](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/ab_v5_92000_specificity_ep200_20260915)。固定第200轮Accuracy=`0.643468 ± 0.015785`、macro-F1=`0.641730 ± 0.015289`、MCC=`0.466119 ± 0.024016`；train/eval loss=`0.707176/0.821146`。相对step49000同协议提升`0.016143/0.015948/0.024426`。
+- 任务 `t-20260915132856-tlxtc` 已Success（477秒）；YAML：[eval_ab_v5_92000_specificity_ep200_20260915.yml](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/archive/job_yamls_20260930/eval_jobs/eval_ab_v5_92000_specificity_ep200_20260915.yml)，输出：[step92000目录](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/ab_v5_92000_specificity_ep200_20260915)。固定第200轮Accuracy=`0.643468 ± 0.015785`、macro-F1=`0.641730 ± 0.015289`、MCC=`0.466119 ± 0.024016`；train/eval loss=`0.707176/0.821146`。相对step49000同协议提升`0.016143/0.015948/0.024426`。
 - 五折各200条曲线、10个诊断头、最终头与4398条OOF完整，LR末轮归零；曲线/折指标/均值/第200轮复算误差0。平均eval loss在第200轮最低，各折最低轮次`102/184/173/119/139`；第189轮瞬时Accuracy最高`0.646197`只作诊断，正式仍为固定末轮。来源：[metrics](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/ab_v5_92000_specificity_ep200_20260915/metrics.json)、[curve](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/ab_v5_92000_specificity_ep200_20260915/epoch_mean.json)、[OOF](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/ab_v5_92000_specificity_ep200_20260915/oof_predictions.csv)。
 
 ### 4.7 v5 92000：300 / 400 / 500 epoch 独立预算对照（2026-09-15）
 
-- 2026-09-15追加用户授权的独立100轮：沿用本节全部数据/缓存/初始化/固定末轮规则，warmup为预算的10%；不是200轮的中间检查点。[100轮YAML](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_ab_v5_92000_specificity_ep100_20260915.yml)。监控通过`--extra-job 100:TASK_ID`接入，沿用完整验收后发布门禁。
+- 2026-09-15追加用户授权的独立100轮：沿用本节全部数据/缓存/初始化/固定末轮规则，warmup为预算的10%；不是200轮的中间检查点。[100轮YAML](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/archive/job_yamls_20260930/eval_jobs/eval_ab_v5_92000_specificity_ep100_20260915.yml)。监控通过`--extra-job 100:TASK_ID`接入，沿用完整验收后发布门禁。
 - 后台[验收发布器](/vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/downstream/monitor_ab_specificity_budgets.py)每30秒检查这三项任务；只有平台Success且完整产物核验通过才回填RESULTS的三条预算行，并同步PROJECT_PROCESS对应终态/Active行。4项发布器CPU测试通过；保留基线、旧结果及其他任务，不修改生产任务或配置，不自动重试失败训练。
 - 用户在查看92000的200轮曲线后，要求测试300/400/500轮。三项均固定§4.6的92000快照、4398条/TTE五折、768维表征、batch8、AdamW、lr峰值5e-5、seed42+fold；只训练分类头，不改基础模型和数据，不从200轮末尾续训。
 - 每个预算独立初始化；10% warmup分别约30/40/50轮，再线性衰减到各自末轮的0。因此比较的是完整训练预算（含scheduler时长），不是同一500轮训练的三个中间检查点。正式只取预先指定的第300/400/500轮，不使用留出折early stopping或best-epoch替换末轮。
 - 三项复用已完成92000/200轮的features.pt独立副本；先核对源/副本字节一致，再通过现有cached_features校验权重、checkpoint JSON、序列顺序、源码、torch版本、精度、batch和最大长度。不得复用49000特征；原200轮缓存/预测不覆盖。
-- YAML：[300轮](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_ab_v5_92000_specificity_ep300_20260915.yml)、[400轮](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_ab_v5_92000_specificity_ep400_20260915.yml)、[500轮](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_ab_v5_92000_specificity_ep500_20260915.yml)。每项独立单卡、非闲时；输出各自的output/downstream_generation/ab_v5_92000_specificity_ep{300,400,500}_20260915目录，拒绝已有run manifest，保留逐轮曲线、每20轮诊断头、最终selected head及OOF。
+- YAML：[300轮](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/archive/job_yamls_20260930/eval_jobs/eval_ab_v5_92000_specificity_ep300_20260915.yml)、[400轮](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/archive/job_yamls_20260930/eval_jobs/eval_ab_v5_92000_specificity_ep400_20260915.yml)、[500轮](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/archive/job_yamls_20260930/eval_jobs/eval_ab_v5_92000_specificity_ep500_20260915.yml)。每项独立单卡、非闲时；输出各自的output/downstream_generation/ab_v5_92000_specificity_ep{300,400,500}_20260915目录，拒绝已有run manifest，保留逐轮曲线、每20轮诊断头、最终selected head及OOF。
 - 验收继续核对五折完整epoch序列、末轮LR=0、selected_epoch、OOF唯一覆盖、逐折指标/mean/SD以及曲线聚合；只在完成后写入RESULTS §0.6a。本文不提前填分数；任务状态及提交ID唯一见[PROJECT_PROCESS](/vepfs-mlp2/c20250601/251105016/project/dllm_test/PROJECT_PROCESS.md)。这三项是用户授权的诊断对照，已观察过的测试曲线不构成新盲评。
 
 ## 5. Baseline 清单与排行榜构造
@@ -134,6 +136,8 @@ NbBench、FLAb、TCR、humanization 不由本轮授权解冻。本文件不修�
 数值仍统一由 [RESULTS](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/RESULTS.md) 管理；本轮为附加测评，获得完整且通过核验的产物前不新增成绩。提交/平台状态只在 [PROJECT_PROCESS](/vepfs-mlp2/c20250601/251105016/project/dllm_test/PROJECT_PROCESS.md) 维护。
 
 ## 7. 已知缺陷与不可比口径
+
+2026-09-30 GDPa1 继续作为 `legacy_reference`：同 CV 选择 alpha 并汇报、全体标签变换等限制随 [独立完整性报告](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_integrity_20260930/final/results/integrity_report.json) 导出，不能将历史 CV 成绩解释为独立泛化分数。本轮不切换新划分、不新增严格训练轨；其余原生探针保留现有协议和原始指标。
 
 - 冻结探针不是全参数微调；当前代码没有新增 full-finetuning 协议。
 - m396 原始行随机拆分的序列重叠、参考输入长度/pooling 差异不能被新 Ours 结果掩盖；按两套 split 分开解释。
@@ -178,3 +182,13 @@ NbBench、FLAb、TCR、humanization 不由本轮授权解冻。本文件不修�
 | 2026-09-15 | 按用户决定移除 GDPa1 nested 执行；参考流程和兼容字段保留，历史产物不改，当前结果只展示参考 CV |
 | 2026-09-13 | 用户授权原生 AB 探针及 prompt/CFG 分组单卡测评；实现与 CPU 验收完成，checkpoint 未确定，未提交 |
 | 2026-09-13 | 用户指定最新 v5；独立快照及真实 GPU 门禁通过，正式矩阵执行以平台账本为准 |
+
+### 2026-09-27 fixed-v2 Fv input protocol
+
+The prior full-H/L protocol remains the default for legacy runs. For fixed-v2 checkpoints, `--input-policy fixed-v2-fv` explicitly selects ANARCI-verified Fv adaptation in `/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/grammar/ab_fv_input.py`. Specificity adapts only two over-capacity pairs, retains all rows/labels/folds and checks no duplicate pair crosses folds after transformation. m396 adapts WT and every variant to aligned H118/L108; all removed flanks must exactly match WT. No arbitrary prefix crop is allowed. The 89,263 raw variants were audited; normal missing-Statium filtering still yields 86,929 variants.
+
+Input audit is part of feature-cache identity and run manifests. Results use separate `specificity-fv-v1` / `m396-fv-v1` directories and feature protocol `ab_audited_fv_postllada_global_residue_mean_v1`. In particular m396 is an Fv-only representation protocol, not the previous full-H245/L213 representation; comparisons must disclose this change even though all variant substitutions remain represented. No new score has been published.
+
+### 2026-09-27 GDPa1 V6 audit
+
+Evaluation identities and all cached CV results were verified. First-16 GPU feature replay and a predeclared step35000 diagnostic are recorded in `/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/diagnostics/gdpa1_v6_20260927/REPORT.md`. EOS is excluded from pooled means but remains attention-visible under the trained V6 canvas. Model naming follows data version V6; fixed-canvas v2 is a separate architecture name. Main-table checkpoint selection is unchanged; 35k diagnostics cannot be substituted as a test-selected best result.

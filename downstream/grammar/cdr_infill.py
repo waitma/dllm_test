@@ -1,11 +1,15 @@
 """CDR infilling eval adapter for grammar BioSeq / LLaDA-fusion models.
 
 Run: python -m downstream.grammar.cdr_infill --smoke --device cpu
+Persist evaluations with --output-dir <NEW_DIRECTORY>; rescore without inference:
+python -m downstream.grammar.cdr_result_io --score-only <DIRECTORY>
 """
 
 from __future__ import annotations
 
 import argparse
+import hashlib
+import json
 import os
 import sys
 from pathlib import Path
@@ -15,7 +19,7 @@ import pandas as pd
 import torch
 from torch.utils.data import DataLoader, Dataset
 
-PROJECT_ROOT = Path("/vepfs-mlp2/c20250601/251105016/project/dllm_test")
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
@@ -32,6 +36,8 @@ from downstream.grammar.common import (
 )
 from downstream.grammar.masks import cdr_generation_partial_mask, cdr_generation_partial_mask_from_subsequence
 from downstream.grammar.metrics import masked_token_accuracy
+from downstream.grammar.cdr_result_io import CDRResultWriter, checkpoint_identity, score_artifacts
+from downstream.benchmark.common.reporting import file_identity
 
 
 def resolve_sabdab_test_json(file_path: str, mode: str, fold: int) -> str:
@@ -194,21 +200,57 @@ def _load_eval_model(args, device: torch.device):
 
 
 def evaluate(args) -> None:
-    device = torch.device(args.device)
-    model, tokenizer = _load_eval_model(args, device)
-    collator = build_eval_collator(model, tokenizer)
+    if args.num_folds <= 0 or (args.max_samples is not None and args.max_samples <= 0):
+        raise ValueError("num-folds and max-samples must be positive")
+    if not args.checkpoint_path:
+        raise ValueError("Dataset evaluation requires a checkpoint; use --smoke for an untrained model")
+    if getattr(args, "output_dir", None) and Path(args.output_dir).exists():
+        raise FileExistsError(f"Output directory already exists: {args.output_dir}")
 
     fold_jsons: list[str] = []
     for fold in range(args.num_folds):
-        path = resolve_sabdab_test_json(args.test_set, args.mode, fold)
+        path = str(Path(resolve_sabdab_test_json(args.test_set, args.mode, fold)).resolve())
         if path in fold_jsons:
             break
         fold_jsons.append(path)
 
+    datasets = [SAbDabDataset(args.test_set, args.mode, fold=fold) for fold in range(len(fold_jsons))]
+    if not datasets or any(len(dataset) == 0 for dataset in datasets):
+        raise ValueError("CDR evaluation contains an empty fold")
+    device = torch.device(args.device)
+    model, tokenizer = _load_eval_model(args, device)
+    collator = build_eval_collator(model, tokenizer)
+    writer = None
+    if getattr(args, "output_dir", None):
+        code_paths = [
+            "downstream/grammar/cdr_infill.py", "downstream/grammar/cdr_result_io.py",
+            "downstream/grammar/common.py", "downstream/grammar/masks.py", "downstream/grammar/metrics.py",
+            "downstream/benchmark/common/reporting.py",
+            "dllm/pipelines/immune_llada/data/grammar.py", "dllm/pipelines/qwen3_vl_arch/sampling_bioseq.py",
+            "examples/llada/load_fusion_checkpoint.py", "examples/llada/protein_fusion_model.py",
+        ]
+        identity = {
+            "checkpoint": checkpoint_identity(args.checkpoint_path),
+            "datasets": [{**file_identity(path), "fold": fold, "n_rows": len(datasets[fold])}
+                         for fold, path in enumerate(fold_jsons)],
+            "tokenizer": {"class": type(tokenizer).__qualname__,
+                          "tokens": [tokenizer.token(i) for i in range(tokenizer.vocab_size)],
+                          "mask_token_id": tokenizer.mask_token_id, "pad_token_id": tokenizer.pad_token_id},
+            "code": [file_identity(PROJECT_ROOT / path) for path in code_paths],
+            "parameters": {"mode": args.mode, "num_folds_requested": args.num_folds,
+                           "resolved_folds": len(fold_jsons), "max_samples": args.max_samples,
+                           "max_iter": args.max_iter, "sampling_strategy": args.sampling_strategy,
+                           "temperature": args.temperature, "device": args.device,
+                           "torch_initial_seed": torch.initial_seed(),
+                           "torch_rng_state_sha256": hashlib.sha256(torch.get_rng_state().numpy().tobytes()).hexdigest(),
+                           "torch_version": torch.__version__, "normalization": "heavy/light J->L (legacy unchanged)"},
+        }
+        writer = CDRResultWriter(args.output_dir, identity)
+
     outer_aars = []
     all_aars = []
     for fold, _json_path in enumerate(fold_jsons):
-        dataset = SAbDabDataset(args.test_set, args.mode, fold=fold)
+        dataset = datasets[fold]
         inner_aars = []
         for sample_idx, (heavy, light, target, _pos, mode) in enumerate(DataLoader(dataset, batch_size=1)):
             if args.max_samples is not None and sample_idx >= args.max_samples:
@@ -230,6 +272,8 @@ def evaluate(args) -> None:
             )
             labels = labels_to_grammar(model, batch["labels"])
             generation_mask = partial_mask.logical_not() & batch["attention_mask"] & batch["residue_mask"]
+            if not bool(generation_mask.any()):
+                raise ValueError(f"Empty CDR target at fold={fold} row={sample_idx}")
             output_tokens, _ = run_grammar_generate(
                 model,
                 batch,
@@ -239,10 +283,19 @@ def evaluate(args) -> None:
                 temperature=args.temperature,
             )
             aar = masked_token_accuracy(output_tokens, labels, generation_mask)
+            if writer is not None:
+                writer.append(fold=fold, row=sample_idx,
+                              reference_ids=labels[generation_mask].tolist(),
+                              prediction_ids=output_tokens[generation_mask].tolist(),
+                              masked_positions=generation_mask[0].nonzero().flatten().tolist(),
+                              aar=float(aar.item()))
             inner_aars.append(float(aar.item()))
         outer_aars.append(float(np.mean(inner_aars) * 100.0) if inner_aars else 0.0)
         all_aars.extend(inner_aars)
 
+    if writer is not None:
+        result = writer.finish(allow_partial=args.max_samples is not None)
+        print("Artifact status:", result["status"], "directory:", str(writer.directory))
     print("Average AAR:", float(np.mean(all_aars) * 100.0) if all_aars else 0.0)
     print("Average AAR all folds:", float(np.mean(outer_aars)) if outer_aars else 0.0)
     print("AAR Standard deviation across all folds:", float(np.std(outer_aars)) if outer_aars else 0.0)
@@ -260,8 +313,14 @@ def main() -> None:
     parser.add_argument("--sampling-strategy", type=str, default="argmax")
     parser.add_argument("--max-iter", type=int, default=8)
     parser.add_argument("--smoke", action="store_true")
+    parser.add_argument("--output-dir", type=Path, help="New artifact directory (never overwritten)")
+    parser.add_argument("--score-only", type=Path, help="Rescore saved artifacts without inference")
+    parser.add_argument("--allow-partial", action="store_true", help="Allow diagnostic scoring of incomplete artifacts")
     args = parser.parse_args()
 
+    if args.score_only:
+        print(json.dumps(score_artifacts(args.score_only, allow_partial=args.allow_partial), indent=2))
+        return
     if args.smoke or not args.test_set:
         print(f"smoke AAR={smoke_eval(device=args.device):.4f}")
         return

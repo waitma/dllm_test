@@ -1,0 +1,57 @@
+TaskName: biomap-a2binder-official-seed3-20260924
+Description: Unchanged PALM A2binder BioMap code; original delta_g CSV; seed3 80/10/10;
+  up to 50 epochs; official best-validation checkpoint test
+Storages:
+- Type: Vepfs
+  MountPath: /vepfs-mlp2/c20250601/251105016
+  VepfsId: vepfs-cnbj2c98dea54433
+  SubPath: c20250601/251105016
+Entrypoint: 'set -euo pipefail
+
+  source /vepfs-mlp2/c20250601/251105016/miniforge3/etc/profile.d/conda.sh
+
+  conda activate pllm
+
+  export PYTHONPATH=/vepfs-mlp2/c20250601/251105016/project/dllm_test
+
+  export PYTHONDONTWRITEBYTECODE=1
+
+  export PYTHONUNBUFFERED=1
+
+  export CUDA_VISIBLE_DEVICES=0
+
+  export USE_TF=0
+
+  export TOKENIZERS_PARALLELISM=false
+
+  export HF_HUB_OFFLINE=1
+
+  export TRANSFORMERS_OFFLINE=1
+
+  export OMP_NUM_THREADS=4
+
+  cd /vepfs-mlp2/c20250601/251105016/project/dllm_test
+
+  /vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/ab_antigen_official_20260924/palm_env/bin/python
+  -m downstream.benchmark.ab_antigen.run_biomap --run-dir /vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/ab_antigen_official_20260924/biomap_seed3
+
+  '
+Tags:
+- ab
+- biomap
+- a2binder
+- official
+- seed3
+- 1gpu
+ImageUrl: cr-mlp-cn-beijing.cr.volces.com/public/airgen:v1
+Framework: Custom
+ResourceQueueName: c20250601
+TaskRoleSpecs:
+- RoleName: worker
+  RoleReplicas: 1
+  Flavor: ml.pni2.3xlarge
+ActiveDeadlineSeconds: 21600
+DelayExitTimeSeconds: 0
+AccessType: Private
+Preemptible: true
+Priority: 6

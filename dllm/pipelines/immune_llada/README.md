@@ -1,6 +1,6 @@
 # Immune LLaDA data pipeline
 
-> Last updated: 2026-09-12
+> Last updated: 2026-09-23
 >
 > This directory owns the **operational** data path for the ESMC-conditioned
 > LLaDA immune model (how to preprocess, what the prepared contract is, which
@@ -62,6 +62,13 @@ The prepared loader does not parse raw columns, reapply filters, retry, replace,
 or silently skip rows. It still scans the prepared JSONL shards once at dataset
 construction to build byte-offset indexes, then decodes and validates one semantic
 row per access. Removing raw preprocessing is not a zero-overhead loading claim.
+
+For source-balanced training, the loader also carries runtime `source_group`
+from each shard's manifest entry; the collator returns aligned `source_groups`
+after overflow filtering. Row `source` remains original provenance and is not a
+reliable balancing key (for example, `tcr_papers` rows may say `tcr_native`).
+This metadata is not serialized into prepared rows. The authoritative contract
+is in [DATA_FORMAT_AUDIT.md](/vepfs-mlp2/c20250601/251105016/project/dllm_test/DATA_FORMAT_AUDIT.md).
 
 The following remain deliberately in the training hot path because they depend
 on the current batch and diffusion state:

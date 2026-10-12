@@ -6,6 +6,7 @@ sequences return ``None``; unknown non-empty recognition relations raise.
 
 from __future__ import annotations
 
+import json
 import re
 from typing import Any, Mapping
 
@@ -17,6 +18,7 @@ from .records import (
     normalize_sequence,
 )
 from .profiles import default_region_profile, sample_region_lengths
+from .mhc import explicit_mhc_chains
 
 _RELATION_POSITIVE = {"binding", "binder", "positive", "pos", "true", "1", "yes"}
 _RELATION_NEGATIVE = {
@@ -360,9 +362,12 @@ def _pair_identifiers(heavy: str, h3: str = "") -> dict[str, str]:
 
 
 def _recognition_identifiers(row: dict[str, Any], *, strip_anchors: bool) -> dict[str, str]:
+    cdr3a = _cdr3_core_key(row.get("cdr3a")) if strip_anchors else normalize_sequence(row.get("cdr3a"))
     cdr3b = _cdr3_core_key(row.get("cdr3b")) if strip_anchors else normalize_sequence(row.get("cdr3b"))
     epitope = normalize_sequence(row.get("epitope_seq"))
     identifiers: dict[str, str] = {}
+    if cdr3a:
+        identifiers["cdr3a_core"] = cdr3a
     if cdr3b:
         identifiers["cdr3b_core"] = cdr3b
     if epitope:
@@ -449,6 +454,14 @@ def _context_chain(sequence: str, role: str) -> BioSeqChain | None:
     return BioSeqChain(sequence, role)
 
 
+def _mhc_context(row: dict[str, Any]) -> list[BioSeqChain]:
+    explicit = explicit_mhc_chains(row)
+    if explicit is not None:
+        return explicit
+    chain = _context_chain(normalize_sequence(row.get("mhc_seq")), "mhc")
+    return [chain] if chain is not None else []
+
+
 def _trait(
     row: dict[str, Any],
     split: str | None,
@@ -461,8 +474,8 @@ def _trait(
     if not is_valid_protein_sequence(epitope) or (not is_valid_protein_sequence(alpha) and not is_valid_protein_sequence(beta)):
         return None
     chains: list[BioSeqChain] = []
-    mhc_chain = _context_chain(mhc, "mhc")
-    if mhc_chain is not None: chains.append(mhc_chain)
+    mhc_chains = _mhc_context(row)
+    chains.extend(mhc_chains)
     chains.append(BioSeqChain(epitope, "peptide"))
     # ``downstream/trait/step4_final`` stores full IMGT junctions (C...F/W) in
     # cdr3a/cdr3b, unlike the anchor-free cores in tcr_native/tcr_papers. Without
@@ -472,8 +485,10 @@ def _trait(
         is_junction=True, profile=profile, source="trait", row_index=row_index,
     ))
     metadata: dict[str, Any] = {"relation_supervised": _relation_is_supervised(row)}
+    if row.get("mhc_resolution_json"):
+        metadata["mhc_resolution"] = json.loads(row["mhc_resolution_json"])
     if profile is not None: metadata["receptor_completion"] = True
-    return BioSeqRecord(chains, "tcr_pmhc" if mhc_chain is not None else "tcr_epitope", "trait", _split(row, split), metadata, labels={"relation": canonical_recognition_relation(row.get("relation"))}, weight=weight, identifiers=_recognition_identifiers(row, strip_anchors=True))
+    return BioSeqRecord(chains, "tcr_pmhc" if mhc_chains else "tcr_epitope", "trait", _split(row, split), metadata, labels={"relation": canonical_recognition_relation(row.get("relation"))}, weight=weight, identifiers=_recognition_identifiers(row, strip_anchors=True))
 
 
 def _native(
@@ -492,8 +507,8 @@ def _native(
     if not is_valid_protein_sequence(epitope) or (not is_valid_protein_sequence(alpha) and not is_valid_protein_sequence(beta)):
         return None
     chains: list[BioSeqChain] = []
-    mhc_chain = _context_chain(mhc, "mhc")
-    if mhc_chain is not None: chains.append(mhc_chain)
+    mhc_chains = _mhc_context(row)
+    chains.extend(mhc_chains)
     chains.append(BioSeqChain(epitope, "peptide"))
     if profile is None:
         # Preserve the historical alpha-then-beta order and raw region columns for
@@ -510,10 +525,12 @@ def _native(
             is_junction=False, profile=profile, source=source, row_index=row_index,
         ))
     metadata = compact_metadata(row, ("source", "tier", "dataset", "paper", "source_file"))
+    if row.get("mhc_resolution_json"):
+        metadata["mhc_resolution"] = json.loads(row["mhc_resolution_json"])
     if source != "tcr_native": metadata["dataset_source"] = source
     metadata["relation_supervised"] = _relation_is_supervised(row)
     if profile is not None: metadata["receptor_completion"] = True
-    return BioSeqRecord(chains, "tcr_pmhc" if mhc_chain is not None else "tcr_epitope", "tcr_native", _split(row, split), metadata, {"relation": canonical_recognition_relation(row.get("relation"))}, weight, _recognition_identifiers(row, strip_anchors=False))
+    return BioSeqRecord(chains, "tcr_pmhc" if mhc_chains else "tcr_epitope", "tcr_native", _split(row, split), metadata, {"relation": canonical_recognition_relation(row.get("relation"))}, weight, _recognition_identifiers(row, strip_anchors=False))
 
 
 def _repertoire(

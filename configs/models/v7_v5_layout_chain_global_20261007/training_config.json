@@ -1,0 +1,33 @@
+{
+  "schema": "immune.training_runtime.v1",
+  "max_steps": 300000,
+  "world_size": 8,
+  "micro_batch": 8,
+  "gradient_accumulation_steps": 8,
+  "global_batch": 512,
+  "seed": 42,
+  "learning_rate": 0.0001,
+  "warmup_steps": 2000,
+  "lr_scheduler_type": "cosine",
+  "eval_every": 1000,
+  "save_every": 1000,
+  "valid_per_source": 256,
+  "output_dir": "/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/immune_v5_object302_noesmc_300k_b512",
+  "step_reference": {
+    "baseline": "historical noESMC downstream evaluation checkpoint",
+    "steps": 150000,
+    "global_batch": 256,
+    "step_multiplier": 2,
+    "sample_exposure_multiplier": 4
+  },
+  "training_submitted": true,
+  "gpu_memory_validated": true,
+  "formal_training_started": true,
+  "last_task_id": "t-20261007153431-vhx2f",
+  "last_task_status": "Running",
+  "formal_steps": 223,
+  "status_updated_at": "2026-10-07T07:41:44.569941+00:00",
+  "gpu_memory_scope": "synthetic micro8 length1218, eight GPUs; not a batch-size optimization sweep",
+  "container_task_id": "t-20261007153431-vhx2f",
+  "active_training_ticket": "v5_scratch_launch_v3_20261007"
+}

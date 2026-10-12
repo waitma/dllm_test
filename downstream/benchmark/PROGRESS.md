@@ -1,5 +1,113 @@
 # IRBench 过程记录
 
+## 2026-10-07T00:39:13.894414+00:00 V7 TCR全量评分和V5对照已发布
+
+完整生成和CPU评分实际exit0，原始候选完整性、主视图分母和保存指标宏平均复核通过，根报告 /vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/outputs/v7_f011_step50082_tcr/report.json。真实TCR结果与协议差异已发布 /vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/RESULTS.md#tcr-generation；历史common6不冒充V7未见，当前较差结果完整保留。三类计划生成评测完成，原架构消融仍运行。
+
+## 2026-10-06T23:50:17.965727+00:00 T4的V5比较来源已绑定，真实V7仍在生成
+
+只核实既有基准/主指标源码及四视图聚合，没有重跑V5或生成V7成绩；可比性与来源见 /vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/TCR_T4_GENERATION.md §8.6。当前同一TCR进程仍运行，后续评分待完整exit0；暂不新增T4排行榜行。
+
+## 2026-10-06T23:39:56.588650+00:00 T4真实GPU输入通过并开始全量生成
+
+真实GPU输入e2be72 rc0，完整预测单次启动，已见80条原始行，非完整结果；原8卡消融继续。后续纯CPU评分准备6e80d3 rc0（此前观察脚本异常类型误捕已单独留痕，未影响生成）。协议与证据 /vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/TCR_T4_GENERATION.md §8.6；本次无新增数字。
+
+## 2026-10-06T23:35:21.048373+00:00 V7轻链完整成绩发布，T4评分辅助控制通过
+
+轻链全量生成/评分及实际退出验收完成，数字及V5比较唯一 /vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/RESULTS.md#ab-pairing，协议 /vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/AB_LIGHT_CHAIN_PAIRING.md §4.6。T4评分辅助的空候选/无定义分母检查已通过，不是模型质量或真实评分结果，见 /vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/TCR_T4_GENERATION.md §8.6。
+
+## 2026-10-06T23:24:18.465554+00:00 V7轻链4000预测结束，评分进入实际执行
+
+逐候选完整性和真实exit0已核实，原评分器单次启动，结果仍待完成。协议/证据只见 /vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/AB_LIGHT_CHAIN_PAIRING.md §4.6；没有新增排行榜数字。
+
+## 2026-10-06T23:18:02.210187+00:00 TCR全量预测入口准备与输出检查通过
+
+真实GPU/全量生成未开始；202条人工候选检查不作为模型能力证据。协议与计划见 /vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/TCR_T4_GENERATION.md §8.6，无新排行榜数字。
+
+## 2026-10-06T23:12:31.503718+00:00 V7两轮checkpoint的T4真实CPU输入核查通过
+
+103160 rc0，真实128次forward；仅输入隔离检查，未产生完整T4评分。协议和证据见 /vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/TCR_T4_GENERATION.md §8.6；无排行榜数字变更。
+
+## 2026-10-06T23:07:56.130738+00:00 V7 T4原生适配完成首轮合成检查
+
+只完成独立adapter、tiny模型人工输入/解码检查和现有基准元数据绑定，未加载正式权重或生成/评分真实T4。协议与证据唯一 /vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/TCR_T4_GENERATION.md §8.6。当前没有新增排行榜数字；原轻链全量生成继续。
+
+## 2026-10-06T22:59:41.079874+00:00 V7轻链单独评分入口准备验收
+
+固定已有评分实现，新增真实退出/全量候选与分母检查；导入和人工控制通过，实际评分未开始。协议与边界见 /vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/AB_LIGHT_CHAIN_PAIRING.md §4.6；不新增排行榜数字。
+
+## 2026-10-06T22:54:53.864578+00:00 V7轻链真实输入验收通过并开始全量预测
+
+两端真实50082输入隔离已验，全量预测一次启动，尚无评分。协议、错误修正和证据唯一 /vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/AB_LIGHT_CHAIN_PAIRING.md §4.6；本次无排行榜数字变更。
+
+## 2026-10-06T22:39:04.095965+00:00 V7轻链评测基准清单已准备
+
+只读核实完整输入及容量，未推理或评分；清单/范围边界见 /vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/AB_LIGHT_CHAIN_PAIRING.md §4.6。没有新增排行榜数字或审核证书。
+
+## 2026-10-06T22:37:03.056870+00:00 V7轻链原生输入/解码适配的新增CPU检查通过
+
+仅完成独立模块和人工CPU验证，真实轻链评测/评分未运行；协议与证据只见 /vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/AB_LIGHT_CHAIN_PAIRING.md §4.6。原九项CDR成绩不改，没有新增排行榜数值、注释或真实GPU测试。
+
+## 2026-10-06T22:28:30.597931+00:00 V7累计两轮后的九项CDR真实完成并入表
+
+原八卡先完成50082/epoch2、八rank保存/恢复/退出核查，再实际完成九项完整CDR任务；两个监督均真实rc0，未重复提交评测。固定checkpoint、argmax/iter1及全部协议保持，原评分器已重算保存预测，根收集器只读汇总通过。实际成绩、V5对照和差异边界唯一见 [/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/RESULTS.md](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/RESULTS.md#ab-cdr)，汇总 /vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/outputs/v7_f011_step50082_cdr/report.json。九项不代替轻链配对/T4；未开展新的注释或独立CUDA测试。
+
+## 2026-10-06T21:49:54.047686+00:00 V7两轮后CDR收数代码已准备、实际结果仍未生成
+
+新增 /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/downstream/collect_v7_cdr_results.py；只读复用真实两轮/9任务完成门禁，检查固定V5历史来源与拒绝提前收数通过（fa332b rc0，/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/v7_formal_eight_gpu_20261002/epoch2_continuation_20261006/recovery_v1/generation_result_collection_v1/root_preparation_review.json）。未生成V7分数、未改RESULTS或模型/评测协议。完整使用方式唯一见 /vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/AB_CDR_INFILLING.md §4.5；当前训练47642/50082，新生成仍waiting_two_epochs。
+
+
+
+
+## 2026-10-06T21:22:17.810232+00:00 V7两轮后生成已接入独立恢复完成节点
+
+新等待监督真实启动，尚无评测任务或结果；执行包与完成指针更新见 /vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/AB_CDR_INFILLING.md §4.4。解码/评分/固定checkpoint不变，原训练与生成失败记录保留，不启动注释分支。新入口实际拒绝提前发布，公开入口/registry尚未改变；训练进度与进程证据见 /vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/V7_TWO_EPOCH_GENERATION_PLAN_20261006.md。
+
+## 2026-10-06T20:59:34.081590+00:00 V7生成监督因训练启动故障退出，尚无评测结果
+
+执行状态以 /vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/V7_TWO_EPOCH_GENERATION_PLAN_20261006.md 为准；原等待快照不代表监督存活。本轮没有发布或运行生成任务、改变评测协议、填入排行榜数字；通用协调器CPU候选不作为生成验收。
+
+## 2026-10-06T17:22:28.246781+00:00 V7两轮后CDR结果的历史对比口径补充
+
+已核对历史V5主表与本轮冻结解码设置，补充对比边界，唯一协议见 /vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/AB_CDR_INFILLING.md §4.4。本轮不新增生成运行、修改执行包或填入未产生的成绩；实际V7结果仍等待两轮终点。
+
+## 2026-10-06T14:15:40.813569+00:00 V7两轮后的9项CDR执行监督已部署等待
+
+现已接通原8卡后续执行，尚无任务发布或生成成绩。PID234066/start2455753425实际存在，等待两轮50082完成。执行状态 /vepfs-mlp2/c20250601/251105016/project/dllm_test/output/v7_formal_eight_gpu_20261002/epoch2_continuation_20261006/generation_pool_v1/state.json；任务协议唯一见 /vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/AB_CDR_INFILLING.md §4.4；不会恢复注释分支。
+
+## 2026-10-06T13:54:38.042567+00:00 V7 CDR原生入口CPU/隔离启动通过，尚未推理
+
+实现及固定协议见 /vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/AB_CDR_INFILLING.md §4.4；状态 /vepfs-mlp2/c20250601/251105016/project/dllm_test/output/v7_formal_eight_gpu_20261002/epoch2_continuation_20261006/generation_plan_v2.json。v1旧包导入问题已修复，失败原件保留；没有真实50082 checkpoint、没有生成任务入队或数字。阶段训练接续已部署，资源内评测接入待完成。
+
+## 2026-10-06T13:38:54.423749+00:00 V7累计两轮后生成评测准备
+
+固定checkpoint50082尚未产生。两轮接续监督已部署等待，V7/A4兼容入口正在准备；未运行下游生成、未更新排行榜。执行状态见 /vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/V7_TWO_EPOCH_GENERATION_PLAN_20261006.md；现有任务协议和范围不变。
+
+## 2026-10-06T13:21:35.490096+00:00 V7两轮后生成评测请求登记，尚未执行
+
+训练节点与接续状态唯一见 /vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/V7_TWO_EPOCH_GENERATION_PLAN_20261006.md。本轮仅读取现有任务协议，V7 f011/A4入口兼容核实待完成；无生成输出、成绩或范围解冻，不进行test选模。
+
+## 2026-10-02T18:53:05+00:00 当前 T4 reference 的训练数据保护范围核验完成
+
+仅审核数据保护证据，未改评测划分/评分/排行榜；当前 reference 键覆盖与最终训练数据条件键残留核查完成。事实以[T4 任务记录](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/TCR_T4_GENERATION.md)及[最终数据验收](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/IMMUNE_TEST_SCOPE_FINAL_20261002.md)为准。
+
+## 2026-09-30 历史评测作业配置归档
+
+旧评测 YAML 已按依赖检查结果移出日常作业目录，任务手册中的历史文件链接随之更新。归档清单、保留文件及恢复方式见 [归档索引](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/archive/job_yamls_20260930/README.md)；现行模板见 [评测目录说明](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/README.md)。本次只整理作业文件与文档路径，评测协议和既有成绩不变。
+
+## 2026-09-30 报告与复算修复
+
+修复论文主列、T3 可比性、endpoint 状态和 checkpoint/训练数据证据区分；补 CDR 可复算产物、未来模板与源码发布检查。保留原始协议和历史数字，当前结果解释及 UpTCR 已完成状态见 [RESULTS](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/RESULTS.md#result-integrity)，执行约定见 [PROJGUIDE](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/PROJGUIDE.md#report-integrity)，验收见 [validation](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_integrity_20260930/validation.json)。
+
+
+## 2026-09-27 v2 immune_v6 官方全矩阵已提交（尚无分数）
+
+对两条仍在训练的 v2 模型提交 RESULTS 官方 Ours 全表（AB 六项 + TCR 十项，共 32 个闲时 1 卡作业）。选点为 live 最佳 val：ESMC fusion **15000 / 0.739**（SHA `3748d09e…`），no-ESMC **110000 / 0.712**（SHA `313cc22a…`）。独立快照 + `eval_snapshot_*` hardlink。`c20250601` 本身份无提交权限，实际队列为 `queue012` Preemptible。训练任务未 cancel/改参。状态、task ID 与回填路径见 [RESULTS v2 评测状态](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/RESULTS.md#v2-immune-v6-eval) 与 [PROJECT_PROCESS](/vepfs-mlp2/c20250601/251105016/project/dllm_test/PROJECT_PROCESS.md)。未编造分数。
+
+## 2026-09-24 AB-AG 官方协议审计与复现准备
+
+按用户要求新增 conventional paired 抗原任务，禁止 VHH。逐 benchmark 核对 baseline 的输入、训练/选模、排序/分类/回归区别及原入口；加入来源锁、逐方法索引与 provenance/CLI 工具，保留 upstream 原文件。实际执行及失败状态统一见 [AB-AG 执行状态](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/RESULTS.md#ab-antigen)；协议与下一步 gate 见 [AB-AG 官方协议手册](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/AB_ANTIGEN_BENCHMARKS.md)。本轮没有 Volc submit/cancel、模型推理或生成成绩。
+
 ## 2026-09-17 159000 最终汇总写入 RESULTS
 
 - 将 AB 六项、TCR 十项的最终产物写入 [RESULTS](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/RESULTS.md)，以159000为当前Ours行，保留论文baseline及49000/92000/140000历史对照。明确AB pairing 16步、CDR2步、Specificity100 epoch、TCR T4仍32步；按用户既定要求不展示m396附加分组结果。
@@ -1268,3 +1376,251 @@ probe 辅报：ProtBERT probe-AUROC 0.793 / acc 0.405 / kNN 0.393；TCR-BERT 0.7
 - 统一汇总：TCRT5 Valid/Unique/Exact1000/Recall/Recovery90/GIANA=`1/1/10/0.007622/235/335`；TcrDesign=`0.999643/1/4/0.003049/197/402`；GRATCR=`1/0.074214/0/0/7/4`。TCR-epiDiff 不排名。
 - GIANA 42/42 `ok`；协议单测 16/16 passed。最终产物目录为 `/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/outputs/tcr_beta_public_benchmark/results`。
 - TcrDesign α addendum：官方单条/双条 batch 等价 smoke 通过；对全部 14,000 条本地 generated β 各解码 10 条 α，`tcrdesign_alpha_generations.csv` 共 140,000 行，回连 β 0 missing/0 mismatch。官方未发布可运行 α/αβ evaluator 或 pairing checkpoint，因此仅保存定性 pair，不计算 α 指标、不改变 β 排名。协议单测随之更新为 18/18 passed。
+
+## 2026-09-24T03:34:55.486906+00:00 MAGE 授权复查与代码缺口澄清
+
+用户已同意 MAGE HF 条款。当前环境认证后成功下载 config/tokenizer，完整权重继续下载；原始 403 报告保留为 acquisition_initial_403.json。ProGen 官方类及 MAGE 所需 Transformers 导入已在独立环境通过，未运行模型。任务手册 §7.1 区分确实缺文件、部分 baseline 链路未定位、完整作者发布未定位、本地缺依赖和上游代码缺陷。无 Volc submit/cancel。
+
+## 2026-09-24T03:54:43.033669+00:00 排除 FLAb2；提交 MAGE 原脚本单样本检查
+
+用户明确排除 FLAb2，已移出 active sources 和方法清单，后续不再处理；原记录归档。MAGE 完整权重已获取、哈希已登记，官方脚本无修改。作业 `t-20260924115209-csmbz`，c20250601 闲时单 GPU，Queue；只测试 WT-RBD n=1，不进行 VHH 测评、不计为 binding 成绩。
+
+## 2026-09-24T04:07:06.335060+00:00 S²ALM 用户指定调研
+
+读取正文/补充材料，核查原仓库、同名仓库全部历史、HF 名称搜索及 Zenodo 链接；核验 Table 2 与 PALM 的 baseline 报告值对应关系。读取 PALM 原 BioMap 和单链变化任务配置及数据，未运行模型、未新建 split。决策见 [S²ALM 复现审计](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/S2ALM_REPRODUCIBILITY_AUDIT.md)，数字见 [S²ALM 文献参照](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/RESULTS.md#s2alm-audit)。FLAb2 仍排除，MAGE 原任务保持，无新增 submit/cancel。
+
+## 2026-09-24T04:48:58.155591+00:00 BioMap 论文、数据与 baseline 代码
+
+核查成果见 [BioMap 官方 baseline 审计](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/BIOMAP_BASELINE_REPRODUCIBILITY_AUDIT.md)。读取官方模型、数据入口、split 和评分，取得补充材料、Source Data、ZIP 中央目录、RCSB 链注释；没有下载全量权重或运行模型，不新增 `[R]` 成绩。
+
+## 2026-09-24T05:06:03.673383+00:00 BioMap A2binder 正式作业提交
+
+用户要求先跑 BioMap。已获取原初始化权重、建立隔离环境、验证原 loader 和三编码器，提交 `t-20260924130337-27l9z`；平台 Queue。当前证据与成绩唯一入口：[BioMap 官方运行状态](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/RESULTS.md#biomap-official-run)。未改作者模型/划分/评分；现有训练任务未操作。
+
+## 2026-09-27 05:34Z v2 downstream failure repair
+
+Prepared 15 repaired job configurations and validated CPU/data paths; no GPU resubmission or new benchmark scores. AB Fv protocol: `/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/AB_NATIVE_PROBES.md`; execution audit: `/vepfs-mlp2/c20250601/251105016/project/dllm_test/PROJECT_PROCESS.md`. Pairing completed generations are reusable for scoring; T1 checks repinned current provenance; held20 supports explicit incomplete-output archival.
+
+## 2026-09-27T05:53:11.583710+00:00 GDPa1 V6 audit
+
+RESULTS renamed model display labels to V6 (data version); artifact paths preserved. All 20 cached property scores reproduced; three checkpoints replayed on 16 inputs; later ESMC35k diagnostic completed with mixed changes. Main scores unchanged. Evidence: `/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/diagnostics/gdpa1_v6_20260927/REPORT.md`.
+
+## 2026-09-27 AB-AG sequence v1
+
+保留历史内容并更新[研究文档](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/ANTIGEN_CONDITIONED_AB_RESEARCH.md)；新增官方数据获取、四子集构建、同源划分、原生 PLL/探针/纯序列生成与独立评分模块。9 项 CPU 协议测试通过，真实 checkpoint CPU 加载/输入布局检查通过；尚无 GPU 质量结果。状态见[RESULTS](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/RESULTS.md#ab-ag-sequence-v1)。
+
+2026-09-27 follow-up: recovered case-mismatched AAYL50, removed two exact AbBiBench duplicates, completed four-subset exact Ag/H/L/H3/pair overlap; numerical tests now10 passed and native metric fixture passed. Smoke remains queued; sequential full-job advancement configured with failure stop.
+
+### 2026-09-27 四子集统一评测接口
+
+实现 validate/export/evaluate、PairScorer/PairGenerator、严格 ID 对齐与 provenance 续跑，以及 no-ESMC150000 适配。使用说明见 [ab_antigen/README.md](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/ab_antigen/README.md)。CPU 协议测试与真实数据输入校验单独记录，不计作模型评测完成。
+
+验证：接口与既有 sequence 测试共27项通过（2.27s）；真实输入校验 binding601、SPR839、AbBiBench215697、CHIMERA test273条通过。仅验证数据/程序契约，未运行 checkpoint 推理。
+
+## 2026-09-28 no-ESMC 评测启动核查
+
+用户要求开始测试；2026-09-28T00:49:34.768573+00:00 通过 Volc get 核验已有 smoke 作业 `t-20260928062524-wls4h` 状态为 Queue，尚无推理结果。看护进程 PID802317 存活，smoke 成功后按已批准计划顺序执行正式评测，失败停止。本轮未重复提交、未取消作业；沿用固定 no-ESMC step150000。核查记录：`/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/ab_ag_sequence_v1_noesmc150000/latest_user_start_check.json`。
+
+### 2026-09-28 本地执行覆盖
+
+用户明确要求本地测试、不提交任务；已停止自动提交并取消 Volc smoke（`t-20260928062524-wls4h`，终态 Killed）。本地 A100 80GB 上启动固定 no-ESMC150000 四子集 smoke，PID833743，日志 [ab_ag_sequence_v1_noesmc150000_local_20260928/run.log](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/ab_ag_sequence_v1_noesmc150000_local_20260928/run.log)。沿用 K20 与正确/替换条件，未改指标协议；启动不等于完成，未获得有效完整模型成绩。
+
+本地进展复核：binding、SPR、AbBiBench 各1条 smoke 的 metrics.json 均为 complete；CHIMERA 已开始输出候选，仍在运行。单样本验证无法给出有意义的 AUC/Spearman，不作为正式 benchmark 分数。
+
+## 2026-09-28 本地正式 AB–Ag 评测启动
+
+用户授权正式运行；启动本地顺序流水线 PID835846，先等待四子集 smoke 产物通过，再执行 binding、SPR、CHIMERA、17个 AbBiBench assay 共20项。无新增 Volc 提交。沿用固定 no-ESMC150000、原数据和指标协议；每项24小时上限，失败停止，保留断点。日志 `/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/ab_ag_sequence_v1_noesmc150000_local_20260928/full_pipeline.log`，状态 `/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/ab_ag_sequence_v1_noesmc150000_local_20260928/local_pipeline_state.json`，逐任务日志 `full_<key>.log`。当前启动时为 waiting_for_smoke，不能报告正式结果已完成。
+
+## 2026-09-28 解除正式预测任务对 CHIMERA 检索的依赖
+
+原本地流水线仍为 waiting_for_smoke，未运行任何正式任务；停止等待进程 PID835846，以 PID848460 重启。Binding/SPR/AbBiBench smoke 已通过，因此预测类正式任务不再等待 CHIMERA 新颖性检索；CHIMERA 正式任务仍检查自身完整 smoke。未终止检索、未改变指标、未提交 Volc。状态：`/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/ab_ag_sequence_v1_noesmc150000_local_20260928/local_pipeline_state.json`。
+
+## 2026-09-30 PLL 批量调整并恢复本地评测
+
+用户要求扩大批量。以剩余4fqi_h1/h3的6条代表记录实测批量2/16/32/64/128；平均每条1.926/1.334/1.379/1.313/1.396秒，分数最大绝对差均为0；batch64峰值allocated显存31.08GiB。选择64，约1.47倍加速（小样本计时，不保证全程同比）。保留4fqi_h1已有20404条完整预测，原评分代码和checkpoint不变，运行参数变化记录在各输出目录batch_execution_change.json。本地流水线PID1614629支持读取既有状态并跳过完成项，续跑h1及h3；未提交集群任务。验证记录：`/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/ab_ag_sequence_v1_noesmc150000_local_20260928/batch_benchmark.json`。
+
+## 2026-09-30 UpTCR 候选基准审计
+
+完成论文/补充材料、官方代码与Zenodo代码归档对照、数据/权重ZIP成员检查，并提取9份分类CSV进行计数和划分审计。发现majority/few-shot跨split重复、冲突标签，以及发布zero-shot test与论文Source Data预测行数不同；尚不纳入已复现baseline。证据 `/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/research/uptcr_20260930/audit_manifest.json`，详细结论见 [TCR审计](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/TCR_BASELINE_EVALUATION_AUDIT.md:765)。本轮未启动UpTCR推理、未修改原作者代码、未影响AB作业。
+
+## 2026-09-30 UpTCR 论文解读归档
+
+已按用户要求将完整研究逻辑和实验解释补充到 [TCR 审计文档](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/TCR_BASELINE_EVALUATION_AUDIT.md#2026-09-30-论文整体思路解读补充)，并同步 [PROJECT_PROCESS](/vepfs-mlp2/c20250601/251105016/project/dllm_test/PROJECT_PROCESS.md#2026-09-30-uptcr-论文解读与评测定位同步)。仍为候选，未执行 UpTCR；论文分数为 [P]，不进入本地复现成绩。接入前需解决划分对应、重复/冲突标签、同源及预训练重叠、上游 embedding 和官方推理验证。未变更 NM2025 主榜、AB 评测或本模型训练方案。
+
+## 2026-09-30 UpTCR 数据与 release 可用性优先
+
+用户澄清不以论文成绩复现为当前目标。已补充 [发布完整度矩阵](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/TCR_BASELINE_EVALUATION_AUDIT.md#2026-09-30-用户澄清优先评估数据可用性与发布完整度)：分类序列数据可作为我们的 benchmark 来源；作者 train 不能直接评测已用其训练的官方 checkpoint。下游微调/测试包较完整但未运行验证；新序列表征、两阶段从头预训练及全套对手复现仍有缺口。自定义 benchmark 不必等待论文分数复现，须独立定义划分及训练重叠控制。本轮未构建新数据划分或启动模型。
+
+2026-09-30 补充：[预计算 embedding 说明](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/TCR_BASELINE_EVALUATION_AUDIT.md#2026-09-30-预计算-embedding-来源与作用)已归档，并同步 PROJECT_PROCESS。明确作者特征仅是官方模型输入，自己的序列模型无需依赖；仅完成代码/方法核查，无新模型运行。
+
+## 2026-09-30 UpTCR 自建 benchmark 方向确认
+
+> 历史方案，已由下方“原划分与论文baseline”决定取代。
+
+按用户最新决定，不沿用或优先复现原majority/few-shot/zero-shot划分；9份分类表统一作为数据来源，全池去重及冲突处理后建立自己的固定划分，使用官方代码比较模型与baseline。原split及论文分数对应不再作为前置条件，原文件保留来源信息。见 [当前构建约定](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/TCR_BASELINE_EVALUATION_AUDIT.md#2026-09-30-统一-benchmark-构建方向当前约定)。本轮文档更新，数据整合、新split和训练尚未执行；模型初始化的训练暴露仍须审核。
+
+## 2026-09-30 UpTCR 原划分与论文baseline（当前决定）
+
+伪序列获取探索完成：从DTU官方NetMHCpan4.1数据包取得名称表和位点定义，UpTCR 51/51字符串精确覆盖；查询工具及官方参考提取检查通过。45种对应多个名称，不能反推唯一全序列；5种匹配鼠H2参考，不删除数据。详见 [方法与产物](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/TCR_BASELINE_EVALUATION_AUDIT.md#2026-09-30-公开-hlamhc-伪序列获取路径已验证)。未改当前评测输入、划分或标签。
+
+HLA获取依据：正文说明结构相关位点并引用NetMHCpan，补充材料仅明确IPD-IMGT/HLA命名规范化；该批完整原序列版本/等位基因映射/提取脚本尚未定位，不能据引用推断确切映射表版本。原CSV的成品MHCseq可直接使用，不阻塞评测。已同步审计、数据格式与PROJECT_PROCESS。
+
+HLA多样性核查：原9表共51种不同34位MHCseq，第一种按全文件行数占36.81%；不同字符串两两位点差异中位16/34。已导出 [51种实际序列及逐split频数](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/research/uptcr_20260930/hla_pseudosequences.csv)。仅统计，不变更源数据、原划分或运行中的αβp轨。
+
+Embedding再核查：确认Zenodo公开的已有特征覆盖9份分类表所有所需肽/α/β序列文件名；每类1个.pt实际下载并成功CPU加载，CRC与finite检查通过。此前上游缺口仅指包外新序列的特征生成，不应称已有embedding未发布或阻塞当前benchmark。证据 [报告](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/research/uptcr_20260930/embedding_release_recheck.json)；未全量下载/加载，不更改当前模型评测。
+
+HLA说明补充：原9表全部MHCseq均为34残基伪序列；官方one-hot/BLOSUM50/Atchley拼接45维后由MHCEncoder编码，与肽融合，不使用HLA预计算ESM特征。当前Ours仍为αβp无HLA首轮，未改变运行。详见 [数据格式记录](/vepfs-mlp2/c20250601/251105016/project/dllm_test/DATA_FORMAT_AUDIT.md)。
+
+执行更新：用户要求开始，PID1813219已在本地提取真实特征；no-ESMC150000、完整FVαβ+peptide无HLA、冻结骨干+MLP，按原valid选模。314102行兼容性检查和39项测试通过；0删行/重标。顺序few-shot/majority/zero-shot，尚无完成成绩。见 [输出](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/uptcr_noesmc150000_original_20260930) 与 [PROJECT_PROCESS](/vepfs-mlp2/c20250601/251105016/project/dllm_test/PROJECT_PROCESS.md)。baseline仍[P]，无外部baseline重跑或Volc提交。
+
+已按用户要求纳入foundation model另一项binding任务，原始发布划分/行/标签完整保留，不清洗去重或重新划分；baseline使用论文[P]，不重训。见 [任务协议](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/TCR_T1_BINDING.md#uptcr-binding) 和 [结果登记](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/RESULTS.md#uptcr-binding-status)。此前自建清洗方案撤回，五处范围入口、方法计划与PROJECT_PROCESS已同步。发布/论文行集差异保留备注，不阻塞；无新Ours结果或作业。
+
+
+## 2026-09-30T18:00:18+00:00 新增TCR数据暴露审计
+
+开始对UpTCR及完整T3支持/查询池核查foundation预训练暴露，受体、epitope和联合配对分开；官方下游split/标签保持原样。方法/数据证据唯一见 [DATA_FORMAT_AUDIT.md](/vepfs-mlp2/c20250601/251105016/project/dllm_test/DATA_FORMAT_AUDIT.md) 的“新增TCR下游暴露审计”，任务约束已同步T1/T3。未新增排行榜指标、未启动下游训练/测试。
+
+
+## 2026-09-30T18:28:30+00:00 Foundation新范围暴露审计完成
+
+对v6/v7的完整扫描完成，发现精确与近似暴露；受体、表位、同一联合配对及跨AB–Ag表位片段分别统计。完整结果与候选清理影响唯一见 [完整审计记录](/vepfs-mlp2/c20250601/251105016/project/dllm_test/DATA_FORMAT_AUDIT.md#tcr-exposure-20260930)。本轮不修改排行榜数字、原始任务split或原样UpTCR运行；新foundation数据清理仍未执行，旧审计证书不能用于新scope放行。
+
+
+## 2026-10-06T14:10:59.736748+00:00 V7两轮后生成执行节点
+
+九个CDR生成任务的监督已启动；只等待两轮真实完成，当前没有发布或入队。
+
+原件 /vepfs-mlp2/c20250601/251105016/project/dllm_test/output/v7_formal_eight_gpu_20261002/epoch2_continuation_20261006/generation_pool_v1/state.json；/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/v7_formal_eight_gpu_20261002/epoch2_continuation_20261006/generation_pool_v1/events.jsonl。
+
+
+## 2026-10-06T14:26:11.771262+00:00 V7两轮后评测等待状态核实
+
+生成监督真实存活，phase=waiting_two_epochs；当前正式训练15800/50082，尚未执行评测或产生可发布成绩。原件 /vepfs-mlp2/c20250601/251105016/project/dllm_test/output/v7_formal_eight_gpu_20261002/epoch2_continuation_20261006/generation_pool_v1/root_status_20261006T142611Z.json；单任务协议唯一见 /vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/AB_CDR_INFILLING.md §4.4。本轮仅状态核实和15000训练保存元数据检查，没有新增下游模型测试或排行榜数字。
+
+
+## 2026-10-06T20:38:24.302204+00:00 V7两轮后生成执行节点
+
+生成监督停止后续动作，保留真实证据：ValueError('Epoch-two supervision stopped')
+
+原件 /vepfs-mlp2/c20250601/251105016/project/dllm_test/output/v7_formal_eight_gpu_20261002/epoch2_continuation_20261006/generation_pool_v1/state.json；/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/v7_formal_eight_gpu_20261002/epoch2_continuation_20261006/generation_pool_v1/events.jsonl。
+
+
+## 2026-10-06T21:19:49.628083+00:00 V7两轮后生成执行节点
+
+九个CDR生成任务的监督已启动；只等待两轮真实完成，当前没有发布或入队。
+
+原件 /vepfs-mlp2/c20250601/251105016/project/dllm_test/output/v7_formal_eight_gpu_20261002/epoch2_continuation_20261006/recovery_v1/generation_pool_v1/state.json；/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/v7_formal_eight_gpu_20261002/epoch2_continuation_20261006/recovery_v1/generation_pool_v1/events.jsonl。
+
+
+## 2026-10-06T22:22:04.625715+00:00 V7两轮后生成执行节点
+
+两轮训练及所有训练进程退出已确认；九个固定CDR任务已在原八卡单次入队，没有新资源申请。
+
+原件 /vepfs-mlp2/c20250601/251105016/project/dllm_test/output/v7_formal_eight_gpu_20261002/epoch2_continuation_20261006/recovery_v1/generation_pool_v1/state.json；/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/v7_formal_eight_gpu_20261002/epoch2_continuation_20261006/recovery_v1/generation_pool_v1/events.jsonl。
+
+
+## 2026-10-06T22:22:24.705373+00:00 V7两轮后生成执行节点
+
+sab23/cdrl1实际生成、退出和逐行重评分通过；完成1/9。
+
+原件 /vepfs-mlp2/c20250601/251105016/project/dllm_test/output/v7_formal_eight_gpu_20261002/epoch2_continuation_20261006/recovery_v1/generation_pool_v1/state.json；/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/v7_formal_eight_gpu_20261002/epoch2_continuation_20261006/recovery_v1/generation_pool_v1/events.jsonl。
+
+
+## 2026-10-06T22:22:24.728978+00:00 V7两轮后生成执行节点
+
+sab23/cdrl2实际生成、退出和逐行重评分通过；完成2/9。
+
+原件 /vepfs-mlp2/c20250601/251105016/project/dllm_test/output/v7_formal_eight_gpu_20261002/epoch2_continuation_20261006/recovery_v1/generation_pool_v1/state.json；/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/v7_formal_eight_gpu_20261002/epoch2_continuation_20261006/recovery_v1/generation_pool_v1/events.jsonl。
+
+
+## 2026-10-06T22:22:24.755257+00:00 V7两轮后生成执行节点
+
+sab23/cdrl3实际生成、退出和逐行重评分通过；完成3/9。
+
+原件 /vepfs-mlp2/c20250601/251105016/project/dllm_test/output/v7_formal_eight_gpu_20261002/epoch2_continuation_20261006/recovery_v1/generation_pool_v1/state.json；/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/v7_formal_eight_gpu_20261002/epoch2_continuation_20261006/recovery_v1/generation_pool_v1/events.jsonl。
+
+
+## 2026-10-06T22:22:24.779738+00:00 V7两轮后生成执行节点
+
+sab23/cdrh1实际生成、退出和逐行重评分通过；完成4/9。
+
+原件 /vepfs-mlp2/c20250601/251105016/project/dllm_test/output/v7_formal_eight_gpu_20261002/epoch2_continuation_20261006/recovery_v1/generation_pool_v1/state.json；/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/v7_formal_eight_gpu_20261002/epoch2_continuation_20261006/recovery_v1/generation_pool_v1/events.jsonl。
+
+
+## 2026-10-06T22:22:24.807035+00:00 V7两轮后生成执行节点
+
+sab23/cdrh2实际生成、退出和逐行重评分通过；完成5/9。
+
+原件 /vepfs-mlp2/c20250601/251105016/project/dllm_test/output/v7_formal_eight_gpu_20261002/epoch2_continuation_20261006/recovery_v1/generation_pool_v1/state.json；/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/v7_formal_eight_gpu_20261002/epoch2_continuation_20261006/recovery_v1/generation_pool_v1/events.jsonl。
+
+
+## 2026-10-06T22:22:34.851896+00:00 V7两轮后生成执行节点
+
+sab23/cdrh3实际生成、退出和逐行重评分通过；完成6/9。
+
+原件 /vepfs-mlp2/c20250601/251105016/project/dllm_test/output/v7_formal_eight_gpu_20261002/epoch2_continuation_20261006/recovery_v1/generation_pool_v1/state.json；/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/v7_formal_eight_gpu_20261002/epoch2_continuation_20261006/recovery_v1/generation_pool_v1/events.jsonl。
+
+
+## 2026-10-06T22:23:05.023654+00:00 V7两轮后生成执行节点
+
+kong/cdrh1实际生成、退出和逐行重评分通过；完成7/9。
+
+原件 /vepfs-mlp2/c20250601/251105016/project/dllm_test/output/v7_formal_eight_gpu_20261002/epoch2_continuation_20261006/recovery_v1/generation_pool_v1/state.json；/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/v7_formal_eight_gpu_20261002/epoch2_continuation_20261006/recovery_v1/generation_pool_v1/events.jsonl。
+
+
+## 2026-10-06T22:23:05.157866+00:00 V7两轮后生成执行节点
+
+kong/cdrh2实际生成、退出和逐行重评分通过；完成8/9。
+
+原件 /vepfs-mlp2/c20250601/251105016/project/dllm_test/output/v7_formal_eight_gpu_20261002/epoch2_continuation_20261006/recovery_v1/generation_pool_v1/state.json；/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/v7_formal_eight_gpu_20261002/epoch2_continuation_20261006/recovery_v1/generation_pool_v1/events.jsonl。
+
+
+## 2026-10-06T22:23:05.313569+00:00 V7两轮后生成执行节点
+
+kong/cdrh3实际生成、退出和逐行重评分通过；完成9/9。
+
+原件 /vepfs-mlp2/c20250601/251105016/project/dllm_test/output/v7_formal_eight_gpu_20261002/epoch2_continuation_20261006/recovery_v1/generation_pool_v1/state.json；/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/v7_formal_eight_gpu_20261002/epoch2_continuation_20261006/recovery_v1/generation_pool_v1/events.jsonl。
+
+
+## 2026-10-06T22:23:05.315930+00:00 V7两轮后生成执行节点
+
+固定50082的九个CDR任务全部完成并重评分，共9741条；成绩待根端审核写入唯一RESULTS。
+
+原件 /vepfs-mlp2/c20250601/251105016/project/dllm_test/output/v7_formal_eight_gpu_20261002/epoch2_continuation_20261006/recovery_v1/generation_pool_v1/state.json；/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/v7_formal_eight_gpu_20261002/epoch2_continuation_20261006/recovery_v1/generation_pool_v1/events.jsonl。
+
+## 2026-10-08 CDR协议对齐
+
+当前best45000所有9个CDR目标转入独立AirGen对齐评测：Kong位置字段/4步，SAb23H2原始design掩码/示例命令2步；直接复用原解码函数。旧单步表仅作历史对照，当前对齐结果见RESULTS.md独立区。
+
+
+### 2026-10-09 评测修复
+
+开始修复step45000评测失败：恢复T1比较表、隔离CHIMERA编号异常；本地复测单链TCR语法约束版本，旧结果保留。结果见RESULTS.md，实验脚本为scripts/downstream/repair_v5_failed.py。
+
+
+2026-10-09：固定latest269000进行37项评测，选点依据为最新完整保存而非验证loss最优；继续使用修复后的CDR/TCR协议。选点证据 /vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/v5_native_latest269000_20261009/selection.json，结果独立写入RESULTS.md。
+
+
+### 2026-10-09 CDR iteration 对照
+
+启动269000步CDR iteration敏感性分析，默认主结果不变。数字由RESULTS.md独立iteration表维护，证据 /vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/v5_cdr_iterations269000_20261009/plan.json。
+
+
+### 2026-10-09 验证最佳138000评测
+
+新增验证最佳138000步37项评测及9类CDR×6步数对照。完整选点证据 /vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/v5_native_best138000_20261009/selection.json；结果由RESULTS.md独立表维护。
+
+
+2026-10-09 修复复测已终态：{"t1-cdr3b": "success", "ag-chimera": "success", "t4-benchmark14": "success", "t4-held20": "success"}。结果及CDR3语法有效率见 /vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/v5_native_best_20261008/repair_final_20261009.json；原始候选保留，MMseqs临时目录已清理。82项回归及60组T1 AUROC复核通过；未见表位泛化弱仍未由流程修复解决。
+
+
+2026-10-12：三checkpoint全下游与两组iteration已全部完成，完整同协议对照置于RESULTS.md顶部。平台终态与汇总证据 /vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/completed_comparison_20261012.json。没有统一最优checkpoint，未见表位泛化及抗原条件生成仍是短板。
+
+
+2026-10-12：澄清 CDR 主表版本：f011 50082 的 74.5438 / 68.6565 / 42.4700 为历史原生 A4、iter=1 成绩，非当前 V5 数据 native object302 权重；“两轮”指训练轮数。保留历史数值，在 Kong 主表补入当前 75.6M 三个 checkpoint 的 AirGen 对齐 iter=4 原始 metrics，并明确跨版本不构成受控消融。仅修正文档展示，未重新评测。
+
+
+2026-10-12：用户确认 CDR 评测以 Ophiuchus-Ab 官方权重复现论文为验收目标，不以代码形式对齐代替结果验证。历史复跑与当前入口验收分开；当前端到端官方权重对照尚待完成。协议见 /vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/AB_CDR_INFILLING.md 。本次仅明确验收规则，未新增评测或修改成绩。
+
+
+2026-10-12：启动270M验证最佳32000步的37项下游评测，四个非闲时单卡组；沿用75.6M修复后协议，CDR Kong iter4、SAb iter2，不按测试分数选点。真实权重CPU门禁通过。结果唯一维护于 /vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/RESULTS.md；证据 /vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/v5_native_270m_best32000_20261012 。

@@ -53,6 +53,13 @@ coverage.xml
 .hypothesis/
 .pytest_cache/
 
+# Rebuildable paper compiler intermediates; keep .bbl and source/deliverables.
+/paper/*.aux
+/paper/*.fls
+/paper/*.fdb_latexmk
+/paper/*.blg
+/paper/*.log
+
 # Translations
 *.mo
 *.pot
@@ -195,3 +202,87 @@ checkpoint-*/
 
 # Fixed-canvas TCR downstream adapter
 !/downstream/grammar/tcr_generation_v2.py
+
+# Antigen-conditioned conventional-antibody protocol audit (no vendor code/data).
+!/downstream/benchmark/ab_antigen/
+/downstream/benchmark/ab_antigen/*
+!/downstream/benchmark/ab_antigen/official.py
+!/downstream/benchmark/ab_antigen/sources.lock.json
+!/downstream/benchmark/ab_antigen/comparisons.tsv
+!/downstream/benchmark/ab_antigen/README.md
+!/downstream/tasks/AB_ANTIGEN_BENCHMARKS.md
+!/downstream/benchmark/ab_antigen/mage_smoke.yml
+!/downstream/benchmark/ab_antigen/acquire_palm.py
+!/downstream/benchmark/ab_antigen/run_biomap.py
+!/downstream/benchmark/ab_antigen/biomap_seed3.yml
+
+# Sequence-only antigen/paired-antibody evaluation implementation
+!/downstream/benchmark/ab_antigen/acquire_sequence.py
+!/downstream/benchmark/ab_antigen/sequence_data.py
+!/downstream/benchmark/ab_antigen/sequence_eval.py
+!/downstream/benchmark/ab_antigen/sequence_audit.py
+!/downstream/benchmark/ab_antigen/sequence_metrics.py
+
+!/downstream/benchmark/ab_antigen/sequence_jobs/
+!/downstream/benchmark/ab_antigen/sequence_jobs/*.yml
+
+!/downstream/benchmark/ab_antigen/sequence_pipeline.py
+
+!/downstream/benchmark/ab_antigen/sequence_overlap.py
+
+!/downstream/benchmark/ab_antigen/interfaces.py
+!/downstream/benchmark/ab_antigen/native_adapter.py
+
+# First-party evaluation source closure. Vendor checkouts, data and outputs stay ignored.
+!/downstream/README.md
+!/downstream/common.py
+!/downstream/embeddings.py
+!/downstream/ophiuchus_eval/
+/downstream/ophiuchus_eval/*
+!/downstream/ophiuchus_eval/__init__.py
+!/downstream/ophiuchus_eval/probe_common.py
+!/downstream/ophiuchus_eval/affinity_m396.py
+!/downstream/ophiuchus_eval/developability.py
+!/downstream/ophiuchus_eval/specificity.py
+!/downstream/grammar/*.py
+!/downstream/tasks/*.md
+!/downstream/benchmark/*.md
+!/downstream/benchmark/common/
+/downstream/benchmark/common/*
+!/downstream/benchmark/common/*.py
+!/downstream/benchmark/tcr_binding/
+/downstream/benchmark/tcr_binding/*
+!/downstream/benchmark/tcr_binding/*.py
+!/downstream/benchmark/tcr_clustering/
+/downstream/benchmark/tcr_clustering/*
+!/downstream/benchmark/tcr_clustering/*.py
+!/downstream/benchmark/tcr_representation/
+/downstream/benchmark/tcr_representation/*
+!/downstream/benchmark/tcr_representation/*.py
+!/downstream/benchmark/tcr_generation_bench/*.py
+!/downstream/benchmark/scripts/
+/downstream/benchmark/scripts/*
+!/downstream/benchmark/scripts/*.py
+!/downstream/benchmark/baselines/
+/downstream/benchmark/baselines/*
+!/downstream/benchmark/baselines/__init__.py
+!/downstream/benchmark/baselines/wrappers/
+/downstream/benchmark/baselines/wrappers/*
+!/downstream/benchmark/baselines/wrappers/*.py
+!/downstream/benchmark/configs/
+/downstream/benchmark/configs/*
+!/downstream/benchmark/configs/integrity_20260930.json
+!/downstream/benchmark/requirements-cpu.txt
+!/eval_jobs/
+/eval_jobs/*
+!/eval_jobs/eval_immune_270m_42000_pairing_reference_v3.yml
+
+# Job-directory indexes and the reversible 2026-09-30 archive inventory.
+# Keep local/generated YAMLs ignored; preserve the two previously tracked configs.
+!/train_jobs/
+/train_jobs/*
+!/train_jobs/README.md
+!/eval_jobs/README.md
+!/docs/archive/job_yamls_20260930/manifest.json
+!/docs/archive/job_yamls_20260930/train_jobs/protein_esmc_llada270m_diffusion_immune_v5_8gpu.yml
+!/docs/archive/job_yamls_20260930/train_jobs/protein_esmc_llada270m_diffusion_immune_v5_8gpu_spot.yml

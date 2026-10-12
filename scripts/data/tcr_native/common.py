@@ -33,6 +33,8 @@ UNIFIED_COLUMNS = [
     "mhc_allele_norm",
     "donor",
     "provenance",
+    "mhc_chains_json",
+    "mhc_resolution_json",
 ]
 
 

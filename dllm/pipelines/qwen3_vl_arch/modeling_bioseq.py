@@ -799,6 +799,7 @@ def compute_masked_cross_entropy(
     light_mask: torch.Tensor | None = None,
     heavy_loss_weight: float = 1.0,
     light_loss_weight: float = 1.0,
+    sequence_weights: torch.Tensor | None = None,
 ) -> torch.Tensor:
     """Cross-entropy on corrupted positions only (``labels != -100``).
 
@@ -806,7 +807,10 @@ def compute_masked_cross_entropy(
 
     Defaults (``focal=False``, no ``token_weights``, no chain masks) are the
     original token/sequence/batch CE. Optional focal, reciprocal/token weights,
-    and AirGen heavy/light reductions are opt-in.
+    and AirGen heavy/light reductions are opt-in. ``sequence_weights`` selects
+    a weighted SUM of per-sequence masked-token means, used by source-balanced
+    training. Its caller accounts for global source counts and DDP/accumulation;
+    do not normalize those weights again inside a local microbatch.
     """
     logits = mask_forbidden_target_logits(logits, forbidden_token_ids)
     token_loss = F.cross_entropy(
@@ -827,21 +831,31 @@ def compute_masked_cross_entropy(
         token_loss = token_loss * token_weights.to(dtype=token_loss.dtype)
     loss_mask = labels.ne(-100)
     batch_size = int(labels.shape[0])
+    if sequence_weights is not None:
+        if tuple(sequence_weights.shape) != (batch_size,):
+            raise ValueError(f"sequence_weights must have shape ({batch_size},)")
+        if not torch.isfinite(sequence_weights).all() or sequence_weights.lt(0).any():
+            raise ValueError("sequence_weights must be finite and nonnegative")
+
+    def reduce(mask: torch.Tensor) -> torch.Tensor:
+        if sequence_weights is None:
+            return _reduce_masked_token_loss(token_loss, mask, loss_norm, batch_size)
+        per_sequence = (token_loss * mask).sum(dim=1) / mask.sum(dim=1).clamp_min(1)
+        return (per_sequence * sequence_weights.to(device=token_loss.device, dtype=token_loss.dtype)).sum()
+
     if heavy_mask is not None and light_mask is not None:
         heavy_valid = heavy_mask.bool() & loss_mask
         light_valid = light_mask.bool() & loss_mask
         neither_valid = loss_mask & ~heavy_mask.bool() & ~light_mask.bool()
         if heavy_valid.any() or light_valid.any():
-            heavy_loss = _reduce_masked_token_loss(token_loss, heavy_valid, loss_norm, batch_size)
-            light_loss = _reduce_masked_token_loss(token_loss, light_valid, loss_norm, batch_size)
+            heavy_loss = reduce(heavy_valid)
+            light_loss = reduce(light_valid)
             loss = float(heavy_loss_weight) * heavy_loss + float(light_loss_weight) * light_loss
             if neither_valid.any():
                 # Positions in neither generated chain keep the single-stream reduction.
-                loss = loss + _reduce_masked_token_loss(
-                    token_loss, neither_valid, loss_norm, batch_size
-                )
+                loss = loss + reduce(neither_valid)
             return loss
-    return _reduce_masked_token_loss(token_loss, loss_mask, loss_norm, batch_size)
+    return reduce(loss_mask)
 
 
 class LocalESMCEncoder(nn.Module):

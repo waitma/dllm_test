@@ -3,7 +3,10 @@
 The loader indexes byte offsets once during construction. ``__getitem__`` only
 reads one already-prepared JSON object and restores ``BioSeqRecord``; it never
 parses a source-specific row, loads blocklists, filters, retries, or replaces a
-bad sample.
+bad sample. Manifest source groups are carried only in memory, separately from
+row provenance, and are not serialized by ``BioSeqRecord.to_dict()``.
+
+Run: python -B -m pytest scripts/tests/immune_llada/test_prepared_source_balancing.py -q
 """
 
 from __future__ import annotations
@@ -13,6 +16,7 @@ import os
 from array import array
 from bisect import bisect_right
 from collections.abc import Iterator
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, TextIO
 
@@ -20,6 +24,13 @@ from torch.utils.data import Dataset
 
 from .preprocessing.validators import validate_manifest, validate_prepared_row
 from .records import BioSeqRecord
+
+
+@dataclass(frozen=True)
+class _PreparedBioSeqRecord(BioSeqRecord):
+    """Runtime shard membership; inherited serialization keeps the original row."""
+
+    source_group: str = field(kw_only=True)
 
 
 class PreparedImmuneDataset(Dataset[BioSeqRecord]):
@@ -38,12 +49,15 @@ class PreparedImmuneDataset(Dataset[BioSeqRecord]):
         # Keep one compact uint64 offset array per shard instead of one Python
         # tuple per record. This matters for multi-million-row datasets: the
         # index remains in memory, but does not approach the size of the JSONL.
-        self._shards: list[tuple[Path, array]] = []
+        self._shards: list[tuple[Path, array, str]] = []
         self._cumulative_counts: list[int] = []
         total = 0
         for shard in split_info.get("shards", []):
             if source is not None and shard.get("source") != source:
                 continue
+            source_group = shard.get("source")
+            if not isinstance(source_group, str) or not source_group:
+                raise ValueError(f"Prepared shard requires a nonempty manifest source group: {shard}")
             path = self.dataset_dir / str(shard["path"])
             if not path.is_file():
                 raise FileNotFoundError(f"Prepared shard listed by manifest is missing: {path}")
@@ -57,7 +71,7 @@ class PreparedImmuneDataset(Dataset[BioSeqRecord]):
                     if line.strip():
                         offsets.append(offset)
             if offsets:
-                self._shards.append((path, offsets))
+                self._shards.append((path, offsets, source_group))
                 total += len(offsets)
                 self._cumulative_counts.append(total)
         if not self._shards:
@@ -73,15 +87,15 @@ class PreparedImmuneDataset(Dataset[BioSeqRecord]):
     def __len__(self) -> int:
         return self._length
 
-    def _location(self, index: int) -> tuple[Path, int]:
+    def _location(self, index: int) -> tuple[Path, int, str]:
         if index < 0:
             index += self._length
         if index < 0 or index >= self._length:
             raise IndexError(f"Prepared dataset index out of range: {index}")
         shard_index = bisect_right(self._cumulative_counts, index)
         previous = self._cumulative_counts[shard_index - 1] if shard_index else 0
-        path, offsets = self._shards[shard_index]
-        return path, int(offsets[index - previous])
+        path, offsets, source_group = self._shards[shard_index]
+        return path, int(offsets[index - previous]), source_group
 
     def _read_line(self, path: Path, offset: int) -> str:
         # A fork can inherit a handle opened by the parent after an earlier
@@ -100,9 +114,10 @@ class PreparedImmuneDataset(Dataset[BioSeqRecord]):
         return handle.readline()
 
     def __getitem__(self, index: int) -> BioSeqRecord:
-        path, offset = self._location(index)
+        path, offset, source_group = self._location(index)
         row: dict[str, Any] = json.loads(self._read_line(path, offset))
-        return validate_prepared_row(row)
+        record = validate_prepared_row(row)
+        return _PreparedBioSeqRecord(**vars(record), source_group=source_group)
 
     def __getstate__(self) -> dict[str, Any]:
         state = self.__dict__.copy()

@@ -316,13 +316,24 @@ def main():
     parser.add_argument("--split-seed", type=int, default=2023)
     parser.add_argument("--ridge-alpha", type=float, default=0.01)
     parser.add_argument("--validate-only", action="store_true")
+    parser.add_argument("--input-policy", choices=["full", "fixed-v2-fv"], default="full")
     args = parser.parse_args()
     if args.log_epoch_metrics and args.task != "specificity":
         parser.error("--log-epoch-metrics is only supported for specificity")
     df, pairs, paths, folds = prepare_task(args.task)
+    input_audit = {"policy": "full"}
+    if args.input_policy == "fixed-v2-fv":
+        from downstream.grammar.ab_fv_input import MANIFEST, adapt_pairs
+        pairs, input_audit = adapt_pairs(args.task, pairs)
+        paths.append(MANIFEST)
+        if folds is not None:
+            for train, test in folds:
+                if {pairs[i] for i in train} & {pairs[i] for i in test}:
+                    raise ValueError("Fv extraction introduces identical pairs across folds")
     if args.validate_only:
         print(json.dumps({"task": args.task, "n": len(df), "n_pair_inputs": len(pairs),
                           "max_H_L_lengths": [max(len(p[i]) for p in pairs) for i in (0, 1)],
+                          "input_audit": input_audit,
                           "data_sha256": {str(p): file_sha256(p) for p in paths}}, indent=2))
         return
     if args.checkpoint is None or args.out_dir is None:
@@ -334,7 +345,7 @@ def main():
     if (args.out_dir / "metrics.json").exists():
         raise FileExistsError("Completed metrics exist; use a fresh output directory")
     args.out_dir.mkdir(parents=True, exist_ok=True)
-    manifest = {"task": args.task, "model": "ours_esmc_llada_fusion",
+    manifest = {"task": args.task, "model": "ours_esmc_llada_fusion", "input_audit": input_audit,
                 "runtime_versions": {"torch": str(torch.__version__), "numpy": np.__version__,
                     "pandas": pd.__version__, "scipy": scipy.__version__, "sklearn": sklearn.__version__,
                     "joblib": joblib.__version__, "cuda": torch.version.cuda},
@@ -347,7 +358,8 @@ def main():
         raise ValueError("Run provenance changed; choose a new output directory")
     write_json(manifest_path, manifest)
     features, feature_manifest = cached_features(pairs, checkpoint=args.checkpoint, out_dir=args.out_dir,
-        device=args.device, batch_size=args.embedding_batch_size, max_length=args.max_length)
+        device=args.device, batch_size=args.embedding_batch_size, max_length=args.max_length,
+        input_audit=input_audit)
     if args.task == "specificity":
         result = run_specificity(df, features, folds, args)
     elif args.task == "gdp_a1":

@@ -1,5 +1,7 @@
 # LLaDA 蛋白预训练（OAS/OTS）项目进度
 
+> 2026-09-30 历史作业配置整理：已归档 YAML 的位置见 [归档索引](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/archive/job_yamls_20260930/README.md)；文中的旧提交命令及原路径文字保留作历史记录，复用配置前请先按索引定位。
+
 > 蛋白训练线的决策与结论笔记本。Volc 任务 / 实验进展的**权威账本**是
 > [`PROJECT_PROCESS.md`](../../PROJECT_PROCESS.md)；下游数字权威在
 > [`RESULTS.md`](../../downstream/benchmark/RESULTS.md)。本文不复述 prepared 布局。

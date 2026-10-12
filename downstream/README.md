@@ -1,5 +1,9 @@
 # BioSeq downstream tasks
 
+2026-09-30 新增 [UpTCR binding benchmark](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/TCR_T1_BINDING.md#uptcr-binding)：原发布划分及标签原样使用，不清洗去重；baseline用论文 [P]，Ours实测单列。已纳入范围；执行状态统一见 [UpTCR 当前结果](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/RESULTS.md#uptcr-binding-status)。
+
+2026-09-27 AB-AG 范围更新以 [benchmark README §0](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/README.md) 为准；纯序列派生协议和本模型入口见[任务手册](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/AB_ANTIGEN_BENCHMARKS.md)。
+
 > **Ophiuchus-Ab baseline 表征探针专项（2026-09-13）**：纠错台账和后续 agent 验收入口见 [AB baseline 测评指南](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/AB_BASELINE_EVALUATION_AUDIT.md)。本次仅登记文档，未修改实现或解冻 headline。
 
 > **Agent 阅读顺序（唯一）**：[`benchmark/PROJGUIDE.md`](benchmark/PROJGUIDE.md)（怎么做）→ [`tasks/<TASK>.md`](tasks/)（做什么、怎么填）→ [`benchmark/RESULTS.md`](benchmark/RESULTS.md) §0（数字）。
@@ -16,12 +20,16 @@ Data defaults: `/vepfs-mlp2/c20250601/251105016/project/dllm_test/data/downstrea
 
 ## 评测范围（2026-08-29 收窄，强制）
 
+2026-09-24 后续范围更新：FLAb2 完全排除，MAGE 保留；以 [README §0](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/README.md) 为准。
+
+2026-09-24 新授权 AB-AG 的范围以 [benchmark README §0](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/README.md) 为准，执行见 [AB-AG 官方协议手册](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/AB_ANTIGEN_BENCHMARKS.md)。下方历史冻结声明不阻止此次 conventional paired 抗原任务，但仍禁止 VHH，也不重启旧 FLAb/MINT 榜。
+
 2026-09-13 TCR 当前子任务与双链生成延后决定见 [benchmark README §0](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/README.md)；本轮新的 Ours 汇总只收指定 49000，不将旧 checkpoint 数字补入空项。
 
 > **当前只做 AB（抗体）与 TCR 两个维度的任务，其余一律不考虑。**
 
-- **在范围内**：TCR T1 Binding / T2 Clustering / T3 Representation / T4 Generation；AB CDR infilling（SAbDab Kong + SAb23H2）、AB Light-chain pairing。AB 的 humanization / GDPa1 / specificity / m396 属 AB 维度、本轮按计划排除。后三项数据已落地，见 [`../data/downstream/PROBE_DATA.md`](../data/downstream/PROBE_DATA.md)。
-- **⛔ 已冻结，不在范围内**：`mint_tasks/`（MINT GeneralPPI）、`benchmark/ppi/`（STRING 90/90）、`benchmark/nbbench/`（纳米抗体）、`flab/`（抗体属性回归，锚点是 MINT 而非 AB 主线）。
+当前任务范围统一引用 [README §0](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/README.md)；原生探针的授权状态见该节，不再沿用旧排除表。
+冻结任务和冻结含义同样以 [README §0](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/README.md) 为准。
 - 冻结含义：**代码、数据与已落盘产物全部保留**，但不再更新数字、不进 headline、不写入论文表、不作为结论依据。
 
 范围定义与逐任务锚点见 [`benchmark/README.md`](benchmark/README.md) §0 / §3。
@@ -234,3 +242,5 @@ python downstream/flab/run_flab_baselines.py \
   --embedder ophiuchus --device cuda \
   --output output/downstream_generation/flab_baselines/g6_Kd__ophiuchus.json
 ```
+
+2026-09-24 范围同步：用户授权的 BioMap ΔG 官方 baseline 首轮执行以 [benchmark README §0](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/README.md#0-评测范围2026-08-29-收窄强制) 为准；运行状态见 [BioMap 官方运行状态](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/RESULTS.md#biomap-official-run)。

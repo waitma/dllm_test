@@ -95,6 +95,7 @@ for AB_CDR_MODE in {modes}; do
   python -u -m downstream.grammar.cdr_infill --checkpoint-path {qckpt} \\
     --test-set {ROOT}/data/downstream/cdr_infilling/{dataset} --mode "${{AB_CDR_MODE}}" \\
     --device cuda --num-folds {folds} --sampling-strategy argmax --max-iter 1 \\
+    --output-dir {shlex.quote(str(taskout))}/"${{AB_CDR_MODE}}" \\
     2>&1 | tee {shlex.quote(str(taskout))}/"${{AB_CDR_MODE}}.log"
 done
 """)

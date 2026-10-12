@@ -1,0 +1,162 @@
+{
+  "version": "v7_v5_layout_chain_global_20261007",
+  "variant": "cv_segment_global",
+  "input_layout": "V5",
+  "initialization": "from_scratch",
+  "status": "v5_full_audit_and_launch_data_binding_passed_not_launched",
+  "weights_included": false,
+  "data_dir": "/vepfs-mlp2/c20250601/251105016/project/dllm_test/data/prepared/immune_v5_receptor_completion",
+  "changes": [
+    "V5 object grammar on fixed-capacity canvas; predict separator and terminal",
+    "ordinary residual branches (scale 1)",
+    "protein-object/global alternating attention; split token does not partition attention"
+  ],
+  "training_arguments": [
+    "--variant",
+    "cv_segment_global",
+    "--input-layout",
+    "V5",
+    "--object-capacity",
+    "302"
+  ],
+  "training_scope": {
+    "included_families": [
+      "antibody_H_L",
+      "TCR"
+    ],
+    "excluded_chain_roles": [
+      "nanobody_vhh"
+    ],
+    "excluded_task_types": [
+      "nanobody",
+      "nanobody_antigen"
+    ],
+    "vhh_status": "out_of_scope_for_current_version",
+    "note": "本版不纳入VHH训练或验收；该字段为范围声明，不是运行时数据过滤器。通用代码兼容性测试不代表本版训练覆盖。"
+  },
+  "partial_sequence_policy": {
+    "layout": "preserve_prepared_full_length_scaffold",
+    "placeholder_input_token": "<mask>",
+    "placeholder_provenance": "chain_metadata.synthetic_residue_mask",
+    "placeholder_attention": true,
+    "placeholder_loss": false,
+    "observed_X_preserved": true,
+    "missing_partner": "preserve_existing_prepared_scaffold_as_masks",
+    "resample_lengths": false
+  },
+  "generation_policy": {
+    "object_capacity": 302,
+    "capacity_includes": [
+      "residues",
+      "chain_separator",
+      "terminal"
+    ],
+    "exact_generation_lengths_required": false,
+    "termination": "first predicted <protd> with a complete valid prefix",
+    "separator": "predicted dot token",
+    "tail": "attended masks; labels=-100; ignored after terminal",
+    "header": "fixed <prots> and receptor type",
+    "target_role_and_scope_features": "unknown; declared first-chain role is on header only",
+    "target_chain_and_position_features": "one receptor object segment with continuous positions; internal dot never splits attention or resets RoPE",
+    "known_chain_conditioning": "whole object or generated suffix after known prefix",
+    "capacity_failure": "explicit error/status; never silent truncation",
+    "capacity_status": "302 verified against every V5 train/valid record; maximum object length 299",
+    "capacity_basis": {
+      "source": "/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/immune_llada/data/grammar.py",
+      "historical_encoder_lengths_including_cls": [
+        168,
+        136
+      ],
+      "historical_decoder_slots_including_eos": [
+        167,
+        135
+      ],
+      "historical_max_residues": [
+        166,
+        134
+      ],
+      "new_formula": "166 + 134 + 1 split + 1 protd = 302",
+      "object_header_tokens_outside_capacity": 2,
+      "per_chain_limits_enforced": false
+    }
+  },
+  "validation": {
+    "regression_tests_passed": 83,
+    "sampled_records": 1250,
+    "sampled_synthetic_positions": 130513,
+    "report": "/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/v7_v5_layout_20261007/canvas_validation.json",
+    "test_log": "/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/v7_v5_layout_20261007/canvas_regression.log",
+    "full_corpus_scanned": false,
+    "retained_test_checkpoints": false,
+    "sampled_data_dir": "/vepfs-mlp2/c20250601/251105016/project/dllm_test/data/prepared/immune_v7_test_scope_final_20261002",
+    "applies_to_selected_v5_data": false
+  },
+  "data_selection": {
+    "version": "V5",
+    "manifest": "/vepfs-mlp2/c20250601/251105016/project/dllm_test/data/prepared/immune_v5_receptor_completion/dataset_manifest.json",
+    "manifest_sha256": "890d44b2ee57649d03209aa61460eaac838daf8796e5c3b76b67f1b2744c9622",
+    "train_records": 7626885,
+    "valid_records": 102308,
+    "shards_present": 85,
+    "selection_reason": "user_requested_V5_data",
+    "apply_v7_post_filters": false,
+    "model_architecture_unchanged": true
+  },
+  "launch_readiness": "Data/code parent gates passed. Existing eight-rank launcher, actual batch/schedule and resource dispatch still required; no job submitted.",
+  "attention_policy": {
+    "segment_unit": "protein object delimited by <prots> and <protd>",
+    "context_blocks": "one segment per complete object including markers; relations outside objects use -1",
+    "target_block": "header and entire reserved canvas are one segment; terminal and tail do not reveal length through features",
+    "split_token": "sequence separator only; no attention or RoPE boundary",
+    "even_layers": "within object",
+    "odd_layers": "global",
+    "position_reset": "only at start of protein object"
+  },
+  "object_attention_validation": {
+    "tests_passed": 84,
+    "test_log": "/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/v7_v5_layout_20261007/object_attention_regression.log",
+    "data_scope": "synthetic CPU tests; V5 real-data adaptation still pending",
+    "retained_test_checkpoints": false
+  },
+  "capacity_validation": {
+    "test_log": "/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/v7_v5_layout_20261007/capacity302_regression.log",
+    "tests_passed": 86,
+    "verified_cases": [
+      "AB/TCR 166+134 fits exactly",
+      "AB/TCR 200+100 fits without per-chain limits",
+      "301 residues plus split/end overflows",
+      "generation starts with 302 masks"
+    ],
+    "full_corpus_coverage_verified": true
+  },
+  "full_dataset_validation": {
+    "status": "passed",
+    "records": 7729193,
+    "splits": {
+      "train": 7626885,
+      "valid": 102308
+    },
+    "shards": 85,
+    "invalid_records": 0,
+    "excluded_vhh": 0,
+    "max_object_length": 299,
+    "max_total_input_length": 1218,
+    "report": "/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/v5_full_binding_20261007/full_audit.json",
+    "report_sha256": "c4581b08183cfcb89041825a276302af990f96b5b8c25b31a906da85e867d9ef",
+    "validation_method": "full per-record schema/provenance/geometry checks, 255 real collator parity controls, every-shard SHA256",
+    "benchmark_decontamination_rerun": false
+  },
+  "launch_binding": {
+    "data_binding": "/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/v5_full_binding_20261007/launch_v1/data_binding.json",
+    "data_binding_sha256": "eb24a794e3d4f8de397b13323ff76eb08acaba64d11953a844131997136e39a8",
+    "source_manifest": "/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/v5_full_binding_20261007/launch_v1/source_manifest.json",
+    "source_manifest_sha256": "58099efaf928b47402419b1bcda865c280baa7bba0d8b6aee44242a00464c177",
+    "driver": "/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/v5_full_binding_20261007/launch_v1/source/scripts/research/run_v7_formal.py",
+    "data_arguments": "/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/v5_full_binding_20261007/launch_v1/launch_data_args.json",
+    "preflight": "/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/v5_full_binding_20261007/launch_v1/native_parent_preflight.json"
+  },
+  "current_regression": {
+    "tests_passed": 97,
+    "log": "/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/v5_full_binding_20261007/regression.log"
+  }
+}

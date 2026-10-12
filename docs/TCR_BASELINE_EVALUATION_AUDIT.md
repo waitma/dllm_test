@@ -1,5 +1,7 @@
 # TCR baseline 与下游评测纠错记录
 
+> 2026-09-30 历史作业配置整理：已归档 YAML 的位置见 [归档索引](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/archive/job_yamls_20260930/README.md)；文中的旧提交命令及原路径文字保留作历史记录，复用配置前请先按索引定位。
+
 > 更新：2026-09-15（UTC）。
 > 最新用户决定：结果页按 AB 在前、TCR 在后整理，逐任务列 baseline、明确 checkpoint 的 Ours 和单列消融；旧全文完整归档，见 §9.28。本文继续只维护关键问题、协议与决策，不复制排行榜数字。
 > 当前本轮终态：指定 v5 49000 的原定 10/10 项已完成并通过各自结果核对，最终 comparison 已收口；精确时间与执行证据见 [任务账本](/vepfs-mlp2/c20250601/251105016/project/dllm_test/PROJECT_PROCESS.md)，数字见 [RESULTS 下半部分](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/RESULTS.md#tcr-binding)。旧 8/10、9/10、失败/恢复和运行中记录均为历史快照，不是当前状态。
@@ -397,7 +399,7 @@ python -m pytest -q scripts/tests/immune_llada/test_tcr_binding_query.py scripts
 
 - 使用当前 c20250601 v5 预训练验证集最优 `checkpoint-29000`（eval_loss=0.7530768225356571），不是按下游测试挑 checkpoint。不替换既有 headline 的历史 checkpoint。
 - 已将权重及 tokenizer 四文件复制到 [独立评测快照](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_checkpoints/fusion_v5_c20250601_step29000_tcr_others_20260913/snapshot_manifest.json)，避免训练 top-k 清理；源/副本权重 SHA256 一致：`31828c1260a9d88f538e5678964ee994cc7d57d6e7e75c87f312303c98bea474`。
-- 作业入口：[eval_tcr_others_cdr3ab_v5_29000.yml](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_tcr_others_cdr3ab_v5_29000.yml)。单卡，五折×三个测试集；embedding batch16，head 最多 200 epochs、patience15，训练内 10% 分层 validation，禁止用 test 早停。
+- 作业入口：[eval_tcr_others_cdr3ab_v5_29000.yml](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/archive/job_yamls_20260930/eval_jobs/eval_tcr_others_cdr3ab_v5_29000.yml)。单卡，五折×三个测试集；embedding batch16，head 最多 200 epochs、patience15，训练内 10% 分层 validation，禁止用 test 早停。
 - tag=`ours_v5_29000_others_cdr3ab_masked_runtime_v2`；原始 audit 位于 [protocol_audit.json](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/outputs/tcr_binding_nm2025_retrained/ours_v5_29000_others_cdr3ab_masked_runtime_v2/cdr3ab/AS/protocol_audit.json)。GPU 提交与终态记 [PROJECT_PROCESS](/vepfs-mlp2/c20250601/251105016/project/dllm_test/PROJECT_PROCESS.md)，新性能值产生后只写 RESULTS 独立 paired 表。
 - 已核验既有 `protenix_abtcr` 环境具备 torch/sklearn/accelerate/transformers/esm；不向共享环境安装包。正式作业先激活 pllm，再显式调用该既有评测 Python。
 - 作业 `t-20260913180748-44599` 首次查询为 Running；随后 **Success**，完整五折收数与复核见下方。β-only baseline 数字不得直接比较本轨道；预训练去污染、全参数对照、直接关系 token 预测均仍待做。
@@ -421,7 +423,7 @@ python -m pytest -q scripts/tests/immune_llada/test_tcr_binding_query.py scripts
 
 **资源与入口变更**：
 
-- 新增 [eval_tcr_others_cdr3ab_v5_29000_spot.yml](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_tcr_others_cdr3ab_v5_29000_spot.yml)。队列 c20250601、1×ml.pni2.3xlarge，**Preemptible: true**；原非闲时 YAML/结果保留，不修改或取消预训练与其他下游任务。
+- 新增 [eval_tcr_others_cdr3ab_v5_29000_spot.yml](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/archive/job_yamls_20260930/eval_jobs/eval_tcr_others_cdr3ab_v5_29000_spot.yml)。队列 c20250601、1×ml.pni2.3xlarge，**Preemptible: true**；原非闲时 YAML/结果保留，不修改或取消预训练与其他下游任务。
 - checkpoint 沿用 §9.2 的独立 29k 快照，数据、输入字段、mask/补全/pooling、五折×三个测试集、MLP 超参、seed 及 batch 均不变。已逐字比较两个 Entrypoint：除 tag 与日志路径/追加方式外相同；未改 Python 评测代码。
 - 新 tag=`ours_v5_29000_others_cdr3ab_masked_runtime_v2_spot_20260913`；提交前确认其输出及特征缓存目录均不存在，确保实际重新抽特征、训练 head 和预测，而非只重读已完成的 §9.2 缓存。
 - 结果根：`/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/outputs/tcr_binding_nm2025_retrained/ours_v5_29000_others_cdr3ab_masked_runtime_v2_spot_20260913/cdr3ab/AS/`；特征缓存位于同一 retrained 根的 `_feature_cache/ours_v5_29000_others_cdr3ab_masked_runtime_v2_spot_20260913/cdr3ab/AS/`。
@@ -447,7 +449,7 @@ python -m pytest -q scripts/tests/immune_llada/test_tcr_binding_query.py scripts
 ### 9.5 2026-09-13：本地繁忙，授权单卡非闲时独立重评
 
 - **用户授权与原因**：用户明确允许本地不合适时提交 1 张非闲时 GPU。本地仍有 `flow_antibody_tcr/occupy.py` 占卡脚本及 FABind 训练，11:23Z GPU 利用率约 84%；没有停止这些进程、没有叠加本地重跑。提交前查询无同范围在途 TCR others 任务。
-- **新增配置**：[eval_tcr_others_cdr3ab_v5_29000_nonspot.yml](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_tcr_others_cdr3ab_v5_29000_nonspot.yml)，c20250601、1×ml.pni2.3xlarge、**Preemptible: false**、4 小时运行上限。旧非闲时/闲时 YAML、模型快照、已有五折结果均不覆盖，不启用抢占重试或额外看护进程。
+- **新增配置**：[eval_tcr_others_cdr3ab_v5_29000_nonspot.yml](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/archive/job_yamls_20260930/eval_jobs/eval_tcr_others_cdr3ab_v5_29000_nonspot.yml)，c20250601、1×ml.pni2.3xlarge、**Preemptible: false**、4 小时运行上限。旧非闲时/闲时 YAML、模型快照、已有五折结果均不覆盖，不启用抢占重试或额外看护进程。
 - **协议不变**：沿用 §9.2 的 v5 29k 独立快照、others/AS 三字段输入、masked recognition、运行时补全、observed-residue pool、冻结 ESMC＋LLaDA/每折 MLP；五折×三测试集、seed、batch 和超参相同。本次是独立复跑，不是 full finetuning、直接关系预测、新 checkpoint 或新增 baseline。
 - **独立产物**：tag=`ours_v5_29000_others_cdr3ab_masked_runtime_v2_nonspot_20260913`；结果根为 `/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/outputs/tcr_binding_nm2025_retrained/ours_v5_29000_others_cdr3ab_masked_runtime_v2_nonspot_20260913/cdr3ab/AS/`，特征根为同一 retrained 目录下的 `_feature_cache/ours_v5_29000_others_cdr3ab_masked_runtime_v2_nonspot_20260913/cdr3ab/AS/`；日志为 `/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/eval_tcr_others_cdr3ab_v5_29000_nonspot_20260913.log`。
 - **提交前验证**：checkpoint 权重存在；新 tag 对应输出和特征目录均不存在；YAML/bash 语法通过。归一化 tag/日志路径后 Entrypoint 与 §9.2 作业逐字一致，资源规格也一致；没有修改 Python 源码，未重复运行模型 CPU 回归。不用旧缓存命中冒充本次重跑。
@@ -466,7 +468,7 @@ python -m pytest -q scripts/tests/immune_llada/test_tcr_binding_query.py scripts
 - **实现**：[runner][ours-run] 新增 `--track others_cdr3b`，显式区分数据轨道（官方 loader 的 `cdr3ab`，即 others）和模型输入模式（`cdr3b`）。所有输入键、特征、pool 只用 peptide/beta；原始 CSV、行序、标签、五折、训练内验证切分种子保持不变。预测 CSV 中仍保留原始 `cdr3a` 供逐行核验，但它不进入模型。`--track cdr3b` 和 `--track cdr3ab` 的既有选择含义不变。
 - **输入边界**：关系 token 仍为 decoder mask；缺失 α 全为 synthetic X，observed pool 排除；MHC、V/J、LongA/B 忽略。补全仍以可见受体作为确定性 seed：β-only 用 β，αβ 用 β/α。因此两种模式的占位长度/位置可能不同，不能把本对照称为“完全固定 token 布局、仅替换 α 残基”的严格消融。
 - **隔离**：新 track 独立输出与缓存路径，禁止与旧大 β-only 数据集的 baseline 自动混排；summary/metrics/run_config 标明 data_track、input_mode、input_columns。源码 hash 更新会使旧缓存拒绝复用，不覆盖或删除旧产物。
-- **配置入口**：[eval_tcr_others_cdr3b_v5_29000_nonspot.yml](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_tcr_others_cdr3b_v5_29000_nonspot.yml)。沿用前次单卡非闲时资源与全部 MLP 超参；tag=`ours_v5_29000_others_cdr3b_masked_runtime_v2_nonspot_20260913`，输出根为 `/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/outputs/tcr_binding_nm2025_retrained/ours_v5_29000_others_cdr3b_masked_runtime_v2_nonspot_20260913/others_cdr3b/AS/`。
+- **配置入口**：[eval_tcr_others_cdr3b_v5_29000_nonspot.yml](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/archive/job_yamls_20260930/eval_jobs/eval_tcr_others_cdr3b_v5_29000_nonspot.yml)。沿用前次单卡非闲时资源与全部 MLP 超参；tag=`ours_v5_29000_others_cdr3b_masked_runtime_v2_nonspot_20260913`，输出根为 `/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/outputs/tcr_binding_nm2025_retrained/ours_v5_29000_others_cdr3b_masked_runtime_v2_nonspot_20260913/others_cdr3b/AS/`。
 - **提交前验证**：本轮实际运行 query 回归与新增 track 回归，共 **43 项通过**（37 既有＋6 新增；不是重复计入此前的 68 项）。YAML/bash 语法通过。真实 others 数据投影后仍为 18,868 个唯一 peptide/beta 输入；五折无训练重复/冲突配对，各训练/测试精确配对交集为零。此检查不等于预训练去污染或近同源无泄露。
 - **全量运行时验收**：18,868 个记录真实 β 残基全部保留，α 全为 synthetic X；完成后长度 242–275 tokens。20 次 fold/split 读取的原始 member metadata 与 §9.5 完全相同；29k 权重 SHA256 与前次一致（`31828c1260a9d88f538e5678964ee994cc7d57d6e7e75c87f312303c98bea474`）。新输出/缓存目录提交前均不存在。
 - **执行状态**：已提交 `t-20260913202402-c9hf5`，12:24Z 首次查询 Staging，12:25Z 确认 Running/重新抽取特征；当时尚无本 β-only 对照的新分数。本地 GPU 利用率 95%，不干扰占卡/FABind 进程；沿用用户已允许的单卡非闲时评测方式。任务账本唯一入口为 [PROJECT_PROCESS](/vepfs-mlp2/c20250601/251105016/project/dllm_test/PROJECT_PROCESS.md)，新指标仅写 [RESULTS][results]。
@@ -660,7 +662,7 @@ python -m pytest -q scripts/tests/immune_llada/test_tcr_binding_query.py scripts
 - **通过证据**：实际 protenix_abtcr 环境联合回归 **81 passed**；修正后 [repr_preflight_v2](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/tcr_v5_49000_20260913/repr_preflight_v2/passed.json) 全行输入长度、最长/缺 α、batch=1/8 和倒序检查通过。独立 [suite_audit_local_v2/passed.json](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/tcr_v5_49000_20260913/suite_audit_local_v2/passed.json) 覆盖上表全部链路，A100-80GB，peak allocated 21.12 GiB，`quality_evaluation=false`。T1/T4 原专属 gate 仍与当前源码/数据匹配。
 - **失败不隐藏**：首版 suite 在完成四轨 T1 和 T2A 后，因预检脚本将 T2B 的 `epitope` 列误作 `peptide` 而失败；原生产 T2B 已正确使用 `epitope`，这不是新的生产任务输入 bug。仅修预检中的标签列适配，重跑完整 suite 后通过。[首版 failed report](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/tcr_v5_49000_20260913/suite_audit_local/report.json) 保留，未覆盖/改成 passed；CPU 测试初版调用了不存在的 metric 名也在正式通过前修正，不计为模型缺陷。
 - **提交/取消纪律**：T2/T3 共享源码验收指纹，T2 修正会使四项旧 gate 过期，因此在它们均 Queue 时精确取消旧四项，确认 Killed；旧 YAML/gate/记录保留。修正后通过新 gate 再以 `*-v2` 名称重提，正式输出 `runtime_v2`，不重复在途运行；T1×4、T4×2 未取消/重复提交。另提交一项独立云端 suite 复验，仍 Queue，不冒称云端验收已通过。精确 ID、YAML 与首次/最新状态唯一见 [PROJECT_PROCESS](/vepfs-mlp2/c20250601/251105016/project/dllm_test/PROJECT_PROCESS.md)。
-- **AB 对照**：已核对 [AB 预检配置](/vepfs-mlp2/c20250601/251105016/project/dllm_test/eval_jobs/eval_ab_v5_49000_llada_20260913_preflight.yml) 和生成器，沿用 c20250601 / ml.pni2.3xlarge / 1 worker / `Preemptible:false`、同镜像/挂载/环境、独立预检和分任务正式作业；五份新 YAML 的 bash 语法、资源字段一致性与代码身份通过校验。未触碰 AB/预训练作业或共享 sampler。
+- **AB 对照**：已核对 [AB 预检配置](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/archive/job_yamls_20260930/eval_jobs/eval_ab_v5_49000_llada_20260913_preflight.yml) 和生成器，沿用 c20250601 / ml.pni2.3xlarge / 1 worker / `Preemptible:false`、同镜像/挂载/环境、独立预检和分任务正式作业；五份新 YAML 的 bash 语法、资源字段一致性与代码身份通过校验。未触碰 AB/预训练作业或共享 sampler。
 - **当前未完成**：正式全量模型结果、云端 suite 复验、T1–T3 对实际 v5 的完整成员/近同源核验、T3 论文同版数据和各 baseline 同输入/episode 对照。T4 仍保留已核实的 held20 重叠分层和 51 条非标准参考记录披露；不偷偷过滤以制造干净结果。新 Ours 汇总只收指定 **49000**，不拼接历史步数；本次小样本产物不是可发表质量数字。
 
 ### 9.23 2026-09-13：短任务转本地，重任务保留云端
@@ -761,3 +763,158 @@ python -m pytest -q scripts/tests/immune_llada/test_tcr_binding_query.py scripts
 [teim-model]: /vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/baselines/TCREpitopeBenchmark/TEIM/scripts/model_raw.py
 [epi-nb]: /vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/baselines/TCREpitopeBenchmark/epiTCR/epiTCR.ipynb
 [tcrh-nb]: /vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/baselines/TCREpitopeBenchmark/TCR-H/TCR-H.ipynb
+
+## 2026-09-30 UpTCR 论文、数据及发布审计（候选，未接入主榜）
+
+**当前用户决定（2026-09-30，覆盖下文历史建议）**：将 UpTCR 纳入当前 foundation model 的另一个 TCR binding benchmark，完全沿用作者发布的 majority/few-shot/zero-shot train/valid/test、原始行和标签，不清洗、不去重、不隔离冲突、不重新划分。baseline 使用论文公开成绩 [P]，不要求重训或复跑；Ours 本地实测另列。此前“统一池清洗重划分”的方案已撤回。执行约定见 [T1任务入口](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/TCR_T1_BINDING.md#uptcr-binding)。已知发布/论文样本数差异保留为比较备注，不阻塞任务接入，也不能标成已确认同一测试行集。
+
+用户要求核验 UpTCR 是否可作为下游 baseline、数据 benchmark，以及 release 能否直接使用。结论：适合增加 T1 的 full-FV αβ / β 与 peptide±HLA 比较轨道；数据与模型均为候选。当前不能声称开箱即用或已复现论文。不改变既有 NM2025 主榜范围，不影响正在运行的 AB 评测。
+
+证据：[论文](https://doi.org/10.1038/s41467-026-78075-x)、[官方代码](https://github.com/tylerlv/UpTCR)、[归档代码](https://doi.org/10.5281/zenodo.21979241)、[处理后数据](https://doi.org/10.5281/zenodo.15128399)、[权重](https://doi.org/10.5281/zenodo.20520000)。审计目录：`/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/research/uptcr_20260930`；manifest 保存本地文件 SHA256。
+
+### 适用范围与论文比较口径
+
+- 输入模式：TCRα+β+peptide+HLA、β+peptide+HLA、α+β+peptide、β+peptide。TCR 使用完整 FV 和 CDR3，HLA 使用34位伪序列。β-only 不等于仅 CDR3β。该模型的亲和力子任务是 peptide–HLA，不能当作 TCR–pMHC KD 回归；它也不是 TCR 生成模型。
+- 论文 majority/few-shot 均为已见靶点监督任务；zero-shot 指测试抗原未见，仍在其他抗原上监督训练，不等于 Ours 无监督 zero-shot PLL。Ours 冻结探针与 UpTCR 完整微调须披露训练差异，统一测试成员与输入条件。
+- 论文比较 DLpTCR、NetTCR2.0、ERGO-AE/LSTM、pMTnet、PanPep、EPACT，称在相同清洗训练集上重训；当前仓库未提供这些对手完整复现实验包，不以论文数值充当本地重跑结果。官方 trainer 的 AUPR 是 sklearn average_precision_score，不能与既有 NM2025 precrec PR-AUC 混用。
+
+### release 实查
+
+**2026-09-30 embedding 澄清及内容抽查（覆盖下方仅核验目录的旧状态）**：已有序列的预计算embedding确实公开发布；不应表述为“缺少embedding”或将其作为当前原发布benchmark的阻碍。Zenodo ZIP中央目录重新在线读取，pepesm/tcr_a/tcr_b分别41599/27066/27946个.pt；9份分类CSV所需唯一序列分别1300/26972/27847，缺失文件名均为0。实际通过Range下载每类1个文件，ZIP CRC通过，CPU weights_only加载成功，float32且数值有限；样本shape分别[15,1280]、[1,145,1280]、[1,140,1280]。这是3文件内容抽查，不代表所有.pt均已加载或官方模型端到端已跑通。证据：[embedding_release_recheck.json](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/research/uptcr_20260930/embedding_release_recheck.json)。HF仍提供4卷data.7z，官方README标为同一处理数据的替代下载；本轮未全量下载HF并与ZIP逐文件比对。未找到的是**为包外新序列生成同款特征的上游checkpoint/提取入口**，与已有特征发布情况分开记录。
+
+- GitHub commit `cf042f45d2ece9e885b034c0ddca0124797d92a5`；无 tag、无 GitHub Release，但存在论文引用的 Zenodo 代码归档；归档59个文件与当前 checkout 全部逐字一致。41个 Python 文件通过 AST 语法检查，未做模型推理验证。
+- 权重 ZIP 为1,091,938,429 bytes，57个成员，包含6个预训练模块以及8种输入/场景的微调目录；已读取中央目录确认成员，未下载/加载全部权重。
+- 数据 ZIP 为40,237,874,634 bytes，96,783个成员。已用 HTTP Range 提取9份分类 CSV，逐文件 ZIP CRC 校验并计算 SHA256。没有下载完整约40GB embedding包，不能宣称核验整个ZIP MD5。
+- 数据包包括 finetune/abpm 的 majority、few-shot、zero-shot 各train/valid/test，pmhc.csv、结构文件和 pretrained_emb；未看到单列的30%/50% split、hard-negative或breast-cancer分析表，不能仅据此断言附件中完全没有这些信息。
+- 已列出的三种分类划分所需 peptide/FVα/FVβ embedding 文件名，在数据归档目录中均有对应项；尚未检查每个 .pt 的内容或加载。
+- 新外部序列依赖 ESM-pep、ESM-ppi-TCR 表征，但当前仓库和权重包未定位到上游模型及生成入口。不能用普通 ESM2 替换后称官方复现。
+- README 使用 `_zeroshot.py`，实际文件是 `_unseen.py`；配置默认 GPU 2，单卡需映射；requirements 未显式列 scikit-learn（代码直接导入）；结果 CSV 追加写入且header判断引用不同文件名，重复执行须隔离目录。
+
+### 实际发布表与划分完整性
+
+| 设置 | train | valid | test | test正/负 | 测试表位数 |
+|---|---:|---:|---:|---|---:|
+| majority | 88,315 | 15,585 | 25,993 | 5,929 / 20,064 | 32 |
+| few-shot | 13,345 | 2,356 | 4,044 | 753 / 3,291 | 216 |
+| zero-shot | 132,180 | 23,326 | 8,958 | 1,493 / 7,465 | 142 |
+
+由9份实际CSV重新计算；字段包含 TRA.CDR3、TRB.CDR3、Epitope、MHCseq、FV_alpha、FV_beta、Label/label。行数含重复，不是独立实验数量。原样数据在 `/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/research/uptcr_20260930/released_tables/data/finetune/abpm`。
+
+- 完整六字段模型输入的 train–test 精确交集：majority 1,111个（影响1,267条测试行），few-shot 6个，zero-shot 0个。zero-shot 的test与train/valid肽表位精确交集均为0；尚未复算30%/50%同源阈值。
+- 同一输入在同一split出现0/1相反标签：majority train/valid/test分别771/29/66组；few-shot为0/0/1组；zero-shot为1137/54/1组。不要无说明删除或重新采负样本并称官方协议。
+- Source Data 的 Fig2i,m 有16,882条预测，Fig2j,n有4,044条，Fig2k,o及Fig2l,p各4,014条。后两者与发布zero-shot test的8,958条不同；只有label和各模型分数，缺少序列ID，不能重建论文准确测试成员。few-shot行数相同也不证明行顺序一致。
+- 来源包含VDJdb、PIRD、McPAS-TCR、IEDB和10x，原论文涉及人及小鼠MHC-I；当前表没有明确物种/来源字段。需核查与本模型全部预训练来源重叠，不能沿用作者的去污染声明。
+
+### 接入建议
+
+先保留原样作者数据复现轨，再单独建立有版本的去重/冲突处理派生轨；优先审核zero-shot，但在论文30%/50%成员对应、原模型实测与训练重叠核验完成前不进入正式headline。我们的序列模型使用CSV即可；UpTCR官方baseline需要其预计算embedding。先验证一个作者发布输入模式与原指标，再扩展四输入模式。此轮仅调研、代码静态审计及数据表检查，未新增GPU作业，未改变既有评测。
+
+### 2026-09-30 论文整体思路解读补充
+
+用户要求完整解读文章，并明确要求将结论同步到对应 process Markdown。以下为文献解读，不能视为本地复现结果或已经批准的模型架构变更。
+
+**研究主线**：利用不完整的相互作用记录，逐级学习单组分和组分组合的表示，再迁移到完整 TCRαβ–peptide–HLA 判别。这里 antigen 主要是呈递肽，不是抗体任务中的完整抗原蛋白。
+
+| 环节 | 输入与方法 | 目的 |
+|---|---|---|
+| 基础表示 | α/β 完整 FV、CDR3、专用语言模型特征；肽序列及肽语言模型特征；HLA 伪序列及理化特征 | 四个编码器保留各组分特点 |
+| Stage I | α–肽、β–肽、肽–HLA 二组分记录 | 预训练基础编码器，学习配对关系 |
+| Stage II | αβ–肽、α–肽–HLA、β–肽–HLA 三组分记录 | 重点训练 αβ 和肽–HLA 融合模块 |
+| 下游微调 | 完整四组分或指定缺失输入配置 | 使用对应监督目标预测结合、肽–HLA 亲和力或残基距离 |
+
+二/三组分指记录的信息完整程度，不应自动解释为独立测量的物理复合物。Foundation model 在此指可迁移的领域表示模块；不是抗原条件生成模型，也不是无需任务训练的通用预测器。
+
+**训练目标**：SoftCLIP 通过组分内部的表示相似性柔化对比目标，缓和“所有非配对组合都是负例”的假设；相似性不等于实验结合证据。SoftTri 使用肽–HLA 定量 IC50 信息调节三元组约束，保留结合强弱差异。最终结合分类仍使用监督二分类目标，不能把软预训练解释为已解决全部负例噪声。
+
+**实验逻辑**：Fig. 2 比较已见/少样本/未见抗原分类；Fig. 3 检查缺失输入、模块与阶段消融，以及肽–HLA 亲和力迁移；后续实验分析表示、交叉反应、结构监督下的残基接触/距离预测、小规模患者队列迁移及选定体系的细胞功能验证。结构任务有额外监督，患者迁移使用目标队列数据，功能响应不等于直接 KD 或临床疗效。
+
+| 正文报告设定 | AUROC [P] | AUPR [P] |
+|---|---:|---:|
+| Majority | 0.905 | 0.749 |
+| Few-shot | 0.800 | 0.561 |
+| 未见抗原，50% 相似性过滤 | 0.642 | 0.296 |
+| 未见抗原，30% 相似性过滤 | 0.594 | 0.252 |
+
+来源：[原文 Fig. 2](https://www.nature.com/articles/s41467-026-78075-x_reference.pdf)。均为作者报告值，未由本地推理复现；更严格未见抗原设定的下降表明泛化仍然困难。作者统一下游训练集，但额外预训练资源和输入信息仍须披露，不能把全部增益归因于架构。
+
+**对本项目的定位**：保留为 TCR binding baseline 和补充数据候选，沿用作者原代码；统一 FV/CDR3、αβ/β、HLA 有无以及训练方式后比较。论文 zero-shot 是监督训练后的未见抗原测试，须与本模型直接 PLL/关系评分分开标注。论文亲和力终点是肽–HLA IC50，不能补位 TCR–pMHC KD 或抗体 KD。分阶段数据利用与相互作用监督是研究参考，当前未决定或实施本模型训练改造。原始发布轨与清洗派生轨是待核验建议，尚未构建新正式 benchmark。
+
+待完成项沿用上文审计：论文 split 对应、重复及冲突标签处理依据、同源与本模型训练重叠审核、上游新序列 embedding 流程、原模型加载和原指标实测。本轮仅补充文献解读及文档，不启动 UpTCR、不新增成绩。
+
+### 2026-09-30 用户澄清：优先评估数据可用性与发布完整度
+
+用户当前目标是判断数据能否用于我们的 benchmark，以及官方发布是否足够复用，不以复现论文分数为前提。重新联网核验 GitHub HEAD 仍为 `cf042f45d2ece9e885b034c0ddca0124797d92a5`；公开 issue #1 仍在请求 ESM-pep / ESM-ppi-TCR 权重及新序列表征入口。只读检查，未发送 issue 或联系作者。
+
+**数据可用性**：已提取的9份分类 CSV 含实际序列、HLA伪序列及标签，可用于我们的监督训练/验证/测试协议；无需作者 embedding 即可输入我们自己的序列模型。作者 train 适合作为下游训练来源，不能作为已用它训练的官方 checkpoint 的独立测试集。若把作者训练池重新划分为新的 benchmark，所有监督 baseline 必须按新划分重新训练，且仍须检查原预训练权重的数据暴露；改 split 不能消除已经发生的预训练重叠。正式指标优先使用核验后的独立留出样本，不能合并三种设定后未经去重直接使用。保留原始数据和版本化派生协议；精确及同源重叠、冲突标签处置依据、负例来源需明确。本文此前的数据问题不否定整个数据源可用，也不要求先复现论文分数才能建立我们自己的 benchmark。
+
+**发布完整度实查**：
+
+| 部分 | 当前发布证据 | 判断 |
+|---|---|---|
+| 下游分类数据 | majority/few-shot/zero-shot 各 train/valid/test，共9份 CSV | 已有可读序列及标签 |
+| 模型与下游训练/测试代码 | 四输入模式；额外有 majority、pMHC、结构训练入口 | 可作为官方实现起点；尚未运行验证 |
+| 预训练模块权重及分类微调权重 | 6个基础/融合模块；4输入模式×few-shot/unseen 共8套目录 | 文件目录已核验，未加载权重；未找到 majority/pMHC/结构成品权重目录 |
+| 作者数据的预计算特征 | 分类表所需序列均可在归档成员名中匹配 | 可望支持已有数据上的官方流程，内容/维度尚未实测 |
+| 新序列专用特征生成 | 未定位 ESM-pep / ESM-ppi-TCR 上游权重和提取脚本 | 外部新序列端到端流程有关键缺口 |
+| Stage I/II 从头预训练 | 有相关 loss 定义，但 scripts/configs 中未定位完整两阶段训练入口；现有 trainer 加载预训练权重 | 不能称完整预训练流程已发布 |
+| 两阶段预训练数据及构建 | 数据 ZIP 中表格为9份分类 CSV、pmhc.csv、TCR3d_actual.csv；未定位逐阶段配对表与完整原始清洗流水线 | 不能把预计算 embedding 数量当作已发布完整配对训练集 |
+| 论文对手 baseline 全套训练脚本/权重 | 当前仓库未定位 | 不能称论文全部比较方法均已发布 |
+
+工程适配项包括 README 的 zeroshot/unseen 文件名不一致、默认 GPU 编号、未显式列出的 sklearn 依赖及输出追加行为。存在下游入口不等于已经通过运行验证；当前只能判断已有数据上的官方微调/推理较接近可执行，不能承诺开箱即用。完整原始序列到预测、完整从头预训练以及全部论文实验发布均未闭环。后续若继续实现，应首先核验官方数据/特征/权重的最小加载流程，而非自写替代模型。
+
+### 2026-09-30 预计算 embedding 来源与作用
+
+**后续来源核验更新**：下述“UpTCR专属生成脚本未定位”仍成立，但已从DTU官方NetMHCpan 4.1数据包取得可用伪序列表及位点定义，并精确覆盖全部51种发布MHCseq。可直接查表获取兼容伪序列，详见下方“公开HLA/MHC伪序列获取路径”。
+
+HLA来源追踪补充：正文 Methods/Representation of HLA 说明伪序列依据已知肽–HLA晶体结构中的近肽残基（文中4.0 Å定义）；算法介绍引用NetMHCpan相关文献34（Hoof等，2009）和35（Jurtz等，2017）。补充材料Note 1明确的是按IPD-IMGT/HLA标准规范化**等位基因命名**，不能据此断言完整HLA序列从该库某版本下载。当前正文/补充材料与官方代码中未定位到该批MHCseq对应的完整序列库版本、逐等位基因映射表、34位原蛋白编号清单或端到端提取脚本。现有loader直接读取CSV的MHCseq，数据已提供成品序列。因此作者说明了表示的构建依据，但当前证据不足以完整追溯每条成品伪序列的生成过程；不把“参考NetMHCpan”升级为“已证实直接复制某版NetMHCpan映射表”。此缺口不影响按原发布数据评测。
+
+HLA序列补充：原9表实查共51种不同34位MHCseq；并非所有记录共用同一字符串。完整序列/逐split频数见 [CSV](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/research/uptcr_20260930/hla_pseudosequences.csv)，统计口径及差异见 [DATA_FORMAT_AUDIT](/vepfs-mlp2/c20250601/251105016/project/dllm_test/DATA_FORMAT_AUDIT.md)。只读统计，不改变原评测数据。
+
+核对原文 Methods 的 Representation of TCR/antigen/HLA，以及官方 `UpTCR/dataset/data.py`、`UpTCR/model/encoder.py` 和 unseen 配置：论文称 TCR FV 的残基表示来自专门预训练的 ESM-ppi-TCR，肽残基表示来自在肽序列上进一步预训练的 ESM-pep。配置指定每位置1280维；模型逻辑上接收 L×1280 的残基特征，文件是否包含额外批次维、padding及特殊token需逐文件和原提取流程验证，不宣称所有原始.pt形状完全一致。
+
+loader 按肽序列/FV序列查找并加载.pt；α/β数据加载时移除首维单例。编码器将这些上下文特征与序列/CDR3卷积分支特征在末维拼接，再经过注意力和映射层，后续由融合模块及任务头输出分数。预计算特征是模型输入，不是结合标签、最终结合分数或实验结构；每个组分的特征可跨不同配对复用。发布的下游代码不包含上游语言模型在线前向，因而其下游反向传播不更新上游语言模型权重。缓存避免每轮重复执行大语言模型，代价是特征存储及外部新序列依赖原提取流程。
+
+对我们的 benchmark：自己的序列模型不需要这些作者特征；官方 UpTCR checkpoint 需要匹配的特征分布，不能仅因普通 ESM2 同为1280维就视为等价替代。用训练集固定的编码器独立提取测试序列特征本身不构成标签泄漏；仍需审核上游预训练/适配是否使用测试相关监督及各阶段数据重叠。当前缺口仍是确切上游权重、提取层和特殊token等处理规则；本轮只核查说明及代码，未生成/加载特征或运行模型。
+
+### 2026-09-30 统一 benchmark 构建方向（历史方案，已被原划分决定取代）
+
+用户明确：暂不关注作者原划分，以其发布数据构建我们自己的模型与 baseline 性能验证。取消“先复现作者划分/分数，再做派生 benchmark”的依赖；原始划分审计保留为历史证据，不再推进论文成员对齐作为当前主线。
+
+1. 将9份分类 CSV 作为同一来源的数据池整合，保留文件、原行号、原场景和原split的 provenance；不能把9表行数之和当成独立样本数。原始文件只读保留。
+2. 在全池层面统一字段和合法性检查，按模型输入去重，统计跨来源同标签重复及冲突标签。原因未明的冲突组先隔离供审计，不自行翻转标签；记录清洗前后数量。保留已有负例来源说明，不将打乱配对负例改称实验确认负例。
+3. 清洗后制定并冻结我们自己的 train/validation/test；按评测问题选择分组与同源隔离规则，避免同一完整输入跨split。具体比例、seed、聚类阈值和留出目标尚未实施或锁定，不默认沿用作者设置。
+4. 所有监督方法使用统一划分、相同测试成员和明确输入轨道。baseline 沿用各自作者官方实现，以新train训练、validation选模、test报告；本模型直接预训练评分与监督适配分开列示。缺失输入时重新核查该轨输入投影后的重复/冲突，不能只依赖六字段去重。
+5. 作者已微调 checkpoint 不直接作为新划分上的独立正式比较，因为可能见过新test；从合适初始化重新做下游训练，并披露/审核初始化权重及上游语言模型的训练暴露。原模型预计算特征可在确认生成模型及数据暴露边界后按序列复用；自己的模型仍直接使用序列。
+6. 当前仅限发布数据已有序列时，上游新序列embedding生成缺口不必阻塞数据池与协议构建；官方模型实际运行仍需核验对应.pt内容、权重加载及原训练入口。
+
+状态：已更新方向与文档，尚未执行全池整合、生成新split或启动UpTCR训练；不将该约定记作benchmark已完成，也不更改既有NM2025/AB结果。
+
+### 2026-09-30 公开 HLA/MHC 伪序列获取路径（已验证）
+
+用户要求探索如何获得伪序列。本轮仅下载参考资源、做精确匹配及参考提取检查；不修改UpTCR数据、划分或运行中模型输入。
+
+**首选资源**：[DTU NetMHCpan 4.1 官方页面](https://services.healthtech.dtu.dk/services/NetMHCpan-4.1/)直接链接的[data.tar.gz](https://services.healthtech.dtu.dk/services/NetMHCpan-4.1/data.tar.gz)。已下载30,310,596 bytes，SHA256=`e43baa3595b208b922ed55e4213cd4255cc9d58623f180597418004a77e94ace`。从中只提取参考文件，未运行NetMHCpan预测。
+
+| 文件 | 用途 | 本地路径 |
+|---|---|---|
+| MHC_pseudo.dat | 等位基因名称→34位伪序列，13010条记录（含别名/重复，非唯一等位基因数） | [参考表](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/research/uptcr_20260930/hla_reference/dtu_MHC_pseudo.dat) |
+| all_varcontacts.nlist | 34个参考位点的有序编号 | [位点文件](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/research/uptcr_20260930/hla_reference/dtu_all_varcontacts.nlist) |
+| B0702.fsa | 官方完整B*070201蛋白参考 | [参考FASTA](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/research/uptcr_20260930/hla_reference/dtu_B0702.fsa) |
+
+**覆盖验证**：UpTCR全部51种34位MHCseq均在DTU表中精确匹配，覆盖全部314102原始行，未替换成近邻。另下载[MHCflurry作者维护的NetMHCpan 34aa表](https://github.com/openvax/mhcflurry/blob/63bbaebe9d2662df0b8138189c3cc216fc3294b4/downloads-generation/allele_sequences/pseudosequences.netmhcpan.34aa.csv)及[PUFFIN作者代码内参考表](https://github.com/gifford-lab/PUFFIN/blob/eddf17d972285a89e80e2837adc1ee6308f5b96b/data/MHC_pseudo.dat)，同样各匹配51/51；这些是同类参考资源的副本，不称独立生物学验证，也不据此断言UpTCR确切采用哪个版本。
+
+**已实现获取方式**：[verify_references.py](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/research/uptcr_20260930/hla_reference/verify_references.py)默认重算覆盖；加`--allele 'HLA-A*02:01'`在已下载DTU表中查询。仅规范分隔符和H-2/H2别名，不截断分型精度、不使用近邻替代；缺失或同名多序列时明确报错。5项检查通过（3个常规名称成功，1个参考冲突、1个不存在名称拒绝）。参考表自身存在冲突规范名HLA-B5112、MAMU-A100101，保留记录而非覆盖；查表工具会拒绝不唯一结果。
+
+**从完整序列提取**：官方位点清单与B0702参考FASTA可重现表中B07:02的34位字符串；该参考使用1-based位点时与含信号肽全序列之间的偏移为24。这只验证一个参考，不能把24当作所有HLA的统一裁剪规则。新完整序列应先确认成熟链编号/参考比对与插入缺失，再按相同位点定义取值；不直接对任意FASTA硬切数字。完整人HLA及对齐资源可从[IPD-IMGT/HLA官方入口](https://www.ebi.ac.uk/ipd/imgt/hla/download/)和其[官方GitHub](https://github.com/ANHIG/IMGTHLA)取得并锁定release。MHCflurry还存在37/39位定义，不能与本任务34位表混用；本轮未实现或声称已验证任意新全长序列的通用提取器。
+
+**反向映射限制**：规范已知名称别名后，51种中45种匹配多个候选名称，6种在此版本表中单一候选；伪序列不能唯一恢复完整蛋白。示例：第一种字符串兼容HLA-A*02:01等361个规范名称，第二种兼容A*03:01等196个。另5种仅匹配鼠H2-Db/Kb/Ld/Kd/Dd参考序列（原行数共28714），说明不能将全部MHCseq统称人HLA；保持原作者数据，不进行物种过滤。候选映射不是对每条原记录原始等位基因身份的确认。
+
+产物：[51种匹配清单](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/research/uptcr_20260930/hla_reference/uptcr_reference_matches.csv)、[统计/文件哈希/提取验证](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/research/uptcr_20260930/hla_reference/summary.json)、[查询验证](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/research/uptcr_20260930/hla_reference/lookup_checks.json)。当前benchmark继续直接使用作者MHCseq；这些资源用于来源核查和后续已知分型查询，不改变现有αβp输入轨。
+
+
+## 2026-09-30 新任务与foundation预训练暴露审计
+
+用户补充要求保护新任务test/few-shot并同时核查TCR与epitope。发现旧v7范围未包含UpTCR，旧通用bank按train/background跳过会漏few-shot支持/负例查询池，且来源不同的core/junction不能统一剥离端点。已实现版本化CPU全量审计及新scope训练gate。方法、数据证据、失败修正和未完成项唯一维护于 [DATA_FORMAT_AUDIT.md](/vepfs-mlp2/c20250601/251105016/project/dllm_test/DATA_FORMAT_AUDIT.md) 的“新增TCR下游暴露审计”；过程见 [PROJECT_PROCESS.md](/vepfs-mlp2/c20250601/251105016/project/dllm_test/PROJECT_PROCESS.md)。保留UpTCR官方原划分/原标签决定，不修改下游成绩，不以新审计冒充新模型评测。
+
+
+2026-09-30完成更新：新TCR范围的v6/v7全量暴露审计结束；结果与来源明细唯一见 [完整审计记录](/vepfs-mlp2/c20250601/251105016/project/dllm_test/DATA_FORMAT_AUDIT.md#tcr-exposure-20260930)。新scope清理/独立复核/证书尚未完成，候选近似标记不能等同于完整样本泄漏；保留官方下游划分与原checkpoint，当前数据状态不支持直接声明foundation级epitope-unseen。

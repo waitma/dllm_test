@@ -11,6 +11,14 @@
 
 ## 0. 评测范围（2026-08-29 收窄，强制）
 
+2026-09-30 用户新增 **UpTCR binding**，作为当前 foundation model 的另一个 TCR 下游基准：完全沿用作者发布划分和标签，不清洗/去重/重划分；baseline引用论文 [P]，不重训。Ours 实测独立记录，发布数据与论文的已知差异就地披露。见 [T1 UpTCR约定](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/TCR_T1_BINDING.md#uptcr-binding)。执行状态见 [UpTCR 当前结果](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/RESULTS.md#uptcr-binding-status)。
+
+2026-09-27 用户确认 AB-AG 主框架为 **三个任务、四个数据子集**：CoV-UniBind binding、SPR、AbBiBench landscape、CHIMERA sequence-only generation。新增本模型 zero-shot 与冻结骨干探针，固定无 ESMC step150000；MAGE 保留，BioMap 等为补充轨。协议见[任务手册 §8.7](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/AB_ANTIGEN_BENCHMARKS.md#87-三任务--四子集纯序列协议2026-09-27)。不测 VHH，FLAb2 排除。
+
+2026-09-24 用户授权先执行 **BioMap ΔG 回归 / A2binder 官方 baseline**，作为 AB-AG 的独立回归附轨，不等同 KD/pKD；状态见 [BioMap 官方运行状态](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/RESULTS.md#biomap-official-run)。
+
+2026-09-24 用户进一步收窄 AB-AG：**FLAb2 完全排除，不再调研、补依赖或试跑；MAGE 保留并优先验证官方生成流程。** 仍不评测 VHH。执行见 [AB-AG 手册](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/AB_ANTIGEN_BENCHMARKS.md)。
+
 > **当前只做 AB（抗体）与 TCR 两个维度的任务，其余一律不考虑。**
 
 **在范围内**
@@ -20,6 +28,7 @@
 | TCR | T1 Binding · T2 Clustering · T3 Representation · T4 Generation |
 | AB | CDR infilling（SAbDab Kong / SAb23H2）· Light-chain pairing |
 | AB（新授权的附加测评，不自动进 headline） | Ours 原生 GDPa1 / Specificity / m396，见 [原生探针任务](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/AB_NATIVE_PROBES.md)；历史 Ophiuchus baseline 结果保持独立 |
+| AB（2026-09-24 新授权） | 抗原→VH/VL、抗原＋VH/VL binding、实验 KD/pKD：按 [AB-AG 官方协议手册](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/AB_ANTIGEN_BENCHMARKS.md) 调研及原代码复现；只做 conventional paired 抗体，禁止 VHH；逐 endpoint 执行状态见 [RESULTS](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/RESULTS.md) |
 | AB（本轮仍排除） | Humanization |
 
 2026-09-13：baseline 纠错与新授权 Ours 测评的区别见 [AB 测评指南 §10](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/AB_BASELINE_EVALUATION_AUDIT.md)。本轮新增原生适配及分组作业方案，不自动改变 headline；尚未提交的方案不能写成完成成绩。
@@ -62,7 +71,7 @@ $ENV/bin/python tcr_binding/run.py --method embed --embedder esm2_150m
 # NM2025 external original-model baseline（不读 train.csv、不 retrain）
 $ENV/bin/python /vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/tcr_binding/run_official_baseline.py --name atmtcr --track cdr3b --neg-source AS
 $ENV/bin/python /vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/tcr_binding/run_official_baseline.py --name teinet --tag teinet_small --track cdr3b --neg-source AS
-$ENV/bin/python /vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/scripts/summarize_nm2025.py  # canonical 本地/论文 fallback 选择
+$ENV/bin/python /vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/scripts/summarize_nm2025.py  # 论文主列、本地另列；默认创建新报告目录
 # NM2025 retrained checkpoint artifact audit（独立诊断，不进入 original-only 主表）
 $ENV/bin/python /vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/tcr_binding/run_retrained_baseline.py --name all --fold all --eval-set all --neg-source AS
 # T2 clustering（论文 Retention/Purity 为 [P] 主表；官方输出本地复算 + 阈值曲线为审计）
@@ -134,6 +143,14 @@ $ENV/bin/python tcr_binding/run.py --method embed --embedder bioseq:/abs/path/fi
 > 冻结任务的历史资料保留在 [`../mint_tasks/README.md`](../mint_tasks/README.md) · [`nbbench/`](nbbench/) · [`../flab/README.md`](../flab/README.md) · [`../downstream.md`](../downstream.md)，**不再更新、不进 headline**。登记表 `outputs/external/paper_reported_baselines.csv` 里这三个基准的 197 行（NbBench 121 + MINT 48 + FLAb 28）**保留为存档但已打 `in_scope=False`**——转录的论文值重新取回代价很高，故不删除，只标记；任何消费方按 `in_scope` 过滤即可，不要另建第二份文件。在范围内为 360 行。
 
 ### 3.1 锚点登记表（唯一权威；其余文档只允许链接到此，不得复述）
+
+2026-09-30 执行修复：T1 选择器固定 `[P]` 主行，`[R]` 仅附列，论文缺项保持空值；来源标签不再兼任可比性证明。T3 论文 ESM2 为 T6-8M，本地 150M 单独标记；数据成员、split、输入、指标、聚合或选模证据缺失时为 `unknown`，已知差异为 `mismatched`，均不生成跨协议排名/差值。脚本与验证入口见 [报告与 CPU 验证约定](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/PROJGUIDE.md#report-integrity)，产物见 [独立完整性报告](/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_integrity_20260930/final/results/integrity_report.json)。
+
+S²ALM（Research 2025）用户指定审计：仅 `[P]` 文献参照，公开原实现/真实权重不可获取；不进入原代码复跑清单。任务输入与 benchmark 适配判定见 [S²ALM 复现审计](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/S2ALM_REPRODUCIBILITY_AUDIT.md)；论文表见 [S²ALM 文献参照](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/RESULTS.md#s2alm-audit)。
+
+BioMap/PALM 的数据、各 baseline 原实现及复现缺口进一步见 [BioMap 官方 baseline 审计](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/BIOMAP_BASELINE_REPRODUCIBILITY_AUDIT.md)；保留为 ΔG 回归候选，不标为已完成原代码复跑。
+
+2026-09-24 新增 AB-AG 候选锚点：MAGE（配对生成）、Agate（分类，源码待定位）、DuaDeep（回归，源码待定位）；AbBiBench / AbRank / CoV-UniBind / MochiBind 为排序相邻轨，FLAb2 已按用户要求完全排除，AntiBinder 为 H-only 排除轨。原论文、官方产物与输入差异见 [AB-AG 官方协议手册](/vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/tasks/AB_ANTIGEN_BENCHMARKS.md)。尚无 `[R]` 模型成绩；help/静态检查不是复现，论文值与当前子集不能混用。
 
 每个在范围任务在此登记它的**锚点论文、数据集版本、切分、指标定义、baseline 出处层、已披露偏离、可引用性**。任何对外数字都必须能落到这张表的某一行上。出处层记号：`[P]` 论文报告值 · `[A]` 官方 artifact 重评分 · `[R]` 官方代码本地重跑 · `[L]` 本地重实现 · `[C]` 本地控制。
 

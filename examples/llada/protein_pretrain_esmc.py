@@ -13,10 +13,14 @@ Dry run (no 8B load):
 
 from __future__ import annotations
 
+import hashlib
 import json
+import math
 import os
 import shutil
 import sys
+import tempfile
+from collections import Counter
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -41,6 +45,7 @@ from dllm.pipelines.immune_llada.data import (
     load_prepared_dataset,
 )
 from dllm.pipelines.immune_llada.data.registry import parse_sources
+from dllm.pipelines.immune_llada.data.balanced_sampling import FullCoverageSourceSampler
 
 from examples.llada.protein_fusion_model import (
     RESIDUES,
@@ -54,6 +59,22 @@ from examples.llada.protein_fusion_model import (
 )
 
 logger = dllm.utils.get_default_logger(__name__)
+
+
+def _atomic_json_file(path: Path, payload: dict[str, Any]) -> None:
+    """Publish checkpoint metadata without exposing a partial JSON file."""
+    temporary = None
+    try:
+        with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", dir=path.parent,
+                                         prefix=f".{path.stem}_", suffix=".tmp", delete=False) as handle:
+            temporary = handle.name
+            json.dump(payload, handle, indent=2, allow_nan=False)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary, path)
+    finally:
+        if temporary is not None and os.path.exists(temporary):
+            os.unlink(temporary)
 
 
 FIXED_HEAVY_ENCODER_LENGTH = 168
@@ -125,6 +146,10 @@ class DataArguments(dllm.utils.DataArguments):
 @dataclass
 class TrainingArguments(transformers.TrainingArguments):
     output_dir: str = ".models/LLaDA-8B-Base/oas-ots-esmc-fusion"
+    source_balanced_training: bool = field(
+        default=False,
+        metadata={"help": "Full-coverage source-balanced sampling and equal-source loss per global optimizer batch"},
+    )
     residue_cond_mode: str = field(
         default="add",
         metadata={"help": 'Residue conditioning: "token" | "feature" | "add"'},
@@ -239,6 +264,141 @@ class FusionTrainer(transformers.Trainer):
     # source equal weight regardless of its row count.
     eval_source_rows: dict[str, int] | None = None
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.canvas_drop_counts: Counter[str] = Counter()
+        self.canvas_drop_counts_by_source: dict[str, Counter[str]] = {}
+        self.train_source_names: list[str] = []
+        self.train_source_lengths: list[int] = []
+        # Fusion forward(**batch) ignores HF num_items_in_batch; compute_loss
+        # returns a microbatch loss for both sampling modes. Let Trainer apply
+        # its one-and-only 1/gradient_accumulation_steps factor in every mode.
+        self.model_accepts_loss_kwargs = False
+        if getattr(self.args, "source_balanced_training", False):
+            if getattr(self.args, "relation_aux", "none") != "none":
+                raise ValueError("source_balanced_training currently requires relation_aux=none")
+            config = self.args.accelerator_config
+            if config.split_batches or config.dispatch_batches:
+                raise ValueError("Source balancing requires split_batches=False and dispatch_batches=False")
+            if self.args.group_by_length:
+                raise ValueError("Source balancing is incompatible with group_by_length")
+            if self.args.ignore_data_skip:
+                raise ValueError("Full-coverage resume requires ignore_data_skip=False")
+            if self.args.n_gpu > 1 and self.args.world_size == 1:
+                raise ValueError("Use one DDP/FSDP process per GPU for source-balanced training")
+
+    def _get_train_sampler(self):
+        if not getattr(self.args, "source_balanced_training", False):
+            return super()._get_train_sampler()
+        if len(self.train_source_names) != len(self.train_source_lengths) or len(set(self.train_source_names)) != len(self.train_source_names):
+            raise ValueError("Source names and lengths are not aligned")
+        if sum(self.train_source_lengths) != len(self.train_dataset):
+            raise ValueError("Source lengths do not cover the complete training dataset")
+        effective_batch = self._train_batch_size * self.args.world_size * self.args.gradient_accumulation_steps
+        sampler = FullCoverageSourceSampler(
+            self.train_source_lengths, effective_batch_size=effective_batch,
+            seed=self.args.data_seed if self.args.data_seed is not None else self.args.seed,
+        )
+        if self.args.max_steps > 0 and self.args.max_steps < sampler.steps_per_coverage_epoch:
+            raise ValueError(
+                f"max_steps={self.args.max_steps} cannot cover every source; need at least "
+                f"{sampler.steps_per_coverage_epoch} optimizer steps for one balanced coverage epoch"
+            )
+        if self.args.max_steps <= 0 and self.args.num_train_epochs < 1:
+            raise ValueError("Full source coverage requires at least one complete coverage epoch")
+        logger.info("Balanced full-coverage epoch: %d examples / %d optimizer steps; source counts=%s",
+                    len(sampler), sampler.steps_per_coverage_epoch,
+                    dict(zip(self.train_source_names, self.train_source_lengths)))
+        return sampler
+
+    def _source_sampling_policy(self) -> dict[str, Any]:
+        if not getattr(self.args, "source_balanced_training", False):
+            return {"source_balanced_training": False}
+        parts = self.train_dataset.datasets if isinstance(self.train_dataset, ConcatDataset) else [self.train_dataset]
+        manifests = []
+        for part in parts:
+            path = getattr(part, "manifest_path", None)
+            if path is not None:
+                path = Path(path).resolve()
+                manifests.append({"path": str(path), "sha256": hashlib.sha256(path.read_bytes()).hexdigest()})
+        return {
+            "source_balanced_training": True,
+            "version": 1,
+            "sources": list(self.train_source_names),
+            "source_lengths": list(self.train_source_lengths),
+            "data_seed": self.args.data_seed if self.args.data_seed is not None else self.args.seed,
+            "microbatch_size": self._train_batch_size,
+            "world_size": self.args.world_size,
+            "gradient_accumulation_steps": self.args.gradient_accumulation_steps,
+            "manifests": manifests,
+        }
+
+    def train(self, resume_from_checkpoint=None, *args, **kwargs):
+        checkpoint = _resume_checkpoint_dir(resume_from_checkpoint, self.args.output_dir)
+        if checkpoint is not None and checkpoint.is_dir():
+            path = checkpoint / "source_sampling.json"
+            saved = json.loads(path.read_text(encoding="utf-8")) if path.is_file() else {"source_balanced_training": False}
+            if saved != self._source_sampling_policy():
+                raise ValueError(
+                    "Source sampling policy changed across resume (source set/data/seed/batch topology). "
+                    "Start a new run instead of silently restarting a different coverage schedule."
+                )
+        return super().train(resume_from_checkpoint, *args, **kwargs)
+
+    def _save_checkpoint(self, model, trial, *args, **kwargs):
+        result = super()._save_checkpoint(model, trial, *args, **kwargs)
+        if self.is_world_process_zero():
+            path = Path(self._get_output_dir(trial)) / f"checkpoint-{self.state.global_step}" / "source_sampling.json"
+            _atomic_json_file(path, self._source_sampling_policy())
+        return result
+
+    def _consume_canvas_drops(self, batch: dict[str, Any], *, training: bool) -> None:
+        counts = batch.pop("_canvas_drop_counts", {})
+        by_source = batch.pop("_canvas_drop_counts_by_source", {})
+        if training:
+            self.canvas_drop_counts.update(counts)
+            for reason, values in by_source.items():
+                self.canvas_drop_counts_by_source.setdefault(reason, Counter()).update(values)
+
+    def get_batch_samples(self, epoch_iterator, num_batches, *args, **kwargs):
+        batches, num_items = super().get_batch_samples(epoch_iterator, num_batches, *args, **kwargs)
+        for batch in batches:
+            self._consume_canvas_drops(batch, training=True)
+        if batches and getattr(self.args, "source_balanced_training", False):
+            source_index = {source: i for i, source in enumerate(self.train_source_names)}
+            local_counts = Counter()
+            for batch in batches:
+                # Sampling uses manifest groups; `sources` retains row provenance
+                # (e.g. oas_paired), which is not a training-group identifier.
+                groups = batch.get("source_groups")
+                if groups is None or any(not isinstance(group, str) or not group for group in groups):
+                    raise ValueError("Source-balanced training requires manifest source_groups for every row")
+                if len(groups) != len(batch["input_ids"]):
+                    raise ValueError("Batch source_groups do not align with its rows")
+                local_counts.update(groups)
+            unknown = set(local_counts) - set(source_index)
+            if unknown:
+                raise ValueError(
+                    f"Batch contains unconfigured source_groups: {sorted(unknown)}; "
+                    f"expected manifest groups: {self.train_source_names}"
+                )
+            counts = torch.tensor([local_counts[source] for source in source_index],
+                                  device=self.accelerator.device, dtype=torch.long)
+            # Counts are AFTER collator drops and cover every rank/microbatch
+            # of this optimizer update. All ranks participate exactly once.
+            counts = self.accelerator.reduce(counts, reduction="sum")
+            if counts.eq(0).any():
+                missing = [source for source, index in source_index.items() if counts[index] == 0]
+                raise ValueError(f"Balanced optimizer batch is missing sources after collation: {missing}")
+            scale = self.args.world_size * self.args.gradient_accumulation_steps / len(source_index)
+            per_source = (scale / counts.float()).cpu().tolist()
+            for batch in batches:
+                batch["source_loss_weights"] = torch.tensor(
+                    [per_source[source_index[source]] for source in batch["source_groups"]], dtype=torch.float32,
+                    device=batch["input_ids"].device,
+                )
+        return batches, num_items
+
     def evaluate(
         self, eval_dataset=None, ignore_keys=None, metric_key_prefix="eval"
     ):  # noqa: ANN001
@@ -297,6 +457,7 @@ class FusionTrainer(transformers.Trainer):
         # loss-only. Loss is a stochastic masked-diffusion estimate (noise sampled
         # in forward); averaged over the eval set it is a stable relative metric.
         inputs = self._prepare_inputs(inputs)
+        self._consume_canvas_drops(inputs, training=False)
         with torch.no_grad():
             loss = model(**inputs).loss.detach()
         return (loss, None, None)
@@ -345,18 +506,21 @@ class CanvasDropLogCallback(transformers.TrainerCallback):
     rise means the canvas no longer fits the data being fed in.
     """
 
-    def __init__(self, collator: Any) -> None:
-        self.collator = collator
+    def __init__(self, trainer: Any) -> None:
+        self.trainer = trainer
 
     def on_log(self, args, state, control, logs=None, **kwargs):  # noqa: ANN001
         if not logs:
             return
-        counts = getattr(self.collator, "drop_counts", None)
+        counts = getattr(self.trainer, "canvas_drop_counts", None)
         if not counts:
             return
         for reason, value in counts.items():
             logs[f"canvas_drop/{reason}"] = int(value)
         logs["canvas_drop/total"] = int(sum(counts.values()))
+        for reason, sources in self.trainer.canvas_drop_counts_by_source.items():
+            for source, value in sources.items():
+                logs[f"canvas_drop_by_source/{source}/{reason}"] = int(value)
 
 
 # Resume-only artefacts written by HF Trainer + FSDP when save_only_model=False.
@@ -453,12 +617,82 @@ class TopKValLossCheckpointCallback(transformers.TrainerCallback):
         self.metric_name = metric_name
         self.slim_checkpoints = bool(slim_checkpoints)
         self.entries: list[tuple[float, int, str]] = []  # (val_loss, step, path)
+        self._restored_root: Path | None = None
+
+    def _restore_entries(self, output_dir: str, state: Any) -> None:
+        """Restore the whole run before retention; never trust manifest paths.
+
+        Older slim checkpoints have no trainer_state.json, so restore their
+        metrics from the manifest. Recover unlisted directories from exact-step
+        log records where possible. Unranked checkpoints are retained, not
+        silently deleted. A malformed manifest fails closed before any pruning.
+        """
+        root = Path(output_dir).resolve()
+        if self._restored_root == root:
+            return
+        manifest = root / "topk_val_manifest.json"
+        recovered: dict[int, float] = {}
+        if manifest.exists():
+            try:
+                payload = json.loads(manifest.read_text(encoding="utf-8"))
+                if payload["metric"] != self.metric_name:
+                    raise ValueError("checkpoint ranking metric changed")
+                for entry in payload["checkpoints"]:
+                    step = entry["step"]
+                    if type(step) is not int or step < 0:
+                        raise ValueError("invalid checkpoint step")
+                    expected = root / f"checkpoint-{step}"
+                    if Path(entry["path"]).resolve() != expected:
+                        raise ValueError("checkpoint path is outside its expected run directory")
+                    value = entry["val_loss"]
+                    score = float(value) if value is not None else float("inf")
+                    if value is not None and not math.isfinite(score):
+                        raise ValueError("non-finite checkpoint metric")
+                    if step in recovered:
+                        raise ValueError("duplicate checkpoint step")
+                    recovered[step] = score
+            except (OSError, ValueError, TypeError, KeyError) as error:
+                raise ValueError(f"Cannot safely restore checkpoint ranking from {manifest}: {error}") from error
+
+        history = list(getattr(state, "log_history", []))
+        directories: list[tuple[int, Path]] = []
+        for path in root.glob("checkpoint-*"):
+            suffix = path.name.removeprefix("checkpoint-")
+            if not suffix.isdigit() or path.name != f"checkpoint-{int(suffix)}":
+                continue
+            if path.is_symlink():
+                raise ValueError(f"Refusing checkpoint retention on symlink: {path}")
+            if not path.is_dir():
+                continue
+            directories.append((int(suffix), path))
+            state_path = path / "trainer_state.json"
+            if state_path.is_file():
+                try:
+                    history.extend(json.loads(state_path.read_text(encoding="utf-8")).get("log_history", []))
+                except (OSError, ValueError, TypeError, AttributeError):
+                    logger.warning("Could not recover checkpoint metrics from %s; preserving unranked checkpoints", state_path)
+        # The live/restored Trainer history is authoritative for exact-step metrics.
+        history.extend(getattr(state, "log_history", []))
+        for record in history:
+            step = record.get("step")
+            value = record.get(self.metric_name)
+            if type(step) is int and value is not None and math.isfinite(float(value)):
+                recovered[step] = float(value)
+        self.entries = [(recovered.get(step, float("inf")), step, str(path)) for step, path in directories]
+        self._restored_root = root
+        logger.info("Restored checkpoint ranking: %d existing directories (%d unranked, protected)",
+                    len(self.entries), sum(not math.isfinite(score) for score, _, _ in self.entries))
+
+    def on_train_begin(self, args, state, control, **kwargs):  # noqa: ANN001
+        if state.is_world_process_zero:
+            self._restore_entries(args.output_dir, state)
 
     def on_save(self, args, state, control, **kwargs):  # noqa: ANN001
         if not state.is_world_process_zero:
             return
+        self._restore_entries(args.output_dir, state)
         step = int(state.global_step)
-        ckpt_dir = os.path.join(args.output_dir, f"checkpoint-{step}")
+        ckpt_dir = str(Path(args.output_dir).resolve() / f"checkpoint-{step}")
         if not os.path.isdir(ckpt_dir):
             return
 
@@ -467,9 +701,11 @@ class TopKValLossCheckpointCallback(transformers.TrainerCallback):
         # wins a best-K slot, but it is still protected below as the latest ckpt.
         val_loss = None
         for record in reversed(state.log_history):
-            if self.metric_name in record:
+            if record.get("step") == step and self.metric_name in record:
                 val_loss = float(record[self.metric_name])
                 break
+        if val_loss is not None and not math.isfinite(val_loss):
+            val_loss = None
         rank_loss = val_loss if val_loss is not None else float("inf")
 
         # Register/refresh this checkpoint, then drop any dirs that vanished.
@@ -482,6 +718,8 @@ class TopKValLossCheckpointCallback(transformers.TrainerCallback):
         latest_step = max(s for _, s, _ in self.entries)
         latest_path = next(p for _, s, p in self.entries if s == latest_step)
         keep: set[str] = {latest_path}
+        # An old checkpoint with an unrecoverable score might be the best one.
+        keep.update(path for score, _, path in self.entries if not math.isfinite(score))
         if self.save_top_k > 0:
             for _, _, path in sorted(self.entries, key=lambda e: e[0])[: self.save_top_k]:
                 keep.add(path)
@@ -499,11 +737,12 @@ class TopKValLossCheckpointCallback(transformers.TrainerCallback):
                 )
         self.entries = [e for e in self.entries if os.path.isdir(e[2])]
 
-        # Slim every retained checkpoint except the latest (resume) one.
+        # Preserve unranked checkpoints in full: their missing metadata may be
+        # recoverable later. Ranked historical best checkpoints can be slimmed.
         resume_path = latest_path
         if self.slim_checkpoints:
-            for _, _, path in self.entries:
-                if path == resume_path:
+            for score, _, path in self.entries:
+                if path == resume_path or not math.isfinite(score):
                     continue
                 removed = slim_checkpoint_dir(path)
                 if removed:
@@ -527,8 +766,7 @@ class TopKValLossCheckpointCallback(transformers.TrainerCallback):
                 for m, s, p in sorted(self.entries, key=lambda e: e[0])
             ],
         }
-        with open(manifest, "w", encoding="utf-8") as handle:
-            json.dump(payload, handle, indent=2)
+        _atomic_json_file(Path(manifest), payload)
 
 
 def _load_llada_tokenizer(model_name_or_path: str) -> transformers.PreTrainedTokenizer:
@@ -1047,10 +1285,12 @@ def train() -> None:
         data_collator=collator,
     )
     trainer.eval_source_rows = eval_source_rows
+    trainer.train_source_names = list(selected_sources)
+    trainer.train_source_lengths = [len(part) for part in train_parts]
     # Aux scalar must land in ``logs`` before WandbCallback.on_log reads it.
     trainer.callback_handler.callbacks.insert(0, RelationAuxLogCallback())
     if bool(training_args.fixed_receptor_lengths):
-        trainer.callback_handler.callbacks.insert(0, CanvasDropLogCallback(collator))
+        trainer.callback_handler.callbacks.insert(0, CanvasDropLogCallback(trainer))
     # The sidecar is independent of top-k retention: every Trainer checkpoint
     # gets its policy metadata before any later retention callback runs.
     trainer.add_callback(FusionConfigCheckpointCallback(tokenizer=tok))

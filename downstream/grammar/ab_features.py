@@ -1,7 +1,8 @@
 """Native, frozen antibody features for ESMC + LLaDA checkpoints.
 
 Used by: python -m downstream.grammar.ab_probes --help
-No Ophiuchus fixed windows, EOS padding, or TCR record construction is used.
+Uses each checkpoint's native AB canvas (including V6 chain EOS slots).
+Global pooling includes real residues only, excluding EOS, padding and grammar.
 """
 from __future__ import annotations
 
@@ -70,18 +71,28 @@ def embed_native_pairs(model, collator, pairs, *, device, batch_size=16):
 
 
 def cached_features(pairs, *, checkpoint: Path, out_dir: Path, device: str,
-                    batch_size: int, max_length: int):
+                    batch_size: int, max_length: int, input_audit=None):
     from examples.llada.load_fusion_checkpoint import load_fusion_for_eval, resolve_fusion_dir
 
     checkpoint = resolve_fusion_dir(checkpoint)
     pairs = [(clean_sequence(h), clean_sequence(l)) for h, l in pairs]
+    config_path = checkpoint / "fusion_config.json"
+    config = json.loads(config_path.read_text()) if config_path.exists() else {}
+    if config.get("fixed_receptor_lengths"):
+        oversized = [(i, len(h), len(l)) for i, (h, l) in enumerate(pairs)
+                     if len(h) > 166 or len(l) > 134]
+        if oversized:
+            raise ValueError(f"Fixed-v2 input overflow before model load: {oversized[:5]}; "
+                             "use audited --input-policy fixed-v2-fv for supported AB probes")
     sources = [Path(__file__), ROOT / "examples/llada/load_fusion_checkpoint.py",
                ROOT / "examples/llada/protein_fusion_model.py",
                ROOT / "dllm/pipelines/immune_llada/data/grammar.py",
                ROOT / "downstream/grammar/common.py",
                ROOT / "dllm/pipelines/llada/models/modeling_llada.py"]
     manifest = {
-        "feature_protocol": FEATURE_PROTOCOL, "checkpoint": str(checkpoint),
+        "feature_protocol": (FEATURE_PROTOCOL if not input_audit or input_audit['policy'] == 'full'
+                             else "ab_audited_fv_postllada_global_residue_mean_v1"),
+        "input_audit": input_audit, "checkpoint": str(checkpoint),
         "checkpoint_sha256": file_sha256(checkpoint / "model.safetensors"),
         "checkpoint_json_sha256": {p.name: file_sha256(p) for p in sorted(checkpoint.glob("*.json"))},
         "pairs_sha256": json_hash(pairs), "n": len(pairs), "max_length": max_length,

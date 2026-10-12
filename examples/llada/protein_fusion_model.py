@@ -977,12 +977,16 @@ class LLaDAEsmcFusion(BioSeqEncoderDiffusionModel):
             encoder_position_ids=batch.get("encoder_position_ids"),
             output_hidden_states=want_aux,
         )
+        sequence_weights = batch.get("source_loss_weights") if self.training else None
+        if sequence_weights is not None and want_aux:
+            raise ValueError("Source-balanced reconstruction does not support relation auxiliary loss")
         if self._train_objective == "bert":
             recon = compute_masked_cross_entropy(
                 output.logits,
                 labels,
                 loss_norm=self._loss_norm,
                 forbidden_token_ids=None,
+                sequence_weights=sequence_weights,
             )
         else:
             token_weights = self._diffusion_token_weights(
@@ -1006,6 +1010,7 @@ class LLaDAEsmcFusion(BioSeqEncoderDiffusionModel):
                 light_mask=timed.light_mask if use_chain_loss else None,
                 heavy_loss_weight=self._heavy_loss_weight,
                 light_loss_weight=self._light_loss_weight,
+                sequence_weights=sequence_weights,
             )
         aux = recon.new_zeros(())
         if want_aux:
