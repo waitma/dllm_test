@@ -4,7 +4,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
-PROJECT_ROOT = Path("/vepfs-mlp2/c20250601/251105016/project/dllm_test")
+PROJECT_ROOT = Path("/project_c20250601/251105016/project/dllm_test")
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 

@@ -19,7 +19,7 @@ import runpy
 import subprocess
 import sys
 
-ROOT = Path('/vepfs-mlp2/c20250601/251105016/project/dllm_test')
+ROOT = Path('/project_c20250601/251105016/project/dllm_test')
 POOL = ROOT/'output/immune_research_pool_c20250601_20261005'
 EPOCH = ROOT/'output/v7_formal_eight_gpu_20261002/epoch2_continuation_20261006'
 BASE = EPOCH/'generation_pool_v1'

@@ -1,7 +1,7 @@
 """Check additional-update/resume accounting once with artificial JSON metadata.
 
 Activate conda pllm, then run:
-  CUDA_VISIBLE_DEVICES='' python -B /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/research/test_formal_segment_dispatch.py
+  CUDA_VISIBLE_DEVICES='' python -B /project_c20250601/251105016/project/dllm_test/scripts/research/test_formal_segment_dispatch.py
 
 Uses the frozen driver's stdlib parser/digest and the new wrapper's metadata helpers.
 All plans, catalogs and checkpoint JSON are synthetic_fakecontrol fixtures in
@@ -20,7 +20,7 @@ import unittest
 from unittest.mock import Mock, patch
 
 
-ROOT = Path('/vepfs-mlp2/c20250601/251105016/project/dllm_test')
+ROOT = Path('/project_c20250601/251105016/project/dllm_test')
 DISPATCH = ROOT / 'scripts/research/pool_formal_dispatch.py'
 WRAPPER = ROOT / 'scripts/research/formal_pool_job.py'
 DRIVER = ROOT / 'output/v7_formal_eight_gpu_20261002/source_snapshot_v2/scripts/research/run_v7_formal.py'

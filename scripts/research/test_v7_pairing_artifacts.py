@@ -1,6 +1,6 @@
 """Check new pairing artifact integrity using disposable artificial observations.
 
-Activate conda pllm and run python -B /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/research/test_v7_pairing_artifacts.py
+Activate conda pllm and run python -B /project_c20250601/251105016/project/dllm_test/scripts/research/test_v7_pairing_artifacts.py
 No model, real sequence, certificate, GPU, job, or checkpoint is created/loaded.
 All artificial prediction files are removed when TemporaryDirectory exits.
 """
@@ -11,7 +11,7 @@ from pathlib import Path
 import runpy
 from tempfile import TemporaryDirectory
 
-ROOT = Path('/vepfs-mlp2/c20250601/251105016/project/dllm_test')
+ROOT = Path('/project_c20250601/251105016/project/dllm_test')
 
 
 def main():

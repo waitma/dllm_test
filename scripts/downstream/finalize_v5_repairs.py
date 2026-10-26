@@ -14,7 +14,7 @@ import shutil
 import sys
 import time
 
-ROOT=Path('/vepfs-mlp2/c20250601/251105016/project/dllm_test')
+ROOT=Path('/project_c20250601/251105016/project/dllm_test')
 sys.path.insert(0,str(ROOT))
 from scripts.downstream.report_v5_suite import update
 
@@ -59,7 +59,7 @@ def main():
         p=ROOT/name;p.write_text(p.read_text()+'\n\n'+text+'\n')
     with (run/'results_update.lock').open('w') as lock:
         fcntl.flock(lock,fcntl.LOCK_EX)
-        p=ROOT/'downstream/benchmark/RESULTS.md';s=p.read_text()
+        p=ROOT/'downstream/benchmark/EVALUATION_PROCESS.md';s=p.read_text()
         s=s.replace('**2026-10-09 修复复测进行中**','**2026-10-09 修复复测已终态**')
         s+='\n\n'+text+'\n';p.write_text(s)
     print(json.dumps(report,ensure_ascii=False),flush=True)

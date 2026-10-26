@@ -26,7 +26,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 
-ROOT = Path("/vepfs-mlp2/c20250601/251105016/project/dllm_test")
+ROOT = Path("/project_c20250601/251105016/project/dllm_test")
 SRC = ROOT / "output" / "repr_diagnostics" / "noise_floor.json"
 DEST = ROOT / "debug" / "figures" / "noise_floor.png"
 

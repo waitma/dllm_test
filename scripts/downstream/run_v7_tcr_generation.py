@@ -1,7 +1,7 @@
 """Collect fixed two-epoch V7 TCR predictions after a matching device audit.
 
 Activate conda pllm; use the worker-compatible Python in a clean process:
-python -I -B /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/downstream/run_v7_tcr_generation.py --device cuda:0 --preflight /absolute/preflight.json --output-root /absolute/new_directory
+python -I -B /project_c20250601/251105016/project/dllm_test/scripts/downstream/run_v7_tcr_generation.py --device cuda:0 --preflight /absolute/preflight.json --output-root /absolute/new_directory
 All original 34 targets receive 100 stochastic candidates and one independent
 argmax control. No scoring, annotation, retries, training, or job submission.
 """
@@ -13,7 +13,7 @@ import re
 import runpy
 import sys
 
-ROOT = Path('/vepfs-mlp2/c20250601/251105016/project/dllm_test')
+ROOT = Path('/project_c20250601/251105016/project/dllm_test')
 sys.path.insert(0, str(ROOT))
 from downstream.v7_native import load_native_checkpoint, require
 from downstream.v7_tcr_generation import beta_input, beta_decode, beta_result, PROTOCOL as PROTOCOL_ID

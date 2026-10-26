@@ -1,7 +1,7 @@
 """Collect the actual nine-task V7 CDR batch and fixed historical V5 references.
 
 Activate conda pllm after actual two-epoch training and nine evaluations finish:
-python -B /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/downstream/collect_v7_cdr_results.py --output /vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/outputs/v7_f011_step50082_cdr/report.json
+python -B /project_c20250601/251105016/project/dllm_test/scripts/downstream/collect_v7_cdr_results.py --output /project_c20250601/251105016/project/dllm_test/downstream/benchmark/outputs/v7_f011_step50082_cdr/report.json
 This stdlib collector never loads a model, generates sequences, reruns scoring,
 edits RESULTS.md, starts jobs or fabricates missing results. It creates a new
 JSON only after all existing native completion and audit gates pass. The root
@@ -18,7 +18,7 @@ import runpy
 import statistics
 
 
-ROOT = Path('/vepfs-mlp2/c20250601/251105016/project/dllm_test')
+ROOT = Path('/project_c20250601/251105016/project/dllm_test')
 EPOCH = ROOT/'output/v7_formal_eight_gpu_20261002/epoch2_continuation_20261006'
 RECOVERY = EPOCH/'recovery_v1'
 GENERATION = RECOVERY/'generation_pool_v1'

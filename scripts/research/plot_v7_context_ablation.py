@@ -1,7 +1,7 @@
 """Export actual p02 metadata and curves without importing models or reading sequences.
 
 Activate pllm and run:
-  python -B /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/research/plot_v7_context_ablation.py --jobs-file /absolute/jobs.json --pool-dir /absolute/pool --output-prefix /absolute/figures/context_ablation
+  python -B /project_c20250601/251105016/project/dllm_test/scripts/research/plot_v7_context_ablation.py --jobs-file /absolute/jobs.json --pool-dir /absolute/pool --output-prefix /absolute/figures/context_ablation
 
 Each rendered page is saved as SVG/PDF/PNG. CSV/JSON always retain missing cells
 and raw denominators. Empty or initial-only inputs produce no numerical figures.

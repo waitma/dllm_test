@@ -14,7 +14,7 @@ import statistics
 import subprocess
 import time
 
-ROOT = Path('/vepfs-mlp2/c20250601/251105016/project/dllm_test')
+ROOT = Path('/project_c20250601/251105016/project/dllm_test')
 SUPERVISION = ROOT/'output/immune_v5_270m_noesmc_300k_b512_supervision'
 RUN = ROOT/'output/immune_v5_270m_noesmc_300k_b512'
 TASK = 't-20261007153431-vhx2f'

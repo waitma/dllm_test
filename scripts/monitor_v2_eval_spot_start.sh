@@ -10,7 +10,7 @@
 #      （全局 STOP 或全部 Success）才收工。
 set -uo pipefail
 
-REPO=/vepfs-mlp2/c20250601/251105016/project/dllm_test
+REPO=/project_c20250601/251105016/project/dllm_test
 EVAL_DATE="${1:-20260928}"
 SUBMISSIONS="$REPO/output/downstream_generation/v2_immune_v6_eval_${EVAL_DATE}/submissions.json"
 MON_DIR="$REPO/output/downstream_generation/v2_immune_v6_eval_${EVAL_DATE}/_monitor"
@@ -43,7 +43,7 @@ setsid nohup bash -c '
     export V2_EVAL_SUBMISSIONS="$SUBMISSIONS"
     export V2_EVAL_MONITOR_DIR="$MON_DIR"
     while true; do
-        /vepfs-mlp2/c20250601/251105016/conda/envs/pllm/bin/python scripts/monitor_v2_eval_spot.py
+        /project_c20250601/251105016/conda/envs/pllm/bin/python scripts/monitor_v2_eval_spot.py
         rc=$?
         if [ "$rc" -eq 0 ]; then
             echo "$(date -u +%FT%TZ) [INFO] 评测看护正常退出（全局 STOP 或全部 Success）" >> "$MON_DIR/monitor.log"

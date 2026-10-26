@@ -14,7 +14,7 @@ from pathlib import Path
 import re
 import time
 
-ROOT = Path('/vepfs-mlp2/c20250601/251105016/project/dllm_test')
+ROOT = Path('/project_c20250601/251105016/project/dllm_test')
 POOL = ROOT/'output/immune_training_container_c20250601_20261007'
 EVIDENCE = ROOT/'output/immune_v5_object302_noesmc_300k_b512_supervision/training_standby_watch_20261008'
 RESULT = POOL/'results/v5_scratch_launch_v3_20261007.json'

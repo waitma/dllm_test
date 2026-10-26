@@ -1,14 +1,14 @@
 """Check new pairing decoding invariants on a tiny frozen model and artificial text.
 
 Activate conda pllm; run with the worker-compatible protenix_abtcr Python and
-CUDA_VISIBLE_DEVICES='': python -B /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/research/test_v7_pairing_adapter.py
+CUDA_VISIBLE_DEVICES='': python -B /project_c20250601/251105016/project/dllm_test/scripts/research/test_v7_pairing_adapter.py
 No real sequences, production weights, annotation tools, GPU, or checkpoints.
 """
 from pathlib import Path
 import json
 import sys
 
-ROOT = Path('/vepfs-mlp2/c20250601/251105016/project/dllm_test')
+ROOT = Path('/project_c20250601/251105016/project/dllm_test')
 SOURCE = ROOT/'output/v7_formal_eight_gpu_20261002/epoch2_continuation_20261006/source_snapshot_v1'
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(SOURCE))

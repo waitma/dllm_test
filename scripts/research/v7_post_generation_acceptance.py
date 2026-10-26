@@ -2,7 +2,7 @@
 
 Activate conda pllm; call check(catalog) from the SHA-bound v2 pool adapter.
 This is a read-only stdlib helper, not a training launcher or certificate maker.
-Artificial boundary tests: python -B /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/research/test_v7_post_generation_acceptance.py
+Artificial boundary tests: python -B /project_c20250601/251105016/project/dllm_test/scripts/research/test_v7_post_generation_acceptance.py
 The publisher must separately verify live supervisor exit, idle workers and
 resource deadlines before publishing. This helper also runs inside GPU workers,
 so it never interprets root-host PIDs in a different process namespace.
@@ -13,7 +13,7 @@ from pathlib import Path
 import runpy
 
 
-ROOT = Path('/vepfs-mlp2/c20250601/251105016/project/dllm_test')
+ROOT = Path('/project_c20250601/251105016/project/dllm_test')
 FORMAL = ROOT/'output/v7_formal_eight_gpu_20261002'
 PARENT = FORMAL/'where_continuation_20261006'
 EPOCH = FORMAL/'epoch2_continuation_20261006'

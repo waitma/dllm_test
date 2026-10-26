@@ -3,7 +3,7 @@
 # Usage: bash run_immune_fusion_repr.sh <ckpt_dir> <tag> [embed_batch_size]
 set -euo pipefail
 
-ROOT="/vepfs-mlp2/c20250601/251105016/project/dllm_test"
+ROOT="/project_c20250601/251105016/project/dllm_test"
 CKPT="${1:?usage: $0 <fusion_ckpt_dir> <tag> [embed_bs]}"
 TAG="${2:?usage: $0 <fusion_ckpt_dir> <tag> [embed_bs]}"
 EMBED_BS="${3:-16}"
@@ -63,9 +63,7 @@ echo "=== T2 embed-threshold ${TAG} $(date -u +%H:%M:%SZ) ===" | tee -a "${LOG}"
 python -u tcr_clustering/run.py --method embed-threshold \
   --embedder "${SPEC}" --tag "${TAG}" 2>&1 | tee -a "${LOG}"
 
-echo "=== T2 K-means embed-bench ${TAG} $(date -u +%H:%M:%SZ) ===" | tee -a "${LOG}"
-python -u tcr_clustering/run_embed_bench.py \
-  --embedder "${SPEC}" --tag "${TAG}" --algos kmeans 2>&1 | tee -a "${LOG}"
+# T2B KMeans removed from benchmark scope on 2026-10-14.
 fi
 
 if stage_enabled t3; then

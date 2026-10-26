@@ -9,7 +9,7 @@ import json
 import sys
 from tempfile import TemporaryDirectory
 
-ROOT = Path('/vepfs-mlp2/c20250601/251105016/project/dllm_test')
+ROOT = Path('/project_c20250601/251105016/project/dllm_test')
 SOURCE = ROOT/'output/v7_formal_eight_gpu_20261002/epoch2_continuation_20261006/source_snapshot_v1'
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(SOURCE))

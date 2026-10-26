@@ -359,7 +359,7 @@ def test_nanobody_antigen_uses_nb_marker_in_receptor_block() -> None:
 
 def test_esmc_hf_tokenizer_supports_chain_separator() -> None:
     adapter = HuggingFaceEsmTokenizerAdapter.from_pretrained(
-        "/vepfs-mlp2/c20250601/251105016/project/dllm_test/model_weights/esmc/ESMC-300M"
+        "/project_c20250601/251105016/project/dllm_test/model_weights/esmc/ESMC-300M"
     )
     tokenizer = GrammarTokenizer(adapter)
     assert tokenizer.chain_separator_id() == adapter.token_id(".")
@@ -532,7 +532,7 @@ def _assert_decoder_encoder_residue_ids_match(batch: dict[str, torch.Tensor]) ->
 
 def test_per_chain_encoder_ids_match_decoder_for_esmc_adapter() -> None:
     esmc_dir = (
-        "/vepfs-mlp2/c20250601/251105016/project/dllm_test/model_weights/esmc/ESMC-300M"
+        "/project_c20250601/251105016/project/dllm_test/model_weights/esmc/ESMC-300M"
     )
     if not __import__("pathlib").Path(esmc_dir, "tokenizer.json").is_file():
         import pytest

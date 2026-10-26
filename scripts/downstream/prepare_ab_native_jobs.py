@@ -21,8 +21,8 @@ import yaml
 ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
-RUNTIME = Path("/vepfs-mlp2/c20250601/251105016/conda/envs/protenix_abtcr")
-PLLM = Path("/vepfs-mlp2/c20250601/251105016/conda/envs/pllm")
+RUNTIME = Path("/project_c20250601/251105016/conda/envs/protenix_abtcr")
+PLLM = Path("/project_c20250601/251105016/conda/envs/pllm")
 
 
 def build_jobs(checkpoint: Path, tag: str, queue: str = "c20250601"):
@@ -30,7 +30,7 @@ def build_jobs(checkpoint: Path, tag: str, queue: str = "c20250601"):
     template = yaml.safe_load((ROOT / "eval_jobs/eval_immune_270m_42000_pairing_reference_v3.yml").read_text())
     out = ROOT / "output/downstream_generation" / tag
     common = f"""set -euo pipefail
-source /vepfs-mlp2/c20250601/251105016/miniforge3/etc/profile.d/conda.sh
+source /project_c20250601/251105016/miniforge3/etc/profile.d/conda.sh
 conda activate {PLLM}
 export PYTHONPATH={ROOT}
 export PYTHONDONTWRITEBYTECODE=1
@@ -42,7 +42,7 @@ export USE_TF=0
 export TOKENIZERS_PARALLELISM=false
 export HF_HUB_OFFLINE=1
 export TRANSFORMERS_OFFLINE=1
-export HF_HOME=/vepfs-mlp2/c20250601/251105016/conda/cache/huggingface
+export HF_HOME=/project_c20250601/251105016/conda/cache/huggingface
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 cd {ROOT}
 conda activate {RUNTIME}

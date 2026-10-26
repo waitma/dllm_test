@@ -36,7 +36,7 @@ TCR_COLUMNS = [
 # A binding example = one TCR paired with one epitope + a binary label.
 BINDING_COLUMNS = TCR_COLUMNS + ["label", "source", "split"]
 
-PROJECT_ROOT = Path("/vepfs-mlp2/c20250601/251105016/project/dllm_test")
+PROJECT_ROOT = Path("/project_c20250601/251105016/project/dllm_test")
 BENCH_ROOT = PROJECT_ROOT / "downstream" / "benchmark"
 DATA_ROOT = PROJECT_ROOT / "data"
 

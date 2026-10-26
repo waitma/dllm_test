@@ -2,10 +2,10 @@
 
 Install the isolated FAISS dependency and score with::
 
-    /vepfs-mlp2/c20250601/251105016/conda/envs/protenix_abtcr/bin/pip install \
-      --target /vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/baselines/GIANA/_deps faiss-cpu
-    /vepfs-mlp2/c20250601/251105016/conda/envs/pllm/bin/python \
-      /vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/tcr_generation_bench/run_public_beta.py score --with-giana
+    /project_c20250601/251105016/conda/envs/protenix_abtcr/bin/pip install \
+      --target /project_c20250601/251105016/project/dllm_test/downstream/benchmark/baselines/GIANA/_deps faiss-cpu
+    /project_c20250601/251105016/conda/envs/pllm/bin/python \
+      /project_c20250601/251105016/project/dllm_test/downstream/benchmark/tcr_generation_bench/run_public_beta.py score --with-giana
 
 GIANA is invoked without V-gene information because the public generation
 interface produces CDR3beta only.  Each model/target is clustered separately
@@ -29,7 +29,7 @@ BENCH = Path(__file__).resolve().parents[1]
 GIANA_REPO = BENCH / "baselines" / "GIANA"
 GIANA_SCRIPT = GIANA_REPO / "GIANA4.1.py"
 GIANA_DEPS = GIANA_REPO / "_deps"
-GIANA_PYTHON = Path("/vepfs-mlp2/c20250601/251105016/conda/envs/protenix_abtcr/bin/python")
+GIANA_PYTHON = Path("/project_c20250601/251105016/conda/envs/protenix_abtcr/bin/python")
 
 
 def _safe_name(value: str) -> str:

@@ -11,7 +11,7 @@ import matplotlib.patheffects as pe
 from matplotlib.patches import FancyBboxPatch, FancyArrowPatch, Circle
 from matplotlib.colors import to_rgb
 
-FIGDIR = "/vepfs-mlp2/c20250601/251105016/project/dllm_test/paper/figures"
+FIGDIR = "/project_c20250601/251105016/project/dllm_test/paper/figures"
 
 
 def use_style():

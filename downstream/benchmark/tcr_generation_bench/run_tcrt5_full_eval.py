@@ -3,14 +3,14 @@
 
 Run both the author-release reconstruction and the current rebuilt models::
 
-    /vepfs-mlp2/c20250601/251105016/conda/envs/pllm/bin/python \
-      /vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/tcr_generation_bench/run_tcrt5_full_eval.py \
+    /project_c20250601/251105016/conda/envs/pllm/bin/python \
+      /project_c20250601/251105016/project/dllm_test/downstream/benchmark/tcr_generation_bench/run_tcrt5_full_eval.py \
       all --with-pgen --reference-pgen --pgen-workers 16
 
 Run only fast CPU metrics (no OLGA Pgen)::
 
-    /vepfs-mlp2/c20250601/251105016/conda/envs/pllm/bin/python \
-      /vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/tcr_generation_bench/run_tcrt5_full_eval.py \
+    /project_c20250601/251105016/conda/envs/pllm/bin/python \
+      /project_c20250601/251105016/project/dllm_test/downstream/benchmark/tcr_generation_bench/run_tcrt5_full_eval.py \
       all
 """
 

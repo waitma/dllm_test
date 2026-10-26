@@ -1,13 +1,13 @@
 """Check the new capacity dispatcher once, without executing a model or job.
 
-  source /vepfs-mlp2/c20250601/251105016/miniforge3/etc/profile.d/conda.sh
+  source /project_c20250601/251105016/miniforge3/etc/profile.d/conda.sh
   conda activate pllm
-  CUDA_VISIBLE_DEVICES='' python -B /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/research/test_pool_large_batch_dispatch.py
+  CUDA_VISIBLE_DEVICES='' python -B /project_c20250601/251105016/project/dllm_test/scripts/research/test_pool_large_batch_dispatch.py
 
 Only the real prepare/parse_args software checks run once. Rejection controls
 use owned synthetic_fakecontrol files; exec and legacy main are mocked. All
 temporary fixture files are deleted. Evidence is written only to the new own
-/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/v7_large_batch_dispatch_controls_20261002 directory.
+/project_c20250601/251105016/project/dllm_test/output/v7_large_batch_dispatch_controls_20261002 directory.
 """
 from contextlib import ExitStack, redirect_stderr
 from datetime import datetime, timezone
@@ -22,9 +22,9 @@ import tempfile
 import time
 from unittest.mock import Mock, patch
 
-ROOT = Path('/vepfs-mlp2/c20250601/251105016/project/dllm_test')
+ROOT = Path('/project_c20250601/251105016/project/dllm_test')
 SOURCE = ROOT / 'scripts/research/pool_large_batch_dispatch.py'
-EXPECTED_SHA = 'f259fb0f0946fb7434c1f78b06f64e5d186ece7b781fd29dac7f3f0fe0e5d866'
+EXPECTED_SHA = '76d07d623f0fe068dcffa55a28c60a38695fe0a256d4a4bfd7751bded50aad5c'
 OUT = ROOT / 'output/v7_large_batch_dispatch_controls_20261002'
 
 

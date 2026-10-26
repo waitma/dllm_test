@@ -1,7 +1,7 @@
 """Check only the new recovery lineage boundary with temporary metadata.
 
 Activate conda pllm, then run:
-python -B /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/research/test_v7_post_generation_recovery_lineage.py
+python -B /project_c20250601/251105016/project/dllm_test/scripts/research/test_v7_post_generation_recovery_lineage.py
 Reuse the original fixture builder without rerunning its accepted tests. No
 sequence, checkpoint, real audit certificate, GPU or queue entry is created.
 """
@@ -13,7 +13,7 @@ import unittest
 from unittest.mock import patch
 
 
-ROOT = Path('/vepfs-mlp2/c20250601/251105016/project/dllm_test')
+ROOT = Path('/project_c20250601/251105016/project/dllm_test')
 LOCAL = ROOT/'output/v7_local_ablation_20261005'
 OLD = LOCAL/'post_generation_pool_v1/source_v1'
 NEW = LOCAL/'post_generation_pool_v2/source_v1'

@@ -1,10 +1,10 @@
 """Check only the new dispatcher with stdlib temporary metadata and mocked exec.
 
 Run once after activating pllm:
-  source /vepfs-mlp2/c20250601/251105016/miniforge3/etc/profile.d/conda.sh
+  source /project_c20250601/251105016/miniforge3/etc/profile.d/conda.sh
   conda activate pllm
-  CUDA_VISIBLE_DEVICES='' python -B /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/research/test_pool_formal_dispatch.py \
-    --evidence-dir /vepfs-mlp2/c20250601/251105016/project/dllm_test/output/v7_formal_dispatch_controls_20261002
+  CUDA_VISIBLE_DEVICES='' python -B /project_c20250601/251105016/project/dllm_test/scripts/research/test_pool_formal_dispatch.py \
+    --evidence-dir /project_c20250601/251105016/project/dllm_test/output/v7_formal_dispatch_controls_20261002
 
 Fixtures are explicitly synthetic_fakecontrol dispatcher metadata, not complete
 formal plans or admission certificates. No wrapper, legacy main, model, process,
@@ -26,7 +26,7 @@ import time
 import unittest
 from unittest.mock import Mock, patch
 
-ROOT = Path('/vepfs-mlp2/c20250601/251105016/project/dllm_test')
+ROOT = Path('/project_c20250601/251105016/project/dllm_test')
 SOURCE = ROOT / 'scripts/research/pool_formal_dispatch.py'
 WRAPPER = ROOT / 'scripts/research/formal_pool_job.py'
 PREVIOUS = ROOT / 'scripts/research/pool_context_ablation_dispatch.py'

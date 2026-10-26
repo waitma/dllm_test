@@ -1,7 +1,7 @@
 """Fixed pool-member dispatcher for one original-model synthetic world8 group.
 
 After activating pllm, source preparation has no execution side effects:
-  python -I -B /vepfs-mlp2/c20250601/251105016/project/dllm_test/output/generic_eight_worker_group_integration_20261002/actual_gpu_original_Trainer_v1/gpu_pool_dispatcher_v1.py --prepare-stage
+  python -I -B /project_c20250601/251105016/project/dllm_test/output/generic_eight_worker_group_integration_20261002/actual_gpu_original_Trainer_v1/gpu_pool_dispatcher_v1.py --prepare-stage
 This prepares reviewable registry/runner bytes and a group mapping only after
 the actual source closure is frozen. It never publishes, submits, enqueues,
 cancels or restarts anything. Existing workers eventually supply the exact
@@ -25,7 +25,7 @@ import traceback
 import uuid
 
 
-ROOT = Path('/vepfs-mlp2/c20250601/251105016/project/dllm_test')
+ROOT = Path('/project_c20250601/251105016/project/dllm_test')
 OLD = ROOT/'output/generic_eight_worker_group_integration_20261002'
 OWN = OLD/'actual_gpu_original_Trainer_v1'
 SELF = OWN/'gpu_pool_dispatcher_v1.py'
@@ -41,7 +41,7 @@ RUNNER = ROOT/'scripts/run_immune_research.py'
 REGISTRY = ROOT/'dllm/pipelines/immune_llada/research/model.py'
 PUBLISHED = ROOT/'scripts/architecture_prototypes/gpu_pool_dispatcher_v1.py'
 LEGACY = ROOT/'output/generic_remaining_slot_learning_integration_20261002/pool_slot_learning_dispatcher_v1.py'
-LEGACY_SHA256 = 'af604dafcd4b146112bfbf988d09109c366328c9e519fb2821a332e6fe22c793'
+LEGACY_SHA256 = '49f9c7e45bca01289cbf87e638e2b0c2f38a301565227a965934ae3fa9ba2df9'
 RUNTIME_MANIFEST_SHA256 = '2ef8f6777120434c0371083838d3ad03d259e807153d7798a745197e7e9cdefd'
 MEMBERS = tuple('g01_r21_world8_member_'+str(index) for index in range(8))
 FALSE_FLAGS = ('execution_ready', 'GPU_admitted', 'data_admitted', 'training_admitted', 'production_admitted',

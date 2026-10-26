@@ -32,7 +32,7 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
-REPO = Path("/vepfs-mlp2/c20250601/251105016/project/dllm_test")
+REPO = Path("/project_c20250601/251105016/project/dllm_test")
 SUBMISSIONS = Path(
     os.environ.get(
         "V2_EVAL_SUBMISSIONS",

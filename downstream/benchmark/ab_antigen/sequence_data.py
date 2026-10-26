@@ -12,7 +12,7 @@ import numpy as np
 import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[3]
-DATA = ROOT / 'data/downstream/ab_antigen_sequence_v1'
+DATA = ROOT / 'data/downstream/ab_antigen_sequence_v2_raw_rows'
 AA = set('ACDEFGHIKLMNPQRSTVWY')
 MAX_LENGTH = 2048
 
@@ -84,18 +84,10 @@ def covunibind():
                 assay=str(row.assay_name), lineage=str(row.antigen_lineage),
                 antibody_name=str(row.antibody_name), pkd=None,
                 pkd_status='not_applicable' if name=='binding' else 'unit_and_censoring_unverified'))
-        # Retain independent assays but exclude contradictory measurements within an assay.
-        groups=defaultdict(list)
-        for r in rows:
-            groups[(r['antigen_key'],r['antibody_key'],r['source_doi'],r['assay'])].append(r)
-        keep=[]
-        for group in groups.values():
-            if len({r['raw_label'] for r in group})>1:
-                excluded.extend(dict(source_id=r['source_id'],reason='conflicting_replicates') for r in group)
-            else:
-                keep.append(group[0]); excluded.extend(dict(source_id=r['source_id'],reason='exact_duplicate') for r in group[1:])
-        outputs[name]=keep
-        audits[name]=dict(raw=len(df), retained=len(keep), exclusions=excluded,
+        # Evaluation rows retain their original multiplicity, order and labels.
+        # Contradictory measurements are retained as separate source rows too.
+        outputs[name]=rows
+        audits[name]=dict(raw=len(df), retained=len(rows), exclusions=excluded,
             source_sha256=hashlib.sha256((base/filename).read_bytes()).hexdigest(),
             score_direction='higher_is_stronger', pkd_status='blocked_unit_and_censoring' if name=='spr' else None)
     return outputs,audits
@@ -172,18 +164,13 @@ def abbibench():
                 rows.append(record('abbibench',f'{assay}:{idx}',ag,h,l,assay=assay,
                     label=value,raw_label=value,endpoint='binding_score',
                     direction_status='higher_stronger_paper_v2_table1',wt_heavy=wt_h,wt_light=wt_l))
-    # Remove exact duplicates without averaging experimental labels.
-    unique=[];seen=set()
-    for row in rows:
-        key=(row['assay'],row['antigen_key'],row['antibody_key'],row['label'])
-        if key in seen:exclusions.append(dict(source_id=row['source_id'],reason='exact_duplicate'))
-        else:unique.append(row);seen.add(key)
-    rows=unique
+    # Keep repeated measurements; source row IDs, not sequence identity, identify rows.
     return rows,dict(retained=len(rows),assays=assays,exclusions=exclusions,
         gate='official_asset_completeness_checked',direction_evidence='https://arxiv.org/html/2506.04235v2#S3.SS1',unmapped_csv=sorted(str(p.name) for p in (base/'binding_affinity').glob('*.csv') if str(p) not in seen_files))
 
 
 def chimera():
+    """Historical full-chain dataset only; new CHIMERA evaluations use chimera_h3."""
     base=DATA/'raw/chimera'; split=json.loads((base/'splits/antigen_fold.json').read_text())
     membership={cid:s for s,ids in split.items() for cid in ids}
     summary=pd.read_csv(base/'metadata/final_summary.csv')
@@ -219,15 +206,9 @@ def chimera():
             numbering={c:[e for e in x['numbering']['imgt'][c] if e[2]!='-'] for c in bounds},
             cdr_masks={c:x['cdr_masks']['imgt'][c][slice(*bounds[c])] for c in bounds},fv_bounds=bounds,
             contact_indices=contacts,contact_definition='reference_CA_CA_lt_8A'))
-    ag_splits=defaultdict(set)
-    for r in rows:ag_splits[r['antigen_key']].add(r['split'])
-    keep=[]
-    for r in rows:
-        if len(ag_splits[r['antigen_key']])>1:
-            exclusions.append(dict(source_id=r['source_id'],reason='antigen_exact_cross_split'))
-        else:keep.append(r)
-    return keep,dict(raw=len(summary),retained=len(keep),exclusions=exclusions,
-        split='official_antigen_fold_filtered_exact_antigen_conflicts',protocol='chimera_sequence_only_v1')
+    # Preserve official split membership even when antigen sequences cross splits.
+    return rows,dict(raw=len(summary),retained=len(rows),exclusions=exclusions,
+        split='official_antigen_fold_no_overlap_removal',protocol='chimera_sequence_only_raw_rows_v2')
 
 
 def main():
@@ -236,9 +217,13 @@ def main():
     outputs,audits=covunibind()
     outputs['abbibench'],audits['abbibench']=abbibench()
     if not args.without_chimera:
-        outputs['chimera'],audits['chimera']=chimera()
+        from downstream.benchmark.ab_antigen.chimera_h3 import prepare, DATA as H3_DATA
+        _,manifest=prepare()
+        audits['chimera_h3']=dict(data_root=str(H3_DATA),counts=manifest['counts'],
+            dataset_sha256=manifest['dataset_sha256'],protocol=manifest['protocol'])
     for name,rows in outputs.items():write_rows(DATA/f'{name}.jsonl',rows)
-    write_json(DATA/'build_audit.json',dict(protocol='ab_ag_sequence_v1',subsets=audits,
+    write_json(DATA/'build_audit.json',dict(protocol='ab_ag_sequence_v2_raw_rows',subsets=audits,
+        deduplication=False, conflicting_replicates='retain_original_labels',
         max_length=MAX_LENGTH,provenance='author_data_project_protocol_not_official_rerun'))
     print(json.dumps({k:len(v) for k,v in outputs.items()}))
 

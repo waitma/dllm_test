@@ -1,7 +1,7 @@
 """Score a completed native V7 pairing run, without generating or training.
 
 Activate conda pllm; use the worker-compatible Python with offline model paths:
-python -I -B /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/downstream/score_v7_pairing.py --plan /absolute/plan.json --output-root /absolute/new_directory
+python -I -B /project_c20250601/251105016/project/dllm_test/scripts/downstream/score_v7_pairing.py --plan /absolute/plan.json --output-root /absolute/new_directory
 The plan binds the existing scorer and local ImmunoMatch weights. The prediction
 runner must have exited successfully. No retries, downloads, or weight copies.
 """
@@ -17,7 +17,7 @@ import runpy
 import shutil
 import sys
 
-ROOT = Path('/vepfs-mlp2/c20250601/251105016/project/dllm_test')
+ROOT = Path('/project_c20250601/251105016/project/dllm_test')
 sys.path.insert(0, str(ROOT))
 from downstream.v7_native import sha, require
 

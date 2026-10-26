@@ -168,8 +168,8 @@ def inspect_fresh(directory, pool, *, mode='runtime', python=sys.executable):
     """Fixed CPU inspection only; never accepts a command, module or training mode."""
     require(mode in ('runtime','source-copy-rehearsal'), 'Unknown inspection mode')
     allowed={Path(sys.executable).resolve(),
-        Path('/vepfs-mlp2/c20250601/251105016/conda/envs/pllm/bin/python').resolve(),
-        Path('/vepfs-mlp2/c20250601/251105016/conda/envs/protenix_abtcr/bin/python').resolve()}
+        Path('/project_c20250601/251105016/conda/envs/pllm/bin/python').resolve(),
+        Path('/project_c20250601/251105016/conda/envs/protenix_abtcr/bin/python').resolve()}
     require(Path(python).is_absolute() and Path(python).resolve() in allowed,
             'Inspection accepts only the current or two explicitly installed Python interpreters')
     directory,pool=Path(directory).resolve(),Path(pool).resolve()

@@ -23,10 +23,10 @@ CKPT = PIN.ckpt
 
 def config_for(key, command):
     config = copy.deepcopy(yaml.safe_load((ROOT / "eval_jobs/eval_tcr_others_longab_v5_29000_nonspot.yml").read_text()))
-    runtime = "/vepfs-mlp2/c20250601/251105016/conda/envs/protenix_abtcr"
+    runtime = "/project_c20250601/251105016/conda/envs/protenix_abtcr"
     entry = f"""set -euo pipefail
-source /vepfs-mlp2/c20250601/251105016/miniforge3/etc/profile.d/conda.sh
-conda activate /vepfs-mlp2/c20250601/251105016/conda/envs/pllm
+source /project_c20250601/251105016/miniforge3/etc/profile.d/conda.sh
+conda activate /project_c20250601/251105016/conda/envs/pllm
 conda activate {runtime}
 export LD_LIBRARY_PATH={runtime}/lib:${{LD_LIBRARY_PATH:-}}
 export PYTHONPATH={ROOT}
@@ -38,7 +38,7 @@ export USE_TF=0
 export TOKENIZERS_PARALLELISM=false
 export HF_HUB_OFFLINE=1
 export TRANSFORMERS_OFFLINE=1
-export HF_HOME=/vepfs-mlp2/c20250601/251105016/conda/cache/huggingface
+export HF_HOME=/project_c20250601/251105016/conda/cache/huggingface
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 export TCR_EVAL_TAG={PIN.tag}
 export TCR_EVAL_CKPT={CKPT}

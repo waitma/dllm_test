@@ -1,7 +1,7 @@
 """Check the mixed reporter with disposable artificial metadata, not training.
 
 Activate conda pllm, then run:
-  CUDA_VISIBLE_DEVICES='' python -B /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/research/test_plot_v7_mixed_ablation.py
+  CUDA_VISIBLE_DEVICES='' python -B /project_c20250601/251105016/project/dllm_test/scripts/research/test_plot_v7_mixed_ablation.py
 
 Reuses ArtificialStudy; all sources, receipts and figures are artificial and
 live in TemporaryDirectory. No real sequence rows, models, checkpoints or

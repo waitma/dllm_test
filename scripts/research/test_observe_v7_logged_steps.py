@@ -1,7 +1,7 @@
 """Check new segment-boundary accounting with in-memory artificial metadata only.
 
 Activate conda pllm, then run:
-  CUDA_VISIBLE_DEVICES='' python -B /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/research/test_observe_v7_logged_steps.py
+  CUDA_VISIBLE_DEVICES='' python -B /project_c20250601/251105016/project/dllm_test/scripts/research/test_observe_v7_logged_steps.py
 
 No training data, model, GPU, subprocess, checkpoint weights or fixtures are used.
 """
@@ -9,7 +9,7 @@ import runpy
 import unittest
 
 
-MODULE = '/vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/research/observe_v7_logged_steps.py'
+MODULE = '/project_c20250601/251105016/project/dllm_test/scripts/research/observe_v7_logged_steps.py'
 reader = runpy.run_path(MODULE, run_name='_progress_reader_control')
 infer = reader['infer_logged_steps']
 

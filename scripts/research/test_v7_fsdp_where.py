@@ -1,8 +1,8 @@
 """Check the where FSDP integration using fabricated CPU tensors only.
 
 Activate conda pllm and use the pinned protenix_abtcr interpreter:
-  python -B /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/research/test_v7_fsdp_where.py
-  python -m torch.distributed.run --standalone --nproc_per_node=2 /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/research/test_v7_fsdp_where.py --worker
+  python -B /project_c20250601/251105016/project/dllm_test/scripts/research/test_v7_fsdp_where.py
+  python -m torch.distributed.run --standalone --nproc_per_node=2 /project_c20250601/251105016/project/dllm_test/scripts/research/test_v7_fsdp_where.py --worker
 No corpus or CUDA access. All temporary model/optimizer checkpoints are removed.
 """
 import ast
@@ -11,7 +11,7 @@ from pathlib import Path
 import sys
 from tempfile import TemporaryDirectory
 
-ROOT = Path('/vepfs-mlp2/c20250601/251105016/project/dllm_test')
+ROOT = Path('/project_c20250601/251105016/project/dllm_test')
 sys.path.insert(0, str(ROOT/'scripts/research'))
 import test_v7_fsdp as original
 

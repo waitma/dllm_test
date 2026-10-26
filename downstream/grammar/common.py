@@ -32,7 +32,7 @@ from dllm.pipelines.qwen3_vl_arch.modeling_bioseq import (
 )
 from dllm.pipelines.qwen3_vl_arch.sampling_bioseq import BioSeqGenerateConfig, generate_bioseq
 
-PROJECT_ROOT = Path("/vepfs-mlp2/c20250601/251105016/project/dllm_test")
+PROJECT_ROOT = Path("/project_c20250601/251105016/project/dllm_test")
 # Kept only for the optional record-fixture smoke path. Current evaluation
 # datasets are supplied explicitly by each retained evaluator.
 DEFAULT_GRAMMAR_DATA_DIR = PROJECT_ROOT / "data" / "prepared" / "immune_v3_heterotypic"

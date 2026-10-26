@@ -1,6 +1,6 @@
 """CPU regressions for restart-safe retention and worker-to-Trainer drop logs.
 
-Run: python -m pytest /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/tests/immune_llada/test_training_retention_and_drop_logs.py -q
+Run: python -m pytest /project_c20250601/251105016/project/dllm_test/scripts/tests/immune_llada/test_training_retention_and_drop_logs.py -q
 """
 
 import json

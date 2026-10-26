@@ -1,7 +1,7 @@
 """Dispatch the fixed R21 seed43 CE repair through its new full runtime.
 
 Activate pllm; root alone runs the new binding controls:
-  python -B -m pytest -p no:cacheprovider /vepfs-mlp2/c20250601/251105016/project/dllm_test/output/generic_CE_full_release_20261002/test_generic_CE_full_binding.py -q
+  python -B -m pytest -p no:cacheprovider /project_c20250601/251105016/project/dllm_test/output/generic_CE_full_release_20261002/test_generic_CE_full_binding.py -q
 Only d02_pilot_seed_gpu_r21_seed43_v2 uses this new source. Other identities
 delegate to the byte-pinned previous CE tiny dispatcher; D00 remains paused.
 The actual source-only runtime manifest and private startup guard are pinned.
@@ -20,15 +20,15 @@ import sys
 from types import SimpleNamespace
 
 
-ROOT = Path('/vepfs-mlp2/c20250601/251105016/project/dllm_test')
+ROOT = Path('/project_c20250601/251105016/project/dllm_test')
 OWN = ROOT/'output/generic_CE_full_release_20261002'
 PRIVATE_ROOT = OWN/'private_sources'
 POOL = ROOT/'output/immune_research_pool_c20250601_20260930'
 SELF = 'pool_generic_CE_full_dispatcher_v1.py'
 BASE = ROOT/'scripts/architecture_prototypes/pool_seed_release_dispatcher_v2.py'
-BASE_SHA256 = 'd5ba656d12965436494d00ef9df662a6d1956e23404c9343cc42517c21109a8d'
+BASE_SHA256 = 'fc1e81e999d6123e0e735bb9f503d218b27de5363916b87f9b78751c7db705a1'
 LEGACY = ROOT/'output/generic_ce_layout_repair_20261002/pool_generic_CE_repair_dispatcher_v1.py'
-LEGACY_SHA256 = 'a38a9837708947a2a7700fc83f29c1155429e53cb6f23645623b1eadead7d283'
+LEGACY_SHA256 = '1d8ccb7f5a547b852716add24fb86e9042d3f7bcb86c648ec3b8b1eda2e5aee6'
 ALIAS = 'd02_pilot_seed_gpu_r21_seed43_v2'
 RUNTIME = OWN/'runtime_packages/r21_seed_runtime_v2'
 RUNTIME_MANIFEST = 'seed_runtime_manifest_v2.json'

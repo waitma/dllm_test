@@ -168,7 +168,7 @@ def build_report(results_dir: Path) -> None:
     lines = [
         "# BioSeq 7L step117000 public CDR3β Track-A result",
         "",
-        "Checkpoint: `/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/grammar_v2_esmc300m_integrated_llada_7l_step117000/best.pt`  ",
+        "Checkpoint: `/project_c20250601/251105016/project/dllm_test/output/grammar_v2_esmc300m_integrated_llada_7l_step117000/best.pt`  ",
         "SHA256: `e3d4c98ea84b4aa2280fe76ec5bf8a806de376699610e9a96960e66ceddb5c01`",
         "",
         "Protocol: epitope-only conditioning, seed 42, batch size 100, 32 masked-diffusion iterations, temperature 1.0, `gumbel_argmax`, 1,000 raw candidates per target. MHC fields are retained in the interchange table but are not consumed by this sampler. No candidate is repaired or given a synthetic C/F/W anchor. Rank is seeded emission order and `raw_score` is empty.",

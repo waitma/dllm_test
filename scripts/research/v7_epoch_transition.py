@@ -8,7 +8,7 @@ import hashlib
 import json
 from pathlib import Path
 
-ROOT = Path('/vepfs-mlp2/c20250601/251105016/project/dllm_test')
+ROOT = Path('/project_c20250601/251105016/project/dllm_test')
 PARENT = ROOT/'output/v7_formal_eight_gpu_20261002/where_continuation_20261006'
 DESTINATION = ROOT/'output/v7_formal_eight_gpu_20261002/epoch2_continuation_20261006'
 ANCESTOR_RUN = ROOT/'output/v7_initial_training_20261005/run'

@@ -1,6 +1,6 @@
 """CPU-only protocol checks; artificial Linear only, no records/groups/jobs.
 
-Activate conda pllm, then run python -B /vepfs-mlp2/c20250601/251105016/
+Activate conda pllm, then run python -B /project_c20250601/251105016/
 project/dllm_test/scripts/research/test_v7_formal_protocol.py.
 """
 import importlib.util

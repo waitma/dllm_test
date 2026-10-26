@@ -57,7 +57,7 @@ def numbering(sequences,out_dir):
         raise ValueError('Numbering cache input changed; separate output directory required')
     source.write_text(json.dumps(inputs)+'\n')
     if not dest.exists():
-        env=os.environ.copy();prefix='/vepfs-mlp2/c20250601/251105016/conda/envs/biophi'
+        env=os.environ.copy();prefix='/project_c20250601/251105016/conda/envs/biophi'
         env['PATH']=prefix+'/bin:'+env['PATH']
         subprocess.run([prefix+'/bin/python',str(Path(__file__).resolve()),'--number-input',str(source),'--number-output',str(dest)],env=env,check=True)
     return json.loads(dest.read_text())

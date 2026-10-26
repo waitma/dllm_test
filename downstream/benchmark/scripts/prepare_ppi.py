@@ -30,7 +30,7 @@ import pandas as pd
 BENCH = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BENCH))
 
-STRING_ROOT = Path("/vepfs-mlp2/c20250601/251105016/project/dllm_test/data/ppi/"
+STRING_ROOT = Path("/project_c20250601/251105016/project/dllm_test/data/ppi/"
                    "string_model_org_90_90_split")
 OUT_DIR = BENCH / "data" / "ppi"
 

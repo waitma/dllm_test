@@ -2,7 +2,7 @@
 
 After activating pllm, root reviews this file, builds the pinned runtime, and
 publishes a byte-identical copy at the absolute project scripts directory.
-The unchanged pool worker invokes /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/run_immune_research.py.
+The unchanged pool worker invokes /project_c20250601/251105016/project/dllm_test/scripts/run_immune_research.py.
 This dispatcher never submits resources or admits real data/model training.
 Its only new envelope is the existing D03 profile-synthetic/1 transport.
 Normal child exit, process cleanup and the original tiny assertion are separate
@@ -19,10 +19,10 @@ import sys
 import time
 from types import SimpleNamespace
 
-ROOT = Path('/vepfs-mlp2/c20250601/251105016/project/dllm_test')
+ROOT = Path('/project_c20250601/251105016/project/dllm_test')
 OWN = ROOT/'output/generic_ce_layout_repair_20261002'
 BASE = ROOT/'output/immune_seed43_gpu_observation_20261002/pool_r21_tiny_diagnosis_dispatcher_v5.py'
-BASE_SHA = 'cad2625c361f93daf45da39a7a52f9abdd75b01faf6d7b62716d66beb629cbe7'
+BASE_SHA = '8faa7c3dcd3ec876381f27c7e96ba51df80e11868bfe2952dbaeec0090033c9f'
 DRIVER = OWN/'run_generic_CE_tiny_repair_v1.py'
 DRIVER_SHA = 'fd8aa33ec74915ef9661ff13b3da28b0cb1f2cfa75a8c2eea10aa094dafc983f'
 RUNTIME = OWN/'runtime_packages/r21_seed_runtime_v2'

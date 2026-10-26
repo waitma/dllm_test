@@ -36,7 +36,7 @@ import sys
 import time
 from datetime import datetime, timezone
 
-REPO = "/vepfs-mlp2/c20250601/251105016/project/dllm_test"
+REPO = "/project_c20250601/251105016/project/dllm_test"
 
 # (TaskName, YAML 相对路径)。TaskName 必须与 YAML 里的 TaskName 完全一致 —— 脚本靠它精确比对。
 TARGETS = [

@@ -1,7 +1,7 @@
 """Run bounded artificial metadata/figure checks without models or real data.
 
 Activate conda pllm, then run:
-  CUDA_VISIBLE_DEVICES='' python -B /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/research/test_plot_v7_large_batch_ablation.py
+  CUDA_VISIBLE_DEVICES='' python -B /project_c20250601/251105016/project/dllm_test/scripts/research/test_plot_v7_large_batch_ablation.py
 
 All fixture files and rendered images live in TemporaryDirectory and are removed.
 There are no binary checkpoints, real sequence rows, ML imports or GPU calls.

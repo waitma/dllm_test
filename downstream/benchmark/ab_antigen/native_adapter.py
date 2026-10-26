@@ -49,8 +49,11 @@ def main():
     parser.add_argument('--task',choices=['binding','spr','abbibench','chimera'],required=True)
     parser.add_argument('--data',type=Path,required=True);parser.add_argument('--out-dir',type=Path,required=True)
     parser.add_argument('--checkpoint',type=Path);parser.add_argument('--assay');parser.add_argument('--pll-batch-size',type=int,default=2)
+    parser.add_argument('--include-extra-assays',action='store_true',help='Explicit supplementary AbBiBench evaluation')
     args=parser.parse_args()
-    rows=load_dataset(args.data,args.task,split='test' if args.task=='chimera' else None,assay=args.assay)
+    if args.task=='chimera':
+        parser.error('This legacy adapter generates full VH/VL. CHIMERA now uses the H3 adapter: run_v5_suite_task.py --task ag-chimera')
+    rows=load_dataset(args.data,args.task,split='test' if args.task=='chimera' else None,assay=args.assay,include_extra_assays=args.include_extra_assays)
     adapter=NativeNoEsmcAdapter(args.checkpoint,pll_batch_size=args.pll_batch_size)
     predictions=run_adapter(args.task,rows,adapter,args.out_dir,model_identity=adapter.identity)
     report=evaluate(args.task,rows,predictions)

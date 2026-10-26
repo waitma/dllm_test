@@ -16,7 +16,7 @@ import runpy
 import time
 import uuid
 
-ROOT = Path('/vepfs-mlp2/c20250601/251105016/project/dllm_test')
+ROOT = Path('/project_c20250601/251105016/project/dllm_test')
 OWN = ROOT/'output/v7_formal_eight_gpu_20261002'
 EPOCH = OWN/'epoch2_continuation_20261006'
 PARENT = OWN/'where_continuation_20261006'

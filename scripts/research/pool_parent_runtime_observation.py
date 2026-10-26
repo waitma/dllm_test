@@ -2,7 +2,7 @@
 
 Activate conda pllm. A future early entry calls observe(original_argv) before
 dispatching the unique capacity job. For cold controls, run:
-  CUDA_VISIBLE_DEVICES='' python -B /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/research/test_pool_parent_runtime_observation.py
+  CUDA_VISIBLE_DEVICES='' python -B /project_c20250601/251105016/project/dllm_test/scripts/research/test_pool_parent_runtime_observation.py
 
 Nonmatching jobs return False without filesystem/environment access. Matching
 jobs write one exclusive metadata receipt under pool/logs, never in the profile
@@ -19,7 +19,7 @@ import sys
 import uuid
 
 
-ROOT = Path('/vepfs-mlp2/c20250601/251105016/project/dllm_test')
+ROOT = Path('/project_c20250601/251105016/project/dllm_test')
 POOL = ROOT / 'output/immune_research_pool_c20250601_20260930'
 POOL_SOURCE = ROOT / 'scripts/immune_research_pool.py'
 ALIAS = 'p04_v7_capacity'

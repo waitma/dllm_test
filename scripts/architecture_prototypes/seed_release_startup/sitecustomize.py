@@ -1,7 +1,7 @@
 """Fixed startup isolation for eight artificial seed diagnostic identities.
 
 Activate pllm; root may run the new focused CPU checks:
-  python -B -m pytest -p no:cacheprovider /vepfs-mlp2/c20250601/251105016/project/dllm_test/output/immune_multiseed_pilot_engineering_20261001/private_sources/scripts/tests/immune_llada/test_pool_seed_dispatcher_v2.py -q
+  python -B -m pytest -p no:cacheprovider /project_c20250601/251105016/project/dllm_test/output/immune_multiseed_pilot_engineering_20261001/private_sources/scripts/tests/immune_llada/test_pool_seed_dispatcher_v2.py -q
 Only the new dispatcher supplies this directory and fixed IMMUNE_SEED_RELEASE_*
 values. Ordinary audited Python children inherit this guard; -I/-S or altered
 environments are outside its contract. No model, CUDA, data or task code runs.
@@ -15,7 +15,7 @@ try:
     from pathlib import Path as _Path
     import sys as _sys
 
-    _original = _Path('/vepfs-mlp2/c20250601/251105016/project/dllm_test')
+    _original = _Path('/project_c20250601/251105016/project/dllm_test')
     _source = _Path(__file__)
     if _source != _source.resolve() or _source.is_symlink():
         raise ValueError('Seed guard source must be canonical')

@@ -7,7 +7,7 @@ import argparse
 import json
 from pathlib import Path
 import sys
-ROOT=Path('/vepfs-mlp2/c20250601/251105016/project/dllm_test')
+ROOT=Path('/project_c20250601/251105016/project/dllm_test')
 sys.path.insert(0,str(ROOT))
 
 

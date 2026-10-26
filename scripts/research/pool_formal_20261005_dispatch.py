@@ -15,15 +15,15 @@ import re
 import runpy
 import sys
 
-ROOT = Path('/vepfs-mlp2/c20250601/251105016/project/dllm_test')
+ROOT = Path('/project_c20250601/251105016/project/dllm_test')
 OWN = ROOT/'output/v7_formal_eight_gpu_20261002'
 POOL = ROOT/'output/immune_research_pool_c20250601_20261005'
 BASE = OWN/'pool_launcher_source_v1/pool_formal_dispatch.py'
-BASE_SHA = '21f2ffe71d23950207eb4c067b0cb26cf5dbb875a13e2ba15bdec3a7d3f5ce59'
+BASE_SHA = '44ea47c8371ea2d5f35a0a0c2fbf171022df27aff8b8f429b32f29e43567d951'
 PREVIOUS = ROOT/'output/v7_large_batch_ablation_20261002/launcher_source_v2/scripts/research/pool_large_batch_ablation_v2_dispatch.py'
-PREVIOUS_SHA = 'b088ba3c19f58060a05393411cdf57a3abe8ecd7ba91508add62142896476cc3'
+PREVIOUS_SHA = '7cf225f5e2a4db198a093ccba9baf1d5bd81e7db1b1e4768504a5228fcced4f5'
 OBSERVER = ROOT/'output/v7_large_batch_ablation_20261002/pool_parent_source_v1/pool_parent_runtime_observation.py'
-OBSERVER_SHA = '8d13c32c6c8e0b6ee65df4573a14e784947e98602e50c7ef10cf2459393e79c8'
+OBSERVER_SHA = 'f356a9d8fcf9e369a062514267c70c17651088c62334a1a9dac716f242b3a2c8'
 CATALOG = OWN/'pool_job_catalog_20261005.json'
 ALIASES = tuple(f'p06_v7_formal_member_{rank}' for rank in range(8))
 IDENTITY_ALIAS = 'p06_v7_pool_identity'

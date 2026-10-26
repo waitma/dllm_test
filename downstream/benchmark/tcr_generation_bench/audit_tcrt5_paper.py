@@ -3,8 +3,8 @@
 
 Run with::
 
-    /vepfs-mlp2/c20250601/251105016/conda/envs/pllm/bin/python \
-      /vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/tcr_generation_bench/audit_tcrt5_paper.py
+    /project_c20250601/251105016/conda/envs/pllm/bin/python \
+      /project_c20250601/251105016/project/dllm_test/downstream/benchmark/tcr_generation_bench/audit_tcrt5_paper.py
 
 The audit keeps three layers separate: locally decoded official weights, the
 authors' ``benchmark_data_w_preds.csv`` artifact, and values stated in Figure 5

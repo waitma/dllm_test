@@ -2,8 +2,8 @@
 
 Runtime smoke example::
 
-    /vepfs-mlp2/c20250601/251105016/conda/envs/protenix_abtcr/bin/python \
-      /vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/tcr_generation_bench/run_public_beta.py \
+    /project_c20250601/251105016/conda/envs/protenix_abtcr/bin/python \
+      /project_c20250601/251105016/project/dllm_test/downstream/benchmark/tcr_generation_bench/run_public_beta.py \
       generate --model tcrt5 --targets rvr --num-candidates 10
 
 Every de-novo adapter implements ``generate(peptide, mhc_allele=None,
@@ -29,9 +29,9 @@ BENCH = Path(__file__).resolve().parents[1]
 BASELINES = BENCH / "baselines"
 TCRT5_MODEL_ID = "dkarthikeyan1/tcrt5_ft_tcrdb"
 TCRDESIGN_REPO = BASELINES / "TcrDesign"
-TCRDESIGN_PYTHON = Path("/vepfs-mlp2/c20250601/251105016/conda/envs/tcrdesign/bin/python")
+TCRDESIGN_PYTHON = Path("/project_c20250601/251105016/conda/envs/tcrdesign/bin/python")
 GRATCR_REPO = BASELINES / "GRATCR"
-GRATCR_PYTHON = Path("/vepfs-mlp2/c20250601/251105016/conda/envs/protenix_abtcr/bin/python")
+GRATCR_PYTHON = Path("/project_c20250601/251105016/conda/envs/protenix_abtcr/bin/python")
 EPIDIFF_REPO = BASELINES / "TCR-epiDiff"
 
 

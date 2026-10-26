@@ -1,8 +1,8 @@
 """Test the private local guard with temporary artificial metadata and CPU locks.
 
-  source /vepfs-mlp2/c20250601/251105016/miniforge3/etc/profile.d/conda.sh
+  source /project_c20250601/251105016/miniforge3/etc/profile.d/conda.sh
   conda activate pllm
-  CUDA_VISIBLE_DEVICES='' python -B /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/research/test_local_metrics_only_ablation_dispatch.py
+  CUDA_VISIBLE_DEVICES='' python -B /project_c20250601/251105016/project/dllm_test/scripts/research/test_local_metrics_only_ablation_dispatch.py
 
 The existing artificial pool fixture is constructed, not its tests rerun.
 No real prepare/main, sequence reads, model/GPU calls or jobs are executed.
@@ -24,7 +24,7 @@ import unittest
 from unittest.mock import patch
 
 
-ROOT = Path('/vepfs-mlp2/c20250601/251105016/project/dllm_test')
+ROOT = Path('/project_c20250601/251105016/project/dllm_test')
 SCRIPT = ROOT / 'scripts/research/local_metrics_only_ablation_dispatch.py'
 
 

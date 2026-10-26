@@ -27,7 +27,7 @@ BENCHMARK_VERSION = "irbench.v1"
 #: previously defaulted to were deleted on 2026-09-08; see
 #: ``docs/archive/grammar_v2_retired_20260908``.
 SMOKE_FUSION_CHECKPOINT = (
-    "/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/"
+    "/project_c20250601/251105016/project/dllm_test/output/"
     "protein_esmc_llada270m_diffusion_immune_v3_8gpu_2m/eval_snapshot_44000"
 )
 

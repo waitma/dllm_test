@@ -8,7 +8,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-ROOT = Path("/vepfs-mlp2/c20250601/251105016/project/dllm_test")
+ROOT = Path("/project_c20250601/251105016/project/dllm_test")
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "scripts/downstream"))
 

@@ -1,7 +1,7 @@
 """Check best3+latest ownership and failure handling using temporary fake states.
 
 After conda activate pllm:
-python -B /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/research/test_native_best3_latest.py
+python -B /project_c20250601/251105016/project/dllm_test/scripts/research/test_native_best3_latest.py
 No real checkpoint, model, corpus, GPU or process is touched.
 """
 import json
@@ -100,7 +100,7 @@ class RetentionTests(unittest.TestCase):
 
     def test_fsdp_full_inventory_via_actual_entry(self):
         import importlib.util
-        entry = Path('/vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/research/run_v7_fsdp_best3.py')
+        entry = Path('/project_c20250601/251105016/project/dllm_test/scripts/research/run_v7_fsdp_best3.py')
         spec = importlib.util.spec_from_file_location('_test_fsdp_best3_entry', entry)
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)

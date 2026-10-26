@@ -1,6 +1,6 @@
 """Full-coverage sampling, exact source weights and real CPU Trainer tests.
 
-Run: python -m pytest /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/tests/immune_llada/test_source_balanced_training.py -q
+Run: python -m pytest /project_c20250601/251105016/project/dllm_test/scripts/tests/immune_llada/test_source_balanced_training.py -q
 """
 
 from bisect import bisect_right

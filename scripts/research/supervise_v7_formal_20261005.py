@@ -2,7 +2,7 @@
 
 Activate conda pllm, then run this file with --inspect-only for a read-only check.
 The frozen copy is launched once without flags for supervision. Creating
-/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/v7_formal_supervision_20261005/STOP
+/project_c20250601/251105016/project/dllm_test/output/v7_formal_supervision_20261005/STOP
 stops this supervisor and future segment admission, not the active training job.
 No platform submit/cancel/restart, failed-job retry, or checkpoint deletion exists.
 """
@@ -21,7 +21,7 @@ import sys
 import time
 import uuid
 
-ROOT = Path('/vepfs-mlp2/c20250601/251105016/project/dllm_test')
+ROOT = Path('/project_c20250601/251105016/project/dllm_test')
 OWN = ROOT/'output/v7_formal_eight_gpu_20261002'
 POOL = ROOT/'output/immune_research_pool_c20250601_20261005'
 RUN = ROOT/'output/v7_initial_training_20261005/run'

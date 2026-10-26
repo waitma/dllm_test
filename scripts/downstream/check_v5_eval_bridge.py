@@ -1,7 +1,7 @@
 """CPU compatibility checks: activate pllm, then python -B SCRIPT --checkpoint ABS."""
 import argparse,json,sys
 from pathlib import Path
-ROOT=Path('/vepfs-mlp2/c20250601/251105016/project/dllm_test');sys.path.insert(0,str(ROOT))
+ROOT=Path('/project_c20250601/251105016/project/dllm_test');sys.path.insert(0,str(ROOT))
 from downstream.v5_native_eval import load,NativeBackbone,cdr_input
 
 def main():

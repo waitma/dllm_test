@@ -2,7 +2,7 @@
 
 Run:
     conda run -n pllm python -m pytest \
-        /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/tests/bioseq/test_grammar_tcr_role_resolution.py -q
+        /project_c20250601/251105016/project/dllm_test/scripts/tests/bioseq/test_grammar_tcr_role_resolution.py -q
 """
 
 from __future__ import annotations

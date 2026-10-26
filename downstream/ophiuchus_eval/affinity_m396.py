@@ -19,7 +19,7 @@ from sklearn.metrics import mean_squared_error
 
 from downstream.ophiuchus_eval.probe_common import embed_pairs, load_embedder, resolve_checkpoint
 
-ROOT = Path("/vepfs-mlp2/c20250601/251105016/project/dllm_test")
+ROOT = Path("/project_c20250601/251105016/project/dllm_test")
 DEFAULT_CSV = ROOT / "data/downstream/in_silico/Desautels_insilico_data.csv"
 # Full-length RCSB 2G75 (245+213). Do not use rcsb_pdb_2G75_vr.fasta (Fv 118+107).
 DEFAULT_FASTA = ROOT / "data/downstream/in_silico/rcsb_pdb_2G75.fasta"

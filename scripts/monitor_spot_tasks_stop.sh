@@ -8,7 +8,7 @@
 # STOP 哨兵会一直留在那里，重新启动看护时 start 脚本会清掉它。
 set -uo pipefail
 
-REPO=/vepfs-mlp2/c20250601/251105016/project/dllm_test
+REPO=/project_c20250601/251105016/project/dllm_test
 MON_DIR="$REPO/output/_monitor"
 PID_FILE="$MON_DIR/monitor.pid"
 

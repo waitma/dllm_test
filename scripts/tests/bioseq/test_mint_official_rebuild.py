@@ -47,7 +47,7 @@ from scripts.downstream.validate_mint_ours_three_ppi import EXPECTED as OURS_THR
 from scripts.downstream.extract_mint_embedding_shard import shard_bounds
 
 
-ROOT = Path("/vepfs-mlp2/c20250601/251105016/project/dllm_test")
+ROOT = Path("/project_c20250601/251105016/project/dllm_test")
 DATA_ROOT = ROOT / "data" / "downstream" / "mint_official"
 MANIFEST = DATA_ROOT / "manifest.json"
 

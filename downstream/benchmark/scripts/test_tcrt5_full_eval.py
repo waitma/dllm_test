@@ -3,8 +3,8 @@
 
 Run with::
 
-    /vepfs-mlp2/c20250601/251105016/conda/envs/pllm/bin/python -m pytest -q \
-      /vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/scripts/test_tcrt5_full_eval.py
+    /project_c20250601/251105016/conda/envs/pllm/bin/python -m pytest -q \
+      /project_c20250601/251105016/project/dllm_test/downstream/benchmark/scripts/test_tcrt5_full_eval.py
 """
 
 from __future__ import annotations

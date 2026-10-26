@@ -1,11 +1,11 @@
 """Focused CPU loader controls; no model forward, training or process group.
 
 Run only these new cases after activation:
-  source /vepfs-mlp2/c20250601/251105016/miniforge3/etc/profile.d/conda.sh
+  source /project_c20250601/251105016/miniforge3/etc/profile.d/conda.sh
   conda activate pllm
-  CUDA_VISIBLE_DEVICES='' USE_TF=0 python -B /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/research/test_v7_formal_eval_tail.py --environment pllm --evidence-dir /vepfs-mlp2/c20250601/251105016/project/dllm_test/output/v7_formal_eval_tail_20261002/pllm
+  CUDA_VISIBLE_DEVICES='' USE_TF=0 python -B /project_c20250601/251105016/project/dllm_test/scripts/research/test_v7_formal_eval_tail.py --environment pllm --evidence-dir /project_c20250601/251105016/project/dllm_test/output/v7_formal_eval_tail_20261002/pllm
 
-For worker, use /vepfs-mlp2/c20250601/251105016/conda/envs/protenix_abtcr/bin/python
+For worker, use /project_c20250601/251105016/conda/envs/protenix_abtcr/bin/python
 with --environment worker and its own evidence directory. Eight real sampler
 objects run as logical ranks in one CPU process. Concatenation replaces only
 the network gather; the actual Accelerator loader remainder and metric-tail
@@ -26,10 +26,10 @@ from tempfile import TemporaryDirectory
 import unittest
 
 
-ROOT = Path('/vepfs-mlp2/c20250601/251105016/project/dllm_test')
+ROOT = Path('/project_c20250601/251105016/project/dllm_test')
 DRIVER = ROOT / 'scripts/research/run_v7_formal.py'
-PYTHONS = {'pllm': '/vepfs-mlp2/c20250601/251105016/conda/envs/pllm/bin/python',
-           'worker': '/vepfs-mlp2/c20250601/251105016/conda/envs/protenix_abtcr/bin/python'}
+PYTHONS = {'pllm': '/project_c20250601/251105016/conda/envs/pllm/bin/python',
+           'worker': '/project_c20250601/251105016/conda/envs/protenix_abtcr/bin/python'}
 OBSERVED = {}
 
 

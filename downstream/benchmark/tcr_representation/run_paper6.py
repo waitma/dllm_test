@@ -1,17 +1,19 @@
 #!/usr/bin/env python
-"""T3-deep -- SCEPTR (Cell Systems 2024) 6-pMHC deep few-shot benchmark.
+"""T3-deep -- local six-target few-shot task inspired by SCEPTR (Cell Systems 2025).
 
-Reproduces the SCEPTR Methods III.1 / Table SI protocol on its own data
-(``data/tcr_representation_paper6/``), independent of the broad 24-epitope T3.
+Uses local data (``data/tcr_representation_paper6/``), independently of the
+broad 24-epitope T3. This is not a paper reproduction: source filtering,
+one-shot sampling, and several baseline input/model recipes differ.
+See downstream/tasks/TCR_T3_REPRESENTATION.md section 7.2.
 
 Universe = ``target_binders.csv`` (6 targets, deduped binders) ++
-``background_pool.csv`` (rest of filtered VDJdb, pure negatives). For each
+``background_pool.csv`` (other labelled receptors, treated as negatives). For each
 target ``e`` and shot ``k`` we sample ``k`` reference binders, score every
 universe row by nearest-neighbour closeness to the reference, and take the
-per-pMHC AUROC of ``e``'s held-out binders vs **the entire background** (paper
-口径, not the other-target-only negatives of the broad T3).
+per-target AUROC of ``e``'s held-out binders vs all other universe rows.
+These negatives are not individually verified non-binders of the target.
 
-Backends (all official source / official weights, via existing wrappers):
+Backends (local wrappers; official weights do not imply a paper-matched recipe):
 - ``levenshtein`` : CDR3b(+CDR3a) Levenshtein NN (rapidfuzz).
 - ``tcrdist``     : official tcrdist3 rectangular distances (universe TCRrep
                     built once, then rectangular distances to each epitope).

@@ -14,7 +14,7 @@ from typing import Any
 
 
 ROOT = Path("output/downstream_generation/ophiuchus_ab")
-PROJECT_ROOT = Path("/vepfs-mlp2/c20250601/251105016/project")
+PROJECT_ROOT = Path("/project_c20250601/251105016/project")
 OASIS_OUTPUT = PROJECT_ROOT / "oasis/output"
 DEFAULT_SUMMARY = ROOT / "generation_metrics_summary.json"
 DEFAULT_REPORT = ROOT / "generation_metrics_report.md"

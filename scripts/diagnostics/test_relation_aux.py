@@ -12,7 +12,7 @@ from pathlib import Path
 
 import torch
 
-ROOT = Path("/vepfs-mlp2/c20250601/251105016/project/dllm_test")
+ROOT = Path("/project_c20250601/251105016/project/dllm_test")
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 

@@ -1,7 +1,7 @@
 """Report explicitly selected V7 attempts from pools and independent local runs.
 
 Activate conda pllm, then run:
-  python -B /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/research/plot_v7_mixed_ablation.py --selection /absolute/selection.json --output-prefix /absolute/figures/mixed --endpoint-step 3750
+  python -B /project_c20250601/251105016/project/dllm_test/scripts/research/plot_v7_mixed_ablation.py --selection /absolute/selection.json --output-prefix /absolute/figures/mixed --endpoint-step 3750
 
 Selection schema v7.mixed_ablation_selection.v1 has batch_plan={path,sha256},
 source_cohorts={revision:{path,sha256}} and exactly 22 cells. make_selection()

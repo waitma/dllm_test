@@ -11,7 +11,7 @@ import numpy as np
 from PIL import Image
 from pymol import cmd
 
-OUT = Path("/vepfs-mlp2/c20250601/251105016/project/dllm_test/paper/figures/icons")
+OUT = Path("/project_c20250601/251105016/project/dllm_test/paper/figures/icons")
 PDB = Path("/tmp/struct_icons")
 NATURE = ["3C6E8F", "C17F65", "5B8F7A", "8B7BA0", "B0A16B", "6A8FA3"]
 

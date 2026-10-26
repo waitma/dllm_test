@@ -10,7 +10,7 @@ import sys
 import traceback
 import time
 
-ROOT=Path('/vepfs-mlp2/c20250601/251105016/project/dllm_test')
+ROOT=Path('/project_c20250601/251105016/project/dllm_test')
 sys.path.insert(0,str(ROOT))
 BENCH=ROOT/'downstream/benchmark'
 sys.path.insert(0,str(BENCH))
@@ -86,7 +86,13 @@ def representation(task,checkpoint,out,backbone,tag):
 
 
 def main():
-    p=argparse.ArgumentParser(description=__doc__);p.add_argument('--task',required=True);p.add_argument('--run',type=Path,required=True);a=p.parse_args()
+    p=argparse.ArgumentParser(description=__doc__);p.add_argument('--task',required=True);p.add_argument('--run',type=Path,required=True)
+    p.add_argument('--include-extra-assays',action='store_true',help='Explicit supplementary AbBiBench evaluation');a=p.parse_args()
+    if a.task == 't2b':
+        p.error('T2B KMeans was removed from evaluation scope on 2026-10-14')
+    if a.task.partition(':')[0]=='ag-abbibench':
+        from downstream.benchmark.ab_antigen.abbibench_scope import validate_assay
+        validate_assay(a.task.partition(':')[2],include_extra_assays=a.include_extra_assays)
     out=a.run/a.task;out.mkdir(parents=True,exist_ok=True)
     if (out/'status.json').exists(): raise FileExistsError('Task already attempted; inspect status before a separately authorized retry')
     status={'status':'running','task':a.task,'started_unix':time.time()};write(out/'status.json',status)
@@ -115,9 +121,12 @@ def main():
             # The entry's loader reuses this exact already-verified model.
             module.load=lambda *args:(model,identity)
             invoke(module,['--checkpoint',checkpoint,'--dataset',a.task[4:],'--output-root',out/'results'])
+        elif a.task.partition(':')[0]=='ag-chimera':
+            from downstream.benchmark.ab_antigen.chimera_h3 import run
+            run(out,model,identity,scheme=a.task.partition(':')[2] or 'imgt')
         else:
             from downstream.v5_native_generation_eval import run
-            run(a.task,out,model,backbone,identity)
+            run(a.task,out,model,backbone,identity,include_extra_assays=a.include_extra_assays)
         status.update(status='success',finished_unix=time.time())
     except BaseException as error:
         status.update(status='failed',error=repr(error),traceback=traceback.format_exc(),finished_unix=time.time());raise

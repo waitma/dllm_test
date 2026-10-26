@@ -1,6 +1,6 @@
 """Run three new stdlib cold controls once after activating conda pllm.
 
-CUDA_VISIBLE_DEVICES='' python -B /vepfs-mlp2/c20250601/251105016/project/
+CUDA_VISIBLE_DEVICES='' python -B /project_c20250601/251105016/project/
 dllm_test/scripts/research/test_pool_formal_v2_dispatch.py
 No model/data/GPU/group/queue execution. Only fallback dispatch is exercised,
 with actual downstream main mocked; temporary source drift fixtures are removed.
@@ -19,7 +19,7 @@ import time
 import traceback
 from unittest.mock import Mock, patch
 
-ROOT = Path('/vepfs-mlp2/c20250601/251105016/project/dllm_test')
+ROOT = Path('/project_c20250601/251105016/project/dllm_test')
 SOURCE = ROOT/'scripts/research/pool_formal_v2_dispatch.py'
 OUT = ROOT/'output/v7_formal_v2_dispatch_controls_20261003'
 

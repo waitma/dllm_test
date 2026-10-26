@@ -1,7 +1,7 @@
 """Score a completed V7 TCR prediction run with the existing sequence metrics.
 
 Activate conda pllm and use the worker-compatible Python in a clean process:
-python -I -B /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/downstream/score_v7_tcr_generation.py --plan /absolute/plan.json --output-root /absolute/new_directory
+python -I -B /project_c20250601/251105016/project/dllm_test/scripts/downstream/score_v7_tcr_generation.py --plan /absolute/plan.json --output-root /absolute/new_directory
 This CPU-only entry reads saved predictions. It does not generate, annotate,
 load weights, train, retry, submit jobs, or change benchmark membership.
 """
@@ -15,7 +15,7 @@ import runpy
 import socket
 import sys
 
-ROOT = Path('/vepfs-mlp2/c20250601/251105016/project/dllm_test')
+ROOT = Path('/project_c20250601/251105016/project/dllm_test')
 sys.path.insert(0, str(ROOT))
 from downstream.v7_native import require, sha
 from downstream.benchmark.common.reporting import object_sha256

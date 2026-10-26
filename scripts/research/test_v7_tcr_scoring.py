@@ -1,7 +1,7 @@
 """Exercise native TCR scoring with artificial references and candidate failures.
 
 Activate conda pllm; use worker-compatible Python:
-python -I -B /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/research/test_v7_tcr_scoring.py
+python -I -B /project_c20250601/251105016/project/dllm_test/scripts/research/test_v7_tcr_scoring.py
 Only synthetic sequences and an in-memory conditioning bank are used. No
 benchmark files, models, annotation, GPU, or checkpoint files are touched.
 """
@@ -10,7 +10,7 @@ import json
 from pathlib import Path
 import sys
 
-ROOT=Path('/vepfs-mlp2/c20250601/251105016/project/dllm_test')
+ROOT=Path('/project_c20250601/251105016/project/dllm_test')
 sys.path.insert(0,str(ROOT))
 from downstream.v7_tcr_scoring import scoring,score_saved_candidates,strict_result
 

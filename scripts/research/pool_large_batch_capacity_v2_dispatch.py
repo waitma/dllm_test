@@ -2,7 +2,7 @@
 
 Activate conda pllm. The future pool entry calls main(argv) before ML imports:
 --variant p05_v7_capacity_v2 --mode profile-synthetic --steps 36
---profile-dir /vepfs-mlp2/c20250601/251105016/project/dllm_test/output/
+--profile-dir /project_c20250601/251105016/project/dllm_test/output/
 immune_research_pool_c20250601_20260930/profiles/p05_v7_capacity_v2
 --output-dir <the exact canonical pool run in capacity_job_v2.json>.
 prepare(argv) is read-only: no model, queue, subprocess, plan or GPU execution.
@@ -18,13 +18,13 @@ import re
 import runpy
 import sys
 
-ROOT = Path('/vepfs-mlp2/c20250601/251105016/project/dllm_test')
+ROOT = Path('/project_c20250601/251105016/project/dllm_test')
 OWN = ROOT/'output/v7_large_batch_ablation_20261002'
 POOL = ROOT/'output/immune_research_pool_c20250601_20260930'
 LEDGER = OWN/'capacity_job_v2.json'
 LEDGER_SHA = '3429ab434375501e56860e52dd83ebe6702f436a6b18b54d26752b7ff2efc152'
 PREVIOUS = ROOT/'scripts/research/pool_large_batch_dispatch.py'
-PREVIOUS_SHA = 'f259fb0f0946fb7434c1f78b06f64e5d186ece7b781fd29dac7f3f0fe0e5d866'
+PREVIOUS_SHA = '76d07d623f0fe068dcffa55a28c60a38695fe0a256d4a4bfd7751bded50aad5c'
 FREEZE = OWN/'source_snapshot_v1.json'
 FREEZE_SHA = '2f416e927d0b2e95aaa2e5932490330464622a3490bea2eac15c1f8b4bb2d783'
 PROFILE_SHA = 'e44e10f134965299f1c288ed7d606b62eb832436230395112a3e6ddf4c542233'

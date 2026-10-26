@@ -16,7 +16,7 @@ import shutil
 import subprocess
 import sys
 
-ROOT=Path('/vepfs-mlp2/c20250601/251105016/project/dllm_test')
+ROOT=Path('/project_c20250601/251105016/project/dllm_test')
 sys.path.insert(0,str(ROOT))
 
 
@@ -49,6 +49,8 @@ def report(run):
                         values+=summarize(value)
             detail='；'.join(values[:9]) or '已完成，详见产物'
         detail=detail.replace('|','/').replace('\n',' ')[:750]
+        if task == 'ag-abbibench:g6_LC_benchmarking_data':
+            continue
         rows.append(f"| {task} | {state['status']} | {detail} | [产物]({folder}) |")
     stamp=datetime.now(timezone.utc).isoformat()
     start=f'<!-- {run.name}:start -->';end=f'<!-- {run.name}:end -->'
@@ -60,13 +62,14 @@ def report(run):
     lock=ROOT/'output/downstream_generation/v5_native_best_20261008/results_update.lock'
     with lock.open('w') as handle:
         fcntl.flock(handle,fcntl.LOCK_EX)
-        target=ROOT/'downstream/benchmark/RESULTS.md';old=target.read_text()
+        target=ROOT/'downstream/benchmark/EVALUATION_PROCESS.md';old=target.read_text()
         if start in old:
             a=old.index(start);b=old.index(end,a)+len(end);old=old[:a]+text+old[b:]
         else:
             head,tail=old.split('\n',1);old=head+'\n\n'+text+'\n'+tail
         temp=target.with_suffix('.latest.tmp');temp.write_text(old);temp.replace(target)
-        write(run/'summary.json',dict(updated_utc=stamp,counts=dict(counts)))
+        from downstream.benchmark.ab_antigen.abbibench_scope import summarize_run
+        write(run/'summary.json',dict(updated_utc=stamp,counts=dict(counts),abbibench_benchmark16=summarize_run(run)))
     if counts['success']==len(plan['tasks']):
         (run/'checkpoint/model.safetensors').unlink(missing_ok=True)
         write(run/'snapshot_released.json',dict(all_tasks_success=True,training_checkpoint_unchanged=True))
@@ -80,7 +83,7 @@ def aligned(run,folder):
     return module
 
 
-def task_worker(run,task):
+def task_worker(run,task,*,include_extra_assays=False):
     import downstream.v5_native_eval as native
     original=native.load
     cache={}
@@ -102,6 +105,7 @@ def task_worker(run,task):
             sys.argv=[str(module.__file__),'--dataset',task[4:]];module.main()
         run_v5_cdr_eval.main=cdr
     sys.argv=[str(run_v5_suite_task.__file__),'--run',str(run),'--task',task]
+    if include_extra_assays:sys.argv.append('--include-extra-assays')
     run_v5_suite_task.main()
     # Remove only reproducible retrieval scratch after task exit/success.
     for p in (run/task).glob('novelty_tmp_*'):
@@ -111,6 +115,7 @@ def task_worker(run,task):
 def main():
     p=argparse.ArgumentParser(description=__doc__);p.add_argument('--run',type=Path,required=True)
     p.add_argument('--group',type=int);p.add_argument('--task');p.add_argument('--report',action='store_true');p.add_argument('--check',action='store_true')
+    p.add_argument('--include-extra-assays',action='store_true')
     a=p.parse_args();plan=json.loads((a.run/'plan.json').read_text())
     if a.report:report(a.run);return
     for path,expected in plan['code_sha256'].items():
@@ -121,15 +126,19 @@ def main():
         folder=a.run/'cpu_gate';folder.mkdir(exist_ok=True);module=aligned(a.run,folder)
         sys.argv=[str(module.__file__),'--audit'];module.main()
         sys.argv=[str(module.__file__),'--check'];module.main();return
-    if a.task:task_worker(a.run,a.task);return
+    if a.task:task_worker(a.run,a.task,include_extra_assays=a.include_extra_assays);return
     if a.group is None:p.error('Supply group/task/report/check')
     results=[]
-    for task in plan['groups'][a.group]:
+    from downstream.benchmark.ab_antigen.abbibench_scope import select_tasks
+    for task in select_tasks(plan['groups'][a.group],include_extra_assays=a.include_extra_assays):
+        if task == 't2b':  # Removed from benchmark scope on 2026-10-14.
+            continue
         if (a.run/'STOP').exists():break
         folder=a.run/task;folder.mkdir(exist_ok=True)
         if (folder/'status.json').exists():continue
         with (folder/'run.log').open('x') as log:
-            result=subprocess.run([sys.executable,'-B',str(Path(__file__).resolve()),'--run',str(a.run),'--task',task],stdout=log,stderr=subprocess.STDOUT)
+            extra=['--include-extra-assays'] if a.include_extra_assays else []
+            result=subprocess.run([sys.executable,'-B',str(Path(__file__).resolve()),'--run',str(a.run),'--task',task,*extra],stdout=log,stderr=subprocess.STDOUT)
         if not (folder/'status.json').exists():write(folder/'status.json',dict(status='failed',error='Worker exited before task status',returncode=result.returncode))
         results.append(dict(task=task,returncode=result.returncode));write(a.run/f'group_{a.group}.json',dict(results=results));report(a.run)
     if any(x['returncode'] for x in results):raise SystemExit(1)

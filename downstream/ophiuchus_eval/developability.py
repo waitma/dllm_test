@@ -22,7 +22,7 @@ from sklearn.preprocessing import PowerTransformer
 
 from downstream.ophiuchus_eval.probe_common import embed_pairs, load_embedder, resolve_checkpoint
 
-ROOT = Path("/vepfs-mlp2/c20250601/251105016/project/dllm_test")
+ROOT = Path("/project_c20250601/251105016/project/dllm_test")
 DEFAULT_CSV = ROOT / "data/downstream/dev/GDPa1_v1.2_20250814.csv"
 DEFAULT_OUT = ROOT / "output/downstream_generation/ophiuchus_ab"
 PAPER_COLS = ("AC-SINS_pH7.4", "HIC", "PR_CHO", "Titer")

@@ -3,19 +3,19 @@
 
 Typical commands::
 
-    /vepfs-mlp2/c20250601/251105016/conda/envs/pllm/bin/python \
-      /vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/tcr_generation_bench/run_public_beta.py prepare
-    /vepfs-mlp2/c20250601/251105016/conda/envs/protenix_abtcr/bin/python \
-      /vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/tcr_generation_bench/run_public_beta.py \
+    /project_c20250601/251105016/conda/envs/pllm/bin/python \
+      /project_c20250601/251105016/project/dllm_test/downstream/benchmark/tcr_generation_bench/run_public_beta.py prepare
+    /project_c20250601/251105016/conda/envs/protenix_abtcr/bin/python \
+      /project_c20250601/251105016/project/dllm_test/downstream/benchmark/tcr_generation_bench/run_public_beta.py \
       generate --model tcrt5 --targets rvr --num-candidates 10 --output /absolute/path/smoke.csv
-    /vepfs-mlp2/c20250601/251105016/conda/envs/pllm/bin/python \
-      /vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/tcr_generation_bench/run_public_beta.py \
+    /project_c20250601/251105016/conda/envs/pllm/bin/python \
+      /project_c20250601/251105016/project/dllm_test/downstream/benchmark/tcr_generation_bench/run_public_beta.py \
       score --generations /absolute/path/generations.csv --num-candidates 1000 --with-giana
-    /vepfs-mlp2/c20250601/251105016/conda/envs/pllm/bin/python \
-      /vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/tcr_generation_bench/run_public_beta.py \
+    /project_c20250601/251105016/conda/envs/pllm/bin/python \
+      /project_c20250601/251105016/project/dllm_test/downstream/benchmark/tcr_generation_bench/run_public_beta.py \
       generate-tcrdesign-alpha --targets rvr --beta-top-k 1 --alpha-per-beta 10
-    /vepfs-mlp2/c20250601/251105016/conda/envs/protenix_abtcr/bin/python \
-      /vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/tcr_generation_bench/run_public_beta.py \
+    /project_c20250601/251105016/conda/envs/protenix_abtcr/bin/python \
+      /project_c20250601/251105016/project/dllm_test/downstream/benchmark/tcr_generation_bench/run_public_beta.py \
       generate-bioseq --targets rvr --num-candidates 10 --output /absolute/path/bioseq_smoke.csv
 
 The mandatory interchange columns are ``model,target_id,peptide,mhc_allele,

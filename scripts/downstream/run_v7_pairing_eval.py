@@ -1,7 +1,7 @@
 """Run the fixed V7 light-chain input audit or full prediction collection.
 
 Activate conda pllm; use the worker-compatible Python in a clean process:
-python -B /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/downstream/run_v7_pairing_eval.py --action preflight --device cpu --output-root NEW_ABSOLUTE_DIRECTORY
+python -B /project_c20250601/251105016/project/dllm_test/scripts/downstream/run_v7_pairing_eval.py --action preflight --device cpu --output-root NEW_ABSOLUTE_DIRECTORY
 Use --action generate for all 500 heavies x 8 candidates, with a matching
 --preflight /absolute/path/preflight.json produced on the same device type.
 The fixed checkpoint is 50082, p0/reference length/iter16/gumbel/CFG0/seed42.
@@ -17,7 +17,7 @@ import re
 import runpy
 import sys
 
-ROOT = Path('/vepfs-mlp2/c20250601/251105016/project/dllm_test')
+ROOT = Path('/project_c20250601/251105016/project/dllm_test')
 EVAL_SOURCE = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(EVAL_SOURCE))
 from downstream.v7_native import load_native_checkpoint, sha, require, input_fingerprint
@@ -30,7 +30,7 @@ GENERATION = RECOVERY/'generation_pool_v1'
 CHECKPOINT = EPOCH/'run/checkpoint-50082'
 PREPARATION = ROOT/'output/v7_pairing_adapter_20261006'
 INVENTORY = PREPARATION/'benchmark_inventory_v2.json'
-INVENTORY_SHA = 'a27eaac8661784f6900d95d6ccf2a0c620a79d27d24cdc7a5895bcded1c8e4e3'
+INVENTORY_SHA = '7617fe50105ced20daceadcd7003062606690c8b74b32c7f024594d6cb0cef9e'
 GATE = ROOT/'output/v7_local_ablation_20261005/post_generation_pool_v2/source_v1/v7_post_generation_acceptance.py'
 GATE_SHA = '9a05fb9cee32aa6e60790fb2b1afb07eb3b63aa8dafe127e05d14cb070338f0c'
 PROTOCOL = dict(name='v7_native_a4_pairing_known_length_v1', prefix_residues=0,

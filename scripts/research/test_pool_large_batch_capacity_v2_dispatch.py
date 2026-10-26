@@ -1,6 +1,6 @@
 """Run only the changed capacity-v2 cold controls, once, after conda pllm.
 
-CUDA_VISIBLE_DEVICES='' python -B /vepfs-mlp2/c20250601/251105016/project/
+CUDA_VISIBLE_DEVICES='' python -B /project_c20250601/251105016/project/
 dllm_test/scripts/research/test_pool_large_batch_capacity_v2_dispatch.py
 No model, profiler run, old job main, exec, socket, data or queue is allowed.
 All mutation controls use TemporaryDirectory synthetic_fakecontrol metadata.
@@ -20,7 +20,7 @@ import time
 import traceback
 from unittest.mock import Mock, patch
 
-ROOT = Path('/vepfs-mlp2/c20250601/251105016/project/dllm_test')
+ROOT = Path('/project_c20250601/251105016/project/dllm_test')
 SOURCE = ROOT/'scripts/research/pool_large_batch_capacity_v2_dispatch.py'
 OUT = ROOT/'output/v7_capacity_v2_dispatch_controls_20261003'
 

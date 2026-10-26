@@ -3,8 +3,8 @@
 
 Run with::
 
-    source /vepfs-mlp2/c20250601/251105016/miniforge3/etc/profile.d/conda.sh
-    conda activate /vepfs-mlp2/c20250601/251105016/conda/envs/protenix_abtcr
+    source /project_c20250601/251105016/miniforge3/etc/profile.d/conda.sh
+    conda activate /project_c20250601/251105016/conda/envs/protenix_abtcr
     pytest -q downstream/benchmark/scripts/test_retrained_ours_protocol.py
 """
 

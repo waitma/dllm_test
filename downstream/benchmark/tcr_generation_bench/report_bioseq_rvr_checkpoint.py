@@ -3,8 +3,8 @@
 
 Run::
 
-    /vepfs-mlp2/c20250601/251105016/conda/envs/pllm/bin/python \
-      /vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/tcr_generation_bench/report_bioseq_rvr_checkpoint.py \
+    /project_c20250601/251105016/conda/envs/pllm/bin/python \
+      /project_c20250601/251105016/project/dllm_test/downstream/benchmark/tcr_generation_bench/report_bioseq_rvr_checkpoint.py \
       --trial-dir /absolute/path/to/trial \
       --checkpoint /absolute/path/to/best.pt
 """

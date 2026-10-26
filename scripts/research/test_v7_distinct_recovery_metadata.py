@@ -1,7 +1,7 @@
 """Check the new recovery lineage using artificial metadata, never a launch.
 
 Activate pllm, then run once:
-CUDA_VISIBLE_DEVICES='' python -I -B /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/research/test_v7_distinct_recovery_metadata.py
+CUDA_VISIBLE_DEVICES='' python -I -B /project_c20250601/251105016/project/dllm_test/scripts/research/test_v7_distinct_recovery_metadata.py
 This creates only an owned temporary timing fixture and an evidence JSON.
 """
 import ast
@@ -17,7 +17,7 @@ import sys
 import time
 import traceback
 
-ROOT = Path('/vepfs-mlp2/c20250601/251105016/project/dllm_test')
+ROOT = Path('/project_c20250601/251105016/project/dllm_test')
 EPOCH = ROOT/'output/v7_formal_eight_gpu_20261002/epoch2_continuation_20261006'
 BASE = EPOCH/'recovery_v1'
 

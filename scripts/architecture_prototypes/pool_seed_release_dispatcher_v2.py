@@ -1,7 +1,7 @@
 """Dispatch eight explicit artificial seed diagnostics; never submit a task.
 
 Activate pllm; root alone may run the focused CPU checks:
-  python -B -m pytest -p no:cacheprovider /vepfs-mlp2/c20250601/251105016/project/dllm_test/output/immune_multiseed_pilot_engineering_20261001/private_sources/scripts/tests/immune_llada/test_pool_seed_dispatcher_v2.py -q
+  python -B -m pytest -p no:cacheprovider /project_c20250601/251105016/project/dllm_test/output/immune_multiseed_pilot_engineering_20261001/private_sources/scripts/tests/immune_llada/test_pool_seed_dispatcher_v2.py -q
 Deployment is separate. Real-built runtime manifest SHA values must be bound
 once below before this new branch can execute. No passing fixture is supplied.
 The strict profile-synthetic/1 envelope means one artificial acceptance
@@ -19,12 +19,12 @@ import runpy
 import sys
 
 
-ROOT = Path('/vepfs-mlp2/c20250601/251105016/project/dllm_test')
+ROOT = Path('/project_c20250601/251105016/project/dllm_test')
 OWN_ROOT = ROOT/'output/immune_multiseed_pilot_engineering_20261001'
 POOL = ROOT/'output/immune_research_pool_c20250601_20260930'
 SELF = 'scripts/architecture_prototypes/pool_seed_release_dispatcher_v2.py'
 GUARD = 'scripts/architecture_prototypes/seed_release_startup/sitecustomize.py'
-GUARD_SHA256 = '4f13aa6aa0cdc522cbd937099f73c596ffbf2566a472a5261b478159f5f8118e'
+GUARD_SHA256 = '9f6f649c8b9ce8d3b6c31f8c2e7e7d7d659f6725575dcca71e157a40a422560e'
 OLD_DISPATCHER = 'scripts/architecture_prototypes/pool_release_dispatcher.py'
 OLD_DISPATCHER_SHA256 = 'cd44da25396852f315c039f07df1ea476e310229852b6c2bab5b8b6e8e2db07a'
 RUNTIME_MANIFEST = 'seed_runtime_manifest_v2.json'

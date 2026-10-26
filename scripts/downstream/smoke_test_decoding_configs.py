@@ -11,7 +11,7 @@ import numpy as np
 import pandas as pd
 import torch
 
-PROJECT_ROOT = Path("/vepfs-mlp2/c20250601/251105016/project/dllm_test")
+PROJECT_ROOT = Path("/project_c20250601/251105016/project/dllm_test")
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from downstream.common import ChainPaddingCollator, load_model, run_generate

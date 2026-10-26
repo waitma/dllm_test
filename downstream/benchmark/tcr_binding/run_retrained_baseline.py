@@ -3,10 +3,10 @@
 
 Run every currently connected model on the official AS five-fold protocol::
 
-    source /vepfs-mlp2/c20250601/251105016/miniforge3/etc/profile.d/conda.sh
-    conda activate /vepfs-mlp2/c20250601/251105016/conda/envs/pllm
-    /vepfs-mlp2/c20250601/251105016/conda/envs/protenix_abtcr/bin/python \
-      /vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/tcr_binding/run_retrained_baseline.py \
+    source /project_c20250601/251105016/miniforge3/etc/profile.d/conda.sh
+    conda activate /project_c20250601/251105016/conda/envs/pllm
+    /project_c20250601/251105016/conda/envs/protenix_abtcr/bin/python \
+      /project_c20250601/251105016/project/dllm_test/downstream/benchmark/tcr_binding/run_retrained_baseline.py \
       --name all --fold all --eval-set all --neg-source AS
 
 The driver reads CSV bytes directly from official ``retrain.zip``, pairs fold N

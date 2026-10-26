@@ -1,7 +1,7 @@
 """Prepare or enqueue one bounded segment in the already allocated eight-GPU pool.
 
 Activate conda pllm. First segment:
-python /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/research/launch_v7_formal_segment_20261005.py --stop-after 8 --enqueue
+python /project_c20250601/251105016/project/dllm_test/scripts/research/launch_v7_formal_segment_20261005.py --stop-after 8 --enqueue
 Subsequent segments additionally require --resume-step N. This never submits or
 restarts a platform task, changes a data certificate, or overwrites a prior plan.
 Use --attempt N for a fresh repaired attempt and --previous-stage ABSOLUTE_PATH
@@ -18,7 +18,7 @@ import runpy
 import time
 import uuid
 
-ROOT = Path('/vepfs-mlp2/c20250601/251105016/project/dllm_test')
+ROOT = Path('/project_c20250601/251105016/project/dllm_test')
 OWN = ROOT/'output/v7_formal_eight_gpu_20261002'
 POOL = ROOT/'output/immune_research_pool_c20250601_20261005'
 OLD_POOL = ROOT/'output/immune_research_pool_c20250601_20260930'

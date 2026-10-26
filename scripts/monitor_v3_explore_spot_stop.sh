@@ -2,7 +2,7 @@
 # 只停 no-ESMC v3 explore 看护循环，不 cancel 任何作业。
 set -uo pipefail
 
-REPO=/vepfs-mlp2/c20250601/251105016/project/dllm_test
+REPO=/project_c20250601/251105016/project/dllm_test
 MON_DIR="$REPO/output/immune_v3_explore_queue012/_monitor"
 PID_FILE="$MON_DIR/monitor.pid"
 

@@ -1,7 +1,7 @@
 """Supervise original artificial25/500 learning in the existing FULL evidence root.
 
 Activate pllm; root alone runs the new frozen controls:
-  python -B -m pytest -p no:cacheprovider /vepfs-mlp2/c20250601/251105016/project/dllm_test/output/generic_CE_learning_integration_20261002/test_generic_CE_learning_binding.py -q
+  python -B -m pytest -p no:cacheprovider /project_c20250601/251105016/project/dllm_test/output/generic_CE_learning_integration_20261002/test_generic_CE_learning_binding.py -q
 The unchanged worker supplies d04_r21_CE_learning_v1 with profile-synthetic/25
 or train/500 plus the fixed artificial data directory. Publication, the single
 launcher-only registry binding, fixture preparation and enqueue are separate
@@ -23,13 +23,13 @@ import time
 from types import SimpleNamespace
 
 
-ROOT = Path('/vepfs-mlp2/c20250601/251105016/project/dllm_test')
+ROOT = Path('/project_c20250601/251105016/project/dllm_test')
 OWN = ROOT/'output/generic_CE_learning_integration_20261002'
 SELF = 'pool_generic_CE_learning_dispatcher_v1.py'
 CHILD = OWN/'cold_learning_child_v1.py'
 CHILD_SHA256 = '7ec9d4fe098384d969ed3dd09117ba5a3921db19d2760f0f65be8e0ab5e8bc47'
 LEGACY = ROOT/'output/generic_CE_full_release_20261002/pool_generic_CE_full_dispatcher_v1.py'
-LEGACY_SHA256 = '487997673629e39c92fcdfe2c72cc3f74f2ebcbf99de3e1b4a17cedee1b3f909'
+LEGACY_SHA256 = '25d8bf20869df837575c8b9bf413cedbdc119ab32259bf1667aca3dc3cf5875f'
 ALIAS = 'd04_r21_CE_learning_v1'
 POOL = ROOT/'output/immune_research_pool_c20250601_20260930'
 TIMEOUTS = {'profile_diagnostic25': 1800, 'synthetic500': 28800}

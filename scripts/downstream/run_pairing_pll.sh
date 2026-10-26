@@ -5,7 +5,7 @@
 # Usage: bash run_pairing_pll.sh <fusion_ckpt_dir> <tag> [batch_size] [max_pairs]
 set -euo pipefail
 
-ROOT="/vepfs-mlp2/c20250601/251105016/project/dllm_test"
+ROOT="/project_c20250601/251105016/project/dllm_test"
 CKPT="${1:?usage: $0 <fusion_ckpt_dir> <tag> [batch_size] [max_pairs]}"
 TAG="${2:?usage: $0 <fusion_ckpt_dir> <tag> [batch_size] [max_pairs]}"
 BS="${3:-4}"

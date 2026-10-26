@@ -11,7 +11,7 @@ import json
 from pathlib import Path
 import shutil
 
-ROOT = Path('/vepfs-mlp2/c20250601/251105016/project/dllm_test')
+ROOT = Path('/project_c20250601/251105016/project/dllm_test')
 PARENT = ROOT/'output/v5_full_binding_20261007'
 BASELINE = PARENT/'launch_v3'
 CONFIG = ROOT/'configs/models/v5_noesmc_270m_20261010'

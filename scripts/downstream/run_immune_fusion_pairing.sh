@@ -7,7 +7,7 @@
 # Usage: bash run_immune_fusion_pairing.sh <fusion_ckpt_dir> <tag> [heavy_batch] [length_mode]
 set -euo pipefail
 
-ROOT="/vepfs-mlp2/c20250601/251105016/project/dllm_test"
+ROOT="/project_c20250601/251105016/project/dllm_test"
 CKPT="${1:?usage: $0 <fusion_ckpt_dir> <tag> [heavy_batch] [length_mode]}"
 TAG="${2:?usage: $0 <fusion_ckpt_dir> <tag> [heavy_batch] [length_mode]}"
 HEAVY_BS="${3:-2}"

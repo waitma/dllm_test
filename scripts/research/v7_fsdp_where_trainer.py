@@ -10,7 +10,7 @@ import sys
 
 import torch
 
-ROOT = Path('/vepfs-mlp2/c20250601/251105016/project/dllm_test')
+ROOT = Path('/project_c20250601/251105016/project/dllm_test')
 BASE_ADAPTER = ROOT/'scripts/research/v7_fsdp_trainer.py'
 spec = importlib.util.spec_from_file_location('_v7_where_original_adapter', BASE_ADAPTER)
 base = importlib.util.module_from_spec(spec)

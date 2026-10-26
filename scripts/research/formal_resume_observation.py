@@ -1,6 +1,6 @@
 """Observe native checkpoint restoration without changing training state.
 
-Imported by /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/research/
+Imported by /project_c20250601/251105016/project/dllm_test/scripts/research/
 run_v7_formal.py after frozen-source isolation. No standalone training command.
 Activate conda pllm before running the companion CPU control script. Importing
 this module uses only stdlib; tensor libraries are imported inside observations.

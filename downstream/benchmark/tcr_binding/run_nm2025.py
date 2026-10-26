@@ -323,7 +323,7 @@ def main():
     ap.add_argument("--method", choices=["random", "knn", "embed", "epitcr"], default="knn")
     ap.add_argument("--track", choices=["cdr3b", "others"], default="cdr3b")
     ap.add_argument("--embedder", default="grammar:decoder:"
-                    "/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/"
+                    "/project_c20250601/251105016/project/dllm_test/output/"
                     "grammar_v2_esmc300m_cmp500k_llada/best.pt")
     ap.add_argument("--head", choices=["logreg", "mlp"], default="mlp")
     ap.add_argument("--epitcr-mhc", action="store_true")

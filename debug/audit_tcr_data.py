@@ -25,7 +25,7 @@ import re
 import numpy as np
 import pandas as pd
 
-ROOT = pathlib.Path("/vepfs-mlp2/c20250601/251105016/project/dllm_test")
+ROOT = pathlib.Path("/project_c20250601/251105016/project/dllm_test")
 AA = set("ACDEFGHIKLMNPQRSTVWY")
 SOURCES = {
     "tcr_papers_v2": ROOT / "data/tcr_papers_v2/dataset/train.csv",

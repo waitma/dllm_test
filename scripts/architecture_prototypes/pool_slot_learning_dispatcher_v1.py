@@ -1,7 +1,7 @@
 """Supervise original artificial25/500 learning for seven remaining source slots.
 
 Activate pllm; root alone runs the frozen controls:
-  python -B -m pytest -p no:cacheprovider /vepfs-mlp2/c20250601/251105016/project/dllm_test/output/generic_remaining_slot_learning_integration_20261002/test_slot_learning_binding.py -q
+  python -B -m pytest -p no:cacheprovider /project_c20250601/251105016/project/dllm_test/output/generic_remaining_slot_learning_integration_20261002/test_slot_learning_binding.py -q
 The unchanged worker supplies one fixed d05 alias, profile-synthetic/25 or
 train/500 with the existing artificial data directory. Publication and enqueue
 are separate root actions. The child is the fixed absolute private source with
@@ -24,13 +24,13 @@ import time
 from types import SimpleNamespace
 
 
-ROOT = Path('/vepfs-mlp2/c20250601/251105016/project/dllm_test')
+ROOT = Path('/project_c20250601/251105016/project/dllm_test')
 OWN = ROOT/'output/generic_remaining_slot_learning_integration_20261002'
 SELF = 'pool_slot_learning_dispatcher_v1.py'
 CHILD = OWN/'cold_slot_learning_child_v1.py'
 CHILD_SHA256 = 'e8673c715836cf2c8ac1212f0a87c72a3018a71ceeedd24a32c5b7389e41bdfe'
 LEGACY = ROOT/'output/generic_CE_learning_integration_20261002/pool_generic_CE_learning_dispatcher_v1.py'
-LEGACY_SHA256 = 'e153f3572a9af29882a30a51a351e09cafc7ead166fa9ec222d24f78aab8f9f8'
+LEGACY_SHA256 = '36b41524c93a17900c11600cb2bbbf075912242ad838c219b9bb204416ac1ee3'
 POOL = ROOT/'output/immune_research_pool_c20250601_20260930'
 SLOTS = frozenset(('d05_r20_seed42_learning_v1', 'd05_r20_seed43_learning_v1',
     'd05_r21_seed42_learning_v1', 'd05_r24_seed42_learning_v1', 'd05_r24_seed43_learning_v1',

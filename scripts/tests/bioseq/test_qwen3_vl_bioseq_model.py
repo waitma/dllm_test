@@ -2,7 +2,7 @@
 
 Run in the ``pllm`` environment::
 
-    python -m pytest /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/tests/bioseq/test_qwen3_vl_bioseq_model.py -q
+    python -m pytest /project_c20250601/251105016/project/dllm_test/scripts/tests/bioseq/test_qwen3_vl_bioseq_model.py -q
 """
 
 from __future__ import annotations
@@ -39,7 +39,7 @@ from dllm.pipelines.qwen3_vl_arch.modeling_bioseq import (
 )
 
 ESM2_650M_DIR = Path(
-    "/vepfs-mlp2/c20250601/251105016/project/dllm_test/model_weights/esm2/esm2_t33_650M_UR50D"
+    "/project_c20250601/251105016/project/dllm_test/model_weights/esm2/esm2_t33_650M_UR50D"
 )
 
 

@@ -1,7 +1,7 @@
 """Run one bounded CPU identity/metadata observation check with no pool job.
 
 Activate conda pllm and run:
-  CUDA_VISIBLE_DEVICES='' python -B /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/research/test_pool_parent_runtime_observation.py
+  CUDA_VISIBLE_DEVICES='' python -B /project_c20250601/251105016/project/dllm_test/scripts/research/test_pool_parent_runtime_observation.py
 
 Artificial process records and argv stay in owned synthetic_fakecontrol temp
 directories, which are removed. One real V4 process_identity read covers only
@@ -22,7 +22,7 @@ import unittest
 from unittest.mock import Mock, patch
 
 
-ROOT = Path('/vepfs-mlp2/c20250601/251105016/project/dllm_test')
+ROOT = Path('/project_c20250601/251105016/project/dllm_test')
 SOURCE = ROOT / 'scripts/research/pool_parent_runtime_observation.py'
 FROZEN_PROFILE = ROOT / 'output/v7_large_batch_ablation_20261002/source_snapshot_v1/scripts/research/profile_v7_large_batch.py'
 namespace = runpy.run_path(str(SOURCE), run_name='_observer_metadata_control')

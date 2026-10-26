@@ -18,7 +18,7 @@ import sys
 from types import SimpleNamespace
 
 
-ROOT = Path('/vepfs-mlp2/c20250601/251105016/project/dllm_test')
+ROOT = Path('/project_c20250601/251105016/project/dllm_test')
 OWN = ROOT / 'output/v7_large_batch_ablation_20261002'
 POOL = ROOT / 'output/immune_research_pool_c20250601_20260930'
 DATA = ROOT / 'output/v7_architecture_pilot_20261002/sample_context_plus20k'
@@ -28,7 +28,7 @@ FREEZE_SHA = '2f416e927d0b2e95aaa2e5932490330464622a3490bea2eac15c1f8b4bb2d783'
 PLAN = OWN / 'batch_selection_v1.json'
 CATALOG = OWN / 'jobs.json'
 PREVIOUS = ROOT / 'scripts/research/pool_large_batch_dispatch.py'
-PREVIOUS_SHA = 'f259fb0f0946fb7434c1f78b06f64e5d186ece7b781fd29dac7f3f0fe0e5d866'
+PREVIOUS_SHA = '76d07d623f0fe068dcffa55a28c60a38695fe0a256d4a4bfd7751bded50aad5c'
 CAPACITY_JOB = '1790981433321562451_p04_v7_capacity_febb28e3'
 STUDY = 'v7_context_factorial_120k_large_batch_v1'
 SAMPLE_SHA = '1efa27ea19d10bc94143c3977c80dba8c3a29bad921c093ca7f24447635b9478'

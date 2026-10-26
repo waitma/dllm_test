@@ -1,7 +1,7 @@
 """Read formal training progress without controlling training or loading weights.
 
 Activate conda pllm, then run:
-  python -B /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/research/observe_v7_logged_steps.py
+  python -B /project_c20250601/251105016/project/dllm_test/scripts/research/observe_v7_logged_steps.py
 
 Only existing plan, receipt, state JSON and complete rank-0 log lines are read.
 Saved steps and logged steps remain separate across segment boundaries.
@@ -15,7 +15,7 @@ from pathlib import Path
 import re
 
 
-ROOT = Path('/vepfs-mlp2/c20250601/251105016/project/dllm_test')
+ROOT = Path('/project_c20250601/251105016/project/dllm_test')
 SUPERVISION = ROOT / 'output/v7_formal_supervision_20261005'
 LAUNCHES = ROOT / 'output/v7_formal_eight_gpu_20261002/launch_20261005'
 RUN = ROOT / 'output/v7_initial_training_20261005/run'

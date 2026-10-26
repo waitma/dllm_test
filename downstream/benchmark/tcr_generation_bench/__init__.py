@@ -2,8 +2,8 @@
 
 Run the public beta track with::
 
-    /vepfs-mlp2/c20250601/251105016/conda/envs/pllm/bin/python \
-      /vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/tcr_generation_bench/run_public_beta.py --help
+    /project_c20250601/251105016/conda/envs/pllm/bin/python \
+      /project_c20250601/251105016/project/dllm_test/downstream/benchmark/tcr_generation_bench/run_public_beta.py --help
 
 Three settings share one metric suite (``common.metrics``) and one eval set
 (``data/tcr_generation_bench/``):

@@ -2,7 +2,7 @@
 
 Run in the ``pllm`` environment::
 
-    python -m pytest /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/tests/bioseq/test_grammar_unknown_relation.py -q
+    python -m pytest /project_c20250601/251105016/project/dllm_test/scripts/tests/bioseq/test_grammar_unknown_relation.py -q
 """
 
 from __future__ import annotations

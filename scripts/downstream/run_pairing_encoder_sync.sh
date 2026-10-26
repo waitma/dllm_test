@@ -4,7 +4,7 @@
 set -euo pipefail
 PAIR_PROMPT="${1:?expected prompt length 0 or 3}"
 case "${PAIR_PROMPT}" in 0|3) ;; *) exit 2 ;; esac
-PAIR_ROOT="/vepfs-mlp2/c20250601/251105016/project/dllm_test"
+PAIR_ROOT="/project_c20250601/251105016/project/dllm_test"
 PAIR_CKPT="${PAIR_ROOT}/output/ab_eval_checkpoints/ab_v5_49000_llada_20260913"
 PAIR_INPUT="${PAIR_ROOT}/data/downstream/comp_chain/test_data_oas_holdout.csv"
 PAIR_OUT="${PAIR_ROOT}/output/downstream_generation/ab_v5_49000_pairing_encoder_sync_20260916/pair-p${PAIR_PROMPT}-cfg0"

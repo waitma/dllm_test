@@ -27,7 +27,7 @@ sys.path.insert(0, str(BENCH))
 from common.model_api import build_embedder  # noqa: E402
 
 CKPT = (
-    "/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/"
+    "/project_c20250601/251105016/project/dllm_test/output/"
     "protein_esmc_llada270m_diffusion_immune_v3_8gpu_2m/eval_snapshot_44000"
 )
 

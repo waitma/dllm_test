@@ -1,7 +1,7 @@
 """Check native CPU Trainer recovery across an explicit epoch/LR extension.
 
 Activate conda pllm, then use the pinned ML Python:
-/vepfs-mlp2/c20250601/251105016/conda/envs/protenix_abtcr/bin/python -B /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/research/test_v7_epoch_schedule.py
+/project_c20250601/251105016/conda/envs/protenix_abtcr/bin/python -B /project_c20250601/251105016/project/dllm_test/scripts/research/test_v7_epoch_schedule.py
 Generic regression tensors only; no corpus or GPU. All temporary checkpoints
 are removed when this process exits normally or raises an exception.
 """
@@ -21,7 +21,7 @@ from transformers import Trainer, TrainerCallback, TrainingArguments, set_seed
 from transformers.optimization import get_cosine_schedule_with_warmup
 from v7_epoch_schedule import epoch_restart_factor, preserve_resume_epoch
 
-ROOT = Path('/vepfs-mlp2/c20250601/251105016/project/dllm_test')
+ROOT = Path('/project_c20250601/251105016/project/dllm_test')
 SOURCE = ROOT/'output/v7_formal_eight_gpu_20261002/where_continuation_20261006/source_snapshot_v1'
 
 # Execute the exact frozen sampler class, without importing its model runner.

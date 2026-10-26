@@ -12,7 +12,7 @@ import math
 from pathlib import Path
 import runpy
 
-ROOT = Path('/vepfs-mlp2/c20250601/251105016/project/dllm_test')
+ROOT = Path('/project_c20250601/251105016/project/dllm_test')
 RUN = ROOT/'output/immune_v5_object302_noesmc_300k_b512'
 SUP = ROOT/'output/immune_v5_object302_noesmc_300k_b512_supervision'
 BUNDLE = ROOT/'output/v5_full_binding_20261007/launch_v3'

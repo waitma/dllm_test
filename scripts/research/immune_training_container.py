@@ -20,7 +20,7 @@ import sys
 import threading
 import time
 
-ROOT = Path('/vepfs-mlp2/c20250601/251105016/project/dllm_test')
+ROOT = Path('/project_c20250601/251105016/project/dllm_test')
 HELPER = ROOT/'scripts/immune_research_pool.py'
 STANDBY = ROOT/'scripts/gpu_standby_load.py'
 

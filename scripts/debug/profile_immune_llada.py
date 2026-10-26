@@ -42,8 +42,8 @@ class ProfileDeadline(TimeoutError):
 
 ROOT = Path(__file__).resolve().parents[2]
 ARTIFACT_ROOT = ROOT / "refactor_baseline/local_profile_20260909"
-PYTHON = "/vepfs-mlp2/c20250601/251105016/conda/envs/protenix_abtcr/bin/python"
-SNAPSHOT = "/vepfs-mlp2/c20250601/251105016/conda/cache/huggingface/hub/models--GSAI-ML--LLaDA-8B-Base/snapshots/0f2787f2d87eac5eed8a087d5ecd24277e6255b2"
+PYTHON = "/project_c20250601/251105016/conda/envs/protenix_abtcr/bin/python"
+SNAPSHOT = "/project_c20250601/251105016/conda/cache/huggingface/hub/models--GSAI-ML--LLaDA-8B-Base/snapshots/0f2787f2d87eac5eed8a087d5ecd24277e6255b2"
 SOURCES = ("oas", "ots", "asd_antibody", "trait", "tcr_native", "tcr_papers", "tcr_repertoire")
 
 

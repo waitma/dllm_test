@@ -1,7 +1,7 @@
 """Record the owned f010/42 attempt's real exit after its full epoch finishes.
 
 Activate conda pllm, then run once after the existing runner has exited:
-python -B /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/research/record_v7_f010_local_completion.py
+python -B /project_c20250601/251105016/project/dllm_test/scripts/research/record_v7_f010_local_completion.py
 This reads real runner sentinels and native artifacts, creates an explicit exit
 receipt and a new report selection, and never launches/retries training. The
 old frozen selection and the already prepared pool publisher stay unchanged.
@@ -14,16 +14,16 @@ import re
 import runpy
 
 
-ROOT = Path('/vepfs-mlp2/c20250601/251105016/project/dllm_test')
+ROOT = Path('/project_c20250601/251105016/project/dllm_test')
 LOCAL = ROOT/'output/v7_local_ablation_20261005'
 SELECTION = LOCAL/'mixed_report_selection_v2.json'
 SELECTION_SHA = '9a60ebd56551c71c16faf86dd5efd4c44448e71fe3a44de31c86221a089dc0fc'
 BASE = LOCAL/'f010_seed42_terminal_evidence_20261006'
 REPORTER = LOCAL/'post_generation_pool_v1/source_v1/plot_v7_mixed_ablation.py'
 REPORTER_FILES = {
-    'plot_v7_mixed_ablation.py': 'cbc6a710d5f030bb591329307e7ba5d6324e9e0503da489f2ae4174312af195d',
-    'plot_v7_large_batch_ablation.py': '868984422b186b13d5ae6a88cd4d3e9b61701f50988585fb1a4dd0374ec08d93',
-    'plot_v7_context_ablation.py': '92a6c8bb0a482f7c38a2d858fee3717123f580a3ce3d1f46bde99853953f2f12',
+    'plot_v7_mixed_ablation.py': '87e7e6b86d7400ffd467cb7002d9206416d6974a86e9e75a062bb389eb278a0e',
+    'plot_v7_large_batch_ablation.py': '0a7f7d927ac35cf6db312faa53e93a4b3a98be12ff0c24e310c3510c9e355dd8',
+    'plot_v7_context_ablation.py': '8bfea63868a0422996eb13a9ffc893b607b488ee183831f720076608675940df',
 }
 
 

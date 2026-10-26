@@ -1,7 +1,7 @@
 """Review a new where-DDP checkpoint using its native save and metric metadata.
 
 Activate conda pllm, then run:
-python -B /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/research/review_v7_where_checkpoint.py --step 9000 --previous 8000
+python -B /project_c20250601/251105016/project/dllm_test/scripts/research/review_v7_where_checkpoint.py --step 9000 --previous 8000
 Only JSON and source hashes are read. No tensors, corpus, GPU, or job controls
 are used. Previously reviewed points must not be repeated.
 """
@@ -13,7 +13,7 @@ import math
 from pathlib import Path
 import runpy
 
-ROOT = Path('/vepfs-mlp2/c20250601/251105016/project/dllm_test')
+ROOT = Path('/project_c20250601/251105016/project/dllm_test')
 BASE = ROOT/'output/v7_formal_eight_gpu_20261002/where_continuation_20261006'
 RUN = BASE/'run'
 HELPER = ROOT/'scripts/research/review_v7_formal_checkpoint.py'

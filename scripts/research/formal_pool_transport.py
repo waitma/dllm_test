@@ -25,14 +25,14 @@ import threading
 import time
 import traceback
 
-ROOT = Path('/vepfs-mlp2/c20250601/251105016/project/dllm_test')
+ROOT = Path('/project_c20250601/251105016/project/dllm_test')
 V4 = ROOT/'output/generic_eight_worker_group_integration_20261002/actual_gpu_original_Trainer_v4'
 FIXED = {
     str(V4/'eight_rank_coordinator_v2.py'): 'dbaf3e8536370309a42fd2c33d23b020224b62d981451b2038387a21009e4001',
     str(V4/'gpu_worker_cold_rank_v1.py'): '4a469cd05a71056342d1e14d0a66a550fa4c1657e86166ca940c5656e3a9cbbe',
     str(V4/'gpu_worker_bootstrap_v1.py'): 'd8b2cf6cde74217602d40bd22f7b6d1568c7c865efe8472beff58021729adce0'}
 SCHEMA = 'v7.formal.pool_intent.v1'
-FINAL_MANIFEST = '28e3cbf8fb860c13b514a11d600579257a233fefe9f70ea070b042d04f8a424c'
+FINAL_MANIFEST = '494592e33d3bea3f16a5bd363d53c6b2f276372f92cb3a84b21fcd65f07c28e9'
 PROCESS_KEYS = {'pid', 'parent_pid', 'parent_start_ticks', 'process_group_id', 'start_ticks', 'hostname', 'boot_id'}
 VARIANTS = {'r20', 'r21', 'r24', 'r26', 'f000', 'f001', 'f010', 'f011', 'f100', 'f101', 'f110', 'f111',
             'cv_segment_global', 'cv_late_fusion', 'fixed_gate_control'}

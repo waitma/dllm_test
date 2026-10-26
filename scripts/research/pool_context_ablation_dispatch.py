@@ -14,14 +14,14 @@ import runpy
 import sys
 import time
 
-ROOT = Path('/vepfs-mlp2/c20250601/251105016/project/dllm_test')
+ROOT = Path('/project_c20250601/251105016/project/dllm_test')
 OWN = ROOT / 'output/v7_context_ablation_20261002'
 POOL = ROOT / 'output/immune_research_pool_c20250601_20260930'
 DATA = ROOT / 'output/v7_architecture_pilot_20261002/sample_context_plus20k'
 FREEZE = OWN / 'source_snapshot_v1.json'
 FREEZE_SHA = '0a88b6a1b38b85fdaa9491444286da6b1bd023c721ce4828d7f5ca0b0b0e53ab'
 PREVIOUS = ROOT / 'scripts/research/pool_v7_pilot_dispatch.py'
-PREVIOUS_SHA = '278457565d86a205807db9061746e98a06dcf8ea07a4f7140c2817be6f0fc4ee'
+PREVIOUS_SHA = '2e3ea24fe3992170e36a1b52548031bd234705c818647771c3b2306e42bf44e4'
 METHODS = ('f000', 'f001', 'f010', 'f011', 'f100', 'f101', 'f110', 'f111',
            'cv_segment_global', 'cv_late_fusion', 'fixed_gate_control')
 ALIASES = {f'p02_v7_{variant}_seed{seed}': (variant, seed)

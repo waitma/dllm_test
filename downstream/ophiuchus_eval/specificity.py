@@ -24,7 +24,7 @@ from transformers.optimization import get_linear_schedule_with_warmup
 
 from downstream.ophiuchus_eval.probe_common import embed_pairs, load_embedder, resolve_checkpoint
 
-ROOT = Path("/vepfs-mlp2/c20250601/251105016/project/dllm_test")
+ROOT = Path("/project_c20250601/251105016/project/dllm_test")
 DEFAULT_CSV = ROOT / "data/downstream/specificity/hd-0_flu-1_cov-2.csv"
 DEFAULT_TTE = ROOT / "data/downstream/specificity/TTE"
 DEFAULT_OUT = ROOT / "output/downstream_generation/ophiuchus_ab"

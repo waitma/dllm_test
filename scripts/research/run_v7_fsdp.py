@@ -20,12 +20,12 @@ import socket
 import subprocess
 import sys
 
-ROOT = Path('/vepfs-mlp2/c20250601/251105016/project/dllm_test')
+ROOT = Path('/project_c20250601/251105016/project/dllm_test')
 BASE = ROOT/'output/v7_formal_eight_gpu_20261002/source_snapshot_v3'
 PARENT = ROOT/'data/prepared/immune_v7_test_scope_final_20261002'
 ADAPTER = ROOT/'scripts/research/v7_fsdp_trainer.py'
 GATE = ROOT/'scripts/research/check_v7_formal_parent.py'
-DATA_SHA = '28e3cbf8fb860c13b514a11d600579257a233fefe9f70ea070b042d04f8a424c'
+DATA_SHA = '494592e33d3bea3f16a5bd363d53c6b2f276372f92cb3a84b21fcd65f07c28e9'
 SIDECAR = 'fsdp_checkpoint.json'
 
 

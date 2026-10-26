@@ -13,7 +13,7 @@ from pathlib import Path
 import runpy
 import sys
 
-ROOT = Path('/vepfs-mlp2/c20250601/251105016/project/dllm_test')
+ROOT = Path('/project_c20250601/251105016/project/dllm_test')
 EVAL_SOURCE = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(EVAL_SOURCE))
 from downstream.v7_native import cdr_argmax, input_fingerprint, require, sha

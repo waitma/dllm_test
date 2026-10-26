@@ -12,9 +12,9 @@ seen test plus the shared seen/unseen independent tests.
 
 Run the complete AS five-fold experiment on one GPU with::
 
-    source /vepfs-mlp2/c20250601/251105016/miniforge3/etc/profile.d/conda.sh
-    conda activate /vepfs-mlp2/c20250601/251105016/conda/envs/pllm
-    python /vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/tcr_binding/run_retrained_ours.py \
+    source /project_c20250601/251105016/miniforge3/etc/profile.d/conda.sh
+    conda activate /project_c20250601/251105016/conda/envs/pllm
+    python /project_c20250601/251105016/project/dllm_test/downstream/benchmark/tcr_binding/run_retrained_ours.py \
       --checkpoint /path/to/checkpoint --tag v5_masked_runtime_new \
       --fold all --eval-set all --neg-source AS --cdr3-format junction
 

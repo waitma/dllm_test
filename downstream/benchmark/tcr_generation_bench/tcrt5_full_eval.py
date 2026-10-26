@@ -2,8 +2,8 @@
 
 Run the complete reconstruction with::
 
-    /vepfs-mlp2/c20250601/251105016/conda/envs/pllm/bin/python \
-      /vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/tcr_generation_bench/run_tcrt5_full_eval.py all
+    /project_c20250601/251105016/conda/envs/pllm/bin/python \
+      /project_c20250601/251105016/project/dllm_test/downstream/benchmark/tcr_generation_bench/run_tcrt5_full_eval.py all
 
 This module keeps the target-rich ``20 x 100`` validation protocol separate
 from the sparse ``13 x 1000`` benchmark and the RVR deep-design target.  The

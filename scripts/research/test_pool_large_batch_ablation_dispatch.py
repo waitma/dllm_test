@@ -1,7 +1,7 @@
 """Run one bounded stdlib-only dispatcher check using owned fakecontrol metadata.
 
 Activate conda pllm and run:
-  CUDA_VISIBLE_DEVICES='' python -B /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/research/test_pool_large_batch_ablation_dispatch.py
+  CUDA_VISIBLE_DEVICES='' python -B /project_c20250601/251105016/project/dllm_test/scripts/research/test_pool_large_batch_ablation_dispatch.py
 
 Only temporary artificial registries, plans, ledgers, capacity records and
 source files are used. The real dispatcher/runner text is read, never an actual
@@ -22,7 +22,7 @@ import unittest
 from unittest.mock import Mock, patch
 
 
-ROOT = Path('/vepfs-mlp2/c20250601/251105016/project/dllm_test')
+ROOT = Path('/project_c20250601/251105016/project/dllm_test')
 ENTRY = ROOT / 'scripts/research/pool_large_batch_ablation_dispatch.py'
 module = runpy.run_path(str(ENTRY), run_name='_artificial_dispatch_control')
 g = module['prepare'].__globals__

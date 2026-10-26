@@ -1,7 +1,7 @@
 """Dispatch one R21 seed43 tiny numerical observation through the existing pool.
 
 Activate pllm before root runs its frozen CPU control budget:
-  python -B -m pytest -p no:cacheprovider /vepfs-mlp2/c20250601/251105016/project/dllm_test/output/immune_seed43_gpu_observation_20261002/test_seed43_gpu_observation_v2_tmp_control.py -q
+  python -B -m pytest -p no:cacheprovider /project_c20250601/251105016/project/dllm_test/output/immune_seed43_gpu_observation_20261002/test_seed43_gpu_observation_v2_tmp_control.py -q
 Only root may deploy/enqueue the single fixed alias after source review. This
 module does not submit jobs, accept a model, or admit training/data. Its child
 observes the original tiny assertion unchanged; a COMPLETE file means the
@@ -24,7 +24,7 @@ import time
 from types import SimpleNamespace
 
 
-ROOT = Path('/vepfs-mlp2/c20250601/251105016/project/dllm_test')
+ROOT = Path('/project_c20250601/251105016/project/dllm_test')
 OWN = ROOT/'output/immune_seed43_gpu_observation_20261002'
 POOL = ROOT/'output/immune_research_pool_c20250601_20260930'
 RUNTIME = ROOT/'output/immune_multiseed_pilot_engineering_20261001/runtime_packages/r21_seed_runtime_v2'
@@ -36,7 +36,7 @@ DRIVER_SHA256 = 'fb35b5501c2a8cbee09bd142d55d68bd5db7c058404a63dc2be3296720a1aa8
 BUDGET = OWN/'execution_budget_v2.json'
 BUDGET_SHA256 = 'be159b84b00886cb2752809b90147a9773b5dd4623b2ca69bb8ec436135b0fbe'
 LEGACY = ROOT/'scripts/architecture_prototypes/pool_seed_release_dispatcher_v2.py'
-LEGACY_SHA256 = 'd5ba656d12965436494d00ef9df662a6d1956e23404c9343cc42517c21109a8d'
+LEGACY_SHA256 = 'fc1e81e999d6123e0e735bb9f503d218b27de5363916b87f9b78751c7db705a1'
 MANIFEST = 'seed_runtime_manifest_v2.json'
 MANIFEST_SHA256 = 'b6772cc422afe7753046730dc097f1a056a9b314c92ce7027b8b369dd1905c62'
 PACKAGE = 'scripts/architecture_prototypes/pilot_seed_runtime_package_v2.py'

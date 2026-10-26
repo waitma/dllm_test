@@ -14,11 +14,11 @@ import runpy
 import sys
 import time
 
-ROOT = Path('/vepfs-mlp2/c20250601/251105016/project/dllm_test')
+ROOT = Path('/project_c20250601/251105016/project/dllm_test')
 OWN = ROOT / 'output/v7_architecture_pilot_20261002'
 POOL = ROOT / 'output/immune_research_pool_c20250601_20260930'
 LEGACY = ROOT / 'scripts/architecture_prototypes/gpu_pool_dispatcher_v3.py'
-LEGACY_SHA = 'c1d1c4cf556815cd4dd51796e0db208fb460d97a8e1d4b0bd70e71d7b849f321'
+LEGACY_SHA = '9dff540e5b9844d6b1b204facbb9fd70ac5c0ecf087033690e561b805e07a5e2'
 FREEZE = OWN / 'source_snapshot_v1.json'
 FREEZE_SHA = '33c12724a5008936416888348782734ccfd28eeae9307983b1eb26e707ccd9d7'
 ALIASES = {f'p01_v7_{variant}_seed{seed}': (variant, seed)

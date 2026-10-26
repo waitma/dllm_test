@@ -44,7 +44,7 @@ import runpy
 import sys
 
 
-ROOT = Path('/vepfs-mlp2/c20250601/251105016/project/dllm_test')
+ROOT = Path('/project_c20250601/251105016/project/dllm_test')
 OLD = ROOT / 'output/v7_large_batch_ablation_20261002'
 LOCAL = ROOT / 'output/v7_local_ablation_20261005'
 POOL = ROOT / 'output/immune_research_pool_c20250601_20261005'
@@ -61,18 +61,18 @@ MANAGED_SHA = '7413c5fc9783ea2aa81dc37ebbdb5ba25588e09f76cc88190039e1a9de26970e'
 SAMPLE_SHA = '1efa27ea19d10bc94143c3977c80dba8c3a29bad921c093ca7f24447635b9478'
 PREFLIGHT_SHA = '21c640f870284cf7f09ebf8766db63ec7e7d311b8e94e0f2567798f53474a5f6'
 LEGACY = OLD / 'launcher_source_v2/scripts/research/pool_large_batch_ablation_v2_dispatch.py'
-LEGACY_SHA = 'b088ba3c19f58060a05393411cdf57a3abe8ecd7ba91508add62142896476cc3'
+LEGACY_SHA = '7cf225f5e2a4db198a093ccba9baf1d5bd81e7db1b1e4768504a5228fcced4f5'
 PARENT_API = OLD / 'pool_parent_source_v1/pool_parent_runtime_observation.py'
-PARENT_API_SHA = '8d13c32c6c8e0b6ee65df4573a14e784947e98602e50c7ef10cf2459393e79c8'
+PARENT_API_SHA = 'f356a9d8fcf9e369a062514267c70c17651088c62334a1a9dac716f242b3a2c8'
 FORMAL = ROOT / 'output/v7_formal_eight_gpu_20261002'
 SUP = ROOT / 'output/v7_formal_supervision_20261005'
 FORMAL_RUN = ROOT / 'output/v7_initial_training_20261005/run'
 RESUME_API = FORMAL / 'source_snapshot_v3/scripts/research/formal_resume_observation.py'
-RESUME_API_SHA = '0a0ca3baa74ae2567953db9fdebab01f031fe0a3ebb1f4ccd28405bf78fa4c97'
+RESUME_API_SHA = '6d29824184fa4c9f2166631bb0e9f2ca6644990d0bd6862a358dabeb33caff26'
 POOL_SOURCE = ROOT / 'scripts/immune_research_pool.py'
 POOL_SOURCE_SHA = 'f3522eca58f7fedf145e8d61986d5124e0cdd9e2718c6062c53c94e563ba832f'
 POST_GENERATION_GATE = ROOT / 'scripts/research/v7_post_generation_acceptance.py'
-POST_GENERATION_GATE_SHA = '0ad5964271e185301aa9b418a04656aac5a690994bc411543b1812a6ddcf2fa5'
+POST_GENERATION_GATE_SHA = '8c3d746fca99b52c28a38770d95c508bc629f21d21e15639a22d639c9b322fcf'
 STUDY = 'v7_context_factorial_120k_large_batch_v1'
 METHODS = ('f000', 'f001', 'f010', 'f011', 'f100', 'f101', 'f110', 'f111',
            'cv_segment_global', 'cv_late_fusion', 'fixed_gate_control')

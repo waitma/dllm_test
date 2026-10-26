@@ -1,7 +1,7 @@
 """Copy a deterministic source-stratified exploratory subset without changing rows.
 
 Activate conda pllm, then run:
-python /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/research/sample_v7_architecture_pilot.py --input-dir /absolute/prepared --output-dir /absolute/new_subset
+python /project_c20250601/251105016/project/dllm_test/scripts/research/sample_v7_architecture_pilot.py --input-dir /absolute/prepared --output-dir /absolute/new_subset
 Use --self-test for small stdlib-only fixtures. No training or annotation runs here.
 """
 import argparse

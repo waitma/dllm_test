@@ -36,7 +36,7 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
-REPO = Path("/vepfs-mlp2/c20250601/251105016/project/dllm_test")
+REPO = Path("/project_c20250601/251105016/project/dllm_test")
 EXPLORE_ROOT = REPO / "train_jobs/immune_v3_explore_queue012"
 README = EXPLORE_ROOT / "README.md"
 PROJECT_PROCESS = REPO / "PROJECT_PROCESS.md"

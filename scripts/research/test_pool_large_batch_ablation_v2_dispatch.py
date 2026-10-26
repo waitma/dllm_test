@@ -1,6 +1,6 @@
 """Run one changed-boundary cold control after activating conda pllm.
 
-CUDA_VISIBLE_DEVICES='' python -B /vepfs-mlp2/c20250601/251105016/project/
+CUDA_VISIBLE_DEVICES='' python -B /project_c20250601/251105016/project/
 dllm_test/scripts/research/test_pool_large_batch_ablation_v2_dispatch.py
 Reads actual planned catalog/plan/capacity metadata, never sequence rows. Only
 the unpublished registry is replaced with an owned temporary literal fixture.
@@ -21,7 +21,7 @@ import time
 import traceback
 from unittest.mock import Mock, patch
 
-ROOT = Path('/vepfs-mlp2/c20250601/251105016/project/dllm_test')
+ROOT = Path('/project_c20250601/251105016/project/dllm_test')
 SOURCE = ROOT/'scripts/research/pool_large_batch_ablation_v2_dispatch.py'
 OUT = ROOT/'output/v7_large_batch_v2_dispatch_controls_20261003'
 

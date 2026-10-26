@@ -2,7 +2,7 @@
 
 Activate conda pllm; invoke the independently frozen copy with --action preview
 for read-only inventory, or --action publish only after actual predecessor exit.
-Example: python -B /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/research/publish_v7_post_generation_ablation.py --action preview
+Example: python -B /project_c20250601/251105016/project/dllm_test/scripts/research/publish_v7_post_generation_ablation.py --action preview
 No platform submission, container/worker restart, annotation, model modification
 or automatic retry is performed. Publication uses the existing eight workers.
 """
@@ -21,7 +21,7 @@ import time
 import uuid
 
 
-ROOT = Path('/vepfs-mlp2/c20250601/251105016/project/dllm_test')
+ROOT = Path('/project_c20250601/251105016/project/dllm_test')
 LOCAL = ROOT/'output/v7_local_ablation_20261005'
 BASE = LOCAL/'post_generation_pool_v1'
 POOL = ROOT/'output/immune_research_pool_c20250601_20261005'

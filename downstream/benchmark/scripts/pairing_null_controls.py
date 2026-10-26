@@ -34,7 +34,7 @@ import pandas as pd
 import torch
 from transformers import RoFormerForSequenceClassification, RoFormerTokenizer
 
-PROJECT = Path("/vepfs-mlp2/c20250601/251105016/project/dllm_test")
+PROJECT = Path("/project_c20250601/251105016/project/dllm_test")
 GEN_DIR = PROJECT / "output" / "downstream_generation"
 IMMUNOMATCH = PROJECT / "data" / "downstream" / "immunomatch"
 # Any prompt3 run carries the same 500 reference heavy/light pairs; this one is

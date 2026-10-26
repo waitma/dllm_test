@@ -32,7 +32,7 @@ from pathlib import Path
 
 import pandas as pd
 
-PROJECT_ROOT = Path("/vepfs-mlp2/c20250601/251105016/project/dllm_test")
+PROJECT_ROOT = Path("/project_c20250601/251105016/project/dllm_test")
 BENCH = Path(__file__).resolve().parents[1]
 TCRT5 = BENCH / "baselines" / "TCRT5_tcr_translate"
 OUT = BENCH / "data" / "tcr_generation_bench"

@@ -8,7 +8,7 @@ from pathlib import Path
 import torch
 from torch.utils.data import DataLoader, Dataset
 
-PROJECT_ROOT = Path("/vepfs-mlp2/c20250601/251105016/project/dllm_test")
+PROJECT_ROOT = Path("/project_c20250601/251105016/project/dllm_test")
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
@@ -69,7 +69,7 @@ def parse_args() -> argparse.Namespace:
         "--output-dir",
         type=Path,
         default=Path(
-            "/vepfs-mlp2/c20250601/251105016/project/dllm_test/.models/bioseq/ophiuchus-ab"
+            "/project_c20250601/251105016/project/dllm_test/.models/bioseq/ophiuchus-ab"
         ),
     )
     parser.add_argument("--batch-size", type=int, default=8)

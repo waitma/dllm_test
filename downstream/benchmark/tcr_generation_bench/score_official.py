@@ -5,8 +5,10 @@
 produced for 14 pMHC. The paper reserves RVRAYTYSK/HLA-A*03:01 for its separate
 simulation and reports the sparse aggregate on the remaining 13 pMHC. Scoring
 that 13-pMHC view with our ported metric
-suite gives authoritative baseline leaderboard rows without re-generation, and
-doubles as the calibration cross-check (see ``scripts/test_tcrt5_metrics.py``).
+suite gives official-artifact rescoring without re-generation. Local references
+were sorted/deduplicated, which changes sequence-recovery tie breaking. All
+released candidates are scored; k controls recall's denominator, not truncation.
+These rows are not an exact paper-protocol or equal-budget comparison to Ours.
 
 Run:
     python tcr_generation_bench/score_official.py -k 100
@@ -57,7 +59,7 @@ def main():
             raise RuntimeError(f"expected paper sparse benchmark n=13, got {len(eval_set)}")
         eval_name = "paper_sparse13"
         out_suffix = ""
-        alignment = "exact"
+        alignment = "local_reference_preprocessing_full_released_candidates"
     preds = scoring.load_benchmark_preds()
 
     for tag, (pred_key, greedy_key) in METHODS.items():
@@ -76,10 +78,12 @@ def main():
                   "baseline_provenance": {
                       "evidence_type": "official_artifact_rescored",
                       "protocol_alignment": alignment,
-                      "paper_comparable": alignment == "exact",
+                      "paper_comparable": False,
                       "citation": "doi:10.1038/s42256-025-01096-6",
                       "source_location": "authors' benchmark_data_w_preds.csv",
-                      "notes": "paper Figure 5 sparse aggregate excludes the reserved RVRAYTYSK simulation pMHC",
+                      "notes": "Figure 5 target scope; local sorted/deduplicated references change recovery ties. All released candidates are scored; k does not truncate predictions. Not an equal-budget Ours comparison.",
+                      "candidate_counts_by_target": {p: len(v) for p, v in designs.items()},
+                      "candidate_selection": "all_released_candidates_no_topk_slice",
                   }, **scored}
         out_dir = OUT / output_tag
         out_dir.mkdir(parents=True, exist_ok=True)

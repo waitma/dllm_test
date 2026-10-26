@@ -8,7 +8,7 @@ inside boxes):
 from __future__ import annotations
 
 import sys
-sys.path.insert(0, "/vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts")
+sys.path.insert(0, "/project_c20250601/251105016/project/dllm_test/scripts")
 import figstyle as S  # noqa: E402
 
 

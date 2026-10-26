@@ -14,13 +14,13 @@ import re
 import runpy
 import sys
 
-ROOT = Path('/vepfs-mlp2/c20250601/251105016/project/dllm_test')
+ROOT = Path('/project_c20250601/251105016/project/dllm_test')
 OWN = ROOT / 'output/v7_large_batch_ablation_20261002'
 POOL = ROOT / 'output/immune_research_pool_c20250601_20260930'
 FREEZE = OWN / 'source_snapshot_v1.json'
 FREEZE_SHA = '2f416e927d0b2e95aaa2e5932490330464622a3490bea2eac15c1f8b4bb2d783'
 PREVIOUS = ROOT / 'scripts/research/pool_context_ablation_dispatch.py'
-PREVIOUS_SHA = '0946d193e7f6e5bb080cc79447a72e09095c543df64fa44b36b9f1e98eb923d6'
+PREVIOUS_SHA = '0f5d146931f36ed3215af18295c3a1a3e371dc468de04a523c0ce71ddac89e37'
 ALIAS = 'p04_v7_capacity'
 
 

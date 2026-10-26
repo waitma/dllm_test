@@ -11,7 +11,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import pandas as pd
 
-DIAG = Path("/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/repr_diagnostics")
+DIAG = Path("/project_c20250601/251105016/project/dllm_test/output/repr_diagnostics")
 ARMS = {
     "BERT 270m@49000": ("bert_270m_49000", "#c0392b"),
     "Diffusion 270m@42000": ("diff_270m_42000", "#2471a3"),
@@ -90,7 +90,7 @@ def main():
     )
     fig.tight_layout(rect=(0, 0, 1, 0.90))
     out = Path(
-        "/vepfs-mlp2/c20250601/251105016/project/dllm_test/debug/figures/"
+        "/project_c20250601/251105016/project/dllm_test/debug/figures/"
         "repr_layer_diagnosis.png"
     )
     out.parent.mkdir(parents=True, exist_ok=True)

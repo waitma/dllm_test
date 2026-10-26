@@ -3,8 +3,8 @@
 
 Run with::
 
-    /vepfs-mlp2/c20250601/251105016/conda/envs/pllm/bin/python -m pytest -q \
-      /vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/scripts/test_public_beta_benchmark.py
+    /project_c20250601/251105016/conda/envs/pllm/bin/python -m pytest -q \
+      /project_c20250601/251105016/project/dllm_test/downstream/benchmark/scripts/test_public_beta_benchmark.py
 
 These tests intentionally exercise protocol decisions that could otherwise
 silently inflate results: prediction columns are never references, invalid

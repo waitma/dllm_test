@@ -14,7 +14,7 @@ from pathlib import Path
 import sys
 import time
 
-ROOT=Path('/vepfs-mlp2/c20250601/251105016/project/dllm_test')
+ROOT=Path('/project_c20250601/251105016/project/dllm_test')
 sys.path.insert(0,str(ROOT))
 
 
@@ -44,7 +44,7 @@ def report(run):
         '| Iteration | Kong H1 | H2 | H3 | SAb H1 | H2 | H3 | L1 | L2 | L3 | 状态 | 耗时 |',
         '|---|---|---|---|---|---|---|---|---|---|---|---|',*rows,end])
     with (ROOT/'output/downstream_generation/v5_native_best_20261008/results_update.lock').open('w') as lock:
-        fcntl.flock(lock,fcntl.LOCK_EX);target=ROOT/'downstream/benchmark/RESULTS.md';text=target.read_text()
+        fcntl.flock(lock,fcntl.LOCK_EX);target=ROOT/'downstream/benchmark/EVALUATION_PROCESS.md';text=target.read_text()
         if start in text:
             a=text.index(start);b=text.index(end,a)+len(end);text=text[:a]+block+text[b:]
         else:head,tail=text.split('\n',1);text=head+'\n\n'+block+'\n'+tail

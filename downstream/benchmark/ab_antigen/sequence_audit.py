@@ -13,7 +13,7 @@ import subprocess
 import numpy as np
 from downstream.benchmark.ab_antigen.sequence_data import ROOT, DATA, digest, write_json
 from downstream.benchmark.ab_antigen.sequence_eval import read_rows,sha
-MMSEQS='/vepfs-mlp2/c20250601/251105016/conda/envs/flow/bin/mmseqs'
+MMSEQS='/project_c20250601/251105016/conda/envs/flow/bin/mmseqs'
 
 
 def clusters(sequences, name, threshold):

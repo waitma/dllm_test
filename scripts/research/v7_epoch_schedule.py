@@ -1,7 +1,7 @@
 """Extend a fixed training horizon with an explicit warmup/cosine restart.
 
 Activate conda pllm; run the CPU native-resume check with:
-python -B /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/research/test_v7_epoch_schedule.py
+python -B /project_c20250601/251105016/project/dllm_test/scripts/research/test_v7_epoch_schedule.py
 This module does not load a model, dataset, checkpoint, or GPU.
 """
 import math

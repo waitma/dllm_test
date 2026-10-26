@@ -3,9 +3,9 @@
 Generate + evaluate (ImmunoMatch, diversity, ANARCI chain/V/J metrics):
   conda activate pllm
   python -m downstream.grammar.light_chain_pairing \\
-    --csv-path /vepfs-mlp2/c20250601/251105016/project/dllm_test/data/downstream/comp_chain/test_data_oas_holdout.csv \\
-    --checkpoint-path /vepfs-mlp2/c20250601/251105016/project/dllm_test/output/protein_esmc_llada270m_diffusion_immune/checkpoint-42000 \\
-    --output-csv /vepfs-mlp2/c20250601/251105016/project/dllm_test/output/downstream_generation/pairing_reflen_v3.csv \\
+    --csv-path /project_c20250601/251105016/project/dllm_test/data/downstream/comp_chain/test_data_oas_holdout.csv \\
+    --checkpoint-path /project_c20250601/251105016/project/dllm_test/output/protein_esmc_llada270m_diffusion_immune/checkpoint-42000 \\
+    --output-csv /project_c20250601/251105016/project/dllm_test/output/downstream_generation/pairing_reflen_v3.csv \\
     --device cuda --num-seqs 8 --light-prompt-tokens 3
 
 Target-length discipline (``--light-length-mode``)
@@ -48,7 +48,7 @@ import torch
 from torch.utils.data import Dataset
 from tqdm import tqdm
 
-PROJECT_ROOT = Path("/vepfs-mlp2/c20250601/251105016/project/dllm_test")
+PROJECT_ROOT = Path("/project_c20250601/251105016/project/dllm_test")
 DEFAULT_HOLDOUT_CSV = PROJECT_ROOT / "data" / "downstream" / "comp_chain" / "test_data_oas_holdout.csv"
 DEFAULT_LENGTH_PRIOR_JSON = (
     PROJECT_ROOT / "data" / "downstream" / "comp_chain" / "oas_train_light_length_prior.json"

@@ -1,7 +1,7 @@
 """Run only new CPU restoration controls after activating conda pllm.
 
-Use /vepfs-mlp2/c20250601/251105016/conda/envs/protenix_abtcr/bin/python -B
-/vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/research/
+Use /project_c20250601/251105016/conda/envs/protenix_abtcr/bin/python -B
+/project_c20250601/251105016/project/dllm_test/scripts/research/
 test_formal_resume_observation.py. Fixtures are artificial CPU state only and
 removed by TemporaryDirectory. No training, model construction, data or CUDA.
 """
@@ -17,7 +17,7 @@ from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
-ROOT = Path('/vepfs-mlp2/c20250601/251105016/project/dllm_test')
+ROOT = Path('/project_c20250601/251105016/project/dllm_test')
 HELPER = ROOT/'scripts/research/formal_resume_observation.py'
 DRIVER = ROOT/'scripts/research/run_v7_formal.py'
 

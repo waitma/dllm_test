@@ -1,7 +1,7 @@
 """Check TCR budget, order, invalid-candidate retention, and sealing with artificial rows.
 
 Activate conda pllm; run worker-compatible Python:
-python -I -B /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/research/test_v7_tcr_artifacts.py
+python -I -B /project_c20250601/251105016/project/dllm_test/scripts/research/test_v7_tcr_artifacts.py
 Uses no model, real benchmark, GPU, annotation, or checkpoints. Temporary
 artifact fixtures are automatically removed; artificial traces are not scores.
 """
@@ -11,7 +11,7 @@ from pathlib import Path
 import runpy
 import tempfile
 
-ROOT=Path('/vepfs-mlp2/c20250601/251105016/project/dllm_test')
+ROOT=Path('/project_c20250601/251105016/project/dllm_test')
 API=runpy.run_path(str(ROOT/'scripts/downstream/run_v7_tcr_generation.py'),run_name='_artifact_fixture')
 
 

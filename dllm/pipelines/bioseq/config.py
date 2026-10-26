@@ -6,7 +6,7 @@ from pathlib import Path
 
 
 DEFAULT_PROJECT_ROOT = Path(
-    "/vepfs-mlp2/c20250601/251105016/project/dllm_test"
+    "/project_c20250601/251105016/project/dllm_test"
 )
 DEFAULT_MODEL_WEIGHTS_ROOT = Path("/c20250601/mj/model_weights")
 BIOSEQ_MODEL_WEIGHTS_ROOT_ENV = "BIOSEQ_MODEL_WEIGHTS_ROOT"

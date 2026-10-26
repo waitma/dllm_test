@@ -57,7 +57,7 @@ def unique_index(rows,key='id'):
     return result
 
 
-def load_dataset(path,task,*,split=None,assay=None):
+def load_dataset(path,task,*,split=None,assay=None,include_extra_assays=False):
     if task not in TASKS:raise ValueError(f'Unknown task: {task}')
     if assay and task!='abbibench':raise ValueError('--assay applies only to AbBiBench')
     rows=read_jsonl(path);unique_index(rows)
@@ -88,6 +88,9 @@ def load_dataset(path,task,*,split=None,assay=None):
         if split and row.get('split')!=split:continue
         if assay and row.get('assay')!=assay:continue
         selected.append(row)
+    if task=='abbibench':
+        from downstream.benchmark.ab_antigen.abbibench_scope import select_rows
+        selected=select_rows(selected,assay=assay,include_extra_assays=include_extra_assays)
     if not selected:raise ValueError('No rows match the requested task/split/assay')
     return selected
 
@@ -172,7 +175,9 @@ class PredictionJournal:
         self.rows[row['id']]=row
 
 
-def run_adapter(task,rows,adapter,out_dir,*,model_identity,mode='zero_shot',candidates=20,seed=42):
+def run_adapter(task,rows,adapter,out_dir,*,model_identity,mode='zero_shot',candidates=20,seed=42,legacy_full_chain=False):
+    if task=='chimera' and not legacy_full_chain:
+        raise ValueError('CHIMERA uses chimera_h3; legacy_full_chain=True is only for archived full-chain experiments')
     if not model_identity:raise ValueError('A pinned model identity is required')
     if mode not in ['zero_shot','frozen_probe']:raise ValueError('Unknown prediction mode')
     if task in ['abbibench','chimera'] and mode!='zero_shot':raise ValueError('This track does not use a supervised probe')
@@ -220,10 +225,12 @@ def validate_generated(row):
     if not actual and not row.get('failure_reason'):raise ValueError('Failed generation needs a failure_reason')
 
 
-def evaluate(task,rows,predictions,*,mode='zero_shot',allow_partial=False,candidates=20,seed=42):
+def evaluate(task,rows,predictions,*,mode='zero_shot',allow_partial=False,candidates=20,seed=42,legacy_full_chain=False):
     if task not in TASKS:raise ValueError('Unknown task')
     if mode not in ['zero_shot','frozen_probe']:raise ValueError('Unknown mode')
     if task in ['abbibench','chimera'] and mode!='zero_shot':raise ValueError(f'{task} v1 is zero-shot only')
+    if task=='chimera' and not legacy_full_chain:
+        raise ValueError('CHIMERA uses chimera_h3; legacy_full_chain=True is only for archived full-chain experiments')
     reference=unique_index(rows);predicted=unique_index(predictions)
     requests=generation_inputs(rows,candidates=candidates,seed=seed) if task=='chimera' else prediction_inputs(rows)
     expected={r.id for r in requests};extra=set(predicted)-expected;missing=expected-set(predicted)
@@ -262,6 +269,8 @@ def evaluate(task,rows,predictions,*,mode='zero_shot',allow_partial=False,candid
     if task=='abbibench':
         if mode!='zero_shot':raise ValueError('AbBiBench v1 is zero-shot only')
         report['per_assay']=group_metrics(joined,group_key='assay')
+        from downstream.benchmark.ab_antigen.abbibench_scope import summarize_groups
+        report['benchmark16']=summarize_groups(report['per_assay'])
     else:
         report['fixed_antibody']=group_metrics(joined,group_key='group_ab',classification=task=='binding')
         report['fixed_antigen']=group_metrics(joined,group_key='group_ag',classification=task=='binding')
@@ -285,14 +294,18 @@ def main():
     parser.add_argument('command',choices=['validate','export','evaluate'])
     parser.add_argument('--task',choices=TASKS,required=True);parser.add_argument('--data',type=Path,required=True)
     parser.add_argument('--split',choices=['train','val','test']);parser.add_argument('--assay')
+    parser.add_argument('--include-extra-assays',action='store_true',help='AbBiBench supplementary assays outside the official 16')
     parser.add_argument('--predictions',type=Path);parser.add_argument('--out-dir',type=Path)
     parser.add_argument('--mode',choices=['zero_shot','frozen_probe'],default='zero_shot')
     parser.add_argument('--allow-partial',action='store_true');parser.add_argument('--candidates',type=int,default=20)
     parser.add_argument('--reference-metrics',action='store_true',help='CHIMERA: run ANARCI/reference recovery/diversity/novelty scoring on CPU')
+    parser.add_argument('--legacy-full-chain',action='store_true',help='Explicit archival full-chain CHIMERA interface; not the H3 benchmark')
     parser.add_argument('--seed',type=int,default=42);args=parser.parse_args()
+    if args.task=='chimera' and not args.legacy_full_chain:
+        parser.error('Use chimera_h3 for the official H3 task; --legacy-full-chain is required to inspect archived full-chain runs')
     if args.reference_metrics and (args.task!='chimera' or args.command!='evaluate'):
         parser.error('--reference-metrics requires evaluate --task chimera')
-    rows=load_dataset(args.data,args.task,split=args.split or ('test' if args.task=='chimera' else None),assay=args.assay)
+    rows=load_dataset(args.data,args.task,split=args.split or ('test' if args.task=='chimera' else None),assay=args.assay,include_extra_assays=args.include_extra_assays)
     if args.command=='validate':
         print(json.dumps(dict(task=args.task,rows=len(rows),dataset_sha256=fingerprint(rows),status='valid_no_inference')));return
     if args.out_dir is None:parser.error('--out-dir is required')
@@ -305,7 +318,7 @@ def main():
             for request in inputs:f.write(json.dumps(asdict(request))+'\n')
         save_json(args.out_dir/'export_manifest.json',dict(task=args.task,dataset_sha256=fingerprint(rows),requests=len(inputs),candidates=args.candidates,seed=args.seed));return
     if args.predictions is None:parser.error('--predictions is required')
-    report=evaluate(args.task,rows,read_jsonl(args.predictions),mode=args.mode,allow_partial=args.allow_partial,candidates=args.candidates,seed=args.seed)
+    report=evaluate(args.task,rows,read_jsonl(args.predictions),mode=args.mode,allow_partial=args.allow_partial,candidates=args.candidates,seed=args.seed,legacy_full_chain=args.legacy_full_chain)
     destination=args.out_dir/'interface_metrics.json'
     if destination.exists() and json.loads(destination.read_text())!=report:raise FileExistsError('Refusing to replace different metrics')
     save_json(destination,report)

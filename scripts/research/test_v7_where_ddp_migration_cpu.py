@@ -1,7 +1,7 @@
 """Test native HF old-model checkpoint recovery into the where model on CPU.
 
 Activate conda pllm, hide CUDA and use the pinned protenix_abtcr Python:
-python -B /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/research/test_v7_where_ddp_migration_cpu.py
+python -B /project_c20250601/251105016/project/dllm_test/scripts/research/test_v7_where_ddp_migration_cpu.py
 Uses fabricated integer inputs and tiny models; all test checkpoints are removed.
 This checks native single-process recovery, not actual world8 GPU admission.
 """
@@ -11,7 +11,7 @@ from tempfile import TemporaryDirectory
 
 import test_v7_fsdp as original
 
-ROOT = Path('/vepfs-mlp2/c20250601/251105016/project/dllm_test')
+ROOT = Path('/project_c20250601/251105016/project/dllm_test')
 NEW = ROOT/'output/v7_formal_eight_gpu_20261002/where_continuation_20261006/source_snapshot_v1'
 replacement = original.load('dllm.pipelines.immune_llada.research_refined._where_ddp_new_model',
                             NEW/'dllm/pipelines/immune_llada/research_refined/model.py')

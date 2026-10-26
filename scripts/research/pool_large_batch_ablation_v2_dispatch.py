@@ -4,18 +4,18 @@ Activate conda pllm. The future pool calls main(original_argv) before ML imports
 For a read-only check use prepare(original_argv). This module never publishes
 registry/queue entries or creates plans. It reuses the SHA-bound private v1
 catalog/source/runner implementation with only capacity protocol and fallback
-replaced. Repository: /vepfs-mlp2/c20250601/251105016/project/dllm_test.
+replaced. Repository: /project_c20250601/251105016/project/dllm_test.
 """
 import hashlib
 from pathlib import Path
 import runpy
 
-ROOT = Path('/vepfs-mlp2/c20250601/251105016/project/dllm_test')
+ROOT = Path('/project_c20250601/251105016/project/dllm_test')
 OWN = ROOT/'output/v7_large_batch_ablation_20261002'
 BASE = OWN/'launcher_source_v1/pool_large_batch_ablation_dispatch.py'
-BASE_SHA = 'dc3408ff7a8e74b7944b5ceb17ca18bdaf0baf9a226d270c9cb12fe99058aa0f'
+BASE_SHA = 'a99a2b5ba6f247e8e3ac903240fd604f59b05bd922f5d7b2be36534821f1ed67'
 PREVIOUS = OWN/'capacity_launcher_source_v2/scripts/research/pool_large_batch_capacity_v2_dispatch.py'
-PREVIOUS_SHA = '998dc1c8f6debbaf1b811a0bb30bebbdd2b450749653f6c92ac5b7f6b02a44d6'
+PREVIOUS_SHA = '73cda09463f9cba4df22ec2f2bf42170f9bdea51d81d838c0ec27fff7caf9827'
 CAPACITY_JOB = '1790992416352344471_p05_v7_capacity_v2_a4854542'
 ROOT_REVIEW = OWN/'capacity_v2_root_terminal_review.json'
 ROOT_REVIEW_SHA = 'b6ae90637728f22bef378e71d0d2c943e50ee74e4ad52165b1f0a66d95970c5b'

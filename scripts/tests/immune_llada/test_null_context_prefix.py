@@ -22,7 +22,7 @@ from dllm.pipelines.immune_llada.data.records import BioSeqChain, BioSeqRecord
 _UNCONDITIONAL_SOURCES = ("oas", "ots", "tcr_repertoire")
 _CONDITIONED_SOURCES = ("asd_antibody", "trait", "tcr_native", "tcr_papers")
 _PREPARED_ROOT = Path(
-    "/vepfs-mlp2/c20250601/251105016/project/dllm_test/data/prepared/immune_v4_beta_relation"
+    "/project_c20250601/251105016/project/dllm_test/data/prepared/immune_v4_beta_relation"
 )
 _CONTEXT_ROLES = frozenset({"antigen", "peptide", "epitope", "mhc", "pmhc", "hla", "protein_a"})
 # Matches preprocessing/filters.py budget.max_length. Duplicated here because

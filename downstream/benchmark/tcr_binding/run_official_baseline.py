@@ -16,8 +16,8 @@ labels it ``论文值，未本地复现``.
 
 Example::
 
-    /vepfs-mlp2/c20250601/251105016/conda/envs/protenix_abtcr/bin/python \
-      /vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/tcr_binding/run_official_baseline.py \
+    /project_c20250601/251105016/conda/envs/protenix_abtcr/bin/python \
+      /project_c20250601/251105016/project/dllm_test/downstream/benchmark/tcr_binding/run_official_baseline.py \
       --name teinet --tag teinet_small --track cdr3b --neg-source AS
 """
 

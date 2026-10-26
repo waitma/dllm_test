@@ -3,7 +3,7 @@
 Generate the local inventory with::
 
     conda run -n pllm python \
-      /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/data/build_immune_receptor_v2.py inventory
+      /project_c20250601/251105016/project/dllm_test/scripts/data/build_immune_receptor_v2.py inventory
 """
 
 from __future__ import annotations
@@ -19,7 +19,7 @@ from typing import Iterable
 from .io import sha256_file
 
 
-PROJECT_ROOT = Path("/vepfs-mlp2/c20250601/251105016/project/dllm_test")
+PROJECT_ROOT = Path("/project_c20250601/251105016/project/dllm_test")
 
 
 @dataclass(frozen=True)

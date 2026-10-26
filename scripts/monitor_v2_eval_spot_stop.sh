@@ -4,7 +4,7 @@
 # 停旧 32 条看护：bash scripts/monitor_v2_eval_spot_stop.sh 20260927
 set -uo pipefail
 
-REPO=/vepfs-mlp2/c20250601/251105016/project/dllm_test
+REPO=/project_c20250601/251105016/project/dllm_test
 EVAL_DATE="${1:-20260928}"
 MON_DIR="$REPO/output/downstream_generation/v2_immune_v6_eval_${EVAL_DATE}/_monitor"
 PID_FILE="$MON_DIR/monitor.pid"

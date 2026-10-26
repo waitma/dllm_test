@@ -15,10 +15,10 @@ if __name__ == '__main__':
     from pathlib import Path as _AblPath
     _abl_selected = [_abl_sys.argv[i+1] for i, value in enumerate(_abl_sys.argv[:-1]) if value == '--variant']
     if len(_abl_selected) == 1 and _abl_selected[0] in ('p04_v7_f010_seed43', 'p04_v7_f101_seed43', 'p04_v7_f110_seed42', 'p04_v7_f110_seed43', 'p04_v7_f111_seed42', 'p04_v7_f111_seed43', 'p04_v7_cv_segment_global_seed42', 'p04_v7_cv_segment_global_seed43', 'p04_v7_cv_late_fusion_seed42', 'p04_v7_cv_late_fusion_seed43', 'p04_v7_fixed_gate_control_seed42', 'p04_v7_fixed_gate_control_seed43'):
-        _abl_entry = _AblPath('/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/v7_local_ablation_20261005/post_generation_pool_v2/source_v1/pool_metrics_only_ablation_v2_dispatch.py')
+        _abl_entry = _AblPath('/project_c20250601/251105016/project/dllm_test/output/v7_local_ablation_20261005/post_generation_pool_v2/source_v1/pool_metrics_only_ablation_v2_dispatch.py')
         if _abl_hashlib.sha256(_abl_entry.read_bytes()).hexdigest() != 'c40bfbb48541dc11cfe35baaa53b02d4f4fdc07dd4257e807aa8c7a1155dca9d':
             raise RuntimeError('Published post-generation ablation entry changed')
-        _abl_receipt = _AblPath('/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/v7_local_ablation_20261005/post_generation_pool_v2/enqueue_receipt.json')
+        _abl_receipt = _AblPath('/project_c20250601/251105016/project/dllm_test/output/v7_local_ablation_20261005/post_generation_pool_v2/enqueue_receipt.json')
         _abl_deadline = _abl_time.monotonic()+60
         while True:
             try:
@@ -26,15 +26,15 @@ if __name__ == '__main__':
             except FileNotFoundError:
                 _abl_batch = {}
             if _abl_batch.get('state') == 'enqueued':
-                if _abl_batch.get('catalog') != {'path': '/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/v7_local_ablation_20261005/post_generation_pool_v2/catalog.json', 'sha256': '50040676c11ab06acb90f65a6cef2090510ff5907ba8fadcc0769940f0fa2ed8'}:
+                if _abl_batch.get('catalog') != {'path': '/project_c20250601/251105016/project/dllm_test/output/v7_local_ablation_20261005/post_generation_pool_v2/catalog.json', 'sha256': '50040676c11ab06acb90f65a6cef2090510ff5907ba8fadcc0769940f0fa2ed8'}:
                     raise RuntimeError('Post-generation batch binding changed')
                 break
             if _abl_time.monotonic() >= _abl_deadline:
                 raise RuntimeError('Post-generation publication did not finish; no automatic retry')
             _abl_time.sleep(0.1)
         raise SystemExit(_abl_runpy.run_path(str(_abl_entry))['main'](_abl_sys.argv[1:],
-            catalog_path=_AblPath('/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/v7_local_ablation_20261005/post_generation_pool_v2/catalog.json'), catalog_sha256='50040676c11ab06acb90f65a6cef2090510ff5907ba8fadcc0769940f0fa2ed8',
-            ledger_path=_AblPath('/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/v7_local_ablation_20261005/guarded_dispatch_v1/claims_post_generation_pool_v2.json'), ledger_sha256='8aea0b22d8dba21b06d2b31ce8c99cadad41efb70617ec74704f4c97c8a476ec'))
+            catalog_path=_AblPath('/project_c20250601/251105016/project/dllm_test/output/v7_local_ablation_20261005/post_generation_pool_v2/catalog.json'), catalog_sha256='50040676c11ab06acb90f65a6cef2090510ff5907ba8fadcc0769940f0fa2ed8',
+            ledger_path=_AblPath('/project_c20250601/251105016/project/dllm_test/output/v7_local_ablation_20261005/guarded_dispatch_v1/claims_post_generation_pool_v2.json'), ledger_sha256='8aea0b22d8dba21b06d2b31ce8c99cadad41efb70617ec74704f4c97c8a476ec'))
 
 # Post-training CDR entry; no model or CUDA imports before dispatch.
 if __name__ == '__main__':
@@ -44,7 +44,7 @@ if __name__ == '__main__':
     from pathlib import Path as _CdrPath
     _cdr_selected = [_cdr_sys.argv[i+1] for i, value in enumerate(_cdr_sys.argv[:-1]) if value == '--variant']
     if len(_cdr_selected) == 1 and _cdr_selected[0] in ('p07_v7_cdr_kong_cdrh1', 'p07_v7_cdr_kong_cdrh2', 'p07_v7_cdr_kong_cdrh3', 'p07_v7_cdr_sab23_cdrl1', 'p07_v7_cdr_sab23_cdrl2', 'p07_v7_cdr_sab23_cdrl3', 'p07_v7_cdr_sab23_cdrh1', 'p07_v7_cdr_sab23_cdrh2', 'p07_v7_cdr_sab23_cdrh3'):
-        _cdr_entry = _CdrPath('/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/v7_formal_eight_gpu_20261002/epoch2_continuation_20261006/recovery_v1/generation_pool_v1/source_v1/pool_v7_generation_dispatch.py')
+        _cdr_entry = _CdrPath('/project_c20250601/251105016/project/dllm_test/output/v7_formal_eight_gpu_20261002/epoch2_continuation_20261006/recovery_v1/generation_pool_v1/source_v1/pool_v7_generation_dispatch.py')
         if _cdr_hashlib.sha256(_cdr_entry.read_bytes()).hexdigest() != '51eb045fd69b876a125990e2893613fbdbe44a3b3260f665affd36e48adaf703':
             raise RuntimeError('Published CDR evaluator changed')
         raise SystemExit(_cdr_runpy.run_path(str(_cdr_entry))['main'](_cdr_sys.argv[1:]))
@@ -53,12 +53,12 @@ if __name__ == '__main__':
     import runpy as _route_runpy
     from pathlib import Path as _RoutePath
     import hashlib as _route_hashlib
-    _route_observer = _RoutePath('/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/v7_large_batch_ablation_20261002/pool_parent_source_v1/pool_parent_runtime_observation.py')
-    if _route_hashlib.sha256(_route_observer.read_bytes()).hexdigest() != '8d13c32c6c8e0b6ee65df4573a14e784947e98602e50c7ef10cf2459393e79c8':
+    _route_observer = _RoutePath('/project_c20250601/251105016/project/dllm_test/output/v7_large_batch_ablation_20261002/pool_parent_source_v1/pool_parent_runtime_observation.py')
+    if _route_hashlib.sha256(_route_observer.read_bytes()).hexdigest() != 'f356a9d8fcf9e369a062514267c70c17651088c62334a1a9dac716f242b3a2c8':
         raise RuntimeError('Frozen pool parent observer changed')
     _route_runpy.run_path(str(_route_observer))['observe']()
-    _route_dispatcher = _RoutePath('/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/v7_formal_eight_gpu_20261002/entry_20261005/pool_formal_20261005_dispatch.py')
-    if _route_hashlib.sha256(_route_dispatcher.read_bytes()).hexdigest() != '87002bb6ba57f837d72943a3816c0254e7fca3224a7dde46052b17af7e6cf492':
+    _route_dispatcher = _RoutePath('/project_c20250601/251105016/project/dllm_test/output/v7_formal_eight_gpu_20261002/entry_20261005/pool_formal_20261005_dispatch.py')
+    if _route_hashlib.sha256(_route_dispatcher.read_bytes()).hexdigest() != '9054333fb805a56dd845a3a0b45a0da8cfe3681d6fd66f9052f932ee078fa5dc':
         raise RuntimeError('Frozen large-batch-v2 entry changed')
     raise SystemExit(_route_runpy.run_path(str(_route_dispatcher))['main']())
 

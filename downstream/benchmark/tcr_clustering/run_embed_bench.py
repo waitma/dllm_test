@@ -1,18 +1,20 @@
 #!/usr/bin/env python
 """T2 second basis -- embedding -> clustering (ARI / NMI / Purity, K sweep).
 
-Reproduces the *A comprehensive benchmarking for evaluating TCR embeddings*
-(Brief Bioinformatics 2025, ``deepomicslab/TCREmbedding``) clustering protocol on
-its fixed labelled dataset (``data/tcr_clustering_embed/tcrs.csv``, 9,033 unique
-CDR3beta / 25 epitopes):
+Local protocol using the dataset from *A comprehensive benchmarking for
+evaluating TCR embeddings* (Brief Bioinformatics 2025,
+``deepomicslab/TCREmbedding``): 9,033 unique CDR3beta / 25 epitopes.
 
     embed CDR3beta -> L2-normalise -> cluster with a K sweep -> ARI / NMI / Purity
 
 The paper sweeps the target cluster count K over {10, 15, ..., 100} (step 5) "to
 alleviate the influence of the target number of clusters" and reports ARI / NMI /
-Purity. We do the same, with K-means as the primary algorithm (fast, matches the
-paper's k-means row) and agglomerative (hierarchical) as a secondary check, and
-report the mean and best over the K sweep.
+Purity. Here the historical ``kmeans`` key means MiniBatchKMeans with L2 input;
+``hierarchical`` means PCA-50 + Ward. These differ from the paper's full KMeans
+and complete linkage. Mean-over-K is the reported metric; best-over-K is a
+test-label diagnostic. This entry point does not reproduce the paper protocol.
+For the separate full-KMeans reconstruction use
+``scripts/downstream/run_t2b_paper_alignment.py`` from the project root.
 
 This is OUR unified evaluation shell for models/embeddings that have no official
 clustering output (our BioSeq model + generic reference embeddings ESM2 / k-mer).
@@ -207,6 +209,16 @@ def run(spec, tag, algos, ks, seed):
                "n_units": int(len(df)), "n_epitopes": int(n_ep),
                "k_sweep": ks, "algos": algos, "seed": seed,
                "load_info": load_info}
+    summary["protocol_alignment"] = "local protocol; not verified paper reproduction"
+    summary["preprocessing"] = "float32, row L2 normalization with epsilon=1e-8"
+    summary["algorithm_details"] = {
+        algo: ({"estimator": "sklearn.cluster.MiniBatchKMeans", "n_init": 3,
+                "batch_size": 2048, "random_state": seed}
+               if algo == "kmeans" else
+               {"estimator": "scipy.cluster.hierarchy.linkage", "method": "ward",
+                "pca_components_if_dim_gt_50": 50, "random_state": seed})
+        for algo in algos
+    }
     for algo in algos:
         sub = curve[curve["algo"] == algo]
         for met in ("ari", "nmi", "purity"):
@@ -234,10 +246,11 @@ def main():
                          "bioseq:/abs/best.pt / emb:NAME:/abs/x.npy")
     ap.add_argument("--tag", default="", help="output subfolder / label")
     ap.add_argument("--algos", default="kmeans",
-                    help="comma list of {kmeans,hierarchical}; hierarchical uses PCA-50")
+                    help="historical keys: kmeans=MiniBatchKMeans; hierarchical=PCA-50+Ward")
     ap.add_argument("--ks", default="", help="comma list of K; default 10..100 step 5")
     ap.add_argument("--seed", type=int, default=0)
     args = ap.parse_args()
+    ap.error('T2B KMeans was removed from evaluation scope on 2026-10-14; historical artifacts are retained')
 
     algos = [a.strip() for a in args.algos.split(",") if a.strip()]
     ks = [int(k) for k in args.ks.split(",")] if args.ks else K_SWEEP

@@ -9,12 +9,12 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-_SKILL = Path("/vepfs-mlp2/c20250601/251105016/project/.cursor/skills/architecture-diagram/scripts")
+_SKILL = Path("/project_c20250601/251105016/project/.cursor/skills/architecture-diagram/scripts")
 sys.path.insert(0, str(_SKILL))
 
 from gv_diagram import Graph, PALETTE, chain_parallel_block, leaf, render, stage  # noqa: E402
 
-OUT = "/vepfs-mlp2/c20250601/251105016/project/dllm_test/llada_fusion_architecture"
+OUT = "/project_c20250601/251105016/project/dllm_test/llada_fusion_architecture"
 
 g = Graph(
     title="LLaDA-8B &#215; ESMC fusion &#8212; training architecture (examples/llada)",

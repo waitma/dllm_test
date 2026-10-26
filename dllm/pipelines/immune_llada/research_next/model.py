@@ -2,6 +2,9 @@
 
 Run: python -m pytest scripts/tests/immune_llada/test_research_next.py -q
 These adaptations are not full reproductions of the cited image/language models.
+
+Historical ablation implementation. The current fixed-chain model and its block
+are defined together in immune_llada/fixed_chain/model.py; start reading there.
 """
 from dataclasses import asdict
 from contextlib import nullcontext

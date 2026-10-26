@@ -3,7 +3,7 @@
 Activate conda pllm. A future reviewed dispatcher may call
 main(original_pool_argv, ticket_catalog_sha256=<immutable catalog SHA>).
 prepare(argv, ticket_catalog_sha256=...) is read-only. The fixed catalog is
-/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/
+/project_c20250601/251105016/project/dllm_test/output/
 v7_large_batch_ablation_20261002/ablation_resume_tickets.json; it is not created
 here. No standalone invocation can supply an unbound catalog override.
 Actual execution requires an explicit ticket, terminal original job, same-cell
@@ -25,13 +25,13 @@ import sys
 import time
 import uuid
 
-ROOT = Path('/vepfs-mlp2/c20250601/251105016/project/dllm_test')
+ROOT = Path('/project_c20250601/251105016/project/dllm_test')
 OWN = ROOT/'output/v7_large_batch_ablation_20261002'
 POOL = ROOT/'output/immune_research_pool_c20250601_20260930'
 TICKETS = OWN/'ablation_resume_tickets.json'
 LOCKS = OWN/'ablation_resume_locks'
 BASE = OWN/'launcher_source_v2/scripts/research/pool_large_batch_ablation_v2_dispatch.py'
-BASE_SHA = 'b088ba3c19f58060a05393411cdf57a3abe8ecd7ba91508add62142896476cc3'
+BASE_SHA = '7cf225f5e2a4db198a093ccba9baf1d5bd81e7db1b1e4768504a5228fcced4f5'
 CATALOG = OWN/'jobs.json'
 CATALOG_SHA = '987394f0e0a539a0ad5e0057aa0952474eecb50f374e8ea1410f9f3168ea746d'
 PLAN = OWN/'batch_selection_v1.json'

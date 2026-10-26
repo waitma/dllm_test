@@ -20,7 +20,7 @@ import sys
 import time
 from pathlib import Path
 
-PROJECT_ROOT = Path("/vepfs-mlp2/c20250601/251105016/project/dllm_test")
+PROJECT_ROOT = Path("/project_c20250601/251105016/project/dllm_test")
 BENCH = PROJECT_ROOT / "downstream" / "benchmark"
 for p in (str(PROJECT_ROOT), str(BENCH)):
     if p not in sys.path:

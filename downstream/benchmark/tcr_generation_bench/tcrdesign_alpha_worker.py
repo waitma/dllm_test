@@ -3,10 +3,10 @@
 
 Direct smoke invocation (normally called by ``run_public_beta.py``)::
 
-    /vepfs-mlp2/c20250601/251105016/conda/envs/tcrdesign/bin/python \
-      /vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/tcr_generation_bench/tcrdesign_alpha_worker.py \
+    /project_c20250601/251105016/conda/envs/tcrdesign/bin/python \
+      /project_c20250601/251105016/project/dllm_test/downstream/benchmark/tcr_generation_bench/tcrdesign_alpha_worker.py \
       --input /absolute/generated_betas.csv --output /absolute/generated_alphas.csv \
-      --tcrdesign-repo /vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/baselines/TcrDesign \
+      --tcrdesign-repo /project_c20250601/251105016/project/dllm_test/downstream/benchmark/baselines/TcrDesign \
       --alpha-per-beta 10 --device cuda
 
 The model architecture, token construction, checkpoint, temperature, official

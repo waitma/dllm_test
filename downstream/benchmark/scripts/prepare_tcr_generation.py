@@ -27,7 +27,7 @@ from pathlib import Path
 import pandas as pd
 
 BENCH = Path(__file__).resolve().parents[1]
-OTS = Path("/vepfs-mlp2/c20250601/251105016/project/dllm_test/data/ots_paired_clean/final")
+OTS = Path("/project_c20250601/251105016/project/dllm_test/data/ots_paired_clean/final")
 OUT = BENCH / "data" / "tcr_generation"
 
 USECOLS = ["chain1_cdr3", "chain2_cdr3", "chain1_anarci_type", "chain2_anarci_type"]

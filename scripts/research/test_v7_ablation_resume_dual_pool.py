@@ -1,6 +1,6 @@
 """Run only the new dual-pool/retained-lock control after conda pllm.
 
-CUDA_VISIBLE_DEVICES='' python -B /vepfs-mlp2/c20250601/251105016/project/
+CUDA_VISIBLE_DEVICES='' python -B /project_c20250601/251105016/project/
 dllm_test/scripts/research/test_v7_ablation_resume_dual_pool.py
 Reuses fixture constructors, not the previous five-control main. All pools and
 checkpoint bytes are temporary; Popen is mocked and no actual process starts.
@@ -20,7 +20,7 @@ import time
 import traceback
 from unittest.mock import patch
 
-ROOT = Path('/vepfs-mlp2/c20250601/251105016/project/dllm_test')
+ROOT = Path('/project_c20250601/251105016/project/dllm_test')
 SOURCE = ROOT/'scripts/research/pool_v7_ablation_resume.py'
 FIXTURE = ROOT/'scripts/research/test_pool_v7_ablation_resume.py'
 OUT = ROOT/'output/v7_ablation_resume_dual_pool_controls_20261003'

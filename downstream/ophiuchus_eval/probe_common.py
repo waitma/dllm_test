@@ -16,7 +16,7 @@ from downstream.embeddings import OphiuchusEmbeddingConfig, OphiuchusEmbeddingMo
 from dllm.pipelines.bioseq import Esm2ProteinTokenizer, ophiuchus_ab_checkpoint_path
 
 DEFAULT_CKPT = Path(
-    "/vepfs-mlp2/c20250601/251105016/project/dllm_test/model_weights/"
+    "/project_c20250601/251105016/project/dllm_test/model_weights/"
     "ophiuchus_ab/Ophiuchus-Ab/Ophiuchus-Ab.ckpt"
 )
 

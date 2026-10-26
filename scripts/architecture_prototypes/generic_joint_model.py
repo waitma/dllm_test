@@ -1,7 +1,7 @@
 """Eight shared-trunk models for artificial integer-object joint tasks.
 
 Activate conda pllm; run the artificial CPU checks at:
-/vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/tests/immune_llada/test_generic_joint_prototype.py
+/project_c20250601/251105016/project/dllm_test/scripts/tests/immune_llada/test_generic_joint_prototype.py
 This module imports no receptor model, real corpus, pretrained weights, or trainer.
 The optional EMA network is training-only; both inference tasks share one trunk.
 """

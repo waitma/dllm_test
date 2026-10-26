@@ -29,7 +29,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 
-ROOT = Path("/vepfs-mlp2/c20250601/251105016/project/dllm_test")
+ROOT = Path("/project_c20250601/251105016/project/dllm_test")
 P6 = ROOT / "downstream/benchmark/outputs/tcr_representation_paper6"
 T2 = ROOT / "downstream/benchmark/outputs/tcr_clustering_embed"
 OUT = ROOT / "debug/figures/readout_effect_official.png"

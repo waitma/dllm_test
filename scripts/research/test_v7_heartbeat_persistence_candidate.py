@@ -1,7 +1,7 @@
 """Test the unbound heartbeat candidate using two groups of eight CPU processes.
 
 Activate conda pllm, then run once:
-CUDA_VISIBLE_DEVICES='' python -I -B /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/research/test_v7_heartbeat_persistence_candidate.py
+CUDA_VISIBLE_DEVICES='' python -I -B /project_c20250601/251105016/project/dllm_test/scripts/research/test_v7_heartbeat_persistence_candidate.py
 Only artificial metadata is used. No model, dataset, GPU or job is accessed.
 Evidence is retained and this script removes only its own temporary fixtures.
 """
@@ -22,7 +22,7 @@ import tempfile
 import time
 import traceback
 
-ROOT = Path('/vepfs-mlp2/c20250601/251105016/project/dllm_test')
+ROOT = Path('/project_c20250601/251105016/project/dllm_test')
 BASE = ROOT / 'output/generic_eight_worker_group_integration_20261002'
 OWN = ROOT / 'output/v7_formal_eight_gpu_20261002/epoch2_continuation_20261006/coordinator_candidate_v1'
 SELF = Path(__file__).resolve()
@@ -170,7 +170,7 @@ def child(mode, directory, rank):
 
 
 def run():
-    require(sys.executable == '/vepfs-mlp2/c20250601/251105016/conda/envs/pllm/bin/python',
+    require(sys.executable == '/project_c20250601/251105016/conda/envs/pllm/bin/python',
             'Activate pllm first')
     _, helper = load('candidate')
     read, write, wait = helper['read'], helper['write'], helper['wait_for']

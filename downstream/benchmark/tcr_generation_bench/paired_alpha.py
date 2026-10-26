@@ -2,8 +2,8 @@
 
 Run the smoke path with::
 
-    /vepfs-mlp2/c20250601/251105016/conda/envs/pllm/bin/python \
-      /vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/tcr_generation_bench/run_public_beta.py \
+    /project_c20250601/251105016/conda/envs/pllm/bin/python \
+      /project_c20250601/251105016/project/dllm_test/downstream/benchmark/tcr_generation_bench/run_public_beta.py \
       generate-tcrdesign-alpha --targets rvr --beta-top-k 1 --alpha-per-beta 10
 
 This module deliberately contains no custom alpha-chain metric.  The released

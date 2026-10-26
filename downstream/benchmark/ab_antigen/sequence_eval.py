@@ -187,18 +187,24 @@ def main():
     p=argparse.ArgumentParser();p.add_argument('--task',choices=['binding','spr','abbibench','chimera'],required=True)
     p.add_argument('--out-dir',type=Path,required=True);p.add_argument('--checkpoint',type=Path,default=CHECKPOINT)
     p.add_argument('--limit',type=int);p.add_argument('--assay');p.add_argument('--pll-batch-size',type=int,default=2)
+    p.add_argument('--include-extra-assays',action='store_true',help='Explicit supplementary AbBiBench evaluation')
     p.add_argument('--preflight',action='store_true');args=p.parse_args()
+    if args.task=='chimera':
+        p.error('CHIMERA full-VH/VL generation is retired. Use run_v5_suite_task.py --task ag-chimera for epitope_group H3; prepare data with python -m downstream.benchmark.ab_antigen.chimera_h3 prepare')
     config=json.loads((args.checkpoint/'fusion_config.json').read_text())
     assert config['residue_cond_mode']=='token' and config['condition_hidden_size']==0
     manifest=json.loads((args.checkpoint/'eval_snapshot_manifest.json').read_text())
     assert manifest['global_step']==150000 and sha(args.checkpoint/'model.safetensors')==EXPECTED_SHA
     source=DATA/f'{args.task}.jsonl';rows=read_rows(source)
-    if args.assay:rows=[r for r in rows if r.get('assay')==args.assay]
+    if args.task=='abbibench':
+        from downstream.benchmark.ab_antigen.abbibench_scope import select_rows
+        rows=select_rows(rows,assay=args.assay,include_extra_assays=args.include_extra_assays)
+    elif args.assay:rows=[r for r in rows if r.get('assay')==args.assay]
     if args.task=='chimera':rows=[r for r in rows if r['split']=='test']
     if args.limit:rows=rows[:args.limit]
     if not rows:raise ValueError('No eligible rows')
     args.out_dir.mkdir(parents=True,exist_ok=True)
-    provenance=dict(protocol='ab_ag_sequence_v1',task=args.task,assay=args.assay,limit=args.limit,
+    provenance=dict(protocol='ab_ag_sequence_v2_raw_rows',task=args.task,assay=args.assay,limit=args.limit,include_extra_assays=args.include_extra_assays,
         input_sha256=sha(source),checkpoint_sha256=EXPECTED_SHA,step=150000,max_length=MAX_LENGTH,
         checkpoint_config_sha256=sha(args.checkpoint/'fusion_config.json'),tokenizer_sha256=sha(args.checkpoint/'tokenizer.json'),
         source_sha256={str(p.relative_to(ROOT)):sha(p) for p in [Path(__file__),Path(__file__).with_name('sequence_data.py'),Path(__file__).with_name('sequence_metrics.py'),ROOT/'examples/llada/protein_fusion_model.py',ROOT/'examples/llada/load_fusion_checkpoint.py',ROOT/'dllm/pipelines/immune_llada/data/grammar.py']},
@@ -251,7 +257,10 @@ def main():
             scored.append({**r,'score':saved['score'],'features':saved['features']})
             if i%10==0:print('scored',i+1,len(rows),flush=True)
     metrics={'status':'complete','scope':provenance['scope'],'n':len(scored)}
-    if args.task=='abbibench':metrics['per_assay']=group_metrics(scored,group_key='assay')
+    if args.task=='abbibench':
+        from downstream.benchmark.ab_antigen.abbibench_scope import summarize_groups
+        metrics['per_assay']=group_metrics(scored,group_key='assay')
+        metrics['benchmark16']=summarize_groups(metrics['per_assay'])
     else:
         for row in scored:
             context='|'+row['source_doi']+'|'+row['assay'] if args.task=='spr' else ''

@@ -1,6 +1,6 @@
 """Five new continuation controls; activate conda pllm before running.
 
-CUDA_VISIBLE_DEVICES='' python -B /vepfs-mlp2/c20250601/251105016/project/
+CUDA_VISIBLE_DEVICES='' python -B /project_c20250601/251105016/project/
 dllm_test/scripts/research/test_pool_v7_ablation_resume.py
 Only artificial TemporaryDirectory checkpoint bytes are hashed, never loaded.
 The actual frozen stdlib prepare runs once with a temporary pool namespace;
@@ -22,7 +22,7 @@ import time
 import traceback
 from unittest.mock import patch
 
-ROOT = Path('/vepfs-mlp2/c20250601/251105016/project/dllm_test')
+ROOT = Path('/project_c20250601/251105016/project/dllm_test')
 SOURCE = ROOT/'scripts/research/pool_v7_ablation_resume.py'
 OUT = ROOT/'output/v7_ablation_resume_controls_20261003'
 

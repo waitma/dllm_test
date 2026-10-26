@@ -1,7 +1,7 @@
 """Check post-generation publication without publishing or training real jobs.
 
 Activate conda pllm, then run:
-python -B /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/research/test_publish_v7_post_generation_ablation.py
+python -B /project_c20250601/251105016/project/dllm_test/scripts/research/test_publish_v7_post_generation_ablation.py
 Tests read actual preparation metadata and use disposable artificial stdlib
 children for the publication/lock boundary. No sequences, weights or GPU calls.
 """
@@ -20,7 +20,7 @@ import unittest
 from unittest.mock import patch
 
 
-ROOT = Path('/vepfs-mlp2/c20250601/251105016/project/dllm_test')
+ROOT = Path('/project_c20250601/251105016/project/dllm_test')
 BASE = ROOT/'output/v7_local_ablation_20261005/post_generation_pool_v1'
 spec = importlib.util.spec_from_file_location('frozen_post_generation_publisher',
     BASE/'source_v1/publish_v7_post_generation_ablation.py')

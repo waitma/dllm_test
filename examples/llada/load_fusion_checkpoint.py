@@ -21,11 +21,11 @@ import torch
 
 logger = logging.getLogger(__name__)
 
-PROJECT_ROOT = Path("/vepfs-mlp2/c20250601/251105016/project/dllm_test")
+PROJECT_ROOT = Path("/project_c20250601/251105016/project/dllm_test")
 DEFAULT_ESMC = PROJECT_ROOT / "model_weights" / "esmc" / "ESMC-300M"
 DEFAULT_LLADA_ID = "GSAI-ML/LLaDA-8B-Base"
 DEFAULT_LLADA_SNAP = Path(
-    "/vepfs-mlp2/c20250601/251105016/conda/cache/huggingface/hub/"
+    "/project_c20250601/251105016/conda/cache/huggingface/hub/"
     "models--GSAI-ML--LLaDA-8B-Base/snapshots/"
     "0f2787f2d87eac5eed8a087d5ecd24277e6255b2"
 )

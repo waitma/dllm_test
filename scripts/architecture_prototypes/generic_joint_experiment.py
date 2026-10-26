@@ -3,7 +3,7 @@
 Activate conda pllm, then run from the project directory:
 USE_TF=0 CUDA_VISIBLE_DEVICES='' python -m scripts.architecture_prototypes.generic_joint_experiment
 --variant g00_shared_joint --cpu-steps 3 --output-dir
-/vepfs-mlp2/c20250601/251105016/project/dllm_test/output/generic_cv_joint_cpu_example
+/project_c20250601/251105016/project/dllm_test/output/generic_cv_joint_cpu_example
 This bounded CPU entry accepts no external data, checkpoint, weights, or GPU flag.
 It writes small evidence only; it is not the planned 500-step method comparison.
 """

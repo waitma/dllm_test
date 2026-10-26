@@ -515,7 +515,7 @@ def self_test():
     import tempfile
     import unittest
     from unittest.mock import patch
-    root = Path('/vepfs-mlp2/c20250601/251105016/project/dllm_test')
+    root = Path('/project_c20250601/251105016/project/dllm_test')
     transport_path = root/'output/v7_formal_eight_gpu_20261002/source_snapshot_v2/scripts/research/formal_pool_transport.py'
     transport = runpy.run_path(str(transport_path), run_name='_artificial_slot_transport')
     coordinator = transport['dependencies']()[0]

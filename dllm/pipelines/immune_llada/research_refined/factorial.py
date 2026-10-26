@@ -1,7 +1,7 @@
 """Independent G/S/L combinations, sharing the existing attention implementation.
 
 Run the CPU integer-input contracts after activating pllm:
-  CUDA_VISIBLE_DEVICES='' USE_TF=0 python -B -m pytest -q /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/tests/immune_llada/test_factorial_architecture.py
+  CUDA_VISIBLE_DEVICES='' USE_TF=0 python -B -m pytest -q /project_c20250601/251105016/project/dllm_test/scripts/tests/immune_llada/test_factorial_architecture.py
 
 The three digits in fGSL select dynamic head gating, fixed residual scaling,
 and alternating segment-local/global attention. These are experimental

@@ -27,7 +27,7 @@ import os
 
 import cairosvg
 
-FIGDIR = "/vepfs-mlp2/c20250601/251105016/project/dllm_test/paper/figures"
+FIGDIR = "/project_c20250601/251105016/project/dllm_test/paper/figures"
 
 # --------------------------------------------------------- Cool SCI palette
 # Inspired by Paul Tol muted + Nature-style cool categorical schemes

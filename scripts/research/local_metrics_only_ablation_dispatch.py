@@ -51,11 +51,11 @@ import socket
 import sys
 
 
-ROOT = Path('/vepfs-mlp2/c20250601/251105016/project/dllm_test')
+ROOT = Path('/project_c20250601/251105016/project/dllm_test')
 POOL_ADAPTER = ROOT / 'scripts/research/pool_metrics_only_ablation_dispatch.py'
-POOL_ADAPTER_SHA = 'a9baf1390cdeeba315c7984c8602599e29033a356fd7649b82dcb206899a5fe8'
+POOL_ADAPTER_SHA = '309f50b2fdbd0a05a6b367217fdb62426539e7cdcb505a688f45ddfef99776a5'
 RUNNER = ROOT / 'scripts/run_in_tmux.sh'
-RUNNER_SHA = '33dcb80073774e788dfdebc48d71b8de17b37d09fc1d7676433b0f805f0a5943'
+RUNNER_SHA = 'd305484f10fa18ac9e06c74c62ba81246ee278bc4a22d7022ece08577ccd7d7d'
 F000_LAUNCH = ROOT / 'output/v7_local_ablation_20261005/launch_receipt.json'
 F000_LAUNCH_SHA = '1d99c57ddb07cd1740b9d1697c6e1bb12beed62caac07bfc65262ab772d7e6be'
 

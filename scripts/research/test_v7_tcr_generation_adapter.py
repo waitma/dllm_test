@@ -1,7 +1,7 @@
 """Check the new TCR adapter with artificial pMHC and a tiny frozen native model.
 
 Activate conda pllm; use protenix_abtcr Python with CUDA_VISIBLE_DEVICES='':
-python -I -B /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/research/test_v7_tcr_generation_adapter.py
+python -I -B /project_c20250601/251105016/project/dllm_test/scripts/research/test_v7_tcr_generation_adapter.py
 No corpus, production weights, annotation, GPU, or checkpoint files are used.
 """
 from pathlib import Path
@@ -9,7 +9,7 @@ import inspect
 import json
 import sys
 
-ROOT = Path('/vepfs-mlp2/c20250601/251105016/project/dllm_test')
+ROOT = Path('/project_c20250601/251105016/project/dllm_test')
 SOURCE = ROOT/'output/v7_formal_eight_gpu_20261002/epoch2_continuation_20261006/source_snapshot_v1'
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(SOURCE))

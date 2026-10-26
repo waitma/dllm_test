@@ -1,7 +1,7 @@
 """Plot one explicitly selected large-batch study using metadata only.
 
 Activate conda pllm and run:
-  python -B /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/research/plot_v7_large_batch_ablation.py --jobs-file /absolute/jobs.json --pool-dir /absolute/pool --batch-plan /absolute/selection.json --batch-plan-sha256 HEX64 --output-prefix /absolute/figures/large_batch
+  python -B /project_c20250601/251105016/project/dllm_test/scripts/research/plot_v7_large_batch_ablation.py --jobs-file /absolute/jobs.json --pool-dir /absolute/pool --batch-plan /absolute/selection.json --batch-plan-sha256 HEX64 --output-prefix /absolute/figures/large_batch
 
 The jobs ledger must bind this study and batch_plan={path,sha256}; each job
 binds its explicit alias, architecture and seed. No models, sequences, binary

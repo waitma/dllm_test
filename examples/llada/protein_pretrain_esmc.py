@@ -106,7 +106,7 @@ class ModelArguments(dllm.utils.ModelArguments):
 class DataArguments(dllm.utils.DataArguments):
     # This is a semantic prepared dataset, not a raw source directory. Raw CSV/
     # JSONL parsing and all rejecting filters happen in scripts/data preprocessing.
-    prepared_data_dir: str = "/vepfs-mlp2/c20250601/251105016/project/dllm_test/data/prepared/immune_v3_heterotypic"
+    prepared_data_dir: str = "/project_c20250601/251105016/project/dllm_test/data/prepared/immune_v3_heterotypic"
     dataset_args: str = "oas+ots"
     # Deprecated compatibility flags accepted by older job YAMLs. They are never
     # read: all source paths, blocklists, row caps, and sampling now belong to the

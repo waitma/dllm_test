@@ -1,10 +1,10 @@
 """Run the independent 120k large-batch architecture protocol, without submitting.
 
 CPU-only entry check (artificial rows, tiny model, two updates):
-  source /vepfs-mlp2/c20250601/251105016/miniforge3/etc/profile.d/conda.sh
+  source /project_c20250601/251105016/miniforge3/etc/profile.d/conda.sh
   conda activate pllm
   CUDA_VISIBLE_DEVICES='' OMP_NUM_THREADS=1 python -B \
-    /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/research/run_v7_large_batch_ablation.py \
+    /project_c20250601/251105016/project/dllm_test/scripts/research/run_v7_large_batch_ablation.py \
     --variant f111 --seed 42 --micro-batch 16 --grad-accum 2 --cpu-smoke \
     --steps 2 --output-dir /absolute/new_cpu_check
 Parameter-only checks: run this absolute script with --self-test.

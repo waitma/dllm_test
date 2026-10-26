@@ -102,11 +102,18 @@ def test_failed_generation_attempts_are_retained(tmp_path):
     class Generator:
         def generate(self,request):
             return dict(heavy='',light='',heavy_eos=False,light_eos=False,token_valid=False,failure_reason='missing_eos')
-    r=generation_rows();p=run_adapter('chimera',r,Generator(),tmp_path,model_identity='failure_fixture',candidates=2)
-    m=evaluate('chimera',r,p,candidates=2)
+    r=generation_rows();p=run_adapter('chimera',r,Generator(),tmp_path,model_identity='failure_fixture',candidates=2,legacy_full_chain=True)
+    m=evaluate('chimera',r,p,candidates=2,legacy_full_chain=True)
     assert m['scored']==8 and m['conditions']['correct']['token_valid_rate']==0
     p[0]['seed']+=1
-    with pytest.raises(ValueError,match='mismatch'):evaluate('chimera',r,p,candidates=2)
+    with pytest.raises(ValueError,match='mismatch'):evaluate('chimera',r,p,candidates=2,legacy_full_chain=True)
+
+
+def test_chimera_does_not_silently_use_full_chain_protocol(tmp_path):
+    with pytest.raises(ValueError,match='chimera_h3'):
+        run_adapter('chimera',generation_rows(),None,tmp_path,model_identity='fixture')
+    with pytest.raises(ValueError,match='chimera_h3'):
+        evaluate('chimera',generation_rows(),[])
 
 
 def test_truncated_resume_journal_rejected(tmp_path):

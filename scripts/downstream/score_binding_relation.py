@@ -15,7 +15,7 @@ This is not pairing PLL. Do not reuse ``pairing_auroc`` / ``mean_token_logprob``
 
 Usage::
 
-    /vepfs-mlp2/c20250601/251105016/conda/envs/protenix_abtcr/bin/python \\
+    /project_c20250601/251105016/conda/envs/protenix_abtcr/bin/python \\
         scripts/downstream/score_binding_relation.py \\
         --checkpoint output/protein_esmc_llada270m_diffusion_immune_v3/checkpoint-42000 \\
         --prepared-data-dir data/prepared/immune_v5_receptor_completion \\
@@ -37,7 +37,7 @@ from typing import Any, Iterable
 import torch
 import torch.nn.functional as F
 
-ROOT = Path("/vepfs-mlp2/c20250601/251105016/project/dllm_test")
+ROOT = Path("/project_c20250601/251105016/project/dllm_test")
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 

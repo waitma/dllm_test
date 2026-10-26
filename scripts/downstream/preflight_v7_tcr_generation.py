@@ -1,7 +1,7 @@
 """Audit actual native V7 TCR inputs without scoring or full benchmark generation.
 
 Activate conda pllm and run with the worker-compatible Python in a clean process:
-python -I -B /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/downstream/preflight_v7_tcr_generation.py --device cpu --output-root /absolute/new_output_directory
+python -I -B /project_c20250601/251105016/project/dllm_test/scripts/downstream/preflight_v7_tcr_generation.py --device cpu --output-root /absolute/new_output_directory
 The CPU audit does not authorize a GPU run. No annotation, training, retries,
 checkpoint copies, resource submission, or certification is performed.
 """
@@ -12,7 +12,7 @@ from pathlib import Path
 import runpy
 import sys
 
-ROOT = Path('/vepfs-mlp2/c20250601/251105016/project/dllm_test')
+ROOT = Path('/project_c20250601/251105016/project/dllm_test')
 sys.path.insert(0, str(ROOT))
 from downstream.v7_native import load_native_checkpoint, input_fingerprint, require, sha
 from downstream.v7_tcr_generation import beta_input, beta_decode, beta_result, PROTOCOL

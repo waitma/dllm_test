@@ -2,8 +2,8 @@
 
 Run the selector through the benchmark summarizer::
 
-    /vepfs-mlp2/c20250601/251105016/conda/envs/protenix_abtcr/bin/python \
-      /vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/scripts/summarize_nm2025.py
+    /project_c20250601/251105016/conda/envs/protenix_abtcr/bin/python \
+      /project_c20250601/251105016/project/dllm_test/downstream/benchmark/scripts/summarize_nm2025.py
 
 An external T1 baseline is eligible as a local result only when it uses the
 author's original checkpoint, the author's inference implementation, and the

@@ -21,7 +21,7 @@ stage_enabled() { [[ ",${GEN_STAGES}," == *",$1,"* ]]; }
 CDR_MAX_ITER="${CDR_MAX_ITER:-2}"
 PAIR_MAX_ITER="${PAIR_MAX_ITER:-124}"
 
-ROOT="/vepfs-mlp2/c20250601/251105016/project/dllm_test"
+ROOT="/project_c20250601/251105016/project/dllm_test"
 CKPT="${1:?usage: $0 <fusion_ckpt_dir> <tag>}"
 TAG="${2:?usage: $0 <fusion_ckpt_dir> <tag>}"
 OUT="${ROOT}/output/downstream_generation"

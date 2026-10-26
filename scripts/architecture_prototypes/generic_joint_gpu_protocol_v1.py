@@ -15,7 +15,7 @@ from pathlib import Path
 import re
 import sys
 
-PROJECT = Path('/vepfs-mlp2/c20250601/251105016/project/dllm_test')
+PROJECT = Path('/project_c20250601/251105016/project/dllm_test')
 POOL = PROJECT/'output/immune_research_pool_c20250601_20260930'
 PACKAGE = PROJECT/'output/generic_joint_runtimes/generic_joint_gpu_v1_20261001'
 ROUTE = 'generic_joint_gpu_v1'

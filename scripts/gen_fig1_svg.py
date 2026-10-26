@@ -26,7 +26,7 @@ from __future__ import annotations
 
 import sys
 
-sys.path.insert(0, "/vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts")
+sys.path.insert(0, "/project_c20250601/251105016/project/dllm_test/scripts")
 import figsvg as F  # noqa: E402
 from figsvg import (INK, SUB, MUT, HAIR, FAINT, BLUE, GREEN, PURPLE, ORANGE,  # noqa: E402
                     VERM, SKY, tint, kicker, save, char_w)
@@ -41,7 +41,7 @@ CDR3B = "CASSIRSSYEQYF"    # a TRB CDR3-beta
 #     Icons: 1AO7 TCR–pMHC · 1NL0 Ab–Ag · 3K1K Nb–Ag · 1BRS PPI
 #     Layout: compact single flow (no left/right split, no title overlap)
 # =======================================================================
-ICONDIR = "/vepfs-mlp2/c20250601/251105016/project/dllm_test/paper/figures/icons"
+ICONDIR = "/project_c20250601/251105016/project/dllm_test/paper/figures/icons"
 
 # Nature-like accents aligned with PyMOL chain palette
 N_STEEL = "#3C6E8F"

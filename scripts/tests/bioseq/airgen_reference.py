@@ -1,7 +1,7 @@
 """Minimal AirGen reference for multichain diffusion parity checks.
 
 Logic copied from
-``/vepfs-mlp2/c20250601/251105016/project/airgen/AirGen-Dev/src/byprot/models/lm/dplm_multichain.py``
+``/project_c20250601/251105016/project/airgen/AirGen-Dev/src/byprot/models/lm/dplm_multichain.py``
 (``q_sample_comp``, ``construct_x_t``). Used when full AirGen imports are unavailable.
 """
 

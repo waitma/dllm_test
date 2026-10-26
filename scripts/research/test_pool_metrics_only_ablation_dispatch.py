@@ -1,8 +1,8 @@
 """Run artificial metadata checks for the private post-formal pool adapter.
 
-  source /vepfs-mlp2/c20250601/251105016/miniforge3/etc/profile.d/conda.sh
+  source /project_c20250601/251105016/miniforge3/etc/profile.d/conda.sh
   conda activate pllm
-  CUDA_VISIBLE_DEVICES='' python -B /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/research/test_pool_metrics_only_ablation_dispatch.py
+  CUDA_VISIBLE_DEVICES='' python -B /project_c20250601/251105016/project/dllm_test/scripts/research/test_pool_metrics_only_ablation_dispatch.py
 
 Fixtures contain no sequences, models, GPU calls, jobs or real completion data.
 They are created in one temporary directory and removed by unittest cleanup.
@@ -21,7 +21,7 @@ import unittest
 from unittest.mock import patch
 
 
-ROOT = Path('/vepfs-mlp2/c20250601/251105016/project/dllm_test')
+ROOT = Path('/project_c20250601/251105016/project/dllm_test')
 SCRIPT = ROOT / 'scripts/research/pool_metrics_only_ablation_dispatch.py'
 FROZEN_RUNNER = ROOT / 'output/v7_local_ablation_20261005/source_snapshot_v1/scripts/research/run_v7_large_batch_ablation.py'
 spec = importlib.util.spec_from_file_location('private_metrics_pool_adapter', SCRIPT)

@@ -6,7 +6,7 @@
 #
 # 例（重跑 v6 prepared shards）：
 #   bash scripts/run_in_tmux.sh prep_v6 \
-#       /vepfs-mlp2/c20250601/251105016/conda/envs/pllm/bin/python \
+#       /project_c20250601/251105016/conda/envs/pllm/bin/python \
 #       scripts/data/preprocess_immune_dataset.py \
 #       --config configs/data/immune_v6_binding_only.yaml \
 #       --output-dir data/prepared/immune_v6_binding_only --overwrite
@@ -29,7 +29,7 @@
 #      .../251105016/tmp，该目录并不存在）。所以这里必须 mkdir -p 后再断言。
 set -uo pipefail
 
-REPO=/vepfs-mlp2/c20250601/251105016/project/dllm_test
+REPO=/project_c20250601/251105016/project/dllm_test
 
 if [ "$#" -lt 2 ]; then
     echo "用法: bash scripts/run_in_tmux.sh <任务名> <命令> [参数...]" >&2
@@ -63,8 +63,8 @@ rm -f "$LOG_DIR/started" "$LOG_DIR/done" "$LOG_DIR/failed" "$LOG_DIR/exit_code"
 # 把命令安全地拼成单个字符串：tmux 只收字符串，%q 保证带空格/引号的参数不被拆开。
 CMD_STR="$(printf '%q ' "$@")"
 
-# 真实的 TMPDIR（不是 /vepfs-mlp2/c20250601/251105016/tmp，那个不存在）。
-RUN_TMPDIR="${TMPDIR:-/vepfs-mlp2/c20250601/251105016/conda/cache/tmp}"
+# 真实的 TMPDIR（不是 /project_c20250601/251105016/tmp，那个不存在）。
+RUN_TMPDIR="${TMPDIR:-/project_c20250601/251105016/conda/cache/tmp}"
 mkdir -p "$RUN_TMPDIR"
 if [ ! -d "$RUN_TMPDIR" ]; then
     echo "TMPDIR 不存在且无法创建: $RUN_TMPDIR" >&2

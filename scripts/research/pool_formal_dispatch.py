@@ -15,13 +15,13 @@ import runpy
 import sys
 
 
-ROOT = Path('/vepfs-mlp2/c20250601/251105016/project/dllm_test')
+ROOT = Path('/project_c20250601/251105016/project/dllm_test')
 OWN = ROOT / 'output/v7_formal_eight_gpu_20261002'
 POOL = ROOT / 'output/immune_research_pool_c20250601_20260930'
 DATA = ROOT / 'data/prepared/immune_v7_test_scope_final_20261002'
 CATALOG = OWN / 'pool_job_catalog.json'
 PREVIOUS = ROOT / 'output/v7_large_batch_ablation_20261002/launcher_source_v1/pool_large_batch_ablation_dispatch.py'
-PREVIOUS_SHA = 'dc3408ff7a8e74b7944b5ceb17ca18bdaf0baf9a226d270c9cb12fe99058aa0f'
+PREVIOUS_SHA = 'a99a2b5ba6f247e8e3ac903240fd604f59b05bd922f5d7b2be36534821f1ed67'
 ALIASES = tuple(f'p03_v7_formal_member_{index}' for index in range(8))
 
 

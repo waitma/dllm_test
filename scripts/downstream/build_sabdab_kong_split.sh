@@ -22,8 +22,8 @@
 # Usage: bash scripts/downstream/build_sabdab_kong_split.sh [--force]
 set -euo pipefail
 
-ROOT="/vepfs-mlp2/c20250601/251105016/project/dllm_test"
-ENV="/vepfs-mlp2/c20250601/251105016/conda/envs/protenix_abtcr"
+ROOT="/project_c20250601/251105016/project/dllm_test"
+ENV="/project_c20250601/251105016/conda/envs/protenix_abtcr"
 PY="$ENV/bin/python"
 SRC_ZIP="$ROOT/data/sabdab.zip"
 OUT="$ROOT/data/downstream/cdr_infilling/sabdab_kong"

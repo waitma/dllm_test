@@ -3,7 +3,7 @@
 # 同一 PID 文件互斥，禁止第二份 daemon。不碰 ESMC / 旧 1M / fusion。
 set -uo pipefail
 
-REPO=/vepfs-mlp2/c20250601/251105016/project/dllm_test
+REPO=/project_c20250601/251105016/project/dllm_test
 MON_DIR="$REPO/output/immune_v3_explore_queue012/_monitor"
 PID_FILE="$MON_DIR/monitor.pid"
 OUT_LOG="$MON_DIR/nohup.out"

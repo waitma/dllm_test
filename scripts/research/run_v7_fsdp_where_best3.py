@@ -1,7 +1,7 @@
 """Independent where-bias FSDP entrypoint with best3+latest full checkpoint retention.
 
 After conda activate pllm, inspect:
-  python -B /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/research/run_v7_fsdp_where_best3.py --help
+  python -B /project_c20250601/251105016/project/dllm_test/scripts/research/run_v7_fsdp_where_best3.py --help
 Use its separate YAML and source manifest. Old DDP/FSDP checkpoints are not
 accepted as same-run resumes; the original entry and frozen model are unedited.
 """
@@ -9,7 +9,7 @@ import importlib.util
 from pathlib import Path
 import sys
 
-ROOT = Path('/vepfs-mlp2/c20250601/251105016/project/dllm_test')
+ROOT = Path('/project_c20250601/251105016/project/dllm_test')
 ENTRY = ROOT/'scripts/research/run_v7_fsdp_best3.py'
 ADAPTER = ROOT/'scripts/research/v7_fsdp_where_trainer.py'
 BASE_ADAPTER = ROOT/'scripts/research/v7_fsdp_trainer.py'

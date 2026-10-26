@@ -12,7 +12,7 @@ import json
 import math
 from pathlib import Path
 
-ROOT = Path('/vepfs-mlp2/c20250601/251105016/project/dllm_test')
+ROOT = Path('/project_c20250601/251105016/project/dllm_test')
 SUP = ROOT/'output/v7_formal_supervision_20261005'
 RUN = ROOT/'output/v7_initial_training_20261005/run'
 CORE = ('loss', 'aa_loss', 'terminal_loss', 'aa_accuracy', 'terminal_accuracy',

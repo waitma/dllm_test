@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import sys
 
-sys.path.insert(0, "/vepfs-mlp2/c20250601/251105016/project/.cursor/skills/architecture-diagram/scripts")
+sys.path.insert(0, "/project_c20250601/251105016/project/.cursor/skills/architecture-diagram/scripts")
 from gv_diagram import (  # noqa: E402
     Graph,
     PALETTE,
@@ -21,7 +21,7 @@ from gv_diagram import (  # noqa: E402
     stage,
 )
 
-OUT = "/vepfs-mlp2/c20250601/251105016/project/dllm_test/bioseq_model_architecture"
+OUT = "/project_c20250601/251105016/project/dllm_test/bioseq_model_architecture"
 
 g = Graph(
     title="BioSeq Diffusion Model \u2014 Training Architecture",

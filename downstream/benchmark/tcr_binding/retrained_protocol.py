@@ -2,10 +2,10 @@
 
 Verify and inspect the downloaded artifacts with::
 
-    source /vepfs-mlp2/c20250601/251105016/miniforge3/etc/profile.d/conda.sh
-    conda activate /vepfs-mlp2/c20250601/251105016/conda/envs/pllm
-    /vepfs-mlp2/c20250601/251105016/conda/envs/protenix_abtcr/bin/python \
-      /vepfs-mlp2/c20250601/251105016/project/dllm_test/downstream/benchmark/tcr_binding/run_retrained_baseline.py \
+    source /project_c20250601/251105016/miniforge3/etc/profile.d/conda.sh
+    conda activate /project_c20250601/251105016/conda/envs/pllm
+    /project_c20250601/251105016/conda/envs/protenix_abtcr/bin/python \
+      /project_c20250601/251105016/project/dllm_test/downstream/benchmark/tcr_binding/run_retrained_baseline.py \
       --verify-only
 
 The protocol never retrains a model.  It pairs each official fold checkpoint
@@ -90,7 +90,7 @@ MODEL_SPECS = {
         checkpoint_template="{fold}_1_1.pth",
         official_code_dir=OFFICIAL_REPO / "ATM_TCR",
         env_python=Path(
-            "/vepfs-mlp2/c20250601/251105016/conda/envs/"
+            "/project_c20250601/251105016/conda/envs/"
             "tcrbench_atmtcr/bin/python"
         ),
         infer_script=WRAPPER_DIR / "atmtcr_official_infer.py",
@@ -103,7 +103,7 @@ MODEL_SPECS = {
         checkpoint_template="{fold}_1_1model_weights.h5",
         official_code_dir=OFFICIAL_REPO / "NetTCR",
         env_python=Path(
-            "/vepfs-mlp2/c20250601/251105016/conda/envs/"
+            "/project_c20250601/251105016/conda/envs/"
             "tcrbench_nettcr/bin/python"
         ),
         infer_script=WRAPPER_DIR / "nettcr_official_infer.py",
@@ -116,7 +116,7 @@ MODEL_SPECS = {
         checkpoint_template="{fold}_1_1.pickle",
         official_code_dir=OFFICIAL_REPO / "epiTCR" / "src",
         env_python=Path(
-            "/vepfs-mlp2/c20250601/251105016/conda/envs/"
+            "/project_c20250601/251105016/conda/envs/"
             "tcrbench_epitcr/bin/python"
         ),
         infer_script=WRAPPER_DIR / "epitcr_official_infer.py",
@@ -129,7 +129,7 @@ MODEL_SPECS = {
         checkpoint_template="{fold}_1_1.pth",
         official_code_dir=OFFICIAL_REPO / "TEIM",
         env_python=Path(
-            "/vepfs-mlp2/c20250601/251105016/conda/envs/"
+            "/project_c20250601/251105016/conda/envs/"
             "protenix_abtcr/bin/python"
         ),
         infer_script=WRAPPER_DIR / "teim_retrained_official_infer.py",
@@ -142,7 +142,7 @@ MODEL_SPECS = {
         checkpoint_template="{fold}_1_1.pkl",
         official_code_dir=OFFICIAL_REPO / "TCR-H",
         env_python=Path(
-            "/vepfs-mlp2/c20250601/251105016/conda/envs/"
+            "/project_c20250601/251105016/conda/envs/"
             "tcrbench_tcrh/bin/python"
         ),
         infer_script=WRAPPER_DIR / "tcrh_retrained_official_infer.py",
@@ -155,7 +155,7 @@ MODEL_SPECS = {
         checkpoint_template="{fold}_1_1.pth",
         official_code_dir=OFFICIAL_REPO / "TEINet(TEINet-large_TEINet-small)",
         env_python=Path(
-            "/vepfs-mlp2/c20250601/251105016/conda/envs/"
+            "/project_c20250601/251105016/conda/envs/"
             "tcrbench_torch20/bin/python"
         ),
         infer_script=WRAPPER_DIR / "teinet_official_infer.py",
@@ -171,7 +171,7 @@ MODEL_SPECS = {
             / "ERGO(ERGO-AE-vdj_ERGO-AE-mc_ERGO-lstm-vdj_ERGO-lstm-mc)"
         ),
         env_python=Path(
-            "/vepfs-mlp2/c20250601/251105016/conda/envs/"
+            "/project_c20250601/251105016/conda/envs/"
             "tcrbench_torch20/bin/python"
         ),
         infer_script=WRAPPER_DIR / "ergo_official_infer.py",
@@ -194,7 +194,7 @@ MODEL_SPECS = {
             / "ERGO(ERGO-AE-vdj_ERGO-AE-mc_ERGO-lstm-vdj_ERGO-lstm-mc)"
         ),
         env_python=Path(
-            "/vepfs-mlp2/c20250601/251105016/conda/envs/"
+            "/project_c20250601/251105016/conda/envs/"
             "tcrbench_torch20/bin/python"
         ),
         infer_script=WRAPPER_DIR / "ergo_official_infer.py",

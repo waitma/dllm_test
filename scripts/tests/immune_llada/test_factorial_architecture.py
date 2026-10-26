@@ -1,9 +1,9 @@
 """CPU-only contracts using integer tensors, with eager temporary checkpoint cleanup.
 
 Run:
-  source /vepfs-mlp2/c20250601/251105016/miniforge3/etc/profile.d/conda.sh
+  source /project_c20250601/251105016/miniforge3/etc/profile.d/conda.sh
   conda activate pllm
-  CUDA_VISIBLE_DEVICES='' USE_TF=0 python -B -m pytest -q /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/tests/immune_llada/test_factorial_architecture.py
+  CUDA_VISIBLE_DEVICES='' USE_TF=0 python -B -m pytest -q /project_c20250601/251105016/project/dllm_test/scripts/tests/immune_llada/test_factorial_architecture.py
 
 No dataset, sequence record, Trainer, GPU operation or production gate is used.
 """

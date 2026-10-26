@@ -15,9 +15,9 @@ import yaml
 
 from downstream.grammar.ab_features import file_sha256, write_json
 
-ROOT = Path("/vepfs-mlp2/c20250601/251105016/project/dllm_test")
-RUNTIME = Path("/vepfs-mlp2/c20250601/251105016/conda/envs/protenix_abtcr")
-PLLM = Path("/vepfs-mlp2/c20250601/251105016/conda/envs/pllm")
+ROOT = Path("/project_c20250601/251105016/project/dllm_test")
+RUNTIME = Path("/project_c20250601/251105016/conda/envs/protenix_abtcr")
+PLLM = Path("/project_c20250601/251105016/conda/envs/pllm")
 DATE = "20260927"
 QUEUE = "queue012"  # this identity cannot CreateCustomTask on c20250601
 TEMPLATE = ROOT / "eval_jobs/eval_immune_270m_42000_pairing_reference_v3.yml"
@@ -63,7 +63,7 @@ MODELS = [
 
 def common_env(checkpoint: Path) -> str:
     return f"""set -euo pipefail
-source /vepfs-mlp2/c20250601/251105016/miniforge3/etc/profile.d/conda.sh
+source /project_c20250601/251105016/miniforge3/etc/profile.d/conda.sh
 conda activate {PLLM}
 conda activate {RUNTIME}
 export LD_LIBRARY_PATH={RUNTIME}/lib:${{LD_LIBRARY_PATH:-}}
@@ -77,7 +77,7 @@ export USE_TF=0
 export TOKENIZERS_PARALLELISM=false
 export HF_HUB_OFFLINE=1
 export TRANSFORMERS_OFFLINE=1
-export HF_HOME=/vepfs-mlp2/c20250601/251105016/conda/cache/huggingface
+export HF_HOME=/project_c20250601/251105016/conda/cache/huggingface
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 cd {ROOT}
 test -f {checkpoint}/model.safetensors
@@ -298,7 +298,7 @@ python -u downstream/benchmark/tcr_binding/run_retrained_ours.py \\
                 43200,
             ),
         )
-    for task in ("t2a", "t2b", "t3broad", "t3deep"):
+    for task in ("t2a", "t3broad", "t3deep"):
         key = f"{task}-v2"
         gate = out / key / "gate.json"
         command = env + f"""mkdir -p {out}/{key}

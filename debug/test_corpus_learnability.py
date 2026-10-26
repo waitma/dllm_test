@@ -32,7 +32,7 @@ import random
 import numpy as np
 import pandas as pd
 
-ROOT = pathlib.Path("/vepfs-mlp2/c20250601/251105016/project/dllm_test")
+ROOT = pathlib.Path("/project_c20250601/251105016/project/dllm_test")
 GB = ROOT / "downstream" / "benchmark" / "data" / "tcr_generation_bench"
 PISTE = ROOT / "data/ppi_task_raw/raw/piste_tcr_epitope_hla/PISTE/data"
 WIN = 5

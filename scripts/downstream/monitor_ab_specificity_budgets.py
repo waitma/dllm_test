@@ -175,7 +175,7 @@ def save_if_unchanged(path, before, after):
 
 def publish(status, verified, out_dir, *, result_path=None, process_path=None):
     """Never publish an epoch result before both audit pass and platform Success."""
-    result_path = result_path or ROOT / "downstream/benchmark/RESULTS.md"
+    result_path = result_path or ROOT / "downstream/benchmark/EVALUATION_PROCESS.md"
     process_path = process_path or ROOT / "PROJECT_PROCESS.md"
     before = result_path.read_text()
     if before.count(RESULT_START) != 1 or before.count(RESULT_END) != 1:

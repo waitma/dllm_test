@@ -1,7 +1,7 @@
 """Check only the new post-generation scheduling boundary with artificial files.
 
 Activate conda pllm, then run:
-python -B /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/research/test_v7_post_generation_acceptance.py
+python -B /project_c20250601/251105016/project/dllm_test/scripts/research/test_v7_post_generation_acceptance.py
 Temporary fixtures contain no sequences, weights, real audit certificates or
 jobs. They are removed after each test. No training entry or GPU is invoked.
 Existing model/source/data gates are not retested or replaced in production.
@@ -17,7 +17,7 @@ import unittest
 from unittest.mock import patch
 
 
-ROOT = Path('/vepfs-mlp2/c20250601/251105016/project/dllm_test')
+ROOT = Path('/project_c20250601/251105016/project/dllm_test')
 
 
 def module(name, filename):

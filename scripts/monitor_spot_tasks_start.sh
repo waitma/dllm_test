@@ -7,7 +7,7 @@
 #      （STOP 哨兵或全部 Success）才算正常收工，wrapper 一起退出。
 set -uo pipefail
 
-REPO=/vepfs-mlp2/c20250601/251105016/project/dllm_test
+REPO=/project_c20250601/251105016/project/dllm_test
 MON_DIR="$REPO/output/_monitor"
 PID_FILE="$MON_DIR/monitor.pid"
 OUT_LOG="$MON_DIR/nohup.out"

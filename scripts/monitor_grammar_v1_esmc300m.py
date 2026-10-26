@@ -4,8 +4,8 @@ Polls Volc task status, WandB metrics, checkpoints, and Volc log snippets.
 Writes rolling reports to output/grammar_v1_esmc300m/monitor.log.
 
 Usage:
-    /vepfs-mlp2/c20250601/251105016/conda/envs/flow/bin/python \
-        /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/monitor_grammar_v1_esmc300m.py \
+    /project_c20250601/251105016/conda/envs/flow/bin/python \
+        /project_c20250601/251105016/project/dllm_test/scripts/monitor_grammar_v1_esmc300m.py \
         --interval-min 15
 
     # one-shot check
@@ -13,7 +13,7 @@ Usage:
 
     # background long-run (example)
     nohup .../monitor_grammar_v1_esmc300m.py --interval-min 15 \
-        >> /vepfs-mlp2/c20250601/251105016/project/dllm_test/output/grammar_v1_esmc300m/monitor_stdout.log 2>&1 &
+        >> /project_c20250601/251105016/project/dllm_test/output/grammar_v1_esmc300m/monitor_stdout.log 2>&1 &
 """
 
 from __future__ import annotations
@@ -27,8 +27,8 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
-PROJECT_ROOT = Path("/vepfs-mlp2/c20250601/251105016/project/dllm_test")
-FLOW_PYTHON = Path("/vepfs-mlp2/c20250601/251105016/conda/envs/flow/bin/python")
+PROJECT_ROOT = Path("/project_c20250601/251105016/project/dllm_test")
+FLOW_PYTHON = Path("/project_c20250601/251105016/conda/envs/flow/bin/python")
 TASK_ID = "t-20260622110228-pj2hb"
 JOB_NAME = "qwen3_vl_bioseq_grammar_v1_esmc300m"
 WANDB_PROJECT = "bioseq-qwen3-vl"
@@ -98,7 +98,7 @@ def latest_wandb_run_id() -> str | None:
 
 
 def wandb_snapshot() -> dict:
-    secret = Path("/vepfs-mlp2/c20250601/251105016/.secrets/wandb_api_key")
+    secret = Path("/project_c20250601/251105016/.secrets/wandb_api_key")
     env = os.environ.copy()
     if secret.exists():
         env["WANDB_API_KEY"] = secret.read_text().strip()

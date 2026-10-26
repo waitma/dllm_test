@@ -2,7 +2,7 @@
 
 Activate conda pllm and run:
 USE_TF=0 CUDA_VISIBLE_DEVICES='' python -m pytest
-/vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/tests/immune_llada/test_generic_joint_prototype.py -q
+/project_c20250601/251105016/project/dllm_test/scripts/tests/immune_llada/test_generic_joint_prototype.py -q
 These small CPU cases check contracts; they cannot establish method improvements.
 """
 from copy import deepcopy

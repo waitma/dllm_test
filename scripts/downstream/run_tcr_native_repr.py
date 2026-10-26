@@ -169,6 +169,8 @@ def main():
     p.add_argument("--task", choices=["preflight", *DATASETS], required=True)
     p.add_argument("--gate", type=Path, default=OUT / "repr_preflight_v2/passed.json")
     args = p.parse_args()
+    if args.task == 't2b':
+        p.error('T2B KMeans was removed from evaluation scope on 2026-10-14')
     if args.task == "preflight":
         preflight(args.gate)
         return

@@ -22,7 +22,7 @@ from dllm.pipelines.bioseq import (
 
 
 def test_bioseq_source_does_not_import_dllm_core():
-    root = Path("/vepfs-mlp2/c20250601/251105016/project/dllm_test/dllm/pipelines/bioseq")
+    root = Path("/project_c20250601/251105016/project/dllm_test/dllm/pipelines/bioseq")
     offenders = []
     for path in root.rglob("*.py"):
         text = path.read_text()
