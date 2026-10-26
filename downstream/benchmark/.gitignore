@@ -1,11 +1,10 @@
-# 生成的评测产物（split_manifest 等小元数据可手动 git add -f）
+# 生成的评测产物与元数据只在本地保留，不强制加入 Git。
 outputs/**
 !outputs/.gitkeep
 
 # baseline 第三方仓库（以 submodule / 单独 clone 管理，不纳入本仓）
 baselines/*/
 !baselines/.gitkeep
-!baselines/README.md
 
 # AppleDouble / 缓存
 ._*
