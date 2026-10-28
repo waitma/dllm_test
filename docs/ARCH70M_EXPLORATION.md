@@ -64,7 +64,13 @@ AB specificity 使用官方固定五折、global observed-residue mean 特征、
 bash /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/experiments/arch70m/run.sh --stage screen --trials A0,A1 --gpus 0
 ```
 
-单机四卡完整筛选（匹配的已完成 A0/A1 自动跳过）：
+本地 A0/A1 正在执行时，其他机器的四卡先跑剩余六组，避免重复调度正在持锁的试验：
+
+```bash
+bash /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/experiments/arch70m/run.sh --stage screen --trials A2,A3,A4,A5,A6,A7 --gpus 0,1,2,3
+```
+
+本地 A0/A1 结束后，单机四卡完整筛选（匹配的已完成 A0/A1 自动跳过）：
 
 ```bash
 bash /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/experiments/arch70m/run.sh --stage screen --gpus 0,1,2,3
@@ -107,12 +113,12 @@ bash /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/experiments/ar
 2026-10-28 首次显存 profile：A0/A1 均选择 micro56，九个56条 micro + 一个8条 micro，global512。最大长度2048、含 Adam 状态、3次实际优化器更新；A0 allocated62.89/reserved77.91 GiB，A1 allocated64.87/reserved79.41 GiB，总94.97 GiB。micro64 超过 reserved+外部占用85%门槛，选择56。8项CPU回归全部通过。
 
 <!-- ARCH70M_RESULTS_BEGIN -->
-自动记录更新时间：2026-10-28T02:27:58Z。原始日志：`/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_v8_20261028`。
+自动记录更新时间：2026-10-28T02:34:30Z。原始日志：`/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_v8_20261028`。
 
 | Trial | Status | Step | Micro × accumulation | Last train CE | Peak allocated GiB |
 |---|---|---:|---|---:|---:|
-| screen_A0_s42 | profiling | 0 / — | 56 × 9 + 8 | — | — |
-| screen_A1_s42 | profiling | 0 / — | 56 × 9 + 8 | — | — |
+| screen_A0_s42 | training | 34 / 1276 | 56 × 9 + 8 | 2.5918 | 20.0135 |
+| screen_A1_s42 | queued | 0 / 1276 | 56 × 9 + 8 | — | — |
 | screen_A2_s42 | pending | 0 / — | — | — | — |
 | screen_A3_s42 | pending | 0 / — | — | — | — |
 | screen_A4_s42 | pending | 0 / — | — | — | — |
@@ -126,3 +132,5 @@ bash /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/experiments/ar
 图中训练 CE 同时展示原始值和 25 步移动平均；验证指标不平滑。训练 GPU 小时不含评估、保存和 profile，不能当作端到端成本。
 未完成试验不参与候选选择或显著性判断。三种子确认必须从头训练；筛选 checkpoint 不作为确认初始化。
 <!-- ARCH70M_RESULTS_END -->
+
+2026-10-28T02:32:25.344359+00:00：本地控制器 PID 69214 已启动 A0→A1 顺序队列，A0 已完成初始完整评估与 checkpoint-0，观察到真实训练 step 17/1276；A1 显存 profile 完成，等待 A0 释放唯一 GPU。实现提交 `e3c6692`。GitHub 推送未成功：当前机器没有 credential helper、GitHub token 或 SSH identity；已向用户请求在机器上登录，绝不将本地 commit 记作已推送。每个试验终态仍会保留本地结果 commit 并尝试 push。

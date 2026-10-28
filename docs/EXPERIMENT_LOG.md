@@ -1,3 +1,5 @@
+> 2026-10-28T02:32:25.344359+00:00：A0/A1 本地筛选队列已启动；micro56、global512；8项CPU检查及真实GPU评估通过。实现commit e3c6692，远程push因凭据缺失未成功；终态及完整曲线以架构探索记录为准。
+
 > 2026-10-28 架构探索实施里程碑：独立分支及冻结 V8 基线完成；实现八变体、单 GPU 累积归一化与恢复、四卡/多机分片、生成和表征评估、原始曲线报告、结束自动 commit/push。CPU/GPU 流程检查完成情况及本地 A0/A1 进展以 [架构探索实验记录](/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/ARCH70M_EXPLORATION.md) 为准；未改写现役 1B 训练。
 
 # 实验记录与更正

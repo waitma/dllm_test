@@ -1,4 +1,4 @@
-> Last updated: 2026-10-28T02:20:00Z (UTC)。本副本属于独立探索分支 `explore/arch70m-v8-20261028`。已实现 75.74M V8 八组架构、10% 数据、单卡公平 batch 训练及四卡独立调度；正在完成验证并启动本地 A0/A1。下方现役 1B 历史状态为迁入快照，不作实时观测。探索实时状态和命令：[架构探索实验记录](/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/ARCH70M_EXPLORATION.md)。
+> Last updated: 2026-10-28T02:20:00Z (UTC)。本副本属于独立探索分支 `explore/arch70m-v8-20261028`。已实现 75.74M V8 八组架构、10% 数据、单卡公平 batch 训练及四卡独立调度；8 项 CPU 检查、真实 GPU 评估及 A0/A1 显存 profile 通过；本地 A0→A1 队列已启动，控制器 PID 69214。源码提交 e3c6692，push 因 GitHub 凭据缺失待完成。下方现役 1B 历史状态为迁入快照，不作实时观测。探索实时状态和命令：[架构探索实验记录](/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/ARCH70M_EXPLORATION.md)。
 
 > Last updated: 2026-10-27T19:00:11.170851+00:00 (UTC)。2026-10-28 03:00:11 +08:00：按用户“不要测试，直接开始训练”，准备1.057B V8正式随机初始化300000步包，micro16×GA4×8/global512，LR1e-4、warmup15000、cosine；沿用正式方案每1000步验证/保存、每25步日志，保留最近两份＋最佳。原micro16命令已转接正式入口，跳过独立NCCL资格/profile/smoke/200步测试；保留源码、数据、设备、认证及checkpoint完整性检查。语法、冻结输入与121分片检查通过；未新增GPU测试。当前开发机仅1卡且无平台控制CLI，未提交或开始八卡训练，等待用户平台执行。[正式入口与配置](/mnt/project-storage/fset-rN4kfh/251105016/dllm_test/docs/BERT_1B_DIRECT_TRAIN_20261028.md)。
 
