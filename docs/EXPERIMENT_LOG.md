@@ -1,3 +1,5 @@
+> 2026-10-28T09:56:24Z：核对 A0/A1 均已完成 1276 步筛选及最终完整评估，checkpoint-1276 和全部逐步曲线已保存；筛选 2/8，三种子确认未开始。QK Norm 在本轮条件 CE 上更低，但整链 AAR、CDR 指标没有同步改善，表征宏平均 AUROC 差异小，尚不能判优。结果提交 10f2a3a / 097d88f；训练成功，远程发布因 GitHub 凭据缺失失败。指标、限制与图见 [架构探索实验记录](/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/ARCH70M_EXPLORATION.md)。
+
 > 2026-10-28T02:32:25.344359+00:00：A0/A1 本地筛选队列已启动；micro56、global512；8项CPU检查及真实GPU评估通过。实现commit e3c6692，远程push因凭据缺失未成功；终态及完整曲线以架构探索记录为准。
 
 > 2026-10-28 架构探索实施里程碑：独立分支及冻结 V8 基线完成；实现八变体、单 GPU 累积归一化与恢复、四卡/多机分片、生成和表征评估、原始曲线报告、结束自动 commit/push。CPU/GPU 流程检查完成情况及本地 A0/A1 进展以 [架构探索实验记录](/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/ARCH70M_EXPLORATION.md) 为准；未改写现役 1B 训练。
