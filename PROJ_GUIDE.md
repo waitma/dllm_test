@@ -1,3 +1,5 @@
+> 2026-10-29（+08:00）用户指定后续架构探索全部在当前开发机执行，替代此前本地/四卡分工。当前唯一 GPU0 上串行调度确认试验 A0/A5/A4 × seeds42/43/44，各3epochs；只用原 V8 固定10%子集与已筛选源码。启动/恢复命令和防重入锁见 [实验记录](/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/ARCH70M_EXPLORATION.md)。每个试验结束后自动更新曲线、commit 并推送探索分支。禁止为此探索追加远端任务；正式1B工作树和作业继续保持隔离。
+
 > 2026-10-28 用户再次明确：架构探索始终沿用当前 V8 数据形式。原 prepared JSONL 字段、链序列与顺序、角色/元数据、relation/family 标签、tokenizer/词表/特殊 token、固定链输入布局保持；10% 子集只选择原记录的 offsets，独立实验索引不构成训练数据格式升级。后续架构变体遵守同一约束。
 
 > 2026-10-28 GitHub 身份：当前开发机已通过用户本人设备验证登录 `waitma`，API 已确认对 `waitma/dllm_test` 有 push 权限；GitHub CLI credential helper 已配置，CLI 位于 `/root/.local/share/github-cli/2.103.3/gh`。探索结果仅推送 `explore/arch70m-v8-20261028`。这是当前开发机的认证状态，其他作业容器需具备自己的可用认证；实验文档与提交仅记录账号和发布回执，不保存认证令牌。

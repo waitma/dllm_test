@@ -2,6 +2,20 @@
 
 2026-10-28，执行用户批准的计划。工作树 `/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore`，分支 `explore/arch70m-v8-20261028`。当前 1B 训练使用的工作树、冻结源码和输出未改动。
 
+## 2026-10-29 本地三种子确认队列
+
+用户指示“继续探索，所有的都在本地这个机器上面跑”。八组筛选已全部完成，A7 于 2026-10-29 00:16:52 +08:00 结束，整链 AAR 13.89%、条件 CE 3.751843、CDR CE 0.815607、宏 AUROC 0.835241。依既定筛选规则冻结 A5 生成候选、A4 表征候选，以及 A0 对照；[selection.json](/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_v8_20261028/selection.json)保存八组终点评测SHA和选择分数。筛选选择没有使用confirm留出集。
+
+2026-10-29 00:33:49 +08:00 已在当前开发机唯一 GPU0 启动持久后台队列，控制器 PID122888（flock）/122889（suite），首个worker PID122910。顺序为 A0 seed42/43/44 → A5 seed42/43/44 → A4 seed42/43/44，共9组；每组从头初始化3epochs、3828步，global512，micro沿用既定显存profile策略。仍是653,288条固定10%子集、原V8数据形式和筛选源码 SHA `053297983e0f2ece2aaad807032695fb5aebd1e0f221138a9bf0d202cc9b9ac4`。旧执行分工已归档，后续探索全部本机运行。
+
+每100步token验证，每250步及epoch末完整生成/表征评测和checkpoint；每组结束后评估confirm留出集及AB specificity，刷新曲线并自动commit/push探索分支。全部9组结束后输出配对三种子统计，当前不宣称确认成功。后台进程独立于本次终端连接；机器重启后可用下列原指令恢复，控制器锁和trial锁防止重复运行，已完成试验经绑定校验后跳过。
+
+```bash
+flock -n /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_v8_20261028/local_confirmation_controller.lock bash /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/experiments/arch70m/run.sh --stage confirm --gpus 0
+```
+
+运行回执：[local_confirmation_controller.json](/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_v8_20261028/local_confirmation_controller.json)；控制台：[local_confirm_20261029.console.log](/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_v8_20261028/local_confirm_20261029.console.log)。下方四卡命令保留为历史交付入口，当前队列不使用它们。
+
 ## 2026-10-28 22:54 +08:00 评测快照与可视化
 
 最新核对：本地 A0/A1/A2 和四卡侧 A3/A4/A5/A6 均完成 seed42、1 epoch、1276 步，含最终 token/生成/冻结表征评测；A7 快照时为 602/1276 步，最近一次完整评测为 step500。以下历史首轮记录与执行分工均按其当时状态理解。当前未做八组最终候选选择或三种子确认。
@@ -186,7 +200,7 @@ bash /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/experiments/ar
 2026-10-28 首次显存 profile：A0/A1 均选择 micro56，九个56条 micro + 一个8条 micro，global512。最大长度2048、含 Adam 状态、3次实际优化器更新；A0 allocated62.89/reserved77.91 GiB，A1 allocated64.87/reserved79.41 GiB，总94.97 GiB。micro64 超过 reserved+外部占用85%门槛，选择56。8项CPU回归全部通过。
 
 <!-- ARCH70M_RESULTS_BEGIN -->
-自动记录更新时间：2026-10-28T16:16:55Z。原始日志：`/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_v8_20261028`。
+自动记录更新时间：2026-10-28T16:36:24Z。原始日志：`/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_v8_20261028`。
 
 | Trial | Status | Step | Micro × accumulation | Last train CE | Peak allocated GiB |
 |---|---|---:|---|---:|---:|
@@ -198,6 +212,15 @@ bash /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/experiments/ar
 | screen_A5_s42 | completed | 1276 / 1276 | 96 × 5 + 32 | 0.3173 | 25.9867 |
 | screen_A6_s42 | completed | 1276 / 1276 | 56 × 9 + 8 | 0.3120 | 21.5255 |
 | screen_A7_s42 | completed | 1276 / 1276 | 56 × 9 + 8 | 0.3157 | 21.5772 |
+| confirm_A0_s42 | training | 12 / 3828 | 56 × 9 + 8 | 3.2065 | 19.9444 |
+| confirm_A0_s43 | pending | 0 / — | — | — | — |
+| confirm_A0_s44 | pending | 0 / — | — | — | — |
+| confirm_A5_s42 | pending | 0 / — | — | — | — |
+| confirm_A5_s43 | pending | 0 / — | — | — | — |
+| confirm_A5_s44 | pending | 0 / — | — | — | — |
+| confirm_A4_s42 | pending | 0 / — | — | — | — |
+| confirm_A4_s43 | pending | 0 / — | — | — | — |
+| confirm_A4_s44 | pending | 0 / — | — | — | — |
 
 ![完整实验曲线](arch70m_results/curves.png)
 

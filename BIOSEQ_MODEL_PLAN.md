@@ -1,3 +1,5 @@
+> 2026-10-29（+08:00）八组1epoch筛选全部结束，按预定规则冻结 A5（生成候选）/A4（表征候选）与 A0 对照。进入原计划的3epochs×seeds42/43/44，共9组、每组3828步；用户要求全部在当前开发机单GPU串行执行。各组重新随机初始化，以相同seed的A0作配对参照，使用独立confirm评测和AB specificity二级验证。既有阈值、数据形式和训练源码SHA保持；尚未得到三种子确认结论，不据筛选结果替换正式1B架构。
+
 > 2026-10-28 架构探索：批准矩阵 A0 原版、A1 QK norm、A2 SDPA 后门控、A3 组合、A4 可学习残差尺度、A5 全全局、A6 同参数 FFN taper、A7 固定 .5 门控。8 层/768/12 头约 75.8M，各组从头训练，先 1 epoch 筛选，再 A0+两个候选 3 epochs×3 seeds；生成与表征等权。细节、研究来源与选择边界见 [架构探索实验记录](/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/ARCH70M_EXPLORATION.md)。
 
 # 当前模型方案

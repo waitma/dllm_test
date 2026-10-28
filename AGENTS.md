@@ -4,7 +4,7 @@ The user explicitly authorized local single-GPU ablations and publication to `ex
 
 User constraint reaffirmed 2026-10-28: preserve the current V8 prepared JSONL record format and model input conventions throughout architecture exploration. Keep chain sequences/order/roles, metadata, relation/family labels, tokenizer/vocabulary, special tokens and fixed-chain layout unchanged. The approved 10% sampling changes only selected record offsets; experiment manifests and evaluation bookkeeping are separate from the training record schema. Reuse the frozen reader/collator. Do not introduce data-format migrations as part of architecture trials.
 
-Current screening allocation (2026-10-28): the developer machine runs A2 on its single GPU; the user submits A3-A7 on four GPUs. A0/A1 are completed. The four-GPU launcher defaults to A3-A7 to avoid rescheduling the active local trial. Confirmation starts only after all eight screening trials finish.
+Current execution allocation (user instruction 2026-10-29, UTC+8): all further architecture exploration runs on this developer machine. All eight A0-A7 screening trials are complete. The frozen selection is A0/A5/A4, seeds 42/43/44, three epochs each (nine confirmation trials), queued serially on local GPU0. Use the existing single-GPU suite with `--stage confirm --gpus 0`; controller receipt is `output/arch70m_v8_20261028/local_confirmation_controller.json`. Do not submit further remote/four-GPU jobs or start duplicate local workers. The earlier A2-local/A3-A7-remote split is historical. Keep the original V8 format, fixed 10% subset, screened source SHA, and exploration-only publication rules.
 
 # Markdown Guidelines
 

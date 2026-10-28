@@ -1,0 +1,68 @@
+{
+  "created": "2026-10-28T16:32:49Z",
+  "confirm_variants": [
+    "A0",
+    "A5",
+    "A4"
+  ],
+  "seeds": [
+    42,
+    43,
+    44
+  ],
+  "epochs": 3,
+  "source_sha256": "053297983e0f2ece2aaad807032695fb5aebd1e0f221138a9bf0d202cc9b9ac4",
+  "data_sha256": "4beaac6b54a1f46492533aeb77c2de2c6ac2a0bd8266fd57a6bb312679435c51",
+  "screening_evidence": {
+    "A0": "2998afafd686af7ad1886825d0d4d7eba6f2afbc55d9b1d8728f8cb581c0878d",
+    "A1": "24b9e5167bbf310b8aa032d5523084480e9de71e8c52e05deaaa4a74f9bd8ca8",
+    "A2": "951345ebd0315d5cd5430e2c16227c836faba7bb4567fc21ad7d2d3e47dd03a9",
+    "A3": "d836ae9e48f4df925e66ed629a847d4f2377b7b90a87fd918044f35368d2f155",
+    "A4": "3f3d11c50c6418e67c9acd3a5c4712c0f2a751d27d94aa1c83cf7e2096fb8b6e",
+    "A5": "4dd7c42fda00fbf3f4129f9115861eadbaa90787318540b069946f2b9cfc9c3e",
+    "A6": "fb1179ab6041546629709e54a472c94d9e2e59ca9387cb03fa28a96962703607",
+    "A7": "6964b1bf16fbc84cfdabf5ffde63a414d25be7cf0724344f9ed689f7881a4291"
+  },
+  "scores": {
+    "A1": {
+      "generation_improvement": 0.015734727752671634,
+      "generation_guard": true,
+      "representation_auroc": 0.8264175061050061
+    },
+    "A2": {
+      "generation_improvement": -0.053252693287752326,
+      "generation_guard": false,
+      "representation_auroc": 0.832627442002442
+    },
+    "A3": {
+      "generation_improvement": 0.02740191785286094,
+      "generation_guard": true,
+      "representation_auroc": 0.8282967032967032
+    },
+    "A4": {
+      "generation_improvement": -0.028963509066628684,
+      "generation_guard": true,
+      "representation_auroc": 0.8478136446886446
+    },
+    "A5": {
+      "generation_improvement": 0.10224162669799514,
+      "generation_guard": true,
+      "representation_auroc": 0.8222203144078144
+    },
+    "A6": {
+      "generation_improvement": 0.006275442212824704,
+      "generation_guard": true,
+      "representation_auroc": 0.8358134920634921
+    },
+    "A7": {
+      "generation_improvement": 0.0770004594764551,
+      "generation_guard": true,
+      "representation_auroc": 0.8352411477411477
+    }
+  },
+  "generation_candidate": "A5",
+  "representation_candidate": "A4",
+  "generation_guard_fallback": false,
+  "selection_partition": "screen",
+  "rule": "Final epoch only; generation mean relative CE improvement with validity/length guards; representation AUROC; deduplicate by mean rank. Candidates are hypotheses, not confirmed wins."
+}
