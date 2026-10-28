@@ -115,11 +115,11 @@ bash /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/experiments/ar
 2026-10-28 首次显存 profile：A0/A1 均选择 micro56，九个56条 micro + 一个8条 micro，global512。最大长度2048、含 Adam 状态、3次实际优化器更新；A0 allocated62.89/reserved77.91 GiB，A1 allocated64.87/reserved79.41 GiB，总94.97 GiB。micro64 超过 reserved+外部占用85%门槛，选择56。8项CPU回归全部通过。
 
 <!-- ARCH70M_RESULTS_BEGIN -->
-自动记录更新时间：2026-10-28T02:34:30Z。原始日志：`/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_v8_20261028`。
+自动记录更新时间：2026-10-28T05:05:06Z。原始日志：`/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_v8_20261028`。
 
 | Trial | Status | Step | Micro × accumulation | Last train CE | Peak allocated GiB |
 |---|---|---:|---|---:|---:|
-| screen_A0_s42 | training | 34 / 1276 | 56 × 9 + 8 | 2.5918 | 20.0135 |
+| screen_A0_s42 | completed | 1276 / 1276 | 56 × 9 + 8 | 0.3116 | 21.5761 |
 | screen_A1_s42 | queued | 0 / 1276 | 56 × 9 + 8 | — | — |
 | screen_A2_s42 | pending | 0 / — | — | — | — |
 | screen_A3_s42 | pending | 0 / — | — | — | — |
