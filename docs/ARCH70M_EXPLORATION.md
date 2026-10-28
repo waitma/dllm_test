@@ -2,6 +2,31 @@
 
 2026-10-28，执行用户批准的计划。工作树 `/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore`，分支 `explore/arch70m-v8-20261028`。当前 1B 训练使用的工作树、冻结源码和输出未改动。
 
+## 2026-10-28 22:54 +08:00 评测快照与可视化
+
+最新核对：本地 A0/A1/A2 和四卡侧 A3/A4/A5/A6 均完成 seed42、1 epoch、1276 步，含最终 token/生成/冻结表征评测；A7 快照时为 602/1276 步，最近一次完整评测为 step500。以下历史首轮记录与执行分工均按其当时状态理解。当前未做八组最终候选选择或三种子确认。
+
+新增[已完成实验终点对比图](/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/arch70m_results/snapshot_20261028T1454Z/final_comparison.png)、[完整验证曲线](/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/arch70m_results/snapshot_20261028T1454Z/validation_curves.png)；同步提供同名 SVG/PDF、[指标 CSV](/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/arch70m_results/snapshot_20261028T1454Z/final_metrics.csv)及[可复现数据快照](/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/arch70m_results/snapshot_20261028T1454Z/snapshot.json)。A7 只以虚线展示已观测点，不参与终点对比；所有验证曲线不平滑。
+
+| 终点指标 | A0 原版 | A1 QK Norm | A2 门控 | A3 QK+门控 | A4 可学习残差 | A5 全局注意力 | A6 FFN 重分配 |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| 验证 CE ↓ | 0.719104 | 0.723178 | 0.719791 | 0.726911 | 0.718150 | 0.746810 | 0.716032 |
+| 条件整链 AAR ↑ | 12.18% | 9.40% | 9.85% | 15.41% | 12.04% | 37.02% | 12.89% |
+| 条件整链长度 MAE ↓ | 76.50 | 78.72 | 85.31 | 50.07 | 80.29 | 5.61 | 77.65 |
+| CDR AAR ↑ | 80.08% | 79.81% | 80.71% | 80.25% | 80.89% | 79.36% | 80.65% |
+| 表征宏 AUROC ↑ | 0.825244 | 0.826418 | 0.832627 | 0.828297 | 0.847814 | 0.822220 | 0.835813 |
+| 表征宏 AUPRC ↑ | 0.630206 | 0.643171 | 0.675151 | 0.671228 | 0.636231 | 0.686560 | 0.644566 |
+
+初步观测：A5 整链 AAR 相对 A0 增加 24.84 个百分点，长度 MAE 从 76.50 降至 5.61，条件 CE 从 4.404985 降至 3.426782；同时 token 验证 CE、CDR AAR 和宏 AUROC 略差，因此改善集中于本轮整链生成指标。A4 宏 AUROC 最高，A6 token 验证 CE 最低。A2 的生成有效率宏平均为 91.30%（其他已完成组均 100%），长度 MAE 仅统计有效输出，须一起解读。
+
+生成和表征指标按来源宏平均；整链生成有 117 条链任务、CDR 有 64 条任务，任务可能来自同一记录，不能当成独立生物样本数；表征验证仅 tcr_papers 33 条、trait 73 条。当前单种子、小样本筛选，没有统计显著性结论，也不能将 AAR 等同于实验功能验证。原始记录/数据格式和冻结训练源码保持；这次只读取日志、生成可视化并更新文档，没有启动新训练或评测。
+
+复现图表（激活 pllm 后使用已有探索环境）：
+
+```bash
+/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_env/bin/python /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/arch70m_results/render_validation_snapshot.py --output-dir /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/arch70m_results/snapshot_20261028T1454Z --snapshot /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/arch70m_results/snapshot_20261028T1454Z/snapshot.json
+```
+
 ## 问题与固定预算
 
 比较架构是否改善固定解码的生成质量、冻结特征的表征质量。两项目标同等重要；更低 MLM loss 不能单独支持“生成更好”的结论。
@@ -161,7 +186,7 @@ bash /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/experiments/ar
 2026-10-28 首次显存 profile：A0/A1 均选择 micro56，九个56条 micro + 一个8条 micro，global512。最大长度2048、含 Adam 状态、3次实际优化器更新；A0 allocated62.89/reserved77.91 GiB，A1 allocated64.87/reserved79.41 GiB，总94.97 GiB。micro64 超过 reserved+外部占用85%门槛，选择56。8项CPU回归全部通过。
 
 <!-- ARCH70M_RESULTS_BEGIN -->
-自动记录更新时间：2026-10-28T14:03:35Z。原始日志：`/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_v8_20261028`。
+自动记录更新时间：2026-10-28T14:54:27Z。原始日志：`/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_v8_20261028`。
 
 | Trial | Status | Step | Micro × accumulation | Last train CE | Peak allocated GiB |
 |---|---|---:|---|---:|---:|
@@ -172,7 +197,7 @@ bash /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/experiments/ar
 | screen_A4_s42 | completed | 1276 / 1276 | 56 × 9 + 8 | 0.3105 | 21.5765 |
 | screen_A5_s42 | completed | 1276 / 1276 | 96 × 5 + 32 | 0.3173 | 25.9867 |
 | screen_A6_s42 | completed | 1276 / 1276 | 56 × 9 + 8 | 0.3120 | 21.5255 |
-| screen_A7_s42 | training | 186 / 1276 | 56 × 9 + 8 | 0.6598 | 21.5772 |
+| screen_A7_s42 | training | 600 / 1276 | 56 × 9 + 8 | 0.3558 | 21.5772 |
 
 ![完整实验曲线](arch70m_results/curves.png)
 
