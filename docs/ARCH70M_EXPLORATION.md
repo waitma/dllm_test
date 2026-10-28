@@ -2,6 +2,24 @@
 
 2026-10-28，执行用户批准的计划。工作树 `/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore`，分支 `explore/arch70m-v8-20261028`。当前 1B 训练使用的工作树、冻结源码和输出未改动。
 
+## 2026-10-29 生成输入与目标区分诊断
+
+在本地确认队列运行期间，进一步检查八组筛选输出是否只体现通用序列恢复。CPU复用冻结collator与make_tasks，重建117条整链任务的七项实际denoise输入（整条目标槽位已MASK），并核验936条已保存预测的原AAR。没有读取confirm评测或重新推理；脚本位于[audit_generation_context.py](/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/arch70m_results/audit_generation_context.py)。
+
+对每个已保存预测，同时按原口径计算正确目标AAR，及同来源、同链类型中其他不同参考序列的平均AAR；排除与本目标完全相同的参考序列，其他参考按序列去重。后者是分数重配对诊断，不是改变条件后重新生成，也不是结合特异性的测量。两列先来源内按任务平均，再四来源宏平均。
+
+| 筛选终点 | 正确目标AAR | 其他目标平均AAR | 正确减其他（百分点） |
+|---|---:|---:|---:|
+| A0 | 12.18% | 12.21% | -0.03 |
+| A4 | 12.04% | 11.49% | +0.55 |
+| A5 | 37.02% | 35.42% | +1.60 |
+
+A5按来源的正确减其他差值为ASD -0.56、OAS -0.80、OTS +0.18、TCR native +7.58个百分点。由此推断，当前高整链AAR含有较强的保守序列贡献，目标区分迹象主要在本轮TCR native样本；不能仅凭37.02%宣称条件特异性或抗体设计能力已提升。该诊断也不能反推模型没有使用条件：要证明因果条件依赖，需要后续以固定模型和解码进行条件替换干预，并与生物学任务结果分开解释。
+
+重复输出也已核对实际输入：TCR native beta的6个不同参考目标，在整链MASK后具有完全相同的模型输入；八个架构各自均对这6条任务生成相同序列。A5在每个来源/链类型内的不同预测数等于不同输入数（总计112个输入对应117条任务），因此这处六次重复不能直接判为模式坍塌。greedy输出不同也不能单独证明生成多样性充分。
+
+原A5/A4候选选择、九组确认队列、独立留出集及判定阈值保持。上述后验诊断补充解释生成质量，不作为事后改选规则，不改变原V8数据形式。产物：[汇总及定义](/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/arch70m_results/context_audit_20261029/context_analysis.json)、[来源对比](/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/arch70m_results/context_audit_20261029/by_source.csv)、[输入与输出数量](/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/arch70m_results/context_audit_20261029/by_source_role.csv)、[逐任务重评分](/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/arch70m_results/context_audit_20261029/per_task.csv)。
+
 ## 2026-10-29 生成覆盖率与相同位置核查
 
 围绕持续目标“得到能够提升表现的架构”，对八组筛选终点的936条整链任务输出（每组117条）逐条重新计分，原发布AAR全部复现。只读取screen原始任务与已保存预测，不做新GPU推理、不读取confirm结果、不改变原选择或确认阈值。核查脚本位于[analyze_generation_coverage.py](/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/arch70m_results/analyze_generation_coverage.py)，不属于冻结训练源码。

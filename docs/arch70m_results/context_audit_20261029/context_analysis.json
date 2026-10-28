@@ -1,0 +1,372 @@
+{
+  "created_utc": "2026-10-28T16:56:28.755777+00:00",
+  "stage": "screen_diagnostic_only",
+  "tasks": 117,
+  "source_file_sha256": {
+    "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/experiments/arch70m/base.json": "a1b52db2dc98bdb921a7681bb047495795b4797c12f4cc247c1dc6a59b12848f",
+    "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_v8_20261028/data/index.json": "4beaac6b54a1f46492533aeb77c2de2c6ac2a0bd8266fd57a6bb312679435c51",
+    "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_v8_20261028/data/screen_tasks.jsonl": "90b9d5f524612779a0b2e13ef5e56d3826071d5ec559390fd6ead846e05b4877",
+    "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_v8_20261028/trials/screen_A0_s42/status.json": "cbfe52f29994bf9ab9da43874ff43163cee3ee5c6251c5bdb04d79ae6586aea9",
+    "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_v8_20261028/trials/screen_A0_s42/metrics/screen_001276_observations.json": "ab505b715d66e5b50ce52fcf8f3dc95fcafd33195dd80c30b08ca82c57e7b7de",
+    "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_v8_20261028/trials/screen_A1_s42/status.json": "81b32ac35c44ed500c96a3bac1dcb76f265328957ef361a24deac9f9dcafc3b5",
+    "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_v8_20261028/trials/screen_A1_s42/metrics/screen_001276_observations.json": "b42a858603c0c17084620da539fb0a03c2d46ba1ed8722fc5e7e2286ea2c5925",
+    "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_v8_20261028/trials/screen_A2_s42/status.json": "c2574917d45cbd776a9916f3eeb5c71e159a50fad798abc6a06bea7e0398eaf2",
+    "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_v8_20261028/trials/screen_A2_s42/metrics/screen_001276_observations.json": "54bea35d02cf76f2f30e6b116d8bd9337c379374d0e263dda714040d64affa4e",
+    "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_v8_20261028/trials/screen_A3_s42/status.json": "2c9dfa615c5746fd54316c1c99bf5bf12dcf83dbb6053ff6b2adf4f37fbad44c",
+    "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_v8_20261028/trials/screen_A3_s42/metrics/screen_001276_observations.json": "e54ac2f883b6afdbcd1efd904e2c5973ee28a4f9c71c61c6437a8eaff7d018f8",
+    "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_v8_20261028/trials/screen_A4_s42/status.json": "e8df40fb57b53669e5ea948d06bd4fc812da0f56fe6fce2b90e09643343761c4",
+    "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_v8_20261028/trials/screen_A4_s42/metrics/screen_001276_observations.json": "fcf1c4a0bcc3accadb93d0ba22d326b4ec716cdefda024524c8ffb951781aa18",
+    "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_v8_20261028/trials/screen_A5_s42/status.json": "3c1f47ebb5c2f815de66e5bdda6f96720cf5a2c9d17a06f4723da97e92846430",
+    "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_v8_20261028/trials/screen_A5_s42/metrics/screen_001276_observations.json": "58cbc86d20e1a45888add499d2b704904f562593fda99edb861b600423c410bd",
+    "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_v8_20261028/trials/screen_A6_s42/status.json": "ff11cca4410855d99e9a80b32d3a4e1846bd61fac5e3e89d2627c26d46d9ec8a",
+    "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_v8_20261028/trials/screen_A6_s42/metrics/screen_001276_observations.json": "58090ea82038cd251df43d118a110e499da8c3389af452d00ba2959f3455cd8f",
+    "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_v8_20261028/trials/screen_A7_s42/status.json": "c48a65695070ab60d316e350ec18f1d11a3a2862e947d0d3581fc57531823ff8",
+    "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_v8_20261028/trials/screen_A7_s42/metrics/screen_001276_observations.json": "f5d6a372e6b7dbe67829bf332f9f8c6601d5e2f3855c7aa3d80104c0cc329c63"
+  },
+  "duplicate_inputs": [
+    {
+      "source": "tcr_native",
+      "role": "tcr_beta",
+      "input_sha256": "ca9b66489864154a2f668b65e9b994bba0dba48cb04acd9e5a435a17b75d53eb",
+      "tasks": 6,
+      "unique_reference_sequences": 6,
+      "receptor_keys": [
+        "cda4c9f1142cafbefd9e9949f3c53f806f39fdda240a6262dfbf13381c39ff5c",
+        "988d3e632faef16098de4b28c549dd4f5ab38eb0176bed1f1bbe53f768a7ad90",
+        "d9bead044fca3c6a900f4f3b56e16a8dd834f61876408e2427560a736c993492",
+        "a44de7856fe2d6e633f20fd9085c9cc34b25c5688913354b83174ed35c13ac83",
+        "a92910102097693874c86f64660be35a07ebafb78b5dcb87bedb5d27d301e4da",
+        "9bc362dae5c3c05958c538ce160756fdf19f712704ca386d67e4cef9de0b2962"
+      ]
+    }
+  ],
+  "summary": [
+    {
+      "variant": "A0",
+      "tasks": 117,
+      "own_target_aar": 0.12180151495482575,
+      "other_target_aar": 0.12209897637512847,
+      "own_minus_other": -0.0002974614203027136
+    },
+    {
+      "variant": "A1",
+      "tasks": 117,
+      "own_target_aar": 0.09401389184071832,
+      "other_target_aar": 0.09436576723088931,
+      "own_minus_other": -0.000351875390170995
+    },
+    {
+      "variant": "A2",
+      "tasks": 117,
+      "own_target_aar": 0.0984696553220494,
+      "other_target_aar": 0.09207074116302995,
+      "own_minus_other": 0.006398914159019456
+    },
+    {
+      "variant": "A3",
+      "tasks": 117,
+      "own_target_aar": 0.15407338665179432,
+      "other_target_aar": 0.15614584460048986,
+      "own_minus_other": -0.002072457948695536
+    },
+    {
+      "variant": "A4",
+      "tasks": 117,
+      "own_target_aar": 0.12035102279556635,
+      "other_target_aar": 0.11485626770163906,
+      "own_minus_other": 0.0054947550939272805
+    },
+    {
+      "variant": "A5",
+      "tasks": 117,
+      "own_target_aar": 0.37015366760913176,
+      "other_target_aar": 0.35415941254048783,
+      "own_minus_other": 0.01599425506864394
+    },
+    {
+      "variant": "A6",
+      "tasks": 117,
+      "own_target_aar": 0.12891901255962374,
+      "other_target_aar": 0.1279190902641052,
+      "own_minus_other": 0.0009999222955185344
+    },
+    {
+      "variant": "A7",
+      "tasks": 117,
+      "own_target_aar": 0.1389324325613068,
+      "other_target_aar": 0.13364967539263856,
+      "own_minus_other": 0.00528275716866825
+    }
+  ],
+  "by_source": [
+    {
+      "variant": "A0",
+      "source": "asd_antibody",
+      "tasks": 23,
+      "own_target_aar": 0.06316707546480661,
+      "other_target_aar": 0.06816917433757425,
+      "own_minus_other": -0.005002098872767637
+    },
+    {
+      "variant": "A0",
+      "source": "oas",
+      "tasks": 32,
+      "own_target_aar": 0.11478416757790537,
+      "other_target_aar": 0.11734405376258507,
+      "own_minus_other": -0.002559886184679703
+    },
+    {
+      "variant": "A0",
+      "source": "ots",
+      "tasks": 32,
+      "own_target_aar": 0.1597033341962334,
+      "other_target_aar": 0.15768655871262172,
+      "own_minus_other": 0.002016775483611688
+    },
+    {
+      "variant": "A0",
+      "source": "tcr_native",
+      "tasks": 30,
+      "own_target_aar": 0.14955148258035764,
+      "other_target_aar": 0.14519611868773283,
+      "own_minus_other": 0.004355363892624797
+    },
+    {
+      "variant": "A1",
+      "source": "asd_antibody",
+      "tasks": 23,
+      "own_target_aar": 0.025788065830183976,
+      "other_target_aar": 0.028292789660666343,
+      "own_minus_other": -0.002504723830482368
+    },
+    {
+      "variant": "A1",
+      "source": "oas",
+      "tasks": 32,
+      "own_target_aar": 0.05131609751355911,
+      "other_target_aar": 0.050974689252500864,
+      "own_minus_other": 0.00034140826105824714
+    },
+    {
+      "variant": "A1",
+      "source": "ots",
+      "tasks": 32,
+      "own_target_aar": 0.1705042821808738,
+      "other_target_aar": 0.16948877038684582,
+      "own_minus_other": 0.0010155117940279684
+    },
+    {
+      "variant": "A1",
+      "source": "tcr_native",
+      "tasks": 30,
+      "own_target_aar": 0.12844712183825638,
+      "other_target_aar": 0.12870681962354422,
+      "own_minus_other": -0.0002596977852878273
+    },
+    {
+      "variant": "A2",
+      "source": "asd_antibody",
+      "tasks": 23,
+      "own_target_aar": 0.029385240388389154,
+      "other_target_aar": 0.030937814392112177,
+      "own_minus_other": -0.001552574003723025
+    },
+    {
+      "variant": "A2",
+      "source": "oas",
+      "tasks": 32,
+      "own_target_aar": 0.11015783893469502,
+      "other_target_aar": 0.10738570064134753,
+      "own_minus_other": 0.0027721382933474877
+    },
+    {
+      "variant": "A2",
+      "source": "ots",
+      "tasks": 32,
+      "own_target_aar": 0.11207974136132828,
+      "other_target_aar": 0.1022206320867398,
+      "own_minus_other": 0.00985910927458847
+    },
+    {
+      "variant": "A2",
+      "source": "tcr_native",
+      "tasks": 30,
+      "own_target_aar": 0.14225580060378515,
+      "other_target_aar": 0.12773881753192026,
+      "own_minus_other": 0.014516983071864891
+    },
+    {
+      "variant": "A3",
+      "source": "asd_antibody",
+      "tasks": 23,
+      "own_target_aar": 0.07817907671815784,
+      "other_target_aar": 0.08475421390361061,
+      "own_minus_other": -0.006575137185452773
+    },
+    {
+      "variant": "A3",
+      "source": "oas",
+      "tasks": 32,
+      "own_target_aar": 0.21083057519311157,
+      "other_target_aar": 0.21400633985217932,
+      "own_minus_other": -0.00317576465906774
+    },
+    {
+      "variant": "A3",
+      "source": "ots",
+      "tasks": 32,
+      "own_target_aar": 0.1500813338198106,
+      "other_target_aar": 0.14858465130444787,
+      "own_minus_other": 0.0014966825153627011
+    },
+    {
+      "variant": "A3",
+      "source": "tcr_native",
+      "tasks": 30,
+      "own_target_aar": 0.17720256087609731,
+      "other_target_aar": 0.17723817334172162,
+      "own_minus_other": -3.561246562433229e-05
+    },
+    {
+      "variant": "A4",
+      "source": "asd_antibody",
+      "tasks": 23,
+      "own_target_aar": 0.07544558641636193,
+      "other_target_aar": 0.07317467770310553,
+      "own_minus_other": 0.0022709087132564035
+    },
+    {
+      "variant": "A4",
+      "source": "oas",
+      "tasks": 32,
+      "own_target_aar": 0.11128043247538029,
+      "other_target_aar": 0.10299060037029677,
+      "own_minus_other": 0.008289832105083512
+    },
+    {
+      "variant": "A4",
+      "source": "ots",
+      "tasks": 32,
+      "own_target_aar": 0.14722004767716876,
+      "other_target_aar": 0.1440109348501673,
+      "own_minus_other": 0.0032091128270014518
+    },
+    {
+      "variant": "A4",
+      "source": "tcr_native",
+      "tasks": 30,
+      "own_target_aar": 0.14745802461335444,
+      "other_target_aar": 0.1392488578829867,
+      "own_minus_other": 0.008209166730367755
+    },
+    {
+      "variant": "A5",
+      "source": "asd_antibody",
+      "tasks": 23,
+      "own_target_aar": 0.3218811048168512,
+      "other_target_aar": 0.3275276901167382,
+      "own_minus_other": -0.00564658529988698
+    },
+    {
+      "variant": "A5",
+      "source": "oas",
+      "tasks": 32,
+      "own_target_aar": 0.36928449322284757,
+      "other_target_aar": 0.37727568077772816,
+      "own_minus_other": -0.007991187554880553
+    },
+    {
+      "variant": "A5",
+      "source": "ots",
+      "tasks": 32,
+      "own_target_aar": 0.2976148480423066,
+      "other_target_aar": 0.2958340252994763,
+      "own_minus_other": 0.0017808227428303168
+    },
+    {
+      "variant": "A5",
+      "source": "tcr_native",
+      "tasks": 30,
+      "own_target_aar": 0.4918342243545216,
+      "other_target_aar": 0.41600025396800866,
+      "own_minus_other": 0.07583397038651297
+    },
+    {
+      "variant": "A6",
+      "source": "asd_antibody",
+      "tasks": 23,
+      "own_target_aar": 0.0758142419444108,
+      "other_target_aar": 0.07800274108178014,
+      "own_minus_other": -0.0021884991373693334
+    },
+    {
+      "variant": "A6",
+      "source": "oas",
+      "tasks": 32,
+      "own_target_aar": 0.13005864687927196,
+      "other_target_aar": 0.12713230409685017,
+      "own_minus_other": 0.002926342782421795
+    },
+    {
+      "variant": "A6",
+      "source": "ots",
+      "tasks": 32,
+      "own_target_aar": 0.1320627255866337,
+      "other_target_aar": 0.13392051011707304,
+      "own_minus_other": -0.0018577845304393326
+    },
+    {
+      "variant": "A6",
+      "source": "tcr_native",
+      "tasks": 30,
+      "own_target_aar": 0.17774043582817844,
+      "other_target_aar": 0.17262080576071745,
+      "own_minus_other": 0.005119630067461008
+    },
+    {
+      "variant": "A7",
+      "source": "asd_antibody",
+      "tasks": 23,
+      "own_target_aar": 0.03218315053464396,
+      "other_target_aar": 0.03254851830180829,
+      "own_minus_other": -0.000365367767164325
+    },
+    {
+      "variant": "A7",
+      "source": "oas",
+      "tasks": 32,
+      "own_target_aar": 0.3127785337483999,
+      "other_target_aar": 0.303223560509369,
+      "own_minus_other": 0.009554973239030951
+    },
+    {
+      "variant": "A7",
+      "source": "ots",
+      "tasks": 32,
+      "own_target_aar": 0.14125863476054884,
+      "other_target_aar": 0.1358115018448766,
+      "own_minus_other": 0.005447132915672252
+    },
+    {
+      "variant": "A7",
+      "source": "tcr_native",
+      "tasks": 30,
+      "own_target_aar": 0.0695094112016345,
+      "other_target_aar": 0.06301512091450037,
+      "own_minus_other": 0.006494290287134123
+    }
+  ],
+  "definitions": {
+    "own_target_aar": "Original full-reference positional AAR; invalid predictions zero.",
+    "other_target_aar": "Same saved prediction scored against each other distinct reference sequence within source/role, then averaged.",
+    "macro": "Average tasks within each source, then equal average across four sources.",
+    "input_signature": "All seven denoise input features after masking the entire target slot; labels and true length excluded.",
+    "unique_predictions": "Valid decoded sequence strings, counted within source/role."
+  },
+  "limitations": [
+    "Post hoc single-seed screening diagnostic, not a selection or confirmation endpoint.",
+    "Rescoring against other references does not intervene on the model input and cannot establish causal conditioning or binding specificity.",
+    "High identity can reflect conserved framework; lower diversity is not inherently worse under greedy decoding.",
+    "Repeated identical inputs can have different correct targets and are expected to produce the same greedy output."
+  ]
+}
