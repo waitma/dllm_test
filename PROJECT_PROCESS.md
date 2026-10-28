@@ -1,3 +1,5 @@
+> Last updated: 2026-10-28T17:36:36.590596+00:00 (UTC)。本地A0确认step500完整screen评估与checkpoint完成：token CE0.816243、整链AAR16.28%、CDR AAR76.41%、宏AUROC0.851734。相较250步整链AAR下降而token/CDR/表征改善，保持原多种子确认与终点评测规则，不据中间点改选。六文件SHA、数据游标和冻结绑定通过；完整曲线/CSV及回执已更新，训练继续至513/3828步。九组均在本机串行，原V8数据形式与10%子集保持。详见[实验记录](/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/ARCH70M_EXPLORATION.md)。
+
 > Last updated: 2026-10-28T17:27:34.378829+00:00 (UTC)。新增CPU模型层蛋白块换序诊断，A0/A4/A5筛选终点权重SHA及18项检查通过；最大logit误差1.90735e-5，chain_id重编号输出逐位一致。证据和限定条件已同步记录，未使用确认结果或改冻结训练源码。单GPU确认A0 seed42仍运行，当前439/3828步；原V8数据形式、固定10%子集和9组队列保持。详见[实验记录](/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/ARCH70M_EXPLORATION.md)。
 
 > Last updated: 2026-10-28T17:17:16.934419+00:00 (UTC)。CPU核查A4筛选权重step500/1250/1276，三个checkpoint模型/binding/state SHA与48个残差尺度向量通过检查，导出层间尺度图和CSV；FFN首层均值0.095983、末层0.109889，作为方法诊断而非确认胜出证据。无新增GPU任务，本地A0确认仍运行，当前354/3828步；冻结源码、10%数据索引与V8形式保持。详见[实验记录](/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/ARCH70M_EXPLORATION.md)。
