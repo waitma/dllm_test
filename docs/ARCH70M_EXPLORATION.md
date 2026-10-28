@@ -69,6 +69,8 @@ QK Norm 的条件 CE 更低，但实际整链 AAR 更低、长度误差更大，
 
 ## 保存、恢复与隔离
 
+当前发布状态（2026-10-28 10:28 UTC）：开发机已由 `waitma` 完成设备登录并验证仓库写权限，探索分支首次推送 4ecc061 成功且远端 SHA 已核对。此前 GitHub 凭据缺失的记录为历史状态；当前发布回执见 [publication_status.json](/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_v8_20261028/publication_status.json)。[GitHub 探索分支](https://github.com/waitma/dllm_test/tree/explore/arch70m-v8-20261028)。
+
 每 250 步及 epoch 末保存，初始 step 0 也保存。包含 safetensors 权重、Adam 状态、scheduler、Python/NumPy/CPU/CUDA/noise RNG、epoch 与 batch cursor、源码/数据/环境绑定。临时目录写完并 SHA 验证后原子重命名。保留最近两份 + screen 最佳生成/表征 + 各 epoch 末。相同指令自动恢复，已完成匹配试验自动跳过；变更源码、数据、micro batch 或环境不冒充续训。
 
 每个 worker 从 SHA 命名的独立源码快照导入，工作树之后的编辑不会改变正在运行的模型。单试验 flock 防重入；机器间通过显式分片避免重复调度。默认以本地 JSONL 为记录依据；`--wandb` 可选，首次创建唯一 ID，只有恢复同一 checkpoint 才复用，W&B 不可用时保留本地日志。每个试验终态生成文档/图，再 commit 并 push **探索分支**；失败也记录，不删证据、不 force-push、不操作 main。发布失败写 `publication_error.json` 并返回失败状态，不能冒称推送成功。
