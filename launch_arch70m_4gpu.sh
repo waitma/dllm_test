@@ -4,6 +4,7 @@
 set -euo pipefail
 ARCH_LAUNCH_ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 ARCH_STAGE=screen
+ARCH_TRIAL_LIST=A3,A4,A5,A6,A7
 ARCH_GPU_LIST="${ARCH_GPUS:-${CUDA_VISIBLE_DEVICES:-0,1,2,3}}"
 ARCH_DRY_RUN=0
 ARCH_EXTRA_ARGS=()
@@ -12,7 +13,9 @@ usage() {
     cat <<'USAGE'
 Usage: bash /absolute/worktree/launch_arch70m_4gpu.sh [options]
 
-  --stage screen|confirm    Default: screen (A0-A7; matching completed trials skip).
+  --stage screen|confirm    Default: screen.
+  --trials A3,A4,A5,A6,A7   Default screening allocation; developer GPU runs A2.
+                           Matching completed trials skip. Ignored for confirm.
   --gpus 0,1,2,3           Exactly four distinct GPU IDs or UUIDs.
                            Default: ARCH_GPUS, then CUDA_VISIBLE_DEVICES, then 0,1,2,3.
   --machine-index N        Forwarded to the suite for disjoint multi-machine trials.
@@ -20,7 +23,7 @@ Usage: bash /absolute/worktree/launch_arch70m_4gpu.sh [options]
   --dry-run                Print the command without checking GPUs or starting jobs.
   --help                   Show this help.
 
-Other suite arguments (such as --output-root, --trials, --wandb, --no-push) are forwarded.
+Other suite arguments (such as --output-root, --wandb, --no-push) are forwarded.
 Each GPU runs its own architecture trial, including training and generation/probe evaluation.
 Confirm requires all eight screening trials to have completed. Data format stays V8.
 USAGE
@@ -28,12 +31,17 @@ USAGE
 
 while (($#)); do
     case "$1" in
-        --stage|--gpus)
+        --stage|--gpus|--trials)
             if (($# < 2)); then printf 'Missing value for %s\n' "$1" >&2; exit 2; fi
-            if [[ "$1" == --stage ]]; then ARCH_STAGE="$2"; else ARCH_GPU_LIST="$2"; fi
+            case "$1" in
+                --stage) ARCH_STAGE="$2" ;;
+                --gpus) ARCH_GPU_LIST="$2" ;;
+                --trials) ARCH_TRIAL_LIST="$2" ;;
+            esac
             shift 2 ;;
         --stage=*) ARCH_STAGE="${1#*=}"; shift ;;
         --gpus=*) ARCH_GPU_LIST="${1#*=}"; shift ;;
+        --trials=*) ARCH_TRIAL_LIST="${1#*=}"; shift ;;
         --dry-run) ARCH_DRY_RUN=1; shift ;;
         --help|-h) usage; exit 0 ;;
         *) ARCH_EXTRA_ARGS+=("$1"); shift ;;
@@ -58,7 +66,11 @@ for ARCH_GPU_ID in "${ARCH_GPU_IDS[@]}"; do
     ARCH_GPU_SEEN["$ARCH_GPU_ID"]=1
 done
 
-ARCH_COMMAND=(bash "$ARCH_LAUNCH_ROOT/experiments/arch70m/run.sh" --stage "$ARCH_STAGE" --gpus "$ARCH_GPU_LIST" "${ARCH_EXTRA_ARGS[@]}")
+ARCH_COMMAND=(bash "$ARCH_LAUNCH_ROOT/experiments/arch70m/run.sh" --stage "$ARCH_STAGE" --gpus "$ARCH_GPU_LIST")
+if [[ "$ARCH_STAGE" == screen ]]; then
+    ARCH_COMMAND+=(--trials "$ARCH_TRIAL_LIST")
+fi
+ARCH_COMMAND+=("${ARCH_EXTRA_ARGS[@]}")
 if ((ARCH_DRY_RUN)); then
     printf '%q ' "${ARCH_COMMAND[@]}"
     printf '\n'

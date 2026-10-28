@@ -75,11 +75,15 @@ QK Norm 的条件 CE 更低，但实际整链 AAR 更低、长度误差更大，
 
 ## 执行命令
 
-独立四卡入口：[launch_arch70m_4gpu.sh](/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/launch_arch70m_4gpu.sh)。默认启动完整筛选，自动跳过匹配的已完成 A0/A1，继续 A2–A7；每张卡独立训练并验证一个变体，空闲后接下一组。入口复用现有冻结训练器，未改数据形式或既有试验源码绑定。
+**当前分工（2026-10-28）**：A0/A1 已完成；开发机单卡继续 A2（注意力门控），用户在四卡机器提交 A3–A7。两边读取同一冻结 10% 索引、使用原 V8 数据形式，统一写入当前探索输出；分配不重叠。四卡任务尚待用户提交，不能把准备好的入口记作已启动。
+
+独立四卡入口：[launch_arch70m_4gpu.sh](/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/launch_arch70m_4gpu.sh)。默认筛选列表已改为 **A3,A4,A5,A6,A7**，避开本地 A2；每张卡独立训练并验证一个变体，空闲后接下一组。入口复用现有冻结训练器，未改数据形式或既有试验源码绑定。`--trials` 可显式改列表；下面的历史完整矩阵命令仅在同名试验未运行时使用。
 
 ```bash
-# 在四卡机器上直接执行；默认 GPU 0,1,2,3，或继承 CUDA_VISIBLE_DEVICES。
-bash /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/launch_arch70m_4gpu.sh
+# 开发机单卡 A2（已由助手启动后无需重复运行）。
+bash /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/experiments/arch70m/run.sh --stage screen --trials A2 --gpus 0
+# 用户四卡任务：A3-A7；与开发机的 A2 不重叠。
+bash /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/launch_arch70m_4gpu.sh --gpus 0,1,2,3 --trials A3,A4,A5,A6,A7
 # 全部八组筛选结束后，运行三种子确认。
 bash /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/launch_arch70m_4gpu.sh --stage confirm
 ```
@@ -87,9 +91,9 @@ bash /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/launch_arch70m
 指定卡号用 `--gpus 0,1,2,3`；预览命令用 `--dry-run`。默认沿用原输出根及恢复/跳过规则，数据分片保持只读。脚本启动前检查四张指定卡是否可见；本地仅一卡时拒绝启动。两台机器共享同一路径和输出时，分别执行：
 
 ```bash
-# 机器 0：A0/A2/A4/A6；已完成 A0 跳过。
+# 两台四卡机器进一步分配远端五组：机器 0 跑 A3/A5/A7。
 bash /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/launch_arch70m_4gpu.sh --machine-index 0 --machine-count 2
-# 机器 1：A1/A3/A5/A7；已完成 A1 跳过。
+# 机器 1 跑 A4/A6；本地开发机仍只跑 A2。
 bash /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/launch_arch70m_4gpu.sh --machine-index 1 --machine-count 2
 ```
 
@@ -98,6 +102,8 @@ bash /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/launch_arch70m
 同一挂载路径的开发机和 GPU 节点使用以下命令。`run.sh` 激活 pllm，并首次创建探索专用 `output/arch70m_env`（system-site-packages venv）安装 matplotlib 3.10.7；不修改原 pllm。可用 `ARCH_CONDA_PREFIX` 指定同依赖的环境。输入和输出都写绝对路径。控制台输出在各 trial 的 `console.log`；逐步状态在 `status.json`。
 
 本地两组（1 GPU）：
+
+以下为历史/通用命令；**当前 A2 在开发机运行，四卡任务使用上方 A3–A7 命令**。完整矩阵或旧分片命令只能在同名试验均未运行时使用。
 
 ```bash
 bash /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/experiments/arch70m/run.sh --stage screen --trials A0,A1 --gpus 0
@@ -153,13 +159,13 @@ bash /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/experiments/ar
 2026-10-28 首次显存 profile：A0/A1 均选择 micro56，九个56条 micro + 一个8条 micro，global512。最大长度2048、含 Adam 状态、3次实际优化器更新；A0 allocated62.89/reserved77.91 GiB，A1 allocated64.87/reserved79.41 GiB，总94.97 GiB。micro64 超过 reserved+外部占用85%门槛，选择56。8项CPU回归全部通过。
 
 <!-- ARCH70M_RESULTS_BEGIN -->
-自动记录更新时间：2026-10-28T10:06:50Z。原始日志：`/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_v8_20261028`。
+自动记录更新时间：2026-10-28T10:15:33Z。原始日志：`/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_v8_20261028`。
 
 | Trial | Status | Step | Micro × accumulation | Last train CE | Peak allocated GiB |
 |---|---|---:|---|---:|---:|
 | screen_A0_s42 | completed | 1276 / 1276 | 56 × 9 + 8 | 0.3116 | 21.5761 |
 | screen_A1_s42 | completed | 1276 / 1276 | 56 × 9 + 8 | 0.3126 | 22.5498 |
-| screen_A2_s42 | pending | 0 / — | — | — | — |
+| screen_A2_s42 | training | 15 / 1276 | 56 × 9 + 8 | 2.7984 | 20.0318 |
 | screen_A3_s42 | pending | 0 / — | — | — | — |
 | screen_A4_s42 | pending | 0 / — | — | — | — |
 | screen_A5_s42 | pending | 0 / — | — | — | — |

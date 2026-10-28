@@ -4,6 +4,8 @@ The user explicitly authorized local single-GPU ablations and publication to `ex
 
 User constraint reaffirmed 2026-10-28: preserve the current V8 prepared JSONL record format and model input conventions throughout architecture exploration. Keep chain sequences/order/roles, metadata, relation/family labels, tokenizer/vocabulary, special tokens and fixed-chain layout unchanged. The approved 10% sampling changes only selected record offsets; experiment manifests and evaluation bookkeeping are separate from the training record schema. Reuse the frozen reader/collator. Do not introduce data-format migrations as part of architecture trials.
 
+Current screening allocation (2026-10-28): the developer machine runs A2 on its single GPU; the user submits A3-A7 on four GPUs. A0/A1 are completed. The four-GPU launcher defaults to A3-A7 to avoid rescheduling the active local trial. Confirmation starts only after all eight screening trials finish.
+
 # Markdown Guidelines
 
 - This ownkaifa02 copy now includes V8 four-relations r2, current V7 diffusion inputs, the latest V-family scratch launch bundles, and current AB/TCR evaluation inputs. Transfer receipts and runtime path/hash migration requirements: `/mnt/project-storage/fset-rN4kfh/251105016/dllm_test/docs/OWNKAIFA02_TRANSFER_20261027.md`. No training/evaluation was started by the transfer.
