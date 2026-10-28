@@ -75,6 +75,26 @@ QK Norm 的条件 CE 更低，但实际整链 AAR 更低、长度误差更大，
 
 ## 执行命令
 
+独立四卡入口：[launch_arch70m_4gpu.sh](/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/launch_arch70m_4gpu.sh)。默认启动完整筛选，自动跳过匹配的已完成 A0/A1，继续 A2–A7；每张卡独立训练并验证一个变体，空闲后接下一组。入口复用现有冻结训练器，未改数据形式或既有试验源码绑定。
+
+```bash
+# 在四卡机器上直接执行；默认 GPU 0,1,2,3，或继承 CUDA_VISIBLE_DEVICES。
+bash /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/launch_arch70m_4gpu.sh
+# 全部八组筛选结束后，运行三种子确认。
+bash /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/launch_arch70m_4gpu.sh --stage confirm
+```
+
+指定卡号用 `--gpus 0,1,2,3`；预览命令用 `--dry-run`。默认沿用原输出根及恢复/跳过规则，数据分片保持只读。脚本启动前检查四张指定卡是否可见；本地仅一卡时拒绝启动。两台机器共享同一路径和输出时，分别执行：
+
+```bash
+# 机器 0：A0/A2/A4/A6；已完成 A0 跳过。
+bash /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/launch_arch70m_4gpu.sh --machine-index 0 --machine-count 2
+# 机器 1：A1/A3/A5/A7；已完成 A1 跳过。
+bash /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/launch_arch70m_4gpu.sh --machine-index 1 --machine-count 2
+```
+
+默认每组结束仍自动本地 commit 并尝试 push；缺少 GitHub 写入凭据时，结果保留并记录发布失败，最终进程可因发布失败返回非零。筛选/训练状态以每组 `status.json` 为准。
+
 同一挂载路径的开发机和 GPU 节点使用以下命令。`run.sh` 激活 pllm，并首次创建探索专用 `output/arch70m_env`（system-site-packages venv）安装 matplotlib 3.10.7；不修改原 pllm。可用 `ARCH_CONDA_PREFIX` 指定同依赖的环境。输入和输出都写绝对路径。控制台输出在各 trial 的 `console.log`；逐步状态在 `status.json`。
 
 本地两组（1 GPU）：
@@ -132,14 +152,14 @@ bash /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/experiments/ar
 2026-10-28 首次显存 profile：A0/A1 均选择 micro56，九个56条 micro + 一个8条 micro，global512。最大长度2048、含 Adam 状态、3次实际优化器更新；A0 allocated62.89/reserved77.91 GiB，A1 allocated64.87/reserved79.41 GiB，总94.97 GiB。micro64 超过 reserved+外部占用85%门槛，选择56。8项CPU回归全部通过。
 
 <!-- ARCH70M_RESULTS_BEGIN -->
-自动记录更新时间：2026-10-28T07:59:18Z。原始日志：`/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_v8_20261028`。
+自动记录更新时间：2026-10-28T10:03:30Z。原始日志：`/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_v8_20261028`。
 
 | Trial | Status | Step | Micro × accumulation | Last train CE | Peak allocated GiB |
 |---|---|---:|---|---:|---:|
 | screen_A0_s42 | completed | 1276 / 1276 | 56 × 9 + 8 | 0.3116 | 21.5761 |
-| screen_A1_s42 | completed | 1276 / 1276 | 56 × 9 + 8 | 0.3126 | 22.5498 |
-| screen_A2_s42 | pending | 0 / — | — | — | — |
-| screen_A3_s42 | pending | 0 / — | — | — | — |
+| screen_A1_s42 | failed | 1276 / — | 56 × 9 + 8 | 0.3126 | 22.5498 |
+| screen_A2_s42 | failed | 0 / — | — | — | — |
+| screen_A3_s42 | failed | 0 / — | — | — | — |
 | screen_A4_s42 | pending | 0 / — | — | — | — |
 | screen_A5_s42 | pending | 0 / — | — | — | — |
 | screen_A6_s42 | pending | 0 / — | — | — | — |
