@@ -2,6 +2,18 @@
 
 2026-10-28，执行用户批准的计划。工作树 `/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore`，分支 `explore/arch70m-v8-20261028`。当前 1B 训练使用的工作树、冻结源码和输出未改动。
 
+## 2026-10-29 蛋白块换序的模型层核查
+
+在本地确认训练继续运行时，仅用CPU FP32读取A0/A4/A5筛选终点step1276权重，模型/binding/state文件SHA与完整checkpoint回执一致。每组选择ASD、OAS、TCR native各一条最短的合格多链整链MASK输入（按长度、受体key、角色排序，不按模型结果选择），分别检查连续chain_id块反序，以及非负chain_id的一一重编号，共18项检查。原始V8记录、collator和训练输入流程保持不变；变换只作用于诊断内存中的七项denoise特征。
+
+将换序后的输出逆置换回原顺序，三模型的logits和最终hidden states均在预设CPU FP32工程容差`atol=5e-5, rtol=1e-5`内一致；所有attention bias经逆置换后逐位一致。全体最大logit绝对差为1.90735e-5、hidden绝对差为7.12276e-6；单独重编号chain_id时两类输出均逐位相同。这里的容差只用于浮点换序检查，与训练重放门槛无关。
+
+这与源码结构一致：token/role/scope嵌入逐位置计算，RoPE使用随蛋白块移动的链内position_ids，attention的同链/异链偏置只依赖chain_id是否相等，FFN与残差尺度均逐位置作用。因此在完整特征随置换P移动时，attention bias按`B -> P B P^T`变换，输出应按`f(PX)=P f(X)`变换。A5把每层改成全局可见，仍保留这些结构；A4的通道尺度也不引入蛋白序号。
+
+这项实测支持：在这些输入和CPU前向上，A5保留蛋白块换序等变性；因此A5与A0的筛选差异不能简单解释成“只有一个模型具备蛋白顺序等变性”。它不证明全部输入或GPU内核逐位相同，不把交换H/L生物学角色或倒置链内残基当作对称操作，也没有测试16轮生成及top-k平分时的选位规则。三种子确认仍按原队列与阈值运行。
+
+产物：[脚本](/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/arch70m_results/check_chain_equivariance.py)、[18项检查CSV](/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/arch70m_results/chain_equivariance_20261029/checks.csv)、[输入签名、置换、checkpoint SHA和结果](/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/arch70m_results/chain_equivariance_20261029/chain_equivariance.json)。
+
 ## 2026-10-29 A4残差尺度检查
 
 本地确认运行期间，只在CPU读取A4已完成筛选的step500/1250/1276权重；模型、binding和state的SHA均与checkpoint回执一致。检查48个尺度向量，每个768维，无非有限值。冻结源码未改，没有额外GPU推理或使用confirm结果。脚本：[inspect_residual_scales.py](/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/arch70m_results/inspect_residual_scales.py)。

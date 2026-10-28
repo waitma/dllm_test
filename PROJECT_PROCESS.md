@@ -1,3 +1,5 @@
+> Last updated: 2026-10-28T17:27:34.378829+00:00 (UTC)。新增CPU模型层蛋白块换序诊断，A0/A4/A5筛选终点权重SHA及18项检查通过；最大logit误差1.90735e-5，chain_id重编号输出逐位一致。证据和限定条件已同步记录，未使用确认结果或改冻结训练源码。单GPU确认A0 seed42仍运行，当前439/3828步；原V8数据形式、固定10%子集和9组队列保持。详见[实验记录](/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/ARCH70M_EXPLORATION.md)。
+
 > Last updated: 2026-10-28T17:17:16.934419+00:00 (UTC)。CPU核查A4筛选权重step500/1250/1276，三个checkpoint模型/binding/state SHA与48个残差尺度向量通过检查，导出层间尺度图和CSV；FFN首层均值0.095983、末层0.109889，作为方法诊断而非确认胜出证据。无新增GPU任务，本地A0确认仍运行，当前354/3828步；冻结源码、10%数据索引与V8形式保持。详见[实验记录](/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/ARCH70M_EXPLORATION.md)。
 
 > Last updated: 2026-10-28T17:06:45.251027+00:00 (UTC)。本地确认首组A0 seed42完成step250完整screen评测和checkpoint；验证CE1.050245、整链AAR18.57%、宏AUROC0.796904。六文件SHA、CPU严格权重/Adam加载、scheduler与数据游标一致性检查通过，训练继续；未运行CUDA重放或独立confirm终点评测。已刷新全曲线与保存验证回执，9组队列、冻结源码、原10%数据与V8形式保持。详见[实验记录](/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/ARCH70M_EXPLORATION.md)。

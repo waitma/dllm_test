@@ -1,3 +1,5 @@
+> 2026-10-29（+08:00）CPU蛋白块换序核查：A0/A4/A5筛选权重在3条多链MASK输入的块反序与chain_id一一重编号中，18项logit/hidden与attention bias检查通过。A5全局注意力与A4通道残差尺度均保留现有链内RoPE、角色随块移动和同链/异链偏置结构，未因此引入蛋白序号依赖。此为有限样本CPU单次前向检查，不扩展为角色互换、GPU逐位一致或多轮解码保证；原确认队列继续。详见[实验记录](/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/ARCH70M_EXPLORATION.md)。
+
 > 2026-10-29（+08:00）A4权重诊断：筛选终点FFN残差尺度通道均值从第1层0.095983逐层升至第8层0.109889，相对初值分别-4.02%/+9.89%；attention尺度也呈层间差异。三个筛选checkpoint的SHA与48个向量均核验，支持后续检验分层缩放的动机，但不能因果归于AUROC改善。未新增/替换候选，原九组三种子确认继续。详见[实验记录与尺度图](/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/ARCH70M_EXPLORATION.md)。
 
 > 2026-10-29（+08:00）补充生成区分诊断：A5正确目标整链AAR为37.02%，同来源/链类型其他不同目标的重评分为35.42%，差值+1.60个百分点且主要来自TCR native。提示保守序列成分贡献较大，不能直接声称条件特异性或抗体设计改善；分数重配对不是条件干预。6条重复TCR beta输出对应相同MASK输入，不能据此判为模式坍塌。继续原九组三种子确认，阈值、源码与数据保持。方法与证据见[实验记录](/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/ARCH70M_EXPLORATION.md)。
