@@ -88,6 +88,8 @@ A5按来源的正确减其他差值为ASD -0.56、OAS -0.80、OTS +0.18、TCR na
 
 2026-10-29 06:08 +08:00，confirm_A0_s42完成step2750完整screen评测与checkpoint。相较第二轮末step2552，token CE从0.683204降至0.680204，CDR CE从0.738246升至0.743392、CDR AAR从80.05%升至80.56%；整链AAR从9.80%小幅升至9.95%，条件CE从5.352371降至5.134570、长度MAE从84.91降至84.86。宏AUROC从0.853470升至0.854481，宏AUPRC从0.674383回落至0.662842；best生成仍为step500，best表征仍为step1250。六文件SHA、冻结源码/数据绑定与181条生成/106条表征观测通过核验；游标epoch=2、next_batch=198、seen_records=1407952、seen_tokens=462236114与逐步日志一致，loss/梯度有限。曲线和CSV已更新，回执：[step2750](/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/arch70m_results/confirmation_checkpoints/confirm_A0_s42_step2750.json)。整链AAR仍约10%，当前指标变化不足以证明架构改善；继续原九组三种子确认协议，独立confirm留出集仍未使用，未进行本点GPU数值重放。下一次完整screen评估在step3000。
 
+2026-10-29 06:39 +08:00，confirm_A0_s42完成step3000完整screen评测与checkpoint。相较step2750，token CE从0.680204降至0.677267，CDR CE从0.743392降至0.727217、CDR AAR从80.56%小幅回落至80.40%；整链AAR从9.95%至9.93%，条件CE从5.134570升至5.473715、长度MAE从84.86降至84.15。宏AUROC从0.854481回落至0.850580，宏AUPRC从0.662842回落至0.648004；best生成仍为step500，best表征仍为step1250。六文件SHA、冻结源码/数据绑定与181条生成/106条表征观测通过核验；游标epoch=2、next_batch=448、seen_records=1535952、seen_tokens=504243138与逐步日志一致，loss/梯度有限。曲线和CSV已更新，回执：[step3000](/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/arch70m_results/confirmation_checkpoints/confirm_A0_s42_step3000.json)。token CE下降尚未转化为整链生成改善，且本点表征指标回落；当前仍不能认定架构提升。继续原九组三种子确认协议，独立confirm留出集仍未使用，未进行本点GPU数值重放。下一次完整screen评估在step3250。
+
 每100步token验证，每250步及epoch末完整生成/表征评测和checkpoint；每组结束后评估confirm留出集及AB specificity，刷新曲线并自动commit/push探索分支。全部9组结束后输出配对三种子统计，当前不宣称确认成功。后台进程独立于本次终端连接；机器重启后可用下列原指令恢复，控制器锁和trial锁防止重复运行，已完成试验经绑定校验后跳过。
 
 ```bash
@@ -280,7 +282,7 @@ bash /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/experiments/ar
 2026-10-28 首次显存 profile：A0/A1 均选择 micro56，九个56条 micro + 一个8条 micro，global512。最大长度2048、含 Adam 状态、3次实际优化器更新；A0 allocated62.89/reserved77.91 GiB，A1 allocated64.87/reserved79.41 GiB，总94.97 GiB。micro64 超过 reserved+外部占用85%门槛，选择56。8项CPU回归全部通过。
 
 <!-- ARCH70M_RESULTS_BEGIN -->
-自动记录更新时间：2026-10-28T22:08:54Z。原始日志：`/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_v8_20261028`。
+自动记录更新时间：2026-10-28T22:39:21Z。原始日志：`/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_v8_20261028`。
 
 | Trial | Status | Step | Micro × accumulation | Last train CE | Peak allocated GiB |
 |---|---|---:|---|---:|---:|
@@ -292,7 +294,7 @@ bash /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/experiments/ar
 | screen_A5_s42 | completed | 1276 / 1276 | 96 × 5 + 32 | 0.3173 | 25.9867 |
 | screen_A6_s42 | completed | 1276 / 1276 | 56 × 9 + 8 | 0.3120 | 21.5255 |
 | screen_A7_s42 | completed | 1276 / 1276 | 56 × 9 + 8 | 0.3157 | 21.5772 |
-| confirm_A0_s42 | training | 2751 / 3828 | 56 × 9 + 8 | 0.2581 | 21.5778 |
+| confirm_A0_s42 | training | 3003 / 3828 | 56 × 9 + 8 | 0.2813 | 21.5778 |
 | confirm_A0_s43 | pending | 0 / — | — | — | — |
 | confirm_A0_s44 | pending | 0 / — | — | — | — |
 | confirm_A5_s42 | pending | 0 / — | — | — | — |
