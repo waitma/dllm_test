@@ -42,6 +42,8 @@ A5按来源的正确减其他差值为ASD -0.56、OAS -0.80、OTS +0.18、TCR na
 
 2026-10-29 00:33:49 +08:00 已在当前开发机唯一 GPU0 启动持久后台队列，控制器 PID122888（flock）/122889（suite），首个worker PID122910。顺序为 A0 seed42/43/44 → A5 seed42/43/44 → A4 seed42/43/44，共9组；每组从头初始化3epochs、3828步，global512，micro沿用既定显存profile策略。仍是653,288条固定10%子集、原V8数据形式和筛选源码 SHA `053297983e0f2ece2aaad807032695fb5aebd1e0f221138a9bf0d202cc9b9ac4`。旧执行分工已归档，后续探索全部本机运行。
 
+2026-10-29 01:05 +08:00，首组confirm_A0_s42已完成step250的screen完整评测并保存checkpoint；token CE=1.050245、整链AAR=18.57%、宏AUROC=0.796904。六文件SHA独立复核通过；CPU严格加载75,741,903参数及80组Adam状态，优化器/scheduler步数250、LR、next_batch250和seen_records128000一致，权重/动量无非有限值，Python/NumPy/CPU/noise RNG可加载且CUDA RNG已保存。此为文件完整性与CPU加载检查，未做CUDA数值重放，未中断训练；独立confirm终点评测尚未开始。验证回执：[step250检查](/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/arch70m_results/confirmation_checkpoints/confirm_A0_s42_step250.json)。
+
 每100步token验证，每250步及epoch末完整生成/表征评测和checkpoint；每组结束后评估confirm留出集及AB specificity，刷新曲线并自动commit/push探索分支。全部9组结束后输出配对三种子统计，当前不宣称确认成功。后台进程独立于本次终端连接；机器重启后可用下列原指令恢复，控制器锁和trial锁防止重复运行，已完成试验经绑定校验后跳过。
 
 ```bash
@@ -234,7 +236,7 @@ bash /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/experiments/ar
 2026-10-28 首次显存 profile：A0/A1 均选择 micro56，九个56条 micro + 一个8条 micro，global512。最大长度2048、含 Adam 状态、3次实际优化器更新；A0 allocated62.89/reserved77.91 GiB，A1 allocated64.87/reserved79.41 GiB，总94.97 GiB。micro64 超过 reserved+外部占用85%门槛，选择56。8项CPU回归全部通过。
 
 <!-- ARCH70M_RESULTS_BEGIN -->
-自动记录更新时间：2026-10-28T16:36:24Z。原始日志：`/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_v8_20261028`。
+自动记录更新时间：2026-10-28T17:06:45Z。原始日志：`/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_v8_20261028`。
 
 | Trial | Status | Step | Micro × accumulation | Last train CE | Peak allocated GiB |
 |---|---|---:|---|---:|---:|
@@ -246,7 +248,7 @@ bash /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/experiments/ar
 | screen_A5_s42 | completed | 1276 / 1276 | 96 × 5 + 32 | 0.3173 | 25.9867 |
 | screen_A6_s42 | completed | 1276 / 1276 | 56 × 9 + 8 | 0.3120 | 21.5255 |
 | screen_A7_s42 | completed | 1276 / 1276 | 56 × 9 + 8 | 0.3157 | 21.5772 |
-| confirm_A0_s42 | training | 12 / 3828 | 56 × 9 + 8 | 3.2065 | 19.9444 |
+| confirm_A0_s42 | training | 264 / 3828 | 56 × 9 + 8 | 0.5244 | 21.5778 |
 | confirm_A0_s43 | pending | 0 / — | — | — | — |
 | confirm_A0_s44 | pending | 0 / — | — | — | — |
 | confirm_A5_s42 | pending | 0 / — | — | — | — |

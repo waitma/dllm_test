@@ -1,0 +1,123 @@
+{
+  "confirm_A0_s42_step250_checkpoint.json": {
+    "sha256": "7e887c165df0f0f367d2d7549693310de89d065cd0d89d1063483ebca2b0e5aa",
+    "result": {
+      "observed_utc": "2026-10-28T17:04:58.218980+00:00",
+      "checkpoint": "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_v8_20261028/trials/confirm_A0_s42/checkpoints/step_000250",
+      "status": "verified",
+      "step": 250,
+      "verified_files": {
+        "optimizer.pt": "e16690e8954764a7f1520cf36ad8d605cfad83a1266f99c0efad798b0e142a89",
+        "model.safetensors": "c1e1a4910a3432765c5698a15a3e2cac602e39652e66676f49b32e2a2766a287",
+        "binding.json": "179f1858fd24f5db200350a91042e98263b4e35aa525cfb80a99763aad82dcab",
+        "rng.pt": "0dbef2a17b19773415e73d9c61f89a2442985d33717bfb3874978baccf22ce2a",
+        "scheduler.pt": "741d71a00eea0b6e2d09c0fb1a9ab6cbfcd2b2e09c169a33c2a561d256d32966",
+        "state.json": "98823def00c9a4e3761e239f39e14c3b0fb7a592a5536e5eb795800e1e61f89c"
+      },
+      "source_sha256": "053297983e0f2ece2aaad807032695fb5aebd1e0f221138a9bf0d202cc9b9ac4",
+      "data_sha256": "4beaac6b54a1f46492533aeb77c2de2c6ac2a0bd8266fd57a6bb312679435c51",
+      "screen_metrics": {
+        "token_ce": 1.0502454946657376,
+        "generation": {
+          "sources": {
+            "cdr": {
+              "oas": {
+                "records": 32,
+                "ce": 1.4408778361976147,
+                "aar": 0.6661012060940266
+              },
+              "ots": {
+                "records": 32,
+                "ce": 1.3115324545651674,
+                "aar": 0.7133399378508329
+              }
+            },
+            "conditional": {
+              "asd_antibody": {
+                "records": 23,
+                "ce": 3.925677537918091,
+                "aar": 0.07268498914963258,
+                "validity": 1.0,
+                "length_mae": 86.82608695652173,
+                "missing_eos": 0
+              },
+              "oas": {
+                "records": 32,
+                "ce": 3.72153003513813,
+                "aar": 0.22307640420867886,
+                "validity": 1.0,
+                "length_mae": 38.6875,
+                "missing_eos": 0
+              },
+              "ots": {
+                "records": 32,
+                "ce": 3.7401392087340355,
+                "aar": 0.2392119525583661,
+                "validity": 1.0,
+                "length_mae": 22.03125,
+                "missing_eos": 0
+              },
+              "tcr_native": {
+                "records": 30,
+                "ce": 3.5088480869928995,
+                "aar": 0.20794311169464738,
+                "validity": 1.0,
+                "length_mae": 39.43333333333333,
+                "missing_eos": 0
+              }
+            }
+          },
+          "cdr_ce": 1.376205145381391,
+          "cdr_aar": 0.6897205719724298,
+          "conditional_ce": 3.724048717195789,
+          "conditional_aar": 0.18572911440283124,
+          "conditional_validity": 1.0,
+          "conditional_length_mae": 46.74454257246377
+        },
+        "representation": {
+          "sources": {
+            "tcr_papers": {
+              "auroc": 0.9010989010989011,
+              "auprc": 0.897142857142857,
+              "shuffled_auroc": 0.15934065934065933,
+              "train_records": 142,
+              "valid_records": 33
+            },
+            "trait": {
+              "auroc": 0.6927083333333333,
+              "auprc": 0.2444543308837126,
+              "shuffled_auroc": 0.42013888888888884,
+              "train_records": 241,
+              "valid_records": 73
+            }
+          },
+          "macro_auroc": 0.7969036172161172,
+          "macro_auprc": 0.5707985940132848,
+          "excluded_single_class_sources": []
+        }
+      }
+    }
+  },
+  "confirm_A0_s42_step250_cpu_load.json": {
+    "sha256": "b1982972009af385e3e313fb5ac977b6731e4d189a59f202f2bb6f2bcf30fce7",
+    "result": {
+      "observed_utc": "2026-10-28T17:05:53.595956+00:00",
+      "status": "passed",
+      "checkpoint": "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_v8_20261028/trials/confirm_A0_s42/checkpoints/step_000250",
+      "cpu_only": true,
+      "parameters": 75741903,
+      "strict_model_state_load": true,
+      "model_and_optimizer_finite": true,
+      "optimizer_states": 80,
+      "optimizer_steps": [
+        250
+      ],
+      "scheduler_last_epoch": 250,
+      "scheduler_lr_matches": true,
+      "state_cursor_matches": true,
+      "python_numpy_cpu_corruption_rng_loadable": true,
+      "cuda_rng_saved": true,
+      "limitation": "CPU structural/load verification only; CUDA replay was not executed and the live training process was not interrupted."
+    }
+  }
+}

@@ -1,3 +1,5 @@
+> Last updated: 2026-10-28T17:06:45.251027+00:00 (UTC)。本地确认首组A0 seed42完成step250完整screen评测和checkpoint；验证CE1.050245、整链AAR18.57%、宏AUROC0.796904。六文件SHA、CPU严格权重/Adam加载、scheduler与数据游标一致性检查通过，训练继续；未运行CUDA重放或独立confirm终点评测。已刷新全曲线与保存验证回执，9组队列、冻结源码、原10%数据与V8形式保持。详见[实验记录](/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/ARCH70M_EXPLORATION.md)。
+
 > Last updated: 2026-10-28T16:56:49.032358+00:00 (UTC)。新增CPU生成输入/目标区分诊断，八架构936条原AAR重算通过；A5正确目标与其他目标AAR分别37.02%/35.42%，需将通用序列恢复与条件特异性分开解释。核对6条TCR beta重复输出来自完全相同的MASK输入。产物、定义及输入SHA已记录；无额外GPU推理、未读confirm评测、未改原选择规则。本地九组确认仍运行，A0 seed42当前187/3828步；冻结源码及10%索引SHA核验保持。详见[实验记录](/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/ARCH70M_EXPLORATION.md)。
 
 > Last updated: 2026-10-28T16:49:32Z (UTC)。八组筛选936条整链输出独立重算与已发布AAR一致；A5相对A0参考位置覆盖率33.60%→95.82%，相同共同覆盖位置准确率37.87%→53.64%，过短输出107/117→0/117。属单种子筛选诊断，尚不构成确认胜出。已保存PNG/PDF/SVG、逐任务CSV及来源SHA；冻结训练源码和原10%数据索引SHA不变。九组本地确认队列继续运行，A0 seed42已至124/3828步，micro56/global512，未启动重复GPU任务或远端任务。详见[生成核查与实验记录](/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/ARCH70M_EXPLORATION.md)。
