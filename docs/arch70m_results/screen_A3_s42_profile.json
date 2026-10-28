@@ -1,0 +1,71 @@
+{
+  "variant": "A3",
+  "micro_batch": 56,
+  "grad_accum": 10,
+  "final_micro_batch": 8,
+  "length": 2048,
+  "candidates": [
+    {
+      "micro_batch": 8,
+      "status": "passed",
+      "allocated_bytes": 10944596992,
+      "reserved_bytes": 12480151552,
+      "external_bytes": 752287744,
+      "total_bytes": 101973950464,
+      "seconds_per_step": 0.6458270156678433,
+      "safe": true
+    },
+    {
+      "micro_batch": 16,
+      "status": "passed",
+      "allocated_bytes": 20790704640,
+      "reserved_bytes": 25262292992,
+      "external_bytes": 752287744,
+      "total_bytes": 101973950464,
+      "seconds_per_step": 0.7442278970071735,
+      "safe": true
+    },
+    {
+      "micro_batch": 32,
+      "status": "passed",
+      "allocated_bytes": 40480036864,
+      "reserved_bytes": 49457135616,
+      "external_bytes": 752287744,
+      "total_bytes": 101973950464,
+      "seconds_per_step": 1.4972347550016518,
+      "safe": true
+    },
+    {
+      "micro_batch": 64,
+      "status": "passed",
+      "allocated_bytes": 79853457920,
+      "reserved_bytes": 97513373696,
+      "external_bytes": 752287744,
+      "total_bytes": 101973950464,
+      "seconds_per_step": 2.9226645693415776,
+      "safe": false
+    },
+    {
+      "micro_batch": 48,
+      "status": "passed",
+      "allocated_bytes": 60165174784,
+      "reserved_bytes": 73586966528,
+      "external_bytes": 752287744,
+      "total_bytes": 101973950464,
+      "seconds_per_step": 2.206658660337174,
+      "safe": true
+    },
+    {
+      "micro_batch": 56,
+      "status": "passed",
+      "allocated_bytes": 70008464896,
+      "reserved_bytes": 85515567104,
+      "external_bytes": 752287744,
+      "total_bytes": 101973950464,
+      "seconds_per_step": 2.522862116321145,
+      "safe": true
+    }
+  ],
+  "device": "NVIDIA RPBZZZ6",
+  "note": "Three real optimizer updates at padded maximum length. Fresh initialization after profiling."
+}

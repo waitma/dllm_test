@@ -1,0 +1,85 @@
+{
+  "variant": "A5",
+  "micro_batch": 96,
+  "grad_accum": 6,
+  "final_micro_batch": 32,
+  "length": 2048,
+  "candidates": [
+    {
+      "micro_batch": 8,
+      "status": "passed",
+      "allocated_bytes": 7344580096,
+      "reserved_bytes": 8935964672,
+      "external_bytes": 750125056,
+      "total_bytes": 101973950464,
+      "seconds_per_step": 0.7204658383270726,
+      "safe": true
+    },
+    {
+      "micro_batch": 16,
+      "status": "passed",
+      "allocated_bytes": 13630837760,
+      "reserved_bytes": 18173919232,
+      "external_bytes": 750125056,
+      "total_bytes": 101973950464,
+      "seconds_per_step": 0.6546678133308887,
+      "safe": true
+    },
+    {
+      "micro_batch": 32,
+      "status": "passed",
+      "allocated_bytes": 26200732160,
+      "reserved_bytes": 35085352960,
+      "external_bytes": 752222208,
+      "total_bytes": 101973950464,
+      "seconds_per_step": 1.3084874096675776,
+      "safe": true
+    },
+    {
+      "micro_batch": 64,
+      "status": "passed",
+      "allocated_bytes": 51344452608,
+      "reserved_bytes": 68916609024,
+      "external_bytes": 752222208,
+      "total_bytes": 101973950464,
+      "seconds_per_step": 2.547670868652252,
+      "safe": true
+    },
+    {
+      "micro_batch": 128,
+      "status": "oom"
+    },
+    {
+      "micro_batch": 96,
+      "status": "passed",
+      "allocated_bytes": 76492105728,
+      "reserved_bytes": 83506495488,
+      "external_bytes": 752222208,
+      "total_bytes": 101973950464,
+      "seconds_per_step": 3.8677185046641775,
+      "safe": true
+    },
+    {
+      "micro_batch": 112,
+      "status": "passed",
+      "allocated_bytes": 89060689408,
+      "reserved_bytes": 97146372096,
+      "external_bytes": 752222208,
+      "total_bytes": 101973950464,
+      "seconds_per_step": 4.368151511007454,
+      "safe": false
+    },
+    {
+      "micro_batch": 104,
+      "status": "passed",
+      "allocated_bytes": 82775676928,
+      "reserved_bytes": 90326433792,
+      "external_bytes": 752222208,
+      "total_bytes": 101973950464,
+      "seconds_per_step": 4.090625300673612,
+      "safe": false
+    }
+  ],
+  "device": "NVIDIA RPBZZZ6",
+  "note": "Three real optimizer updates at padded maximum length. Fresh initialization after profiling."
+}
