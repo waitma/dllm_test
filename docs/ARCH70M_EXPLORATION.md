@@ -2,6 +2,22 @@
 
 2026-10-28，执行用户批准的计划。工作树 `/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore`，分支 `explore/arch70m-v8-20261028`。当前 1B 训练使用的工作树、冻结源码和输出未改动。
 
+## 2026-10-29 生成覆盖率与相同位置核查
+
+围绕持续目标“得到能够提升表现的架构”，对八组筛选终点的936条整链任务输出（每组117条）逐条重新计分，原发布AAR全部复现。只读取screen原始任务与已保存预测，不做新GPU推理、不读取confirm结果、不改变原选择或确认阈值。核查脚本位于[analyze_generation_coverage.py](/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/arch70m_results/analyze_generation_coverage.py)，不属于冻结训练源码。
+
+| A0 vs A5，筛选终点 | A0 | A5 |
+|---|---:|---:|
+| 参考序列位置覆盖率（来源宏平均） | 33.60% | 95.82% |
+| 两者共同覆盖位置的准确率（来源宏平均） | 37.87% | 53.64% |
+| 输出不足真实长度一半的任务 | 107 / 117 | 0 / 117 |
+
+共同覆盖位置按每条配对任务的 `min(A0预测长度,A5预测长度,参考长度)` 确定，因此两模型比较同一组位置；它是描述性筛选诊断，不替代原全参考长度AAR。四来源共同位置准确率分别为 ASD 32.82%→57.26%、OAS 43.51%→55.87%、OTS 37.42%→41.79%、TCR native 37.71%→59.65%。改善同时伴随提前EOS减少与共同位置预测更准确，不能仅归因于“生成长度更长”，也未由此证实跨链注意力的因果机制。
+
+整链生成中的CDR位置与“给定其余残基的CDR补全”是不同任务。基于精确FR/CDR注释的后验重算显示，OAS整链CDR AAR为5.82%→26.38%、OTS为8.60%→20.54%；这不改变此前CDR补全AAR 80.08%→79.36%的记录。所有指标均只作当前单种子筛选解释，确认阶段仍使用原来的独立留出集与三种子规则。
+
+产物：[诊断图](/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/arch70m_results/coverage_audit_20261029/coverage_diagnostic.png)、[来源汇总](/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/arch70m_results/coverage_audit_20261029/by_source.csv)、[相同位置比较](/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/arch70m_results/coverage_audit_20261029/shared_positions.csv)、[定义及日志SHA](/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/arch70m_results/coverage_audit_20261029/coverage_analysis.json)。
+
 ## 2026-10-29 本地三种子确认队列
 
 用户指示“继续探索，所有的都在本地这个机器上面跑”。八组筛选已全部完成，A7 于 2026-10-29 00:16:52 +08:00 结束，整链 AAR 13.89%、条件 CE 3.751843、CDR CE 0.815607、宏 AUROC 0.835241。依既定筛选规则冻结 A5 生成候选、A4 表征候选，以及 A0 对照；[selection.json](/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_v8_20261028/selection.json)保存八组终点评测SHA和选择分数。筛选选择没有使用confirm留出集。
