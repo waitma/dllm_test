@@ -1,0 +1,122 @@
+{
+  "observed_utc": "2026-10-28T20:07:36.348811+00:00",
+  "status": "verified_file_integrity_and_metadata",
+  "checkpoint": "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_v8_20261028/trials/confirm_A0_s42/checkpoints/step_001750",
+  "step": 1750,
+  "verified_files": {
+    "optimizer.pt": "3914697a32cc6820ce589bd32853bf5e46a3eadf2cc8e7536c521f3189915738",
+    "model.safetensors": "3d233ce279a7ede60b7ff0eb665a272300d336c91d870a4a566b99e13ddf5280",
+    "binding.json": "179f1858fd24f5db200350a91042e98263b4e35aa525cfb80a99763aad82dcab",
+    "rng.pt": "b02c9f91baf4bff6c2d668f398f1dcc4644ce34ab6c99fdfbde01dc5643583b3",
+    "scheduler.pt": "e06465727c4ee707d5c920fc8716205d96894b754df9bc23f3f4ab505b4cee50",
+    "state.json": "faebb30e77768f704807943bfce311bf414c0960b8bf5e8199d0e2f28f7f2299"
+  },
+  "state": {
+    "step": 1750,
+    "epoch": 1,
+    "next_batch": 474,
+    "seen_records": 895976,
+    "seen_tokens": 294223586,
+    "elapsed_train_seconds": 12550.029074933846,
+    "best_generation": 2.3925619906887574,
+    "best_representation": 0.8731398809523809,
+    "epoch_end_steps": [
+      1276
+    ],
+    "wandb_id": "68c9d1ab475b49898c0e64e91a8f05b9",
+    "best_generation_step": 500,
+    "best_representation_step": 1250
+  },
+  "source_sha256": "053297983e0f2ece2aaad807032695fb5aebd1e0f221138a9bf0d202cc9b9ac4",
+  "data_sha256": "4beaac6b54a1f46492533aeb77c2de2c6ac2a0bd8266fd57a6bb312679435c51",
+  "metrics_file_sha256": "53e43e15075973116902aebcaf1236d6d824048c32efdab1284a1fe6bbcc8040",
+  "observations_file_sha256": "266b9e7270a31a602d8d636848da2c91242e693ee17bdf968180d45a01a0f9a2",
+  "screen_metrics": {
+    "token_ce": 0.700540202976984,
+    "generation": {
+      "sources": {
+        "cdr": {
+          "oas": {
+            "records": 32,
+            "ce": 0.9650222542695701,
+            "aar": 0.74097197689116
+          },
+          "ots": {
+            "records": 32,
+            "ce": 0.5789418499916792,
+            "aar": 0.8573760334402323
+          }
+        },
+        "conditional": {
+          "asd_antibody": {
+            "records": 23,
+            "ce": 4.882313873456872,
+            "aar": 0.06742881963338529,
+            "validity": 1.0,
+            "length_mae": 90.43478260869566,
+            "missing_eos": 0
+          },
+          "oas": {
+            "records": 32,
+            "ce": 5.085204891860485,
+            "aar": 0.0876417858493587,
+            "validity": 1.0,
+            "length_mae": 86.3125,
+            "missing_eos": 0
+          },
+          "ots": {
+            "records": 32,
+            "ce": 4.6016741171479225,
+            "aar": 0.11789610531597446,
+            "validity": 1.0,
+            "length_mae": 79.40625,
+            "missing_eos": 0
+          },
+          "tcr_native": {
+            "records": 30,
+            "ce": 4.057781100273132,
+            "aar": 0.09853446713669488,
+            "validity": 1.0,
+            "length_mae": 87.03333333333333,
+            "missing_eos": 0
+          }
+        }
+      },
+      "cdr_ce": 0.7719820521306247,
+      "cdr_aar": 0.7991740051656961,
+      "conditional_ce": 4.656743495684603,
+      "conditional_aar": 0.09287529448385333,
+      "conditional_validity": 1.0,
+      "conditional_length_mae": 85.79671648550723
+    },
+    "representation": {
+      "sources": {
+        "tcr_papers": {
+          "auroc": 0.9175824175824175,
+          "auprc": 0.9025974025974024,
+          "shuffled_auroc": 0.13736263736263735,
+          "train_records": 142,
+          "valid_records": 33
+        },
+        "trait": {
+          "auroc": 0.7829861111111112,
+          "auprc": 0.40379341478901415,
+          "shuffled_auroc": 0.4114583333333333,
+          "train_records": 241,
+          "valid_records": 73
+        }
+      },
+      "macro_auroc": 0.8502842643467643,
+      "macro_auprc": 0.6531954086932082,
+      "excluded_single_class_sources": []
+    }
+  },
+  "generation_observations": 181,
+  "representation_observations": 106,
+  "contiguous_training_records": 1753,
+  "training_losses_and_gradients_finite": true,
+  "limitations": [
+    "Intermediate screen evaluation only; final confirm holdout remains unused.",
+    "Six checkpoint files verified against receipt; no GPU checkpoint replay or numerical-resume test was performed at step 1750."
+  ]
+}
