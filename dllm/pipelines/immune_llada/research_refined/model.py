@@ -3,6 +3,9 @@
 After activating pllm: python -m pytest scripts/tests/immune_llada/test_research_refined.py -q
 The 768/8/12/3072 backbone is unchanged; compact protein vocabulary removes unused
 text embedding/head parameters. Each release has distinct experiment identifiers.
+
+Historical ablation implementation. Current FixedChainModel is self-contained
+in immune_llada/fixed_chain/model.py and no longer inherits this class.
 """
 from dataclasses import asdict
 import json

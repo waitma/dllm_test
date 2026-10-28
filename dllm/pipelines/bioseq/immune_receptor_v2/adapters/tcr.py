@@ -3,7 +3,7 @@
 Run a bounded build with::
 
     conda run -n pllm python \
-      /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/data/build_immune_receptor_v2.py \
+      /mnt/project-storage/fset-rN4kfh/251105016/dllm_test/scripts/data/build_immune_receptor_v2.py \
       build-tcr --limit-per-source 100
 """
 

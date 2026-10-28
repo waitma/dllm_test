@@ -286,3 +286,12 @@ checkpoint-*/
 !/docs/archive/job_yamls_20260930/manifest.json
 !/docs/archive/job_yamls_20260930/train_jobs/protein_esmc_llada270m_diffusion_immune_v5_8gpu.yml
 !/docs/archive/job_yamls_20260930/train_jobs/protein_esmc_llada270m_diffusion_immune_v5_8gpu_spot.yml
+
+# Approved isolated architecture experiment artifacts.
+/output/
+/experiments/arch70m/__pycache__/
+!/experiments/arch70m/*.json
+!/experiments/arch70m/*.md
+!/docs/ARCH70M_EXPLORATION.md
+!/docs/arch70m_results/
+!/docs/arch70m_results/**

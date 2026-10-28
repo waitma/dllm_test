@@ -1,0 +1,68 @@
+{
+  "updated": "2026-10-28T02:27:56Z",
+  "output_root": "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_v8_20261028",
+  "trials": [
+    {
+      "trial": "screen_A0_s42",
+      "status": "profiling",
+      "step": 0,
+      "total_steps": null,
+      "parameters": 75741903,
+      "micro_batch": 56,
+      "grad_accum": 10,
+      "final_micro_batch": 8
+    },
+    {
+      "trial": "screen_A1_s42",
+      "status": "profiling",
+      "step": 0,
+      "total_steps": null,
+      "parameters": 75742927,
+      "micro_batch": 56,
+      "grad_accum": 10,
+      "final_micro_batch": 8
+    },
+    {
+      "trial": "screen_A2_s42",
+      "status": "pending",
+      "step": 0,
+      "total_steps": null,
+      "parameters": 75815727
+    },
+    {
+      "trial": "screen_A3_s42",
+      "status": "pending",
+      "step": 0,
+      "total_steps": null,
+      "parameters": 75816751
+    },
+    {
+      "trial": "screen_A4_s42",
+      "status": "pending",
+      "step": 0,
+      "total_steps": null,
+      "parameters": 75754191
+    },
+    {
+      "trial": "screen_A5_s42",
+      "status": "pending",
+      "step": 0,
+      "total_steps": null,
+      "parameters": 75741903
+    },
+    {
+      "trial": "screen_A6_s42",
+      "status": "pending",
+      "step": 0,
+      "total_steps": null,
+      "parameters": 75741903
+    },
+    {
+      "trial": "screen_A7_s42",
+      "status": "pending",
+      "step": 0,
+      "total_steps": null,
+      "parameters": 75741903
+    }
+  ]
+}

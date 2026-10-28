@@ -1,0 +1,9 @@
+final_micro_batch,grad_accum,micro_batch,parameters,status,step,total_steps,trial
+8,10,56,75741903,profiling,0,,screen_A0_s42
+8,10,56,75742927,profiling,0,,screen_A1_s42
+,,,75815727,pending,0,,screen_A2_s42
+,,,75816751,pending,0,,screen_A3_s42
+,,,75754191,pending,0,,screen_A4_s42
+,,,75741903,pending,0,,screen_A5_s42
+,,,75741903,pending,0,,screen_A6_s42
+,,,75741903,pending,0,,screen_A7_s42

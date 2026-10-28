@@ -3,7 +3,7 @@
 Use through the main data builder or run its focused tests with::
 
     conda run -n pllm python -m pytest \
-      /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/tests/bioseq/test_immune_receptor_v2.py -q
+      /mnt/project-storage/fset-rN4kfh/251105016/dllm_test/scripts/tests/bioseq/test_immune_receptor_v2.py -q
 """
 
 from __future__ import annotations

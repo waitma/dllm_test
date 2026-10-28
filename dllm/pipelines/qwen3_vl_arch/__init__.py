@@ -9,7 +9,7 @@ from __future__ import annotations
 from typing import Any
 
 SOURCE_ROOT = (
-    "/vepfs-mlp2/c20250601/251105016/project/dllm_test/base_model/"
+    "/mnt/project-storage/fset-rN4kfh/251105016/dllm_test/base_model/"
     "Qwen3-VL/qwen-vl-finetune/qwenvl/model"
 )
 

@@ -34,7 +34,7 @@ class PairingSource:
     buckets: tuple[str, ...]
 
 
-PROJECT_ROOT = Path("/vepfs-mlp2/c20250601/251105016/project/dllm_test")
+PROJECT_ROOT = Path("/mnt/project-storage/fset-rN4kfh/251105016/dllm_test")
 DEFAULT_PAIRING_SOURCES = (
     PairingSource(
         "oas",

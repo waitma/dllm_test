@@ -79,7 +79,7 @@ TOKEN_CLASS_NAMES = {
 }
 
 DEFAULT_GRAMMAR_DATA_DIR = Path(
-    "/vepfs-mlp2/c20250601/251105016/project/dllm_test/data/bioseq_grammar_v1"
+    "/mnt/project-storage/fset-rN4kfh/251105016/dllm_test/data/bioseq_grammar_v1"
 )
 
 # Fixed ESMC canvas lengths include the leading <cls>. Decoder slots are the

@@ -1,3 +1,5 @@
+> 2026-10-28 探索分支二级确认：75M A0+两候选的最后 epoch checkpoint 使用现有官方 specificity 五折及固定 100 epoch 头，输入采用已审计 fixed-v2-fv（2/4398 对转换），隐藏 relation、观测残基 global mean；不得混称 full-chain 主榜结果，不以外层测试选候选或 epoch。数据 SHA/恢复校验与待执行状态见 [架构探索实验记录](/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/ARCH70M_EXPLORATION.md)。
+
 # AB Native Frozen Probes — 我们的 ESMC + LLaDA 模型
 
 > 2026-09-30 历史作业配置整理：已归档 YAML 的位置见 [归档索引](/vepfs-mlp2/c20250601/251105016/project/dllm_test/docs/archive/job_yamls_20260930/README.md)；文中的旧提交命令及原路径文字保留作历史记录，复用配置前请先按索引定位。

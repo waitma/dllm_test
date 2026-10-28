@@ -3,7 +3,7 @@
 Run the end-to-end builder with::
 
     conda run -n pllm python \
-      /vepfs-mlp2/c20250601/251105016/project/dllm_test/scripts/data/build_immune_receptor_v2.py all
+      /mnt/project-storage/fset-rN4kfh/251105016/dllm_test/scripts/data/build_immune_receptor_v2.py all
 """
 
 from .audit import audit_records, merge_exact_measurements
