@@ -1,3 +1,5 @@
+> 2026-10-28T10:07:06Z：补交根目录独立四卡 shell，复用原 suite；A0/A1 源码绑定不变。检查发现驱动查询 0,1,2,3 时会只返回 GPU0 且 exit 0，首次单卡负向检查意外进入调度：A0 自动跳过，A1/A2/A3 在 CUDA 初始化失败，均无新增训练步。调度器把 A1 已完成状态误写 failed，自动产生 78c1a03；该提交仅反映入口检查失败，不代表原 A1 训练失败。已验证两组最终 checkpoint receipt 的全部 SHA、训练日志仍各 1276 步，恢复真实 completed 状态；A2/A3 未开始的检查目录移入 [入口检查证据](/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_v8_20261028/validation/four_gpu_launcher_20261028T100322Z/reconciliation.json)。入口改为校验实际返回四个不同 GPU UUID；模拟四卡转发、重复/缺卡拒绝、真实单卡拒绝及源码绑定检查均通过，未进行四卡实跑。曲线已按原真实结果刷新。
+
 > 2026-10-28T09:56:24Z：核对 A0/A1 均已完成 1276 步筛选及最终完整评估，checkpoint-1276 和全部逐步曲线已保存；筛选 2/8，三种子确认未开始。QK Norm 在本轮条件 CE 上更低，但整链 AAR、CDR 指标没有同步改善，表征宏平均 AUROC 差异小，尚不能判优。结果提交 10f2a3a / 097d88f；训练成功，远程发布因 GitHub 凭据缺失失败。指标、限制与图见 [架构探索实验记录](/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/ARCH70M_EXPLORATION.md)。
 
 > 2026-10-28T02:32:25.344359+00:00：A0/A1 本地筛选队列已启动；micro56、global512；8项CPU检查及真实GPU评估通过。实现commit e3c6692，远程push因凭据缺失未成功；终态及完整曲线以架构探索记录为准。

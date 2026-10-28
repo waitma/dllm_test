@@ -140,6 +140,7 @@ bash /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/experiments/ar
 
 ## 实施与检查记录
 
+- 独立四卡 shell：语法、screen/confirm 与多机参数转发、可见设备继承、缺卡/重复卡拦截通过；驱动可能忽略无效编号并返回成功，入口额外验证实际四个不同 GPU UUID。当前开发机只有一卡，未做四卡实跑。入口初次检查造成的 A1 状态误标已依据最终 checkpoint 全部文件 SHA 和原始训练/评估记录纠正，无新增训练步；原始异常、未开始的 A2/A3 检查输出及恢复回执均保留在 [检查证据](/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_v8_20261028/validation/four_gpu_launcher_20261028T100322Z/reconciliation.json)。
 - 从正式 V8 源码建立隔离工作树；没有启动/取消/改写现役 1B 作业。
 - CPU：原版 A0 初始权重、前向、梯度逐位一致；八变体有限梯度；累积归一化；checkpoint/Adam/RNG 保存恢复；标签隔离；目标长度隐藏；常量门控控制；新参数序列化；机器分片和配对统计检查。
 - 真实数据、小尺寸模型、GPU：完整 screen token/generation/probe 评估流程通过。此检查只验证管线，不作为 75M 架构实验结果。
@@ -152,14 +153,14 @@ bash /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/experiments/ar
 2026-10-28 首次显存 profile：A0/A1 均选择 micro56，九个56条 micro + 一个8条 micro，global512。最大长度2048、含 Adam 状态、3次实际优化器更新；A0 allocated62.89/reserved77.91 GiB，A1 allocated64.87/reserved79.41 GiB，总94.97 GiB。micro64 超过 reserved+外部占用85%门槛，选择56。8项CPU回归全部通过。
 
 <!-- ARCH70M_RESULTS_BEGIN -->
-自动记录更新时间：2026-10-28T10:03:30Z。原始日志：`/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_v8_20261028`。
+自动记录更新时间：2026-10-28T10:06:50Z。原始日志：`/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_v8_20261028`。
 
 | Trial | Status | Step | Micro × accumulation | Last train CE | Peak allocated GiB |
 |---|---|---:|---|---:|---:|
 | screen_A0_s42 | completed | 1276 / 1276 | 56 × 9 + 8 | 0.3116 | 21.5761 |
-| screen_A1_s42 | failed | 1276 / — | 56 × 9 + 8 | 0.3126 | 22.5498 |
-| screen_A2_s42 | failed | 0 / — | — | — | — |
-| screen_A3_s42 | failed | 0 / — | — | — | — |
+| screen_A1_s42 | completed | 1276 / 1276 | 56 × 9 + 8 | 0.3126 | 22.5498 |
+| screen_A2_s42 | pending | 0 / — | — | — | — |
+| screen_A3_s42 | pending | 0 / — | — | — | — |
 | screen_A4_s42 | pending | 0 / — | — | — | — |
 | screen_A5_s42 | pending | 0 / — | — | — | — |
 | screen_A6_s42 | pending | 0 / — | — | — | — |
