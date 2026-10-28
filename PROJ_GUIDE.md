@@ -1,3 +1,5 @@
+> 2026-10-28 用户再次明确：架构探索始终沿用当前 V8 数据形式。原 prepared JSONL 字段、链序列与顺序、角色/元数据、relation/family 标签、tokenizer/词表/特殊 token、固定链输入布局保持；10% 子集只选择原记录的 offsets，独立实验索引不构成训练数据格式升级。后续架构变体遵守同一约束。
+
 > 2026-10-28 探索工作树规则：本目录 `/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore` 仅提交/推送 `explore/arch70m-v8-20261028`。所有架构试验使用独立单 GPU worker 和不可变源码快照，四卡并行试验，不调用 DDP/NCCL。global batch 512 固定，micro 由最大长度三次实际 optimizer update 的显存 profile 决定。原 `/mnt/project-storage/fset-rN4kfh/251105016/dllm_test` 训练版本只读；长训不受改动。入口、恢复、发布规则见 [架构探索实验记录](/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/ARCH70M_EXPLORATION.md)。
 
 

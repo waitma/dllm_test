@@ -2,6 +2,8 @@
 
 # 当前训练数据与格式
 
+2026-10-28 用户确认架构探索的数据格式冻结：保持当前 V8 prepared JSONL 记录及原 reader/collator 输入约定。核对探索索引的 109 个训练分片，路径与内容 SHA 均与父索引一致；10% 子集仅另存原记录 offsets。`arch70m.data.v1` 标识实验采样清单，未替换原训练记录 schema。原字段、链序列/顺序、角色、元数据、relation/family 标签、词表/特殊 token 与固定链布局保持。评估的来源/受体分组信息仅为外围记账，不写回原记录。本次仅记录约束，未重建数据、修改训练代码或重启作业。
+
 2026-10-27 1B测试新增物化迁移绑定 `immune.bert_mlm.materialized_v8.v1`：独立index/binding/manifest位于 `/mnt/project-storage/fset-rN4kfh/251105016/dllm_test/output/bert_v8_1b_test_20261027/data`，全部运行路径使用新存储。原plan/index/binding/manifest/config/reader验收文件只作为归档证据，不读取旧路径。门禁比较原证据哈希链、121分片集合/顺序/offset、开发集、reader/objective可执行AST、family词表和布局，允许四个模型尺寸字段变化，再执行原训练器全量分片SHA。6,604,459条记录及划分不变；未改原数据或历史绑定。CPU另抽读全部分片首尾242条。历史父目录未完整迁移，故不冒称原符号链接递归门禁在新机器可运行。[详情](/mnt/project-storage/fset-rN4kfh/251105016/dllm_test/docs/BERT_1B_TEST_20261027.md)。
 
 > 2026-10-27 ownkaifa02 已同步 V8 four-relations r2、Diffusion V7 及现役下游输入；文件字节保持源 SHA-256，跨目录数据链接物化为普通文件。未改划分、标签或评分口径；index/binding 路径迁移尚待验收。详见 [OWNKAIFA02_TRANSFER_20261027.md](/mnt/project-storage/fset-rN4kfh/251105016/dllm_test/docs/OWNKAIFA02_TRANSFER_20261027.md)。

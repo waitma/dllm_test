@@ -2,6 +2,8 @@
 
 The user explicitly authorized local single-GPU ablations and publication to `explore/arch70m-v8-20261028`. This worktree is `/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore`. Keep the production worktree and active training bundles read-only. Update documentation in this exploration worktree. Four GPUs run independent trials. See docs/ARCH70M_EXPLORATION.md for the approved protocol.
 
+User constraint reaffirmed 2026-10-28: preserve the current V8 prepared JSONL record format and model input conventions throughout architecture exploration. Keep chain sequences/order/roles, metadata, relation/family labels, tokenizer/vocabulary, special tokens and fixed-chain layout unchanged. The approved 10% sampling changes only selected record offsets; experiment manifests and evaluation bookkeeping are separate from the training record schema. Reuse the frozen reader/collator. Do not introduce data-format migrations as part of architecture trials.
+
 # Markdown Guidelines
 
 - This ownkaifa02 copy now includes V8 four-relations r2, current V7 diffusion inputs, the latest V-family scratch launch bundles, and current AB/TCR evaluation inputs. Transfer receipts and runtime path/hash migration requirements: `/mnt/project-storage/fset-rN4kfh/251105016/dllm_test/docs/OWNKAIFA02_TRANSFER_20261027.md`. No training/evaluation was started by the transfer.

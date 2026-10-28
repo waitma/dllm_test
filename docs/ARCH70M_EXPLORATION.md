@@ -27,6 +27,8 @@ QK norm 参考 [Qwen3 技术报告](https://arxiv.org/html/2505.09388v1)；门�
 
 ## 数据与防泄漏边界
 
+**2026-10-28 用户确认：所有架构探索保持当前数据形式。** 沿用 V8 prepared JSONL 的字段、链序列与顺序、chain roles/metadata、relation/family 标签，以及现有 tokenizer、词表、特殊 token 和固定链输入布局；复用冻结的 reader/collator。10% 抽样只选择原记录 offsets。独立实验索引与评估记账信息不改变训练记录 schema，不为架构变体新增或转换输入格式。已核对 109 个训练分片的路径与内容 SHA 均与父索引相同；本次仅补充约束，正在运行的实验无需变动。
+
 原数据只读：`/mnt/project-storage/fset-rN4kfh/251105016/dllm_test/data/prepared/immune_v8_four_relations_20261026_r2`。使用当前验证过的父 index，每个训练分片内按 relation、receptor signature 分层，以确定性 hash 选约十分之一，最小分层至少 1 条。不是“只读开头 10%”。训练索引、验证样本和全部输入 SHA 固定在探索 output 的 `data/index.json`。
 
 先排除所有原 valid 和 protected probe_valid 的 observed receptor identity，再排除 AB specificity 全部 4398 个样本的完整链及已审计 Fv 对。identity 包含角色和真实观测序列，去掉 synthetic residues，涵盖 VHH。保护的是精确受体组合，**不声称同源性、单链或结构簇完全隔离**。原 probe_train 只用于拟合冻结特征头，不加入额外预训练步骤。
