@@ -2,6 +2,16 @@
 
 2026-10-28，执行用户批准的计划。工作树 `/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore`，分支 `explore/arch70m-v8-20261028`。当前 1B 训练使用的工作树、冻结源码和输出未改动。
 
+## 2026-10-29 A4残差尺度检查
+
+本地确认运行期间，只在CPU读取A4已完成筛选的step500/1250/1276权重；模型、binding和state的SHA均与checkpoint回执一致。检查48个尺度向量，每个768维，无非有限值。冻结源码未改，没有额外GPU推理或使用confirm结果。脚本：[inspect_residual_scales.py](/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/arch70m_results/inspect_residual_scales.py)。
+
+A4新增的12,288个参数是8层×2条残差分支×768通道的尺度系数，初始均为0.1。筛选终点的FFN系数通道均值按层依次为0.095983、0.097109、0.099781、0.102425、0.104981、0.106650、0.108567、0.109889；首层相对初值-4.02%，末层+9.89%。attention尺度也不相同，例如第5层链内attention均值0.107428，第6层全局attention均值0.099855。A0保持固定0.1；其尺度是非持久buffer，不应因checkpoint中没有这些键而误认为尺度不存在。
+
+这证明本轮A4确实学到了层间和通道间不同的尺度，不是所有层始终维持初值。它只提供后续检验分层残差设计的线索：系数不是attention概率，也不直接代表分支输出贡献，其他投影权重可以共同适应，不能将单种子的AUROC改善因果归于该曲线。图中阴影为同一层768通道的标准差，不是三种子置信区间。九组三种子确认和原判定规则保持，尚未据此新增或替换候选。
+
+产物：[尺度图](/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/arch70m_results/residual_scale_audit_20261029/residual_scales.png)、[三个checkpoint逐层CSV](/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/arch70m_results/residual_scale_audit_20261029/layer_scales.csv)、[定义与权重SHA](/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/arch70m_results/residual_scale_audit_20261029/residual_scale_analysis.json)。同目录包含PDF/SVG。
+
 ## 2026-10-29 生成输入与目标区分诊断
 
 在本地确认队列运行期间，进一步检查八组筛选输出是否只体现通用序列恢复。CPU复用冻结collator与make_tasks，重建117条整链任务的七项实际denoise输入（整条目标槽位已MASK），并核验936条已保存预测的原AAR。没有读取confirm评测或重新推理；脚本位于[audit_generation_context.py](/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/arch70m_results/audit_generation_context.py)。
