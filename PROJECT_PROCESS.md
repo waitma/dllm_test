@@ -1,3 +1,5 @@
+> Last updated: 2026-10-28T19:40:53.908345+00:00 (UTC)。本地A0确认step1500完整screen评测与checkpoint已核验：token CE0.710401、CDR AAR80.42%、整链AAR10.67%、宏AUROC0.836977。整链指标较首轮末部分恢复，表征AUROC回落；best生成500/best表征1250保持。六文件SHA、数据游标及原冻结绑定通过，完整曲线/CSV与回执已更新。当前1529/3828步，九组确认继续在本机执行；原V8形式、固定10%子集保持，尚无三种子确认结论。详见[实验记录](/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/ARCH70M_EXPLORATION.md)。
+
 > Last updated: 2026-10-28T19:11:15.354565+00:00 (UTC)。本地A0确认第一轮完成，step1250/1276完整screen评估与checkpoint已核验并更新曲线。1276步token CE0.717845、整链AAR9.25%、CDR AAR80.00%、宏AUROC0.861855；1250步AUROC峰值0.873140，best生成仍为500、best表征为1250。首轮游标epoch=1/next_batch=0、累计653288条与日志一致；原V8形式、10%子集和冻结源码保持。当前1288/3828步，第二轮继续，九组确认尚未完成。详见[实验记录](/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/ARCH70M_EXPLORATION.md)。
 
 > Last updated: 2026-10-28T18:37:31.920543+00:00 (UTC)。本地A0确认step1000完整screen评估与checkpoint完成：token CE0.725498、整链AAR10.65%、CDR AAR79.50%、宏AUROC0.851295。token/CDR继续改善，整链AAR基本持平而条件CE升高；best生成/表征仍为step500。六文件SHA、数据游标和冻结绑定通过，已更新完整曲线/CSV及回执。训练当前1014/3828步，九组队列继续在本机执行，原V8形式与固定10%子集保持。详见[实验记录](/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/ARCH70M_EXPLORATION.md)。
