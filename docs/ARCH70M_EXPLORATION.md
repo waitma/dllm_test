@@ -1,5 +1,9 @@
 # V8 约 70M 架构探索实验记录
 
+## 新增本地第二轮（2026-10-29 UTC）
+
+B1全局＋可学习残差，B2每层链内→全局并保持参数预算，B3二者组合；三组约75.75M，单GPU串行，仅seed43/1epoch/micro56/global512。原V8形式及653,288条固定10%子集、原目标/评估保持；A0/A4/A5 seed43同预算对照已完成。8项CPU验证与快照导入通过，本节记录启动前状态；后续进度见独立[方案与运行记录](/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/ARCH70M_ROUND2.md)、[曲线与报告](/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/arch70m_results/round2/REPORT.md)。本地任务不重启旧三种子确认，不影响八卡独立复核。
+
 ## 当前复核：8卡、每卡独立、仅新增 seed43（2026-10-29）
 
 2026-10-29 09:29(+08)首轮八卡启动失败，8/8均为step0；原始console显示`torch.cuda.set_device(0)`处`No CUDA GPUs are available`，不是训练后的指标失败。外围启动器误将nvidia-smi的NVML UUID传入CUDA_VISIBLE_DEVICES；本机实际复现：数字0可执行CUDA运算，NVML UUID选择失败，CUDA属性返回的UUID与NVML不同。另有复制的Git代理127.0.0.1:10808不可达；旧publication异常覆盖了训练退出码，导致外层只看到publication_failed。

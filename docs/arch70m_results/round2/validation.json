@@ -1,0 +1,20 @@
+{
+  "created": "2026-10-29T04:51:11Z",
+  "status": "CPU_and_frozen_adapter_checks_passed",
+  "tests": 8,
+  "source_sha256": "93518fa2a14bc029e808cefae7aef8c38d79804683bb5274af27ff5f4e67d65e",
+  "base_source_sha256": "053297983e0f2ece2aaad807032695fb5aebd1e0f221138a9bf0d202cc9b9ac4",
+  "data_sha256": "4beaac6b54a1f46492533aeb77c2de2c6ac2a0bd8266fd57a6bb312679435c51",
+  "records": 653288,
+  "seed": 43,
+  "micro_batch": 56,
+  "global_batch": 512,
+  "epochs": 1,
+  "parameters": {
+    "B1": 75754191,
+    "B2": 75748047,
+    "B3": 75766479
+  },
+  "snapshot": "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_round2_20261029/sources/93518fa2a14bc029e808cefae7aef8c38d79804683bb5274af27ff5f4e67d65e",
+  "frozen_adapter_stdout": "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_round2_20261029/sources/93518fa2a14bc029e808cefae7aef8c38d79804683bb5274af27ff5f4e67d65e\n/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_round2_20261029/sources/93518fa2a14bc029e808cefae7aef8c38d79804683bb5274af27ff5f4e67d65e/architecture_round2/models.py\n93518fa2a14bc029e808cefae7aef8c38d79804683bb5274af27ff5f4e67d65e"
+}
