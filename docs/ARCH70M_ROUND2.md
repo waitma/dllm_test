@@ -1,6 +1,6 @@
 # 本地第二轮架构探索：B1 / B2 / B3
 
-2026-10-29，按用户“本地的架构可以开新的探索”启动独立后续实验。当前为启动前检查完成，等待本机 GPU0 串行执行；具体实时进度以输出目录 status.json 为准，不持续人工轮询。
+2026-10-29，按用户“本地的架构可以开新的探索”启动独立后续实验。当前本机GPU0已启动B1正式训练，启动核验时step11/1276；B2、B3随后串行。具体实时进度以输出目录status.json为准，不持续人工轮询。
 
 | 变体 | 相对现有模型的改动 | 参数量 | 主要比较 |
 |---|---|---:|---|
@@ -46,3 +46,9 @@ bash /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/launch_arch70m
 每组结束自动刷新报告、完整曲线PNG/PDF/SVG及CSV，commit/push到 `explore/arch70m-v8-20261028`。推送失败保留本地提交、记录pending，不改变训练退出码；共享发布锁避免与八卡报告相互覆盖。不改生产工作树 `/mnt/project-storage/fset-rN4kfh/251105016/dllm_test`。
 
 所有指标分别呈现，不以较低训练loss代替生成/表征改善；只比较同seed同epoch终点，保留完整中间曲线。整链AAR受长度、保守区域影响，须并看条件CE、长度误差、CDR及表征AUROC/AUPRC；本轮单种子筛选不能给显著性或结合特异性结论。
+
+## 实际启动回执（2026-10-29T04:57:31Z UTC）
+
+控制器PID193460，B1 worker PID193467；实际命令已从/proc核验为冻结快照下的`--train-one B1`。最大长度2048/micro56的3次真实更新通过，峰值allocated=41.96GiB、reserved=55.78GiB，外部显存计入后仍低于85%门槛。随后全新exec已进入正式训练，首次核验step1，当前记录step11，MLM loss=2.973250且梯度有限；这些只是启动检查，尚无本轮终点改善结论。B2/B3真实GPU检查在各自启动时执行。
+
+[启动证据](/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/arch70m_results/round2/startup_verified.json)。完成这一轮启动核验后不持续人工轮询，后台控制器按既定顺序自动执行与发布。

@@ -1,3 +1,5 @@
+> 2026-10-29（UTC）第二轮B1已通过真实GPU micro56/2048显存门槛并从新初始化进入正式训练，B2/B3按序待运行；原seed43/global512/1epoch协议保持。8项CPU检查覆盖新层次mask、梯度重计算和恢复；不代表B2/B3真实GPU已通过或新架构已改善。启动回执 /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/arch70m_results/round2/startup_verified.json。
+
 > 2026-10-29（UTC）用户授权本地新增第二轮探索：B1=A5全局＋可学习残差；B2=每层链内→全局→FFN2048；B3=B2＋可学习残差，三者约75.75M。仅seed43、1epoch、micro56/global512，复用A0/A4/A5同seed同预算对照及原10%数据；B2/B3同时调整attention/FFN预算，不能只归因注意力顺序。原目标/评估与V8形式保持，新源码独立快照。8项CPU检查及冻结适配通过；GPU实测待启动。详见[第二轮方案](/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/ARCH70M_ROUND2.md)。
 
 > 2026-10-29（+08:00）用户将架构复核预算收敛为“仅再验证一个seed”：新增A0–A7 × seed43，各从头训练1epoch，与已完成seed42同预算对照；八卡各执行独立单GPU进程，统一micro56、global512。冻结原V8数据形式、653,288条10%子集和模型/训练源码；只新增外部启动/汇总工具。旧A0/A5/A4 × 三种子三epoch派发计划终止后续调度，已运行的A0 seed42保留完成并独立记录，不能混入1epoch配对比较。新报告只呈现seed42/43终点和完整曲线，不沿用原三种子显著性规则；seed42的A5原micro96，相关数值累积差异仍须披露。详见[当前实验入口](/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/launch_arch70m_8gpu.sh)。
