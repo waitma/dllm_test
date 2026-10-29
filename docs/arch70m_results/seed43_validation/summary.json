@@ -1,5 +1,5 @@
 {
-  "updated": "2026-10-29T00:09:05Z",
+  "updated": "2026-10-29T01:29:42Z",
   "seed": 43,
   "training_epochs": 1,
   "trials": [
@@ -3719,56 +3719,56 @@
       "trial": "screen_A0_s43",
       "variant": "A0",
       "seed": 43,
-      "status": "pending",
+      "status": "failed",
       "step": 0
     },
     {
       "trial": "screen_A1_s43",
       "variant": "A1",
       "seed": 43,
-      "status": "pending",
+      "status": "failed",
       "step": 0
     },
     {
       "trial": "screen_A2_s43",
       "variant": "A2",
       "seed": 43,
-      "status": "pending",
+      "status": "failed",
       "step": 0
     },
     {
       "trial": "screen_A3_s43",
       "variant": "A3",
       "seed": 43,
-      "status": "pending",
+      "status": "failed",
       "step": 0
     },
     {
       "trial": "screen_A4_s43",
       "variant": "A4",
       "seed": 43,
-      "status": "pending",
+      "status": "failed",
       "step": 0
     },
     {
       "trial": "screen_A5_s43",
       "variant": "A5",
       "seed": 43,
-      "status": "pending",
+      "status": "failed",
       "step": 0
     },
     {
       "trial": "screen_A6_s43",
       "variant": "A6",
       "seed": 43,
-      "status": "pending",
+      "status": "failed",
       "step": 0
     },
     {
       "trial": "screen_A7_s43",
       "variant": "A7",
       "seed": 43,
-      "status": "pending",
+      "status": "failed",
       "step": 0
     }
   ],

@@ -1,6 +1,6 @@
 # A0–A7：仅新增 seed 43
 
-更新时间：2026-10-29T00:09:08Z；完成 0/8。
+更新时间：2026-10-29T01:29:45Z；完成 0/8。
 
 固定原V8形式、653,288条10%子集；每组从头初始化1epoch/1276步，global512。
 八张卡各自执行一个单GPU进程，没有DDP/NCCL；统一micro batch由manifest记录。
@@ -9,14 +9,14 @@
 
 | 架构 | seed43状态 | step | 整链AAR | CDR AAR | AUROC | AUPRC |
 |---|---|---:|---:|---:|---:|---:|
-| A0 | pending | 0 | — | — | — | — |
-| A1 | pending | 0 | — | — | — | — |
-| A2 | pending | 0 | — | — | — | — |
-| A3 | pending | 0 | — | — | — | — |
-| A4 | pending | 0 | — | — | — | — |
-| A5 | pending | 0 | — | — | — | — |
-| A6 | pending | 0 | — | — | — | — |
-| A7 | pending | 0 | — | — | — | — |
+| A0 | failed | 0 | — | — | — | — |
+| A1 | failed | 0 | — | — | — | — |
+| A2 | failed | 0 | — | — | — | — |
+| A3 | failed | 0 | — | — | — | — |
+| A4 | failed | 0 | — | — | — | — |
+| A5 | failed | 0 | — | — | — | — |
+| A6 | failed | 0 | — | — | — | — |
+| A7 | failed | 0 | — | — | — | — |
 
 ![完整曲线](/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/arch70m_results/seed43_validation/curves.png)
 

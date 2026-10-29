@@ -1,6 +1,5 @@
 {
-  "status": "ready_not_run",
-  "seed": 43,
+  "created": "2026-10-29T01:29:18Z",
   "seeds": [
     43
   ],
@@ -20,8 +19,122 @@
   "global_batch": 512,
   "micro_batch": 56,
   "source_sha256": "053297983e0f2ece2aaad807032695fb5aebd1e0f221138a9bf0d202cc9b9ac4",
-  "data_sha256": "4beaac6b54a1f46492533aeb77c2de2c6ac2a0bd8266fd57a6bb312679435c51",
   "launcher_sha256": "5b74171f003c68e5c21be6a585b458aac75840f74a0a24af69f6064494b1a407",
-  "hardware_validation": "CPU scheduling tests only; eight-GPU execution pending user launch",
-  "output_root": "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_v8_20261028"
+  "data_sha256": "4beaac6b54a1f46492533aeb77c2de2c6ac2a0bd8266fd57a6bb312679435c51",
+  "training_recipe": {
+    "selection_probability": 0.15,
+    "mask_fraction": 0.8,
+    "random_other_fraction": 0.1,
+    "unchanged_fraction": 0.1,
+    "supervision": "binding_mlm_nonbinding_relation_only_vhh",
+    "excluded_targets": [
+      "<prots>",
+      "<protd>",
+      "<pad>",
+      "<mask>"
+    ],
+    "random_replacement": "other_token_in_same_residue_or_grammar_family",
+    "relation_input": "explicit_binding_nonbinding_always_MASK",
+    "minimum_selected_per_record": 0,
+    "loss": "global_selected_token_mean",
+    "relation_selection_probability": 1.0,
+    "nonbinding": "token_loss_relation_only; sequence_context_clean; family_auxiliary_enabled",
+    "unlabelled": "unchanged_full_token_mlm",
+    "receptor_scope": "antibody_H_L; TCR_alpha_beta; single_nanobody_vhh",
+    "vhh_layout": "first_chain_capacity; role_nanobody_vhh; marker_nb; no_light_chain",
+    "auxiliary": "species_qualified_v_family",
+    "auxiliary_population": "all_observed_receptor_chains; missing_filtered_unseen_annotations_are_unknown",
+    "auxiliary_loss": "global_eligible_chain_mean",
+    "pooling": "observed_residue_mean_per_chain"
+  },
+  "assignments": [
+    {
+      "variant": "A0",
+      "seed": 43,
+      "stage": "screen",
+      "epochs": 1,
+      "gpu": "0",
+      "micro_batch": 56,
+      "global_batch": 512,
+      "trial": "screen_A0_s43",
+      "gpu_uuid": "GPU-04343ede-7775-860f-2e75-70c7353aee2e"
+    },
+    {
+      "variant": "A1",
+      "seed": 43,
+      "stage": "screen",
+      "epochs": 1,
+      "gpu": "1",
+      "micro_batch": 56,
+      "global_batch": 512,
+      "trial": "screen_A1_s43",
+      "gpu_uuid": "GPU-8ee25d2d-0b62-8083-68f4-f279c7cdb6fd"
+    },
+    {
+      "variant": "A2",
+      "seed": 43,
+      "stage": "screen",
+      "epochs": 1,
+      "gpu": "2",
+      "micro_batch": 56,
+      "global_batch": 512,
+      "trial": "screen_A2_s43",
+      "gpu_uuid": "GPU-cc2bf388-9123-7c11-7e5e-0ba20599ab35"
+    },
+    {
+      "variant": "A3",
+      "seed": 43,
+      "stage": "screen",
+      "epochs": 1,
+      "gpu": "3",
+      "micro_batch": 56,
+      "global_batch": 512,
+      "trial": "screen_A3_s43",
+      "gpu_uuid": "GPU-3979f27e-242f-c060-68ca-5bfa7ad9090b"
+    },
+    {
+      "variant": "A4",
+      "seed": 43,
+      "stage": "screen",
+      "epochs": 1,
+      "gpu": "4",
+      "micro_batch": 56,
+      "global_batch": 512,
+      "trial": "screen_A4_s43",
+      "gpu_uuid": "GPU-3158abb4-01d0-2ef2-ad08-46c712010689"
+    },
+    {
+      "variant": "A5",
+      "seed": 43,
+      "stage": "screen",
+      "epochs": 1,
+      "gpu": "5",
+      "micro_batch": 56,
+      "global_batch": 512,
+      "trial": "screen_A5_s43",
+      "gpu_uuid": "GPU-2abb110a-7796-89b0-cb3e-51251e2ceda4"
+    },
+    {
+      "variant": "A6",
+      "seed": 43,
+      "stage": "screen",
+      "epochs": 1,
+      "gpu": "6",
+      "micro_batch": 56,
+      "global_batch": 512,
+      "trial": "screen_A6_s43",
+      "gpu_uuid": "GPU-ea0cf078-2122-574f-58d0-b5b00763d339"
+    },
+    {
+      "variant": "A7",
+      "seed": 43,
+      "stage": "screen",
+      "epochs": 1,
+      "gpu": "7",
+      "micro_batch": 56,
+      "global_batch": 512,
+      "trial": "screen_A7_s43",
+      "gpu_uuid": "GPU-79ec7816-cd6f-9a1e-345c-dc8ce16a1fe4"
+    }
+  ]
 }

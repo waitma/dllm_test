@@ -1,3 +1,5 @@
+> Last updated: 2026-10-29T01:29:45Z (UTC)。seed43八架构复核 0/8 完成；record screen_A3_s43 failed。原始日志 /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_v8_20261028；完整报告 /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/arch70m_results/seed43_validation/REPORT.md。仅新增seed43，各1epoch；未执行旧三种子统计。
+
 > Last updated: 2026-10-29T00:07:57.170570+00:00 (UTC)。按用户最新要求交付8卡独立单GPU复核入口，仅新增seed43，A0–A7各1epoch，与既有seed42筛选对照；global512、统一micro56，原V8固定10%子集和冻结训练源码保持。旧三种子串行派发器PID122889已于2026-10-29T00:00:55Z停止，当前已运行的A0 seed42 worker保留完成，不再派发seed44；持续监督仍暂停。新8卡任务未在本机启动。说明和命令见 /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/ARCH70M_EXPLORATION.md。
 
 > 2026-10-29 07:25 +08:00，按用户要求停止持续人工轮询，待之后再查看。已启动的本地串行确认队列保持后台运行，未取消或重启训练。最后一次整体核查（2026-10-28T23:25:25Z）：A0–A7筛选8/8完成；三种子确认0/9完成，首组confirm_A0_s42为3393/3828步，训练PID122910和控制器PID122889均通过实际命令核验；其余8组尚未开始。已有控制器继续执行后续试验及既定评测、记录和发布流程。此处暂停的是主动监督，不是GPU训练。
