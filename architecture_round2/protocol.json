@@ -1,0 +1,36 @@
+{
+  "seed": 43,
+  "epochs": 1,
+  "steps": 1276,
+  "global_batch": 512,
+  "micro_batch": 56,
+  "variants": [
+    "B1",
+    "B2",
+    "B3"
+  ],
+  "references": [
+    "A0",
+    "A4",
+    "A5"
+  ],
+  "reference_stage": "screen",
+  "data_records": 653288,
+  "data_format": "original V8; byte-identical fixed 10% data index",
+  "B1": "A5 all-global attention plus trainable per-channel attention/FFN residual scales, initialized to 0.1",
+  "B2": "8 blocks: chain-local attention then global attention then SwiGLU FFN; FFN width 2048; fixed residual scales 0.1",
+  "B3": "B2 plus trainable per-channel residual scales on all three sublayers, initialized to 0.1",
+  "parameter_budget": "approximately 75.75M each; extra attention in B2/B3 is paid for by reducing FFN width from 3072 to 2048",
+  "scientific_scope": "Single-seed architectural screening with unchanged MLM/family objectives, decoding, datasets and evaluation partitions; no significance or causal mechanism claim",
+  "hierarchy_inspiration": "PoET-2 encoder chain-local then global attention, https://arxiv.org/html/2508.04724v2#S3.SS2.SSS4",
+  "limitations": [
+    "B2/B3 jointly change attention organization and the allocation of attention versus FFN parameters.",
+    "This is a sequence-only adaptation, not a reproduction of PoET-2 retrieval, structural inputs or dual decoders.",
+    "AAR alone does not establish conditional or binding specificity."
+  ],
+  "parameters": {
+    "B1": 75754191,
+    "B2": 75748047,
+    "B3": 75766479
+  }
+}
