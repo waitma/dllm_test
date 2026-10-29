@@ -1,5 +1,9 @@
 # V8 约 70M 架构探索实验记录
 
+## 已完成结果复核（2026-10-29T13:24:16Z UTC）
+
+八架构seed42/43均完成，第二轮B1完成，B2/B3因显存门槛止于正式step0。A5整链生成优势在两个种子重复；A4表征优势未重复；B1呈现生成/表征取舍。17组连续训练日志与绑定、seed43九组最终checkpoint共54文件SHA通过核验；没有新增训练或改变数据。[完整比较与曲线](/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/arch70m_results/review_20261029/REPORT.md)。
+
 ## 新增本地第二轮（2026-10-29 UTC）
 
 B1全局＋可学习残差，B2每层链内→全局并保持参数预算，B3二者组合；三组约75.75M，单GPU串行，仅seed43/1epoch/micro56/global512。原V8形式及653,288条固定10%子集、原目标/评估保持；A0/A4/A5 seed43同预算对照已完成。8项CPU验证与快照导入通过，本节记录启动前状态；后续进度见独立[方案与运行记录](/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/ARCH70M_ROUND2.md)、[曲线与报告](/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/arch70m_results/round2/REPORT.md)。本地任务不重启旧三种子确认，不影响八卡独立复核。

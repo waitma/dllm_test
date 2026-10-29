@@ -1,3 +1,5 @@
+> 2026-10-29（UTC）同预算终点复核支持继续保留A5整链生成候选；A4在seed42的表征优势没有在seed43重复。B1作为全局＋可学习残差，仅seed43显示CDR/AUPRC小幅改善、整链AAR小幅回落，不认定全面胜出或显著改善。B2/B3尚无正式训练结果，85%显存门槛失败不构成效果消融。未改变原配方/数据或追加种子。完整证据 /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/arch70m_results/review_20261029/REPORT.md。
+
 > 2026-10-29（UTC）第二轮B1已通过真实GPU micro56/2048显存门槛并从新初始化进入正式训练，B2/B3按序待运行；原seed43/global512/1epoch协议保持。8项CPU检查覆盖新层次mask、梯度重计算和恢复；不代表B2/B3真实GPU已通过或新架构已改善。启动回执 /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/arch70m_results/round2/startup_verified.json。
 
 > 2026-10-29（UTC）用户授权本地新增第二轮探索：B1=A5全局＋可学习残差；B2=每层链内→全局→FFN2048；B3=B2＋可学习残差，三者约75.75M。仅seed43、1epoch、micro56/global512，复用A0/A4/A5同seed同预算对照及原10%数据；B2/B3同时调整attention/FFN预算，不能只归因注意力顺序。原目标/评估与V8形式保持，新源码独立快照。8项CPU检查及冻结适配通过；GPU实测待启动。详见[第二轮方案](/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/ARCH70M_ROUND2.md)。

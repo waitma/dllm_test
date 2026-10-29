@@ -1,3 +1,5 @@
+> Last updated: 2026-10-29T13:24:16Z (UTC)。结果复核：A0–A7 seed42/43各8组完成；本地B1完成1276步，B2/B3因micro56/2048 profile reserved＋外部显存约91%超过85%门槛止于正式step0，非OOM。A5两种子整链AAR37.02%/36.51%保持优势；B1 seed43整链AAR35.35%、CDR80.50%、AUROC0.8321/AUPRC0.6895，较A5有取舍；A4表征优势未在第二种子重现。17组日志与绑定及seed43共54份checkpoint文件SHA核验；曲线/完整结论 /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/arch70m_results/review_20261029/REPORT.md。本次未启动或修改训练，GPU空闲。
+
 > Last updated: 2026-10-29T07:31:43Z (UTC)。本地第二轮架构探索 1/3 完成；B3 failed。仅seed43、每组1epoch；报告 /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/arch70m_results/round2/REPORT.md。
 
 > Last updated: 2026-10-29T07:30:49Z (UTC)。本地第二轮架构探索 1/3 完成；B2 failed。仅seed43、每组1epoch；报告 /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/arch70m_results/round2/REPORT.md。
