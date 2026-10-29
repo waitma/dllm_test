@@ -2,6 +2,8 @@
 
 更新时间：2026-10-29T01:30:11Z；完成 0/8。
 
+最近一次八卡尝试8/8在step0失败；CUDA数字卡号与发布状态修复已完成，重试尚未执行。见同目录cuda_selector_fix_20261029.json。
+
 固定原V8形式、653,288条10%子集；每组从头初始化1epoch/1276步，global512。
 八张卡各自执行一个单GPU进程，没有DDP/NCCL；统一micro batch由manifest记录。
 与seed42同epoch终点比较；seed42原先A5的micro96、其余micro56，须保留该数值累积差异。

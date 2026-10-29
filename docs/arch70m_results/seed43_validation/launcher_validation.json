@@ -1,5 +1,5 @@
 {
-  "status": "CPU_checks_passed_eight_GPU_run_not_started",
+  "status": "fixed_launcher_CPU_and_single_GPU_checks_passed_eight_GPU_retry_pending",
   "unit_tests": 8,
   "source_sha256": "053297983e0f2ece2aaad807032695fb5aebd1e0f221138a9bf0d202cc9b9ac4",
   "data_sha256": "4beaac6b54a1f46492533aeb77c2de2c6ac2a0bd8266fd57a6bb312679435c51",
@@ -14,5 +14,10 @@
   "no_trial_status_changed": true,
   "frozen_worker_module": "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_v8_20261028/sources/053297983e0f2ece2aaad807032695fb5aebd1e0f221138a9bf0d202cc9b9ac4/experiments/arch70m/train.py",
   "frozen_trainer_seed43_exec_checked": true,
-  "curve_visually_inspected": true
+  "curve_visually_inspected": true,
+  "initial_validation_status": "CPU_checks_passed_eight_GPU_run_not_started",
+  "latest_cpu_test_count": 13,
+  "numeric_cuda_selector_qualified": true,
+  "eight_gpu_last_attempt": "all eight failed at step0 before fix",
+  "fix_receipt": "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/arch70m_results/seed43_validation/cuda_selector_fix_20261029.json"
 }

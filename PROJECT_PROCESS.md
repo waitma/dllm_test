@@ -1,3 +1,5 @@
+> Last updated: 2026-10-29T01:47:10.763055+00:00 (UTC)。seed43八卡首轮09:29(+08)全部在step0失败，八份console均为No CUDA GPUs are available：启动器误将平台NVML UUID作为CUDA_VISIBLE_DEVICES，本机已复现数字0成功、NVML UUID失败，且两类UUID不同。已改数字selector＋PCI_BUS_ID，新增真实CUDA kernel资格检查；Git按运行环境代理/直连逐命令覆盖，推送失败保留本地提交并记pending，不再掩盖训练退出码。13项CPU回归及本机单GPU CUDA运算通过，旧失败证据已归档；新八卡重试尚未启动。模型、数据、seed43/1epoch/global512/micro56均保持。修复回执 /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/arch70m_results/seed43_validation/cuda_selector_fix_20261029.json。
+
 > Last updated: 2026-10-29T01:30:11Z (UTC)。seed43八架构复核 0/8 完成；final seed43 eight-architecture report。原始日志 /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_v8_20261028；完整报告 /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/arch70m_results/seed43_validation/REPORT.md。仅新增seed43，各1epoch；未执行旧三种子统计。
 
 > Last updated: 2026-10-29T01:30:08Z (UTC)。seed43八架构复核 0/8 完成；record screen_A5_s43 failed。原始日志 /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_v8_20261028；完整报告 /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/arch70m_results/seed43_validation/REPORT.md。仅新增seed43，各1epoch；未执行旧三种子统计。

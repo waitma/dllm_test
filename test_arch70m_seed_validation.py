@@ -71,7 +71,8 @@ class LauncherTests(unittest.TestCase):
             with patch.object(launcher, 'visible_uuids', return_value=['GPU-'+str(i) for i in range(8)]), \
                  patch.object(launcher, 'verify_reference', return_value=({'recipe': {}}, 1276)), \
                  patch.object(suite, 'verify_data'), patch.object(suite, 'snapshot', return_value=(source, launcher.SOURCE_SHA)), \
-                 patch.object(launcher, 'completed', side_effect=complete), patch.object(launcher, 'publish') as publish, \
+                 patch.object(launcher, 'completed', side_effect=complete), \
+                 patch.object(launcher, 'publish', return_value={'status': 'pending'}) as publish, \
                  patch.object(launcher.subprocess, 'Popen', Process), patch('builtins.print'), \
                  patch.dict(os.environ, {'WORLD_SIZE': '8', 'LOCAL_RANK': '7', 'NCCL_DEBUG': 'INFO', 'TORCHELASTIC_RUN_ID': 'old'}):
                 launcher.execute(self.args(out))
@@ -85,7 +86,7 @@ class LauncherTests(unittest.TestCase):
                 self.assertEqual(env['ARCH70M_FROZEN_SOURCE'], str(source))
                 self.assertFalse(any(k in launcher.DISTRIBUTED_ENV or k.startswith(('NCCL_', 'TORCHELASTIC_')) for k in env))
                 self.assertNotIn('torchrun', cmd)
-            self.assertEqual(mapping, {v:'GPU-'+str(i) for i,v in enumerate(launcher.VARIANTS)})
+            self.assertEqual(mapping, {v:str(i) for i,v in enumerate(launcher.VARIANTS)})
             self.assertEqual(launcher.read(out/'seed43_validation/manifest.json')['seeds'], [43])
 
     def test_corrupt_completed_checkpoint_is_not_silently_skipped(self):
@@ -107,6 +108,7 @@ class LauncherTests(unittest.TestCase):
             t = out/'trials/screen_A5_s43'; t.mkdir(parents=True)
             launcher.write(t/'profile.json', dict(variant='A5', micro_batch=56, common_micro_seed_validation=43))
             with patch.object(launcher, 'sha', return_value=launcher.DATA_SHA), \
+                 patch.object(launcher, 'qualify_cuda', return_value={'stage': 'cuda_qualified'}), \
                  patch.object(launcher.os, 'execv') as execute:
                 launcher.profile_one(args)
             cmd = execute.call_args.args[1]
@@ -114,6 +116,80 @@ class LauncherTests(unittest.TestCase):
             self.assertEqual(cmd[cmd.index('--stage')+1], 'screen')
             self.assertEqual(cmd[cmd.index('--variant')+1], 'A5')
             self.assertIn('experiments.arch70m.train', cmd)
+
+    def test_nvml_uuid_resolves_to_numeric_cuda_selector(self):
+        with patch.object(launcher.subprocess, 'run', return_value=subprocess.CompletedProcess([], 0, '5\n', '')):
+            self.assertEqual(launcher.cuda_device_id('GPU-nvml-only'), '5')
+        self.assertEqual(launcher.cuda_device_id('0'), '0')
+        env = launcher.worker_env(Path('/tmp/frozen'), '5')
+        self.assertEqual(env['CUDA_VISIBLE_DEVICES'], '5')
+        self.assertEqual(env['CUDA_DEVICE_ORDER'], 'PCI_BUS_ID')
+
+    def test_dead_copied_loopback_proxy_is_overridden_per_push(self):
+        commands = []
+        def run(cmd, **kwargs):
+            if 'config' in cmd:
+                return subprocess.CompletedProcess(cmd, 0, 'http://127.0.0.1:10808\n', '')
+            commands.append((cmd, kwargs)); return subprocess.CompletedProcess(cmd, 0, '', '')
+        proxy_keys = {k:'' for k in ('https_proxy','HTTPS_PROXY','http_proxy','HTTP_PROXY','all_proxy','ALL_PROXY')}
+        with patch.object(launcher.subprocess, 'check_output', return_value='https://github.com/waitma/dllm_test.git\n'), \
+             patch.object(launcher.subprocess, 'run', side_effect=run), \
+             patch.object(launcher.socket, 'create_connection', side_effect=OSError('refused')), \
+             patch.dict(os.environ, proxy_keys):
+            result = launcher.push_results()
+        self.assertEqual(result['status'], 'pushed'); self.assertEqual(result['transport'], 'direct')
+        self.assertIn('http.https://github.com/waitma/dllm_test.git.proxy=', commands[0][0])
+        self.assertFalse(any('10808' in arg for arg in commands[0][0]))
+        self.assertTrue(all(k not in commands[0][1]['env'] for k in proxy_keys))
+
+    def test_git_push_failure_is_pending_not_a_training_exception(self):
+        def run(cmd, **kwargs):
+            return subprocess.CompletedProcess(cmd, 1 if 'config' in cmd else 128, '', 'Connection refused')
+        proxy_keys = {k:'' for k in ('https_proxy','HTTPS_PROXY','http_proxy','HTTP_PROXY','all_proxy','ALL_PROXY')}
+        with patch.object(launcher.subprocess, 'check_output', return_value='https://github.com/waitma/dllm_test.git\n'), \
+             patch.object(launcher.subprocess, 'run', side_effect=run), patch.dict(os.environ, proxy_keys):
+            result = launcher.push_results()
+        self.assertEqual(result['status'], 'pending'); self.assertEqual(result['exit_code'], 128)
+
+    def test_original_training_error_survives_publication_pending(self):
+        from experiments.arch70m import suite
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp)/'out'; out.mkdir(); source = Path(tmp)/'source'; source.mkdir()
+            counter = {}; guard = threading.Lock()
+            def complete(root, variant):
+                with guard:
+                    counter[variant] = counter.get(variant, 0)+1
+                    return counter[variant] > 1
+            class Process:
+                def __init__(self, cmd, **kwargs):
+                    self.pid = 9000; self.variant = cmd[cmd.index('--worker')+1]
+                    if self.variant == 'A3':
+                        kwargs['stdout'].write('RuntimeError: No CUDA GPUs are available\n'); kwargs['stdout'].flush()
+                def wait(self): return 1 if self.variant == 'A3' else 0
+            with patch.object(launcher, 'visible_uuids', return_value=['GPU-'+str(i) for i in range(8)]), \
+                 patch.object(launcher, 'verify_reference', return_value=({'recipe': {}}, 1276)), \
+                 patch.object(suite, 'verify_data'), patch.object(suite, 'snapshot', return_value=(source, launcher.SOURCE_SHA)), \
+                 patch.object(launcher, 'completed', side_effect=complete), \
+                 patch.object(launcher, 'publish', return_value={'status': 'pending'}), \
+                 patch.object(launcher.subprocess, 'Popen', Process), patch('builtins.print'):
+                with self.assertRaisesRegex(RuntimeError, 'Training failed: screen_A3_s43'):
+                    launcher.execute(self.args(out))
+            status = launcher.read(out/'trials/screen_A3_s43/status.json')
+            self.assertEqual(status['training_exit_code'], 1)
+            self.assertEqual(status['error'], 'RuntimeError: No CUDA GPUs are available')
+
+    def test_publish_only_never_queries_or_starts_gpu_jobs(self):
+        args = self.args('/tmp/arch70m_unused'); args.publish_only = True
+        with patch.object(launcher, 'publish', return_value={'status':'pending'}) as pub, \
+             patch.object(launcher, 'visible_uuids') as gpu, patch('builtins.print'):
+            launcher.execute(args)
+        pub.assert_called_once(); gpu.assert_not_called()
+        with patch.dict(os.environ, {'CUDA_VISIBLE_DEVICES':'0'}), \
+             patch('sys.argv', ['launcher', '--publish-only']), \
+             patch.object(launcher, 'publish', return_value={'status':'pending'}) as pub, \
+             patch('builtins.print'):
+            launcher.main()
+        pub.assert_called_once()
 
     def test_report_keeps_both_seeds_and_excludes_pending_from_deltas(self):
         from experiments.arch70m import report as reporting

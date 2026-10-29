@@ -1,0 +1,72 @@
+{
+  "observed_utc": "2026-10-29T01:44:39.823663+00:00",
+  "failed_attempt": "2026-10-29T01:29:18Z",
+  "workers": {
+    "A0": {
+      "step": 0,
+      "error": "RuntimeError: No CUDA GPUs are available",
+      "console_sha256": "af0e016ef3320d94bc18499a65069641ca29c14900271dc638cd43ef0f7029ab"
+    },
+    "A1": {
+      "step": 0,
+      "error": "RuntimeError: No CUDA GPUs are available",
+      "console_sha256": "af0e016ef3320d94bc18499a65069641ca29c14900271dc638cd43ef0f7029ab"
+    },
+    "A2": {
+      "step": 0,
+      "error": "RuntimeError: No CUDA GPUs are available",
+      "console_sha256": "af0e016ef3320d94bc18499a65069641ca29c14900271dc638cd43ef0f7029ab"
+    },
+    "A3": {
+      "step": 0,
+      "error": "RuntimeError: No CUDA GPUs are available",
+      "console_sha256": "af0e016ef3320d94bc18499a65069641ca29c14900271dc638cd43ef0f7029ab"
+    },
+    "A4": {
+      "step": 0,
+      "error": "RuntimeError: No CUDA GPUs are available",
+      "console_sha256": "af0e016ef3320d94bc18499a65069641ca29c14900271dc638cd43ef0f7029ab"
+    },
+    "A5": {
+      "step": 0,
+      "error": "RuntimeError: No CUDA GPUs are available",
+      "console_sha256": "af0e016ef3320d94bc18499a65069641ca29c14900271dc638cd43ef0f7029ab"
+    },
+    "A6": {
+      "step": 0,
+      "error": "RuntimeError: No CUDA GPUs are available",
+      "console_sha256": "af0e016ef3320d94bc18499a65069641ca29c14900271dc638cd43ef0f7029ab"
+    },
+    "A7": {
+      "step": 0,
+      "error": "RuntimeError: No CUDA GPUs are available",
+      "console_sha256": "af0e016ef3320d94bc18499a65069641ca29c14900271dc638cd43ef0f7029ab"
+    }
+  },
+  "failure_archive": "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_v8_20261028/seed43_validation/failed_20261029T0129Z",
+  "primary_cause": "NVML UUID passed as CUDA_VISIBLE_DEVICES is not a CUDA UUID on this GPU platform.",
+  "secondary_cause": "Copied localhost Git proxy refused connections; publication exception obscured training exit code.",
+  "nvml_uuid": "GPU-e0448106-9b16-47c3-38c0-0122f68bc415",
+  "numeric_selector_cuda_qualification": {
+    "stage": "cuda_qualified",
+    "cuda_visible_devices": "0",
+    "cuda_device_order": "PCI_BUS_ID",
+    "device_count": 1,
+    "device": "NVIDIA RPBZZZ6",
+    "cuda_uuid": "228d392b-a64e-0098-8b61-1b5249a74896",
+    "torch": "2.7.1+cu128"
+  },
+  "frozen_source_sha256": "053297983e0f2ece2aaad807032695fb5aebd1e0f221138a9bf0d202cc9b9ac4",
+  "data_sha256": "4beaac6b54a1f46492533aeb77c2de2c6ac2a0bd8266fd57a6bb312679435c51",
+  "eight_gpu_retry_performed": false,
+  "initial_uuid_selector_reproduction": {
+    "cuda_visible_devices": "GPU-e0448106-9b16-47c3-38c0-0122f68bc415",
+    "device_count_reported": 1,
+    "status": "failed",
+    "error": "No CUDA GPUs are available",
+    "observed_before_fix_in_this_session": true
+  },
+  "cpu_regression_tests": 13,
+  "git_proxy_command_override_verified": true,
+  "fixed_launcher_sha256": "a3c300ce6c39f5f99d14739fe6b51b43b022006b65c39e7e790554e2aa84843a"
+}

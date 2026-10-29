@@ -2,6 +2,12 @@
 
 ## 当前复核：8卡、每卡独立、仅新增 seed43（2026-10-29）
 
+2026-10-29 09:29(+08)首轮八卡启动失败，8/8均为step0；原始console显示`torch.cuda.set_device(0)`处`No CUDA GPUs are available`，不是训练后的指标失败。外围启动器误将nvidia-smi的NVML UUID传入CUDA_VISIBLE_DEVICES；本机实际复现：数字0可执行CUDA运算，NVML UUID选择失败，CUDA属性返回的UUID与NVML不同。另有复制的Git代理127.0.0.1:10808不可达；旧publication异常覆盖了训练退出码，导致外层只看到publication_failed。
+
+已修复为数字卡号（UUID输入先解析为数字index）＋PCI_BUS_ID顺序，NVML UUID仅作去重审计，并在每个worker内实际初始化CUDA及运行tiny kernel后才profile。训练错误原文、training_exit_code和publication_status独立输出；推送使用可用运行时代理或直连，以逐命令Git设置覆盖旧代理，不改全局Git配置。推送失败仅记pending并保留本地commit；之后可执行`bash /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/launch_arch70m_8gpu.sh --publish-only`单独同步，无GPU工作。`--no-push`也可用于仅本地提交。重试使用本文原8卡命令，仍只seed43，不改变模型/数据/预算；八组均0步，无训练进度需要回滚。
+
+13项CPU回归及本机真实单GPU CUDA运算通过，Git代理命令覆盖离线核验通过；未启动真实8卡重试。原八卡失败status/process/console/publication错误保存于`/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_v8_20261028/seed43_validation/failed_20261029T0129Z`，原日志保留追加。证据：[cuda_selector_fix_20261029.json](/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/arch70m_results/seed43_validation/cuda_selector_fix_20261029.json)。
+
 用户最新指示：八张卡分别跑A0–A7，只增加一个seed，不再追加更多seed。新入口固定seed43，每组从随机权重训练1epoch（1276步），与已完成的seed42、1epoch筛选匹配。global batch512、LR1e-4等原训练配方不变；八组统一micro56（9×56＋8），可用`--micro-batch`统一调整。每张卡先在2048最大长度做3次真实更新的显存核验，再exec全新冻结训练进程，profile权重不会用于正式训练。无DDP/NCCL。
 
 模型/训练源码SHA仍为`053297983e0f2ece2aaad807032695fb5aebd1e0f221138a9bf0d202cc9b9ac4`，数据索引SHA仍为`4beaac6b54a1f46492533aeb77c2de2c6ac2a0bd8266fd57a6bb312679435c51`。V8形式、tokenizer和固定653,288条10%子集保持；不得重新抽取数据。需要原实验输出根中的data目录、seed42绑定及其原绝对路径数据文件，迁移机器沿用原挂载路径。

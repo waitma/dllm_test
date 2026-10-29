@@ -10,10 +10,12 @@ import math
 import os
 from pathlib import Path
 import shutil
+import socket
 import subprocess
 import sys
 import time
 import traceback
+from urllib.parse import urlparse
 
 ROOT = Path(os.environ.get('ARCH70M_PROJECT_ROOT', Path(__file__).resolve().parent)).resolve()
 sys.path.insert(0, os.environ.get('ARCH70M_FROZEN_SOURCE', str(ROOT)))
@@ -41,7 +43,9 @@ def parser():
     p.add_argument('--output-root', type=Path, default=ROOT/'output/arch70m_v8_20261028')
     p.add_argument('--micro-batch', type=int, default=56,
                    help='Common micro batch for all eight variants; global batch stays 512. Default: 56.')
-    p.add_argument('--dry-run', action='store_true', help='Print all eight assignments; no GPU access or output writes.')
+    mode = p.add_mutually_exclusive_group()
+    mode.add_argument('--dry-run', action='store_true', help='Print all eight assignments; no GPU access or output writes.')
+    mode.add_argument('--publish-only', action='store_true', help='Refresh/commit/push reports without starting GPU jobs.')
     p.add_argument('--no-push', action='store_true', help='Commit result reports locally without pushing.')
     p.add_argument('--wandb', action='store_true')
     p.add_argument('--worker', choices=VARIANTS, help=argparse.SUPPRESS)
@@ -76,10 +80,37 @@ def worker_env(source, gpu):
            if k not in DISTRIBUTED_ENV and not k.startswith(('NCCL_', 'TORCHELASTIC_'))}
     env.update(CUDA_VISIBLE_DEVICES=gpu, PYTHONPATH=str(source), ARCH70M_PROJECT_ROOT=str(ROOT),
                ARCH70M_FROZEN_SOURCE=str(source),
+               CUDA_DEVICE_ORDER='PCI_BUS_ID',
                CUBLAS_WORKSPACE_CONFIG=':4096:8', USE_TF='0', PYTHONDONTWRITEBYTECODE='1',
                OPENBLAS_NUM_THREADS='1', OMP_NUM_THREADS='4')
     env.pop('CUDA_LAUNCH_BLOCKING', None)
     return env
+
+
+def cuda_device_id(requested):
+    """NVML UUIDs may differ from CUDA UUIDs on the worker's virtualized GPU stack."""
+    if requested.isdecimal(): return requested
+    result = subprocess.run(['nvidia-smi', '--id='+requested, '--query-gpu=index', '--format=csv,noheader'],
+                            text=True, capture_output=True, check=True)
+    rows = result.stdout.split()
+    if len(rows) != 1 or not rows[0].isdecimal():
+        raise ValueError('Cannot resolve a numeric CUDA device selector for '+requested)
+    return rows[0]
+
+
+def qualify_cuda():
+    """Exercise the CUDA runtime and a kernel; NVML device_count alone is insufficient."""
+    import torch
+    torch.cuda.init()
+    count = torch.cuda.device_count()
+    if count != 1: raise RuntimeError(f'Expected one visible CUDA GPU, found {count}.')
+    value = torch.ones(1, device='cuda:0')+1
+    torch.cuda.synchronize()
+    if value.item() != 2: raise RuntimeError('CUDA kernel qualification failed.')
+    prop = torch.cuda.get_device_properties(0)
+    return dict(stage='cuda_qualified', cuda_visible_devices=os.environ.get('CUDA_VISIBLE_DEVICES'),
+                cuda_device_order=os.environ.get('CUDA_DEVICE_ORDER'), device_count=count,
+                device=prop.name, cuda_uuid=str(getattr(prop, 'uuid', 'unavailable')), torch=torch.__version__)
 
 
 def verify_reference(out, micro):
@@ -140,6 +171,14 @@ def profile_one(args):
     if digest(worker_binding()) != SOURCE_SHA or sha(args.output_root/'data/index.json') != DATA_SHA:
         raise ValueError('Worker source/data binding differs.')
     t = args.output_root/'trials'/f'screen_{args.worker}_s{SEED}'; t.mkdir(parents=True, exist_ok=True)
+    try:
+        evidence = qualify_cuda()
+    except Exception as exc:
+        write(t/'cuda_device.json', dict(stage='cuda_failed', error=str(exc),
+              cuda_visible_devices=os.environ.get('CUDA_VISIBLE_DEVICES'), updated=stamp()))
+        raise
+    write(t/'cuda_device.json', dict(evidence, updated=stamp()))
+    print(json.dumps(evidence), flush=True)
     profile_path = t/'profile.json'
     with lock(t/'seed43_profile.lock', blocking=False):
         if profile_path.exists():
@@ -238,6 +277,42 @@ def report(out):
     return done
 
 
+def push_results():
+    """Use a reachable runtime proxy or direct Git, without changing shared Git config."""
+    remote = subprocess.check_output(['git', '-C', str(ROOT), 'remote', 'get-url', 'origin'], text=True).strip()
+    configured = subprocess.run(['git', '-C', str(ROOT), 'config', '--get-urlmatch', 'http.proxy', remote],
+                                text=True, capture_output=True)
+    candidates = [os.environ.get(k) for k in ('https_proxy', 'HTTPS_PROXY', 'http_proxy', 'HTTP_PROXY', 'all_proxy', 'ALL_PROXY')]
+    candidates.append(configured.stdout.strip() if configured.returncode == 0 else None)
+    selected = ''
+    for candidate in candidates:
+        if not candidate: continue
+        proxy = urlparse(candidate if '://' in candidate else 'http://'+candidate)
+        if proxy.hostname in ('localhost', '127.0.0.1', '::1'):
+            try:
+                with socket.create_connection((proxy.hostname, proxy.port or 80), timeout=.5): pass
+            except OSError:
+                continue
+        selected = candidate; break
+    # A URL-specific -c setting overrides copied developer-machine proxy config.
+    command = ['git', '-C', str(ROOT), '-c', 'http.proxy='+selected,
+               '-c', 'http.'+remote+'.proxy='+selected, 'push', 'origin', 'HEAD:'+BRANCH]
+    env = os.environ.copy()
+    for key in ('https_proxy', 'HTTPS_PROXY', 'http_proxy', 'HTTP_PROXY', 'all_proxy', 'ALL_PROXY'):
+        env.pop(key, None)
+    try:
+        result = subprocess.run(command, env=env, text=True, capture_output=True, timeout=60)
+    except subprocess.TimeoutExpired:
+        return dict(status='pending', error='Git push timed out; local result commit retained.')
+    error = result.stderr.strip()
+    for candidate in candidates:
+        if candidate:
+            parsed = urlparse(candidate if '://' in candidate else 'http://'+candidate)
+            if parsed.username or parsed.password: error = error.replace(candidate, '<redacted proxy>')
+    return dict(status='pushed' if result.returncode == 0 else 'pending', exit_code=result.returncode,
+                transport='runtime_proxy' if selected else 'direct', error=error[-3000:] if result.returncode else None)
+
+
 def publish(out, message, push):
     def git(*args): return subprocess.check_output(['git', '-C', str(ROOT), *args], text=True).strip()
     with lock(ROOT/'output/arch70m_publish.lock'):
@@ -248,10 +323,19 @@ def publish(out, message, push):
         p.write_text(f'> Last updated: {stamp()} (UTC)。seed43八架构复核 {done}/8 完成；{message}。原始日志 {out}；完整报告 {ROOT/REPORT_REL}/REPORT.md。仅新增seed43，各1epoch；未执行旧三种子统计。\n\n'+p.read_text())
         git('add', '--', str(REPORT_REL), 'PROJECT_PROCESS.md'); git('diff', '--cached', '--check')
         git('-c', 'user.name=Codex', '-c', 'user.email=codex@openai.com', 'commit', '-m', 'arch70m: '+message)
-        if push: git('push', 'origin', 'HEAD:'+BRANCH)
+        result = push_results() if push else dict(status='disabled')
+        result.update(commit=git('rev-parse', 'HEAD'), updated=stamp())
+        write(out/'seed43_validation/publication.json', result)
+        if result['status'] == 'pending':
+            print(json.dumps(dict(event='publication_pending', **result)), flush=True)
+        return result
 
 
 def execute(args):
+    if args.publish_only:
+        result = publish(args.output_root, 'refresh seed43 reports without GPU work', not args.no_push)
+        print(json.dumps(dict(event='publication', **result)), flush=True)
+        return
     jobs = plan(args)
     if args.dry_run:
         print(json.dumps(dict(seed=SEED, seeds=[SEED], epochs=1, independent_single_gpu=True,
@@ -267,7 +351,9 @@ def execute(args):
         runner = args.output_root/'seed43_validation'/f'launcher_{runner_sha}.py'
         if not runner.exists(): shutil.copyfile(__file__, runner)
         if sha(runner) != runner_sha: raise ValueError('Launcher snapshot changed.')
-        for job, gpu in zip(jobs, uuids): job['gpu_uuid'] = gpu
+        for job, gpu in zip(jobs, uuids):
+            job['gpu_uuid'] = gpu
+            job['cuda_visible_device'] = cuda_device_id(job['gpu'])
         manifest = dict(created=stamp(), seeds=[SEED], baseline_seed=42, variants=list(VARIANTS), epochs=1,
                         total_steps=total, global_batch=512, micro_batch=args.micro_batch,
                         source_sha256=signature, launcher_sha256=runner_sha, data_sha256=DATA_SHA,
@@ -288,30 +374,45 @@ def execute(args):
             if args.wandb: command.append('--wandb')
             print(json.dumps(dict(job, event='launch')), flush=True)
             with (t/'console.log').open('a') as log:
-                p = subprocess.Popen(command, cwd=source, env=worker_env(source, job['gpu_uuid']), stdout=log, stderr=subprocess.STDOUT)
-                write(t/'process.json', dict(pid=p.pid, gpu=job['gpu_uuid'], command=command, started=stamp()))
+                log_start = log.tell()
+                p = subprocess.Popen(command, cwd=source, env=worker_env(source, job['cuda_visible_device']), stdout=log, stderr=subprocess.STDOUT)
+                write(t/'process.json', dict(pid=p.pid, gpu=job['gpu'], gpu_uuid=job['gpu_uuid'],
+                    cuda_visible_device=job['cuda_visible_device'], command=command, log_start=log_start, started=stamp()))
                 code = p.wait()
             if code == 0 and not completed(args.output_root, job['variant']):
                 code = 1
             if code:
                 status = read(t/'status.json') if (t/'status.json').exists() else {}
-                if status.get('status') != 'failed':
-                    write(t/'status.json', dict(status='failed', step=status.get('step', 0), exit_code=code,
-                                                updated=stamp(), error='See console.log; no other seed was scheduled.'))
+                with (t/'console.log').open('rb') as log:
+                    log.seek(0, 2); size = log.tell(); log.seek(max(log_start, size-6000))
+                    tail = log.read().decode(errors='replace')
+                errors = [line for line in tail.splitlines() if 'Error:' in line or 'Exception:' in line]
+                error = errors[-1] if errors else '\n'.join(tail.splitlines()[-10:]) or f'Worker exited {code} without new log output.'
+                write(t/'status.json', dict(status, status='failed', step=status.get('step', 0),
+                    exit_code=code, training_exit_code=code, updated=stamp(), error=error, error_tail=tail))
+                print(json.dumps(dict(event='training_failed', trial=name, training_exit_code=code, error=error,
+                                      console_log=str(t/'console.log'))), flush=True)
             try:
-                publish(args.output_root, f'record {name} '+('completed' if not code else 'failed'), not args.no_push)
+                publication = publish(args.output_root, f'record {name} '+('completed' if not code else 'failed'), not args.no_push)
             except Exception:
                 write(t/'seed43_publication_error.json', dict(updated=stamp(), error=traceback.format_exc()))
-                return name, code or 1, 'publication_failed'
-            return name, code, 'finished'
+                publication = dict(status='local_report_failed')
+            return name, code, publication['status']
 
         failures = []
         with ThreadPoolExecutor(max_workers=8) as pool:
             for result in as_completed([pool.submit(run_one, job) for job in jobs]):
-                value = result.result(); print(json.dumps(dict(trial=value[0], exit_code=value[1], status=value[2])), flush=True)
+                value = result.result()
+                print(json.dumps(dict(trial=value[0], exit_code=value[1], training_exit_code=value[1],
+                    status='training_failed' if value[1] else 'completed', publication_status=value[2])), flush=True)
                 if value[1]: failures.append(value[0])
-        publish(args.output_root, 'final seed43 eight-architecture report', not args.no_push)
-        if failures: raise RuntimeError('Failed trials/publications: '+', '.join(failures))
+        try:
+            publication = publish(args.output_root, 'final seed43 eight-architecture report', not args.no_push)
+        except Exception:
+            write(args.output_root/'seed43_validation/publication_error.json', dict(error=traceback.format_exc(), updated=stamp()))
+            publication = dict(status='local_report_failed')
+        print(json.dumps(dict(event='suite_finished', training_failures=failures, publication_status=publication['status'])), flush=True)
+        if failures: raise RuntimeError('Training failed: '+', '.join(failures)+'; original errors printed above and saved in each console.log.')
 
 
 def main():
@@ -321,7 +422,7 @@ def main():
         if args.source is None: raise ValueError('Worker requires a frozen --source.')
         profile_one(args)
     else:
-        if args.gpus is None:
+        if args.gpus is None and not args.publish_only:
             args.gpus = gpu_ids(os.environ.get('ARCH_GPUS') or os.environ.get('CUDA_VISIBLE_DEVICES') or '0,1,2,3,4,5,6,7')
         execute(args)
 

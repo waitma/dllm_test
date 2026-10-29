@@ -1,3 +1,5 @@
+> 2026-10-29（+08:00）8卡启动器修复：本平台NVML UUID与CUDA UUID不一致，CUDA_VISIBLE_DEVICES使用数字卡号，设置CUDA_DEVICE_ORDER=PCI_BUS_ID；NVML UUID仅用于物理设备去重审计。worker启动时实际cuda.init并运行tiny kernel，不能只信NVML device_count。发布时按当前环境代理或直连覆盖Git命令，忽略连不上的本机loopback代理，不修改共享Git全局配置；推送失败记录pending并保留提交，训练原始错误与退出码独立显示。可用 --publish-only 稍后同步结果，无GPU工作；--no-push保留本地提交。13项回归＋本机真实单卡验证通过，8卡重试待执行。
+
 > 2026-10-29（+08:00）当前架构复核入口为 [launch_arch70m_8gpu.sh](/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/launch_arch70m_8gpu.sh)：仅seed43、A0–A7各单卡1epoch。统一micro56，9个56加一个8条micro组成global512；更改时通过 --micro-batch 对八组统一指定。每卡在最大长度2048上做3次真实更新核验85%显存门槛，再由全新进程从头训练；不逐架构自动改变micro。训练器和数据仍用已冻结版本。当前8卡脚本由用户执行，本机未启动新任务；旧三种子调度已停止，当前已启动的A0继续收尾，持续监督暂停。报告位于 docs/arch70m_results/seed43_validation，逐试验commit/push探索分支。
 
 > 2026-10-28 用户再次明确：架构探索始终沿用当前 V8 数据形式。原 prepared JSONL 字段、链序列与顺序、角色/元数据、relation/family 标签、tokenizer/词表/特殊 token、固定链输入布局保持；10% 子集只选择原记录的 offsets，独立实验索引不构成训练数据格式升级。后续架构变体遵守同一约束。
