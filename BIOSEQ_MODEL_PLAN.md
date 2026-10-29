@@ -1,3 +1,5 @@
+> 2026-10-29 UTC：用户授权继续本地架构探索，优先补齐B2/B3层次注意力，同时以共同micro32重跑A5(B0)/B1，构成固定/可学习残差×全局/链内后全局的四组比较；层次组同时缩FFN匹配参数，保留此耦合限制。仅seed43，各1epoch/global512；原数据、目标和模型实现保持。旧micro56结果独立历史参考，不与本轮混作同micro对照。方案 /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/ARCH70M_HIERARCHY_M32.md。
+
 > 2026-10-29（UTC）同预算终点复核支持继续保留A5整链生成候选；A4在seed42的表征优势没有在seed43重复。B1作为全局＋可学习残差，仅seed43显示CDR/AUPRC小幅改善、整链AAR小幅回落，不认定全面胜出或显著改善。B2/B3尚无正式训练结果，85%显存门槛失败不构成效果消融。未改变原配方/数据或追加种子。完整证据 /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/arch70m_results/review_20261029/REPORT.md。
 
 > 2026-10-29（UTC）第二轮B1已通过真实GPU micro56/2048显存门槛并从新初始化进入正式训练，B2/B3按序待运行；原seed43/global512/1epoch协议保持。8项CPU检查覆盖新层次mask、梯度重计算和恢复；不代表B2/B3真实GPU已通过或新架构已改善。启动回执 /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/arch70m_results/round2/startup_verified.json。

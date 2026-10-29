@@ -1,0 +1,25 @@
+{
+  "micro_batch": 32,
+  "global_batch": 512,
+  "grad_accum": 16,
+  "seed": 43,
+  "epochs": 1,
+  "steps": 1276,
+  "variants": ["B2", "B3", "B0", "B1"],
+  "previous_source_sha256": "93518fa2a14bc029e808cefae7aef8c38d79804683bb5274af27ff5f4e67d65e",
+  "data_sha256": "4beaac6b54a1f46492533aeb77c2de2c6ac2a0bd8266fd57a6bb312679435c51",
+  "data_records": 653288,
+  "data_format": "unchanged original V8 and byte-identical fixed 10% index",
+  "B0": "A5 control, all-global attention and fixed residual scales, 75741903 parameters",
+  "B1": "All-global attention and learned residual scales, 75754191 parameters",
+  "B2": "Every block: chain-local attention then global attention then FFN2048, 75748047 parameters",
+  "B3": "B2 plus learned residual scales, 75766479 parameters",
+  "profile": "all four variants pass 3 real updates at micro32 / maxlen2048 and the original 85% memory gate before formal training",
+  "primary_comparisons": [["B2", "B0"], ["B3", "B2"], ["B3", "B1"], ["B1", "B0"]],
+  "historical_results": "micro56 results remain archived and are not treated as matched-micro primary controls",
+  "limitations": [
+    "One seed only; no statistical-significance or binding-specificity claim.",
+    "B2/B3 reallocate attention/FFN parameter budgets; the effect is not solely attention order.",
+    "Original objectives, optimizer, schedule, corruption, decoding, evaluation and input format are unchanged."
+  ]
+}

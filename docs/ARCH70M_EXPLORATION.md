@@ -1,3 +1,5 @@
+> 2026-10-29T14:09:23Z UTC：用户授权继续本地探索；新micro32四组共同对照队列B2→B3→A5(B0)→B1准备启动，旧micro56证据保持。见[本轮方案](/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/ARCH70M_HIERARCHY_M32.md)。
+
 # V8 约 70M 架构探索实验记录
 
 ## 已完成结果复核（2026-10-29T13:24:16Z UTC）

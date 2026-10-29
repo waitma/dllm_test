@@ -1,3 +1,5 @@
+> 2026-10-29T14:09:23Z UTC：用户授权继续本地探索；新micro32四组共同对照队列B2→B3→A5(B0)→B1准备启动，旧micro56证据保持。见[本轮方案](/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/ARCH70M_HIERARCHY_M32.md)。
+
 > 当前状态复核：2026-10-29T13:24:16Z UTC。B1已完成1276步；B2/B3在正式step0因显存安全门槛停止，队列已结束。下文启动时进度是历史记录。结果与完整曲线见[本次复核](/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/arch70m_results/review_20261029/REPORT.md)。
 
 # 本地第二轮架构探索：B1 / B2 / B3

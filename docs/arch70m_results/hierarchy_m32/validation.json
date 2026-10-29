@@ -1,0 +1,21 @@
+{
+  "checked": "2026-10-29T14:09:21Z",
+  "status": "CPU_protocol_and_snapshot_adapter_passed",
+  "tests": 4,
+  "source_sha256": "eb2fda14bc98a3386637d7b590233538464f6b6e78125d002ea2e14cc4e8f443",
+  "previous_source_sha256": "93518fa2a14bc029e808cefae7aef8c38d79804683bb5274af27ff5f4e67d65e",
+  "data_sha256": "4beaac6b54a1f46492533aeb77c2de2c6ac2a0bd8266fd57a6bb312679435c51",
+  "micro_batch": 32,
+  "global_batch": 512,
+  "grad_accum": 16,
+  "seed": 43,
+  "epochs": 1,
+  "variants": [
+    "B2",
+    "B3",
+    "B0",
+    "B1"
+  ],
+  "model_implementation": "unchanged architecture_round2.models",
+  "snapshot": "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_hierarchy_m32_20261029/sources/eb2fda14bc98a3386637d7b590233538464f6b6e78125d002ea2e14cc4e8f443"
+}

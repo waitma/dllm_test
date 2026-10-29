@@ -1,0 +1,91 @@
+{
+  "updated": "2026-10-29T14:09:21Z",
+  "output_root": "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_hierarchy_m32_20261029",
+  "trials": [
+    {
+      "variant": "B2",
+      "label": "Local then global",
+      "status": "pending",
+      "step": 0,
+      "seed": 43,
+      "micro_batch": 32,
+      "global_batch": 512,
+      "epochs": 1,
+      "path": "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_hierarchy_m32_20261029/trials/screen_B2_s43"
+    },
+    {
+      "variant": "B3",
+      "label": "Local then global + learned scales",
+      "status": "pending",
+      "step": 0,
+      "seed": 43,
+      "micro_batch": 32,
+      "global_batch": 512,
+      "epochs": 1,
+      "path": "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_hierarchy_m32_20261029/trials/screen_B3_s43"
+    },
+    {
+      "variant": "B0",
+      "label": "A5 control",
+      "status": "pending",
+      "step": 0,
+      "seed": 43,
+      "micro_batch": 32,
+      "global_batch": 512,
+      "epochs": 1,
+      "path": "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_hierarchy_m32_20261029/trials/screen_B0_s43"
+    },
+    {
+      "variant": "B1",
+      "label": "Global + learned scales",
+      "status": "pending",
+      "step": 0,
+      "seed": 43,
+      "micro_batch": 32,
+      "global_batch": 512,
+      "epochs": 1,
+      "path": "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_hierarchy_m32_20261029/trials/screen_B1_s43"
+    }
+  ],
+  "historical": [
+    {
+      "variant": "A0",
+      "seed": 43,
+      "micro_batch": 56,
+      "comparison": "historical_not_matched_micro",
+      "token.all.loss": 0.7160742652432394,
+      "generation.conditional_ce": 6.594973297319982,
+      "generation.conditional_aar": 0.03420571923438141,
+      "generation.cdr_aar": 0.7953700823709369,
+      "generation.conditional_length_mae": 99.0331101190476,
+      "representation.macro_auroc": 0.8353746947496947,
+      "representation.macro_auprc": 0.6713806593366038
+    },
+    {
+      "variant": "A5",
+      "seed": 43,
+      "micro_batch": 56,
+      "comparison": "historical_not_matched_micro",
+      "token.all.loss": 0.752313277157745,
+      "generation.conditional_ce": 3.4498782231647898,
+      "generation.conditional_aar": 0.36512258325334324,
+      "generation.cdr_aar": 0.8028106591664255,
+      "generation.conditional_length_mae": 6.5660778985507235,
+      "representation.macro_auroc": 0.827857905982906,
+      "representation.macro_auprc": 0.6719025573192239
+    },
+    {
+      "variant": "B1",
+      "seed": 43,
+      "micro_batch": 56,
+      "comparison": "historical_not_matched_micro",
+      "token.all.loss": 0.7519910114315438,
+      "generation.conditional_ce": 3.45656885119236,
+      "generation.conditional_aar": 0.3535112515805312,
+      "generation.cdr_aar": 0.8050046660937369,
+      "generation.conditional_length_mae": 8.363134057971015,
+      "representation.macro_auroc": 0.8320550976800977,
+      "representation.macro_auprc": 0.6895097592466013
+    }
+  ]
+}

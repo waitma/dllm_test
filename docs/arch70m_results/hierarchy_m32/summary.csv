@@ -1,0 +1,5 @@
+epochs,global_batch,label,micro_batch,path,seed,status,step,variant
+1,512,Local then global,32,/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_hierarchy_m32_20261029/trials/screen_B2_s43,43,pending,0,B2
+1,512,Local then global + learned scales,32,/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_hierarchy_m32_20261029/trials/screen_B3_s43,43,pending,0,B3
+1,512,A5 control,32,/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_hierarchy_m32_20261029/trials/screen_B0_s43,43,pending,0,B0
+1,512,Global + learned scales,32,/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_hierarchy_m32_20261029/trials/screen_B1_s43,43,pending,0,B1
