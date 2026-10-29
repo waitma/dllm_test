@@ -1,5 +1,5 @@
-epochs,global_batch,label,micro_batch,path,seed,status,step,variant
-1,512,Local then global,32,/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_hierarchy_m32_20261029/trials/screen_B2_s43,43,pending,0,B2
-1,512,Local then global + learned scales,32,/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_hierarchy_m32_20261029/trials/screen_B3_s43,43,pending,0,B3
-1,512,A5 control,32,/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_hierarchy_m32_20261029/trials/screen_B0_s43,43,pending,0,B0
-1,512,Global + learned scales,32,/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_hierarchy_m32_20261029/trials/screen_B1_s43,43,pending,0,B1
+epochs,global_batch,label,micro_batch,path,peak_allocated_gib,profile_allocated_gib,profile_reserved_gib,profile_safe,seed,status,step,training_gpu_hours,variant
+1,512,Local then global,32,/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_hierarchy_m32_20261029/trials/screen_B2_s43,13.306901931762695,42.21588134765625,49.10546875,True,43,training,7,0.024815859695922378,B2
+1,512,Local then global + learned scales,32,/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_hierarchy_m32_20261029/trials/screen_B3_s43,,42.30660915374756,49.19921875,True,43,qualified,0,,B3
+1,512,A5 control,32,/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_hierarchy_m32_20261029/trials/screen_B0_s43,,24.396206855773926,31.82421875,True,43,qualified,0,,B0
+1,512,Global + learned scales,32,/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_hierarchy_m32_20261029/trials/screen_B1_s43,,24.396676063537598,32.01171875,True,43,qualified,0,,B1

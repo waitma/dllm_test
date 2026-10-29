@@ -1,6 +1,6 @@
 # 层次注意力探索：共同micro32
 
-更新时间：2026-10-29T14:09:23Z UTC；完成0/4。
+更新时间：2026-10-29T14:13:36Z UTC；完成0/4。
 
 统一seed43、1epoch/1276步、global512=16×micro32，原V8形式及653,288条固定10%子集。所有变体先通过micro32/maxlen2048的3次真实更新与原85%显存门槛，再由全新进程正式训练。
 B0是与A5架构相同的共同micro32对照；B1是全局＋可学习缩放；B2每层链内→全局→FFN2048；B3为B2＋可学习缩放。四组复用之前冻结的模型实现，不修改原目标/数据/评估。
@@ -8,10 +8,10 @@ B0是与A5架构相同的共同micro32对照；B1是全局＋可学习缩放；B
 
 | 变体 | 状态 | step | 整链AAR↑ | CDR AAR↑ | AUROC↑ | AUPRC↑ | profile allocated/reserved GiB |
 |---|---|---:|---:|---:|---:|---:|---:|
-| B2 | pending | 0 | — | — | — | — | — |
-| B3 | pending | 0 | — | — | — | — | — |
-| B0 (A5 control) | pending | 0 | — | — | — | — | — |
-| B1 | pending | 0 | — | — | — | — | — |
+| B2 | training | 7 | — | — | — | — | 42.22/49.11 |
+| B3 | qualified | 0 | — | — | — | — | 42.31/49.20 |
+| B0 (A5 control) | qualified | 0 | — | — | — | — | 24.40/31.82 |
+| B1 | qualified | 0 | — | — | — | — | 24.40/32.01 |
 
 ![完整曲线](/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/arch70m_results/hierarchy_m32/curves.png)
 

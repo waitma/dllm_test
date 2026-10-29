@@ -1,6 +1,6 @@
 # 本地层次注意力探索：micro32共同对照
 
-2026-10-29 UTC，用户指示“开始探索”。本轮补齐尚未正式训练的B2/B3，并用共同micro重跑A5/B1作主要对照。当前CPU启动/恢复检查与冻结快照导入已通过，准备GPU资格检查；实际状态随后记录。
+2026-10-29 UTC，用户指示“开始探索”。本轮补齐尚未正式训练的B2/B3，并用共同micro重跑A5/B1作主要对照。截至2026-10-29T14:13:34Z，四组GPU资格全部通过；B2已正式训练至核验时step7/1276，B3→A5(B0)→B1排队。启动后交后台执行，不持续人工轮询。
 
 | 运行顺序 | ID | 架构 | 参数量 |
 |---:|---|---|---:|
@@ -41,9 +41,22 @@ bash /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/launch_arch70m
 本轮源码SHA：`eb2fda14bc98a3386637d7b590233538464f6b6e78125d002ea2e14cc4e8f443`。
 快照：`/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_hierarchy_m32_20261029/sources/eb2fda14bc98a3386637d7b590233538464f6b6e78125d002ea2e14cc4e8f443`。
 
-启动/恢复检查4项通过：错误micro/数据/源码或不安全profile拒绝；四组资格缺失/被篡改拒绝；完成项checkpoint损坏拒绝；原输出保护和独立快照适配导入。旧模型数学检查保持先前8项通过状态，本轮未重复运行。真实GPU检查尚待执行。
+启动/恢复检查4项通过：错误micro/数据/源码或不安全profile拒绝；四组资格缺失/被篡改拒绝；完成项checkpoint损坏拒绝；原输出保护和独立快照适配导入。旧模型数学检查保持先前8项通过状态，本轮未重复运行。四组真实GPU资格检查均已通过；具体峰值和实际进程见下方启动回执。
 
 [CPU及快照验证](/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/arch70m_results/hierarchy_m32/validation.json)
 [状态、完整曲线与CSV](/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/arch70m_results/hierarchy_m32/REPORT.md)
 
 终点同时看验证CE、整链AAR/条件CE/长度MAE、CDR和表征AUROC/AUPRC，不只按训练loss排名。一个种子不作显著性或结合特异性结论；本轮尚无效果结果。
+
+## 正式启动回执（2026-10-29T14:13:34Z UTC）
+
+控制器PID217039，B2 worker PID217143；从/proc核验了实际命令及worker工作目录为本轮源码快照。四组都通过micro32/maxlen2048三次真实更新，loss和梯度有限，profile源码/数据/资格文件SHA均匹配；B2随后由全新进程开始正式训练，首次核验step1，本次核验step7。原85%门槛保持。
+
+| 变体 | 最大长度allocated GiB | reserved GiB | reserved＋外部/总量 |
+|---|---:|---:|---:|
+| B2 | 42.22 | 49.11 | 52.44% |
+| B3 | 42.31 | 49.20 | 52.54% |
+| B0 | 24.40 | 31.82 | 34.25% |
+| B1 | 24.40 | 32.01 | 34.44% |
+
+[启动证据](/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/arch70m_results/hierarchy_m32/startup_verified.json)。本次只是启动成功检查，四组终点尚未完成；由后台控制器逐组保存、评估并发布完整曲线。

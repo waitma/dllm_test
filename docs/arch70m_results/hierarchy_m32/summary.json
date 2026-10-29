@@ -1,50 +1,64 @@
 {
-  "updated": "2026-10-29T14:09:21Z",
+  "updated": "2026-10-29T14:13:34Z",
   "output_root": "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_hierarchy_m32_20261029",
   "trials": [
     {
       "variant": "B2",
       "label": "Local then global",
-      "status": "pending",
-      "step": 0,
+      "status": "training",
+      "step": 7,
       "seed": 43,
       "micro_batch": 32,
       "global_batch": 512,
       "epochs": 1,
-      "path": "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_hierarchy_m32_20261029/trials/screen_B2_s43"
+      "path": "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_hierarchy_m32_20261029/trials/screen_B2_s43",
+      "training_gpu_hours": 0.024815859695922378,
+      "peak_allocated_gib": 13.306901931762695,
+      "profile_safe": true,
+      "profile_allocated_gib": 42.21588134765625,
+      "profile_reserved_gib": 49.10546875
     },
     {
       "variant": "B3",
       "label": "Local then global + learned scales",
-      "status": "pending",
+      "status": "qualified",
       "step": 0,
       "seed": 43,
       "micro_batch": 32,
       "global_batch": 512,
       "epochs": 1,
-      "path": "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_hierarchy_m32_20261029/trials/screen_B3_s43"
+      "path": "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_hierarchy_m32_20261029/trials/screen_B3_s43",
+      "profile_safe": true,
+      "profile_allocated_gib": 42.30660915374756,
+      "profile_reserved_gib": 49.19921875
     },
     {
       "variant": "B0",
       "label": "A5 control",
-      "status": "pending",
+      "status": "qualified",
       "step": 0,
       "seed": 43,
       "micro_batch": 32,
       "global_batch": 512,
       "epochs": 1,
-      "path": "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_hierarchy_m32_20261029/trials/screen_B0_s43"
+      "path": "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_hierarchy_m32_20261029/trials/screen_B0_s43",
+      "profile_safe": true,
+      "profile_allocated_gib": 24.396206855773926,
+      "profile_reserved_gib": 31.82421875
     },
     {
       "variant": "B1",
       "label": "Global + learned scales",
-      "status": "pending",
+      "status": "qualified",
       "step": 0,
       "seed": 43,
       "micro_batch": 32,
       "global_batch": 512,
       "epochs": 1,
-      "path": "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_hierarchy_m32_20261029/trials/screen_B1_s43"
+      "path": "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_hierarchy_m32_20261029/trials/screen_B1_s43",
+      "profile_safe": true,
+      "profile_allocated_gib": 24.396676063537598,
+      "profile_reserved_gib": 32.01171875
     }
   ],
   "historical": [
