@@ -1,5 +1,5 @@
 {
-  "created": "2026-10-29T01:29:18Z",
+  "created": "2026-10-29T02:08:47Z",
   "seeds": [
     43
   ],
@@ -19,7 +19,7 @@
   "global_batch": 512,
   "micro_batch": 56,
   "source_sha256": "053297983e0f2ece2aaad807032695fb5aebd1e0f221138a9bf0d202cc9b9ac4",
-  "launcher_sha256": "5b74171f003c68e5c21be6a585b458aac75840f74a0a24af69f6064494b1a407",
+  "launcher_sha256": "a3c300ce6c39f5f99d14739fe6b51b43b022006b65c39e7e790554e2aa84843a",
   "data_sha256": "4beaac6b54a1f46492533aeb77c2de2c6ac2a0bd8266fd57a6bb312679435c51",
   "training_recipe": {
     "selection_probability": 0.15,
@@ -57,7 +57,8 @@
       "micro_batch": 56,
       "global_batch": 512,
       "trial": "screen_A0_s43",
-      "gpu_uuid": "GPU-04343ede-7775-860f-2e75-70c7353aee2e"
+      "gpu_uuid": "GPU-c132c299-75b0-a879-3d99-221bb3382c76",
+      "cuda_visible_device": "0"
     },
     {
       "variant": "A1",
@@ -68,7 +69,8 @@
       "micro_batch": 56,
       "global_batch": 512,
       "trial": "screen_A1_s43",
-      "gpu_uuid": "GPU-8ee25d2d-0b62-8083-68f4-f279c7cdb6fd"
+      "gpu_uuid": "GPU-c442c84b-6531-d6a7-9e57-93ddaa5636e4",
+      "cuda_visible_device": "1"
     },
     {
       "variant": "A2",
@@ -79,7 +81,8 @@
       "micro_batch": 56,
       "global_batch": 512,
       "trial": "screen_A2_s43",
-      "gpu_uuid": "GPU-cc2bf388-9123-7c11-7e5e-0ba20599ab35"
+      "gpu_uuid": "GPU-2af01c21-558c-e719-2cbf-c030cc25f9e9",
+      "cuda_visible_device": "2"
     },
     {
       "variant": "A3",
@@ -90,7 +93,8 @@
       "micro_batch": 56,
       "global_batch": 512,
       "trial": "screen_A3_s43",
-      "gpu_uuid": "GPU-3979f27e-242f-c060-68ca-5bfa7ad9090b"
+      "gpu_uuid": "GPU-b4fef1eb-b351-32c2-b5bd-1d5cda7aaf4f",
+      "cuda_visible_device": "3"
     },
     {
       "variant": "A4",
@@ -101,7 +105,8 @@
       "micro_batch": 56,
       "global_batch": 512,
       "trial": "screen_A4_s43",
-      "gpu_uuid": "GPU-3158abb4-01d0-2ef2-ad08-46c712010689"
+      "gpu_uuid": "GPU-11e9d25c-80fa-f644-cac9-e942a6a623b5",
+      "cuda_visible_device": "4"
     },
     {
       "variant": "A5",
@@ -112,7 +117,8 @@
       "micro_batch": 56,
       "global_batch": 512,
       "trial": "screen_A5_s43",
-      "gpu_uuid": "GPU-2abb110a-7796-89b0-cb3e-51251e2ceda4"
+      "gpu_uuid": "GPU-30f4586a-d586-74b5-9cfe-4edfc44e9324",
+      "cuda_visible_device": "5"
     },
     {
       "variant": "A6",
@@ -123,7 +129,8 @@
       "micro_batch": 56,
       "global_batch": 512,
       "trial": "screen_A6_s43",
-      "gpu_uuid": "GPU-ea0cf078-2122-574f-58d0-b5b00763d339"
+      "gpu_uuid": "GPU-1023bfa8-8ded-52da-6dd6-62b8440a9831",
+      "cuda_visible_device": "6"
     },
     {
       "variant": "A7",
@@ -134,7 +141,8 @@
       "micro_batch": 56,
       "global_batch": 512,
       "trial": "screen_A7_s43",
-      "gpu_uuid": "GPU-79ec7816-cd6f-9a1e-345c-dc8ce16a1fe4"
+      "gpu_uuid": "GPU-e766a153-6d4a-fa58-0d8d-1129dbd0c790",
+      "cuda_visible_device": "7"
     }
   ]
 }
