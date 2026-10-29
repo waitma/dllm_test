@@ -1,6 +1,6 @@
 # 本地第二轮架构探索
 
-更新时间：2026-10-29T07:30:49Z；新试验完成 1/3。
+更新时间：2026-10-29T07:31:43Z；新试验完成 1/3。
 
 仅seed43；原V8形式与固定10%子集；global512、micro56、1epoch/1276步，冻结原MLM配方和评估代码。
 A0/A4/A5复用八卡侧同seed、同预算结果；B1全局＋可学习残差，B2每层链内→全局→FFN2048，B3为B2＋可学习残差。
@@ -14,7 +14,7 @@ B2/B3重新分配attention/FFN参数预算，不能将差异只归于attention�
 | A5 | reference | completed | 1276 | 0.3651 | 0.8028 | 0.8279 | 0.6719 |
 | B1 | new | completed | 1276 | 0.3535 | 0.8050 | 0.8321 | 0.6895 |
 | B2 | new | failed | 0 | — | — | — | — |
-| B3 | new | pending | 0 | — | — | — | — |
+| B3 | new | failed | 0 | — | — | — | — |
 
 ![完整曲线](/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/arch70m_results/round2/curves.png)
 

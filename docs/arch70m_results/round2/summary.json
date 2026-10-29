@@ -1,5 +1,5 @@
 {
-  "updated": "2026-10-29T07:30:47Z",
+  "updated": "2026-10-29T07:31:41Z",
   "output_root": "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_round2_20261029",
   "trials": [
     {
@@ -1886,7 +1886,7 @@
       "variant": "B3",
       "kind": "new",
       "seed": 43,
-      "status": "pending",
+      "status": "failed",
       "step": 0,
       "path": "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_round2_20261029/trials/screen_B3_s43"
     }
