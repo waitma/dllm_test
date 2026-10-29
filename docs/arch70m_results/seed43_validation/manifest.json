@@ -1,0 +1,27 @@
+{
+  "status": "ready_not_run",
+  "seed": 43,
+  "seeds": [
+    43
+  ],
+  "baseline_seed": 42,
+  "variants": [
+    "A0",
+    "A1",
+    "A2",
+    "A3",
+    "A4",
+    "A5",
+    "A6",
+    "A7"
+  ],
+  "epochs": 1,
+  "total_steps": 1276,
+  "global_batch": 512,
+  "micro_batch": 56,
+  "source_sha256": "053297983e0f2ece2aaad807032695fb5aebd1e0f221138a9bf0d202cc9b9ac4",
+  "data_sha256": "4beaac6b54a1f46492533aeb77c2de2c6ac2a0bd8266fd57a6bb312679435c51",
+  "launcher_sha256": "5b74171f003c68e5c21be6a585b458aac75840f74a0a24af69f6064494b1a407",
+  "hardware_validation": "CPU scheduling tests only; eight-GPU execution pending user launch",
+  "output_root": "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_v8_20261028"
+}

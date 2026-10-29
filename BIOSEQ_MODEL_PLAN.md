@@ -1,3 +1,5 @@
+> 2026-10-29（+08:00）用户将架构复核预算收敛为“仅再验证一个seed”：新增A0–A7 × seed43，各从头训练1epoch，与已完成seed42同预算对照；八卡各执行独立单GPU进程，统一micro56、global512。冻结原V8数据形式、653,288条10%子集和模型/训练源码；只新增外部启动/汇总工具。旧A0/A5/A4 × 三种子三epoch派发计划终止后续调度，已运行的A0 seed42保留完成并独立记录，不能混入1epoch配对比较。新报告只呈现seed42/43终点和完整曲线，不沿用原三种子显著性规则；seed42的A5原micro96，相关数值累积差异仍须披露。详见[当前实验入口](/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/launch_arch70m_8gpu.sh)。
+
 > 2026-10-29（+08:00）CPU蛋白块换序核查：A0/A4/A5筛选权重在3条多链MASK输入的块反序与chain_id一一重编号中，18项logit/hidden与attention bias检查通过。A5全局注意力与A4通道残差尺度均保留现有链内RoPE、角色随块移动和同链/异链偏置结构，未因此引入蛋白序号依赖。此为有限样本CPU单次前向检查，不扩展为角色互换、GPU逐位一致或多轮解码保证；原确认队列继续。详见[实验记录](/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/ARCH70M_EXPLORATION.md)。
 
 > 2026-10-29（+08:00）A4权重诊断：筛选终点FFN残差尺度通道均值从第1层0.095983逐层升至第8层0.109889，相对初值分别-4.02%/+9.89%；attention尺度也呈层间差异。三个筛选checkpoint的SHA与48个向量均核验，支持后续检验分层缩放的动机，但不能因果归于AUROC改善。未新增/替换候选，原九组三种子确认继续。详见[实验记录与尺度图](/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/ARCH70M_EXPLORATION.md)。

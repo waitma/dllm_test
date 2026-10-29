@@ -1,5 +1,28 @@
 # V8 约 70M 架构探索实验记录
 
+## 当前复核：8卡、每卡独立、仅新增 seed43（2026-10-29）
+
+用户最新指示：八张卡分别跑A0–A7，只增加一个seed，不再追加更多seed。新入口固定seed43，每组从随机权重训练1epoch（1276步），与已完成的seed42、1epoch筛选匹配。global batch512、LR1e-4等原训练配方不变；八组统一micro56（9×56＋8），可用`--micro-batch`统一调整。每张卡先在2048最大长度做3次真实更新的显存核验，再exec全新冻结训练进程，profile权重不会用于正式训练。无DDP/NCCL。
+
+模型/训练源码SHA仍为`053297983e0f2ece2aaad807032695fb5aebd1e0f221138a9bf0d202cc9b9ac4`，数据索引SHA仍为`4beaac6b54a1f46492533aeb77c2de2c6ac2a0bd8266fd57a6bb312679435c51`。V8形式、tokenizer和固定653,288条10%子集保持；不得重新抽取数据。需要原实验输出根中的data目录、seed42绑定及其原绝对路径数据文件，迁移机器沿用原挂载路径。
+
+```bash
+# 在8卡机器执行：GPU0→A0，GPU1→A1，……，GPU7→A7；全部仅seed43。
+bash /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/launch_arch70m_8gpu.sh --gpus 0,1,2,3,4,5,6,7
+
+# 只预览8个任务，不访问GPU或写实验输出。
+bash /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/launch_arch70m_8gpu.sh --gpus 0,1,2,3,4,5,6,7 --dry-run
+```
+
+相同命令可按原绑定恢复中断试验；完成试验核对最终checkpoint六文件SHA和终点评测后跳过。每个worker只看见其分配的一张物理卡，启动前逐卡解析UUID，缺卡或编号/UUID别名重复时不启动试验。固定seed43无多seed选项，也不调用旧suite的confirm阶段。原始日志位于`/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_v8_20261028/trials/screen_A*_s43/console.log`；后台启动可在命令前使用`nohup`并重定向控制器日志。
+
+每组保留逐步loss、每100步token验证、每250步及epoch末生成/表征评测和checkpoint。结束后刷新[seed42/43报告](/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/arch70m_results/seed43_validation/REPORT.md)、PNG/PDF/SVG完整曲线、原始CSV和同seed相对A0差值，并commit/push当前探索分支。`--no-push`只做本地结果提交，`--wandb`可启用W&B。只比较相同1epoch终点；两种子仅作复核，不能套用旧三种子显著性规则。seed42原A5采用micro96，其他组micro56，该历史差异保留披露。
+
+入口验证：8项CPU回归通过，覆盖单seed/八卡固定分配、分布式环境清理、单卡worker参数解析、缺卡与UUID别名拦截、断点profile后exec冻结训练器并显式传seed43、checkpoint损坏拒绝跳过、双seed报告不纳入pending结果。真实单卡机器上缺卡门槛通过，未新增trial状态；冻结worker模块导入路径和源码/数据SHA均核验，初始报告0/8及曲线已生成并检查。回执：[launcher_validation.json](/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/arch70m_results/seed43_validation/launcher_validation.json)。真实8卡训练待用户执行。
+
+旧三种子计划已被本段替代：2026-10-29T00:00:55Z只向派发器PID122889发送SIGTERM，已核验当前A0 seed42 worker PID122910保留运行；后续seed43/44的旧confirm任务不再派发。历史selection.json和旧confirm结果保留，当前3epoch A0不能与新1epoch seed43混作架构对照。持续人工监督保持暂停。当前开发机只有一张GPU，未启动或宣称完成真实8卡验证。
+
+
 2026-10-28，执行用户批准的计划。工作树 `/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore`，分支 `explore/arch70m-v8-20261028`。当前 1B 训练使用的工作树、冻结源码和输出未改动。
 
 ## 2026-10-29 蛋白块换序的模型层核查

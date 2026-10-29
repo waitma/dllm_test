@@ -1,4 +1,4 @@
-> 2026-10-29（+08:00）用户指定后续架构探索全部在当前开发机执行，替代此前本地/四卡分工。当前唯一 GPU0 上串行调度确认试验 A0/A5/A4 × seeds42/43/44，各3epochs；只用原 V8 固定10%子集与已筛选源码。启动/恢复命令和防重入锁见 [实验记录](/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/ARCH70M_EXPLORATION.md)。每个试验结束后自动更新曲线、commit 并推送探索分支。禁止为此探索追加远端任务；正式1B工作树和作业继续保持隔离。
+> 2026-10-29（+08:00）当前架构复核入口为 [launch_arch70m_8gpu.sh](/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/launch_arch70m_8gpu.sh)：仅seed43、A0–A7各单卡1epoch。统一micro56，9个56加一个8条micro组成global512；更改时通过 --micro-batch 对八组统一指定。每卡在最大长度2048上做3次真实更新核验85%显存门槛，再由全新进程从头训练；不逐架构自动改变micro。训练器和数据仍用已冻结版本。当前8卡脚本由用户执行，本机未启动新任务；旧三种子调度已停止，当前已启动的A0继续收尾，持续监督暂停。报告位于 docs/arch70m_results/seed43_validation，逐试验commit/push探索分支。
 
 > 2026-10-28 用户再次明确：架构探索始终沿用当前 V8 数据形式。原 prepared JSONL 字段、链序列与顺序、角色/元数据、relation/family 标签、tokenizer/词表/特殊 token、固定链输入布局保持；10% 子集只选择原记录的 offsets，独立实验索引不构成训练数据格式升级。后续架构变体遵守同一约束。
 

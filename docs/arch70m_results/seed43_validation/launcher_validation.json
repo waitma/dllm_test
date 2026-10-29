@@ -1,0 +1,18 @@
+{
+  "status": "CPU_checks_passed_eight_GPU_run_not_started",
+  "unit_tests": 8,
+  "source_sha256": "053297983e0f2ece2aaad807032695fb5aebd1e0f221138a9bf0d202cc9b9ac4",
+  "data_sha256": "4beaac6b54a1f46492533aeb77c2de2c6ac2a0bd8266fd57a6bb312679435c51",
+  "micro_batch": 56,
+  "seed": 43,
+  "epochs": 1,
+  "steps": 1276,
+  "initial_report_completed": 0,
+  "dispatcher_pid_122889_live": false,
+  "missing_card_gate_passed": true,
+  "missing_card_test_exitcode": 1,
+  "no_trial_status_changed": true,
+  "frozen_worker_module": "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_v8_20261028/sources/053297983e0f2ece2aaad807032695fb5aebd1e0f221138a9bf0d202cc9b9ac4/experiments/arch70m/train.py",
+  "frozen_trainer_seed43_exec_checked": true,
+  "curve_visually_inspected": true
+}
