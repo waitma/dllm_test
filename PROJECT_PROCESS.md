@@ -1,3 +1,5 @@
+> Last updated: 2026-10-29T22:57:34Z (UTC)。层次注意力micro32探索 2/4 完成；B3 completed。仅seed43/1epoch/global512，四组共同micro32，原V8固定10%数据；报告 /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/arch70m_results/hierarchy_m32/REPORT.md。
+
 > Last updated: 2026-10-29T18:33:30Z (UTC)。层次注意力micro32探索 1/4 完成；B2 completed。仅seed43/1epoch/global512，四组共同micro32，原V8固定10%数据；报告 /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/arch70m_results/hierarchy_m32/REPORT.md。
 
 > Last updated: 2026-10-29T14:13:34Z (UTC)。本地层次探索正式运行：四组共同micro32/maxlen2048的3次GPU更新全部通过85%门槛；B2 step7/1276，controller PID217039/worker PID217143命令与快照工作目录已核验，loss/梯度有限。B3→A5(B0)→B1排队；仅seed43/各1epoch/global512、原V8固定10%子集及模型实现保持。B2/B3最坏长度reserved约49GiB，旧micro56证据不改。启动检查结束后停止主动轮询，后台逐组自动评估、checkpoint和commit/push。方案 /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/ARCH70M_HIERARCHY_M32.md。
