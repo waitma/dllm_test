@@ -1,3 +1,5 @@
+> Last updated: 2026-10-29T05:02:54Z (UTC)。seed43八架构复核 7/8 完成；record screen_A1_s43 completed。原始日志 /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_v8_20261028；完整报告 /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/arch70m_results/seed43_validation/REPORT.md。仅新增seed43，各1epoch；未执行旧三种子统计。
+
 > Last updated: 2026-10-29T04:57:31Z (UTC)。本地第二轮正式启动：B1 step11/1276，controller PID193460/worker PID193467实际命令核验；B2/B3排队。B1 micro56/maxlen2048三次GPU更新通过，allocated峰值41.96GiB，reserved55.78GiB；全新进程正式训练loss/梯度有限。仅seed43、各1epoch/global512、原V8固定10%数据；旧模型/训练SHA保持。方案与曲线 /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/ARCH70M_ROUND2.md，启动证据 /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/arch70m_results/round2/startup_verified.json。完成启动核验后停止主动轮询，后台自动执行/逐组发布。
 
 > Last updated: 2026-10-29T04:54:26Z (UTC)。本地第二轮B1→B2→B3已实现并完成8项CPU及冻结快照导入检查；GPU0空闲，准备启动。仅seed43，各1epoch/global512/micro56；原V8固定10%数据完全复用，原八卡训练源码SHA不变。A0/A4/A5 seed43对照已完成；本轮尚无新训练结果。说明 /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/ARCH70M_ROUND2.md。
