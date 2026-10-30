@@ -1,3 +1,5 @@
+> Last updated: 2026-10-30T04:08:13Z (UTC)。层次注意力micro32探索 4/4 完成；B1 completed。仅seed43/1epoch/global512，四组共同micro32，原V8固定10%数据；报告 /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/arch70m_results/hierarchy_m32/REPORT.md。
+
 > Last updated: 2026-10-30T01:32:17Z (UTC)。层次注意力micro32探索 3/4 完成；B0 completed。仅seed43/1epoch/global512，四组共同micro32，原V8固定10%数据；报告 /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/arch70m_results/hierarchy_m32/REPORT.md。
 
 > Last updated: 2026-10-29T22:57:34Z (UTC)。层次注意力micro32探索 2/4 完成；B3 completed。仅seed43/1epoch/global512，四组共同micro32，原V8固定10%数据；报告 /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/arch70m_results/hierarchy_m32/REPORT.md。
