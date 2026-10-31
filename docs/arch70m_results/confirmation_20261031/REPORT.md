@@ -1,6 +1,6 @@
 # 三种子完整架构确认
 
-更新时间：2026-10-31T21:49:21Z UTC；完成7/9；decision=not_assessed。
+更新时间：2026-10-31T21:52:41Z UTC；完成8/9；decision=not_assessed。
 
 A0原架构、B0=A5全局注意力、B1=全局＋可学习残差。配对seed42/43/44，各随机初始化3epoch/3828步；共同micro32/global512，原V8形式与固定10%数据。
 候选来自既有screen筛选；所有九组完成后才对confirm留出终点作配对统计。训练过程中只用screen曲线观察，不按confirm结果选checkpoint。原抗体特异性五折评估一并保留，属于辅助验证。
@@ -14,9 +14,9 @@ A0原架构、B0=A5全局注意力、B1=全局＋可学习残差。配对seed42/
 | A0 | 43 | completed | 3828 | 0.0301 | 0.8048 | 0.8925 | 0.8260 |
 | B0 | 43 | completed | 3828 | 0.3436 | 0.8012 | 0.9126 | 0.7828 |
 | B1 | 43 | completed | 3828 | 0.3509 | 0.8039 | 0.8871 | 0.7841 |
-| A0 | 44 | training | 3828 | — | — | — | — |
+| A0 | 44 | completed | 3828 | 0.1737 | 0.8017 | 0.8625 | 0.7328 |
 | B0 | 44 | completed | 3828 | 0.3454 | 0.8021 | 0.8716 | 0.7712 |
-| B1 | 44 | qualified | 0 | — | — | — | — |
+| B1 | 44 | training | 22 | — | — | — | — |
 
 ![完整screen训练/验证曲线](/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/arch70m_results/confirmation_20261031/curves.png)
 
