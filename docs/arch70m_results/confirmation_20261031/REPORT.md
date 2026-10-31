@@ -1,6 +1,6 @@
 # 三种子完整架构确认
 
-更新时间：2026-10-31T13:56:46Z UTC；完成1/9；decision=not_assessed。
+更新时间：2026-10-31T14:00:37Z UTC；完成2/9；decision=not_assessed。
 
 A0原架构、B0=A5全局注意力、B1=全局＋可学习残差。配对seed42/43/44，各随机初始化3epoch/3828步；共同micro32/global512，原V8形式与固定10%数据。
 候选来自既有screen筛选；所有九组完成后才对confirm留出终点作配对统计。训练过程中只用screen曲线观察，不按confirm结果选checkpoint。原抗体特异性五折评估一并保留，属于辅助验证。
@@ -8,12 +8,12 @@ A0原架构、B0=A5全局注意力、B1=全局＋可学习残差。配对seed42/
 
 | 变体 | seed | 状态 | step | confirm整链AAR | confirm CDR AAR | confirm AUROC | confirm AUPRC |
 |---|---:|---|---:|---:|---:|---:|---:|
-| A0 | 42 | training | 3827 | — | — | — | — |
+| A0 | 42 | training | 3828 | — | — | — | — |
 | B0 | 42 | completed | 3828 | 0.3486 | 0.8040 | 0.8843 | 0.7318 |
-| B1 | 42 | training | 3828 | — | — | — | — |
-| A0 | 43 | training | 3827 | — | — | — | — |
+| B1 | 42 | completed | 3828 | 0.3340 | 0.8061 | 0.8807 | 0.7327 |
+| A0 | 43 | training | 3828 | — | — | — | — |
 | B0 | 43 | qualified | 0 | — | — | — | — |
-| B1 | 43 | qualified | 0 | — | — | — | — |
+| B1 | 43 | training | 28 | — | — | — | — |
 | A0 | 44 | qualified | 0 | — | — | — | — |
 | B0 | 44 | qualified | 0 | — | — | — | — |
 | B1 | 44 | qualified | 0 | — | — | — | — |
