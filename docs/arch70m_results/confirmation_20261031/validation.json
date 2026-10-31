@@ -1,0 +1,24 @@
+{
+  "checked": "2026-10-31T05:23:44Z",
+  "status": "six_CPU_confirmation_checks_passed",
+  "tests": 6,
+  "source_sha256": "3c9c424d816b9fda7adfba5047d9e075ac15dc036342b59461edd35031e50971",
+  "previous_source_sha256": "eb2fda14bc98a3386637d7b590233538464f6b6e78125d002ea2e14cc4e8f443",
+  "data_sha256": "4beaac6b54a1f46492533aeb77c2de2c6ac2a0bd8266fd57a6bb312679435c51",
+  "snapshot": "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_confirm_20261031/sources/3c9c424d816b9fda7adfba5047d9e075ac15dc036342b59461edd35031e50971",
+  "micro_batch": 32,
+  "global_batch": 512,
+  "seeds": [
+    42,
+    43,
+    44
+  ],
+  "variants": [
+    "A0",
+    "B0",
+    "B1"
+  ],
+  "epochs": 3,
+  "total_steps": 3828,
+  "model_implementation": "unchanged original A0 and frozen round-two B0/B1"
+}

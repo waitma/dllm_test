@@ -1,0 +1,12 @@
+{
+  "checked": "2026-10-31T05:14:23Z",
+  "status": "passed",
+  "variants": [
+    "B0",
+    "B1",
+    "B2",
+    "B3"
+  ],
+  "checkpoint_files": 24,
+  "source_sha256": "eb2fda14bc98a3386637d7b590233538464f6b6e78125d002ea2e14cc4e8f443"
+}

@@ -1,0 +1,47 @@
+{
+  "confirm_variants": [
+    "A0",
+    "B0",
+    "B1"
+  ],
+  "seeds": [
+    42,
+    43,
+    44
+  ],
+  "epochs": 3,
+  "micro_batch": 32,
+  "source_sha256": "3c9c424d816b9fda7adfba5047d9e075ac15dc036342b59461edd35031e50971",
+  "data_sha256": "4beaac6b54a1f46492533aeb77c2de2c6ac2a0bd8266fd57a6bb312679435c51",
+  "previous_source_sha256": "eb2fda14bc98a3386637d7b590233538464f6b6e78125d002ea2e14cc4e8f443",
+  "screen_evidence": {
+    "B0": {
+      "metrics_path": "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_hierarchy_m32_20261029/trials/screen_B0_s43/metrics/screen_001276.json",
+      "sha256": "b4ff687ea0c4acaba0c0d45857e09d490daa9cc44b8dcfbf6547de1199a22779"
+    },
+    "B1": {
+      "metrics_path": "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_hierarchy_m32_20261029/trials/screen_B1_s43/metrics/screen_001276.json",
+      "sha256": "35eb68426ad26bf4b8f4b8b229a2817341fc5bd1c61a0381280ea109a8a60cf1"
+    },
+    "B2": {
+      "metrics_path": "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_hierarchy_m32_20261029/trials/screen_B2_s43/metrics/screen_001276.json",
+      "sha256": "dc8c335072fb9ccb36e0b1b8c861043788f76c6d9044ec4424ea64eaab8e46b5"
+    },
+    "B3": {
+      "metrics_path": "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_hierarchy_m32_20261029/trials/screen_B3_s43/metrics/screen_001276.json",
+      "sha256": "8700e983483930be8a6929d31dd53857d266d68d6d12f2ad9b10a3dd98ccc35a"
+    }
+  },
+  "decision_protocol": {
+    "bootstrap_repetitions": 5000,
+    "familywise_alpha": 0.05,
+    "simultaneous_comparisons": 6,
+    "seed_direction": "all_three_positive",
+    "minimum_generation_relative_ce_gain": 0.02,
+    "minimum_representation_auroc_gain": 0.005,
+    "generation_quality_guards": "At least 2 of 3 paired seeds: AAR and CDR AAR no worse; validity >= baseline-0.02; length MAE <= 1.1*baseline",
+    "representation_guard": "mean macro AUPRC does not decrease",
+    "positive_result": "Only claim the endpoint passing every frozen criterion; one endpoint is not a universal or joint improvement.",
+    "negative_result": "Goal remains unfinished. Keep the negative result and continue designing candidates; never relax thresholds to manufacture a positive result."
+  }
+}

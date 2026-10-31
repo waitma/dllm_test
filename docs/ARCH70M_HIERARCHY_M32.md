@@ -1,3 +1,5 @@
+> 2026-10-31T05:23:46Z UTC：micro32四组全部完成且最终checkpoint核验通过；B1成为完整确认候选，层次B2/B3未晋级。用户授权开展三种子三epoch完整确认，见[当前计划](/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/ARCH70M_STABLE_VALIDATION.md)。下文启动进度为历史。
+
 # 本地层次注意力探索：micro32共同对照
 
 2026-10-29 UTC，用户指示“开始探索”。本轮补齐尚未正式训练的B2/B3，并用共同micro重跑A5/B1作主要对照。截至2026-10-29T14:13:34Z，四组GPU资格全部通过；B2已正式训练至核验时step7/1276，B3→A5(B0)→B1排队。启动后交后台执行，不持续人工轮询。

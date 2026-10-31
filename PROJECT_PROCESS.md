@@ -1,3 +1,5 @@
+> Last updated: 2026-10-31T05:23:46Z (UTC)。用户恢复并扩大稳定架构验证：上一轮micro32四组全部完成、24份最终checkpoint文件SHA通过，B1整链37.41%/AUROC0.8391高于A5的36.03%/0.8253，层次B2/B3未晋级。新冻结A0/A5(B0)/B1×seed42/43/44，各3epochs/3828步、micro32/global512，共9组，6项CPU和快照检查通过，准备GPU资格后启动。原V8形式与10%子集保持；目标尚未完成。计划 /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/ARCH70M_STABLE_VALIDATION.md。
+
 > Last updated: 2026-10-30T04:08:13Z (UTC)。层次注意力micro32探索 4/4 完成；B1 completed。仅seed43/1epoch/global512，四组共同micro32，原V8固定10%数据；报告 /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/arch70m_results/hierarchy_m32/REPORT.md。
 
 > Last updated: 2026-10-30T01:32:17Z (UTC)。层次注意力micro32探索 3/4 完成；B0 completed。仅seed43/1epoch/global512，四组共同micro32，原V8固定10%数据；报告 /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/arch70m_results/hierarchy_m32/REPORT.md。

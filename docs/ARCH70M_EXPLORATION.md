@@ -1,3 +1,5 @@
+> 2026-10-31T05:23:46Z UTC：micro32四组全部完成且最终checkpoint核验通过；B1成为完整确认候选，层次B2/B3未晋级。用户授权开展三种子三epoch完整确认，见[当前计划](/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/ARCH70M_STABLE_VALIDATION.md)。下文启动进度为历史。
+
 > 2026-10-29T14:09:23Z UTC：用户授权继续本地探索；新micro32四组共同对照队列B2→B3→A5(B0)→B1准备启动，旧micro56证据保持。见[本轮方案](/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/ARCH70M_HIERARCHY_M32.md)。
 
 # V8 约 70M 架构探索实验记录

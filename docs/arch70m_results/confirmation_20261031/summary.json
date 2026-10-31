@@ -1,0 +1,111 @@
+{
+  "updated": "2026-10-31T05:23:44Z",
+  "output_root": "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_confirm_20261031",
+  "trials": [
+    {
+      "variant": "A0",
+      "seed": 42,
+      "status": "pending",
+      "step": 0,
+      "total_steps": 3828,
+      "epochs": 3,
+      "micro_batch": 32,
+      "global_batch": 512
+    },
+    {
+      "variant": "B0",
+      "seed": 42,
+      "status": "pending",
+      "step": 0,
+      "total_steps": 3828,
+      "epochs": 3,
+      "micro_batch": 32,
+      "global_batch": 512
+    },
+    {
+      "variant": "B1",
+      "seed": 42,
+      "status": "pending",
+      "step": 0,
+      "total_steps": 3828,
+      "epochs": 3,
+      "micro_batch": 32,
+      "global_batch": 512
+    },
+    {
+      "variant": "A0",
+      "seed": 43,
+      "status": "pending",
+      "step": 0,
+      "total_steps": 3828,
+      "epochs": 3,
+      "micro_batch": 32,
+      "global_batch": 512
+    },
+    {
+      "variant": "B0",
+      "seed": 43,
+      "status": "pending",
+      "step": 0,
+      "total_steps": 3828,
+      "epochs": 3,
+      "micro_batch": 32,
+      "global_batch": 512
+    },
+    {
+      "variant": "B1",
+      "seed": 43,
+      "status": "pending",
+      "step": 0,
+      "total_steps": 3828,
+      "epochs": 3,
+      "micro_batch": 32,
+      "global_batch": 512
+    },
+    {
+      "variant": "A0",
+      "seed": 44,
+      "status": "pending",
+      "step": 0,
+      "total_steps": 3828,
+      "epochs": 3,
+      "micro_batch": 32,
+      "global_batch": 512
+    },
+    {
+      "variant": "B0",
+      "seed": 44,
+      "status": "pending",
+      "step": 0,
+      "total_steps": 3828,
+      "epochs": 3,
+      "micro_batch": 32,
+      "global_batch": 512
+    },
+    {
+      "variant": "B1",
+      "seed": 44,
+      "status": "pending",
+      "step": 0,
+      "total_steps": 3828,
+      "epochs": 3,
+      "micro_batch": 32,
+      "global_batch": 512
+    }
+  ],
+  "decision": {
+    "status": "pending",
+    "remaining": [
+      "A0_s42",
+      "B0_s42",
+      "B1_s42",
+      "A0_s43",
+      "B0_s43",
+      "B1_s43",
+      "A0_s44",
+      "B0_s44",
+      "B1_s44"
+    ],
+    "decision": "not_assessed"
+  }
+}
