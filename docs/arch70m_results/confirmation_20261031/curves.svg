@@ -6,7 +6,7 @@
   <rdf:RDF xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:cc="http://creativecommons.org/ns#" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
    <cc:Work>
     <dc:type rdf:resource="http://purl.org/dc/dcmitype/StillImage"/>
-    <dc:date>2026-10-31T22:01:35.552894</dc:date>
+    <dc:date>2026-10-31T22:01:49.499650</dc:date>
     <dc:format>image/svg+xml</dc:format>
     <dc:creator>
      <cc:Agent>
@@ -16393,6 +16393,8 @@ L 45.128656 125.015156
 L 45.214733 126.522093
 L 45.30081 127.689404
 L 45.386887 128.696832
+L 45.472964 129.568879
+L 45.559041 130.454013
 " clip-path="url(#pe65a6e0a44)" style="fill: none; stroke: #9467bd; stroke-width: 1.2; stroke-linecap: square"/>
    </g>
    <g id="line2d_36">
@@ -16432,6 +16434,8 @@ L 45.128656 135.125427
 L 45.214733 135.591626
 L 45.30081 134.962518
 L 45.386887 135.588238
+L 45.472964 135.707912
+L 45.559041 137.152225
 " clip-path="url(#pe65a6e0a44)" style="fill: none; stroke: #9467bd; stroke-opacity: 0.12; stroke-width: 0.4; stroke-linecap: square"/>
    </g>
    <g id="line2d_37">
@@ -16439,6 +16443,8 @@ L 45.386887 135.588238
 L 42.46027 59.797781
 L 42.546347 60.113735
 L 42.632424 61.334088
+L 42.718501 62.655243
+L 42.804578 64.554023
 " clip-path="url(#pe65a6e0a44)" style="fill: none; stroke: #8c564b; stroke-width: 1.2; stroke-linecap: square"/>
    </g>
    <g id="line2d_38">
@@ -16446,6 +16452,8 @@ L 42.632424 61.334088
 L 42.46027 59.341176
 L 42.546347 60.745645
 L 42.632424 64.995147
+L 42.718501 67.939861
+L 42.804578 74.047924
 " clip-path="url(#pe65a6e0a44)" style="fill: none; stroke: #8c564b; stroke-opacity: 0.12; stroke-width: 0.4; stroke-linecap: square"/>
    </g>
    <g id="patch_3">
@@ -31791,6 +31799,8 @@ L 45.128656 780.800722
 L 45.214733 729.740792
 L 45.30081 707.381111
 L 45.386887 711.176025
+L 45.472964 740.296558
+L 45.559041 720.254521
 " clip-path="url(#pa6c2baf582)" style="fill: none; stroke: #9467bd; stroke-linecap: square"/>
    </g>
    <g id="line2d_274">
@@ -31798,6 +31808,8 @@ L 45.386887 711.176025
 L 42.46027 634.478872
 L 42.546347 733.370742
 L 42.632424 628.779394
+L 42.718501 733.673059
+L 42.804578 733.673059
 " clip-path="url(#pa6c2baf582)" style="fill: none; stroke: #8c564b; stroke-linecap: square"/>
    </g>
    <g id="patch_33">
@@ -36762,6 +36774,8 @@ L 455.97366 659.065362
 L 456.058231 660.595844
 L 456.14462 661.781395
 L 456.231882 662.804564
+L 456.318391 663.690238
+L 456.404525 664.589202
 " clip-path="url(#ped58c21a77)" style="fill: none; stroke: #9467bd; stroke-linecap: square"/>
    </g>
    <g id="line2d_312">
@@ -36769,6 +36783,8 @@ L 456.231882 662.804564
 L 453.304242 592.828953
 L 453.390152 593.149844
 L 453.476602 594.389265
+L 453.562502 595.731063
+L 453.648379 597.659512
 " clip-path="url(#ped58c21a77)" style="fill: none; stroke: #8c564b; stroke-linecap: square"/>
    </g>
    <g id="patch_38">
@@ -41900,6 +41916,8 @@ L 866.802171 659.065362
 L 866.893536 660.595844
 L 866.996104 661.781395
 L 867.095005 662.804564
+L 867.180906 663.690238
+L 867.276356 664.589202
 " clip-path="url(#p983a997532)" style="fill: none; stroke: #9467bd; stroke-linecap: square"/>
    </g>
    <g id="line2d_354">
@@ -41907,6 +41925,8 @@ L 867.095005 662.804564
 L 864.168762 592.828953
 L 864.234326 593.149844
 L 864.336285 594.389265
+L 864.401823 595.731063
+L 864.467376 597.659512
 " clip-path="url(#p983a997532)" style="fill: none; stroke: #8c564b; stroke-linecap: square"/>
    </g>
    <g id="patch_43">
