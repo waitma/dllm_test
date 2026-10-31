@@ -1,3 +1,5 @@
+> 当前执行核验：2026-10-31T05:29:55Z UTC。九组GPU资格全部通过，A0 seed42 step14/3828；其余8组排队。源/数据/三epoch绑定和实际命令通过检查。当前尚无稳定性结论，目标仍未完成。
+
 # 稳定架构完整确认：2026-10-31
 
 用户最新指示：继续完整验证，直到获得稳定提升的架构。本轮从既有筛选转入冻结候选的三种子确认；目标尚未完成，不能保证任何候选会通过。后台依次训练、验证、保存、汇总并发布，不持续人工盯进度。完成全部试验后按下述冻结标准判断；未通过保持负结果，后续继续设计架构，不降低门槛或挑选最好seed。
@@ -50,7 +52,7 @@ bash /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/launch_arch70m
 
 输出：`/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_confirm_20261031`。冻结源码：`/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_confirm_20261031/sources/3c9c424d816b9fda7adfba5047d9e075ac15dc036342b59461edd35031e50971`。
 
-6项CPU检查通过：原初始化保持、种子与九组资格绑定、未完成时禁止稳定判定、效应量/方向/解码护栏、已知效应的配对bootstrap及错配拒绝、历史保护和快照导入。真实GPU资格检查待执行。
+6项CPU检查通过：原初始化保持、种子与九组资格绑定、未完成时禁止稳定判定、效应量/方向/解码护栏、已知效应的配对bootstrap及错配拒绝、历史保护和快照导入。九个seed/架构组合的真实GPU资格检查均已通过；首组A0 seed42已正式训练，详见启动回执。
 
 每组结束自动commit/push到`explore/arch70m-v8-20261028`，更新完整曲线PNG/PDF/SVG、原始逐步CSV、配对终点与统计；推送失败记pending，不覆盖训练退出码。三轮九组是多天计算预算，按实际记录报告进展，不提前承诺结果。
 
@@ -59,3 +61,21 @@ bash /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/launch_arch70m
 [冻结判定](/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/arch70m_results/confirmation_20261031/decision.json)
 
 完整结束后`decision.json`和`continuation.json`给出通过的方向或仍未稳定的原因。若未稳定，目标继续未完成，需据负结果设计下一轮，不能把当前验证结束当成目标达成。
+
+## 实际启动核验（2026-10-31T05:29:55Z UTC）
+
+控制器PID307655，首组worker PID307866；实际--train-one/--variant A0/--seed42命令及快照工作目录已从/proc核验，绑定epochs3/3828步、micro32/global512和源码/数据SHA匹配。九组全部完成各3次maxlen2048真实更新，loss/梯度有限、显存低于原85%门槛。首组正式运行首次核验step2，本次记录step14；本次未进行checkpoint GPU数值重放。
+
+| GPU资格组 | allocated GiB | reserved GiB | safe |
+|---|---:|---:|---|
+| A0_s42 | 36.37 | 44.01 | True |
+| B0_s42 | 24.40 | 31.82 | True |
+| B1_s42 | 24.40 | 32.01 | True |
+| A0_s43 | 36.37 | 44.01 | True |
+| B0_s43 | 24.40 | 31.82 | True |
+| B1_s43 | 24.40 | 32.01 | True |
+| A0_s44 | 36.37 | 44.01 | True |
+| B0_s44 | 24.40 | 31.82 | True |
+| B1_s44 | 24.40 | 32.01 | True |
+
+[启动证据](/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/arch70m_results/confirmation_20261031/startup_verified.json)。后续由后台控制器执行，不持续人工轮询；统计门槛未通过前不宣告稳定架构目标完成。

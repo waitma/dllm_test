@@ -1,96 +1,116 @@
 {
-  "updated": "2026-10-31T05:23:44Z",
+  "updated": "2026-10-31T05:29:55Z",
   "output_root": "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_confirm_20261031",
   "trials": [
     {
       "variant": "A0",
       "seed": 42,
-      "status": "pending",
-      "step": 0,
+      "status": "training",
+      "step": 14,
       "total_steps": 3828,
       "epochs": 3,
       "micro_batch": 32,
-      "global_batch": 512
+      "global_batch": 512,
+      "training_gpu_hours": 0.02770375200262707,
+      "last_train_ce": 3.0886654384423013,
+      "profile_allocated_gib": 36.369235038757324,
+      "profile_reserved_gib": 44.01171875
     },
     {
       "variant": "B0",
       "seed": 42,
-      "status": "pending",
+      "status": "qualified",
       "step": 0,
       "total_steps": 3828,
       "epochs": 3,
       "micro_batch": 32,
-      "global_batch": 512
+      "global_batch": 512,
+      "profile_allocated_gib": 24.396206855773926,
+      "profile_reserved_gib": 31.82421875
     },
     {
       "variant": "B1",
       "seed": 42,
-      "status": "pending",
+      "status": "qualified",
       "step": 0,
       "total_steps": 3828,
       "epochs": 3,
       "micro_batch": 32,
-      "global_batch": 512
+      "global_batch": 512,
+      "profile_allocated_gib": 24.396676063537598,
+      "profile_reserved_gib": 32.01171875
     },
     {
       "variant": "A0",
       "seed": 43,
-      "status": "pending",
+      "status": "qualified",
       "step": 0,
       "total_steps": 3828,
       "epochs": 3,
       "micro_batch": 32,
-      "global_batch": 512
+      "global_batch": 512,
+      "profile_allocated_gib": 36.369235038757324,
+      "profile_reserved_gib": 44.01171875
     },
     {
       "variant": "B0",
       "seed": 43,
-      "status": "pending",
+      "status": "qualified",
       "step": 0,
       "total_steps": 3828,
       "epochs": 3,
       "micro_batch": 32,
-      "global_batch": 512
+      "global_batch": 512,
+      "profile_allocated_gib": 24.396206855773926,
+      "profile_reserved_gib": 31.82421875
     },
     {
       "variant": "B1",
       "seed": 43,
-      "status": "pending",
+      "status": "qualified",
       "step": 0,
       "total_steps": 3828,
       "epochs": 3,
       "micro_batch": 32,
-      "global_batch": 512
+      "global_batch": 512,
+      "profile_allocated_gib": 24.396676063537598,
+      "profile_reserved_gib": 32.01171875
     },
     {
       "variant": "A0",
       "seed": 44,
-      "status": "pending",
+      "status": "qualified",
       "step": 0,
       "total_steps": 3828,
       "epochs": 3,
       "micro_batch": 32,
-      "global_batch": 512
+      "global_batch": 512,
+      "profile_allocated_gib": 36.369235038757324,
+      "profile_reserved_gib": 44.01171875
     },
     {
       "variant": "B0",
       "seed": 44,
-      "status": "pending",
+      "status": "qualified",
       "step": 0,
       "total_steps": 3828,
       "epochs": 3,
       "micro_batch": 32,
-      "global_batch": 512
+      "global_batch": 512,
+      "profile_allocated_gib": 24.396206855773926,
+      "profile_reserved_gib": 31.82421875
     },
     {
       "variant": "B1",
       "seed": 44,
-      "status": "pending",
+      "status": "qualified",
       "step": 0,
       "total_steps": 3828,
       "epochs": 3,
       "micro_batch": 32,
-      "global_batch": 512
+      "global_batch": 512,
+      "profile_allocated_gib": 24.396676063537598,
+      "profile_reserved_gib": 32.01171875
     }
   ],
   "decision": {

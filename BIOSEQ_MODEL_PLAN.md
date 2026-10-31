@@ -1,3 +1,5 @@
+> 2026-10-31 UTC：新三种子三epoch确认9/9 GPU资格通过并进入首组A0 seed42训练。原模型/数据保持，六项同时配对比较及效应量/三seed方向/解码guard已冻结；只有完整confirm和辅助验证产物齐全后判断，启动成功不算架构目标达成。回执 /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/arch70m_results/confirmation_20261031/startup_verified.json。
+
 > 2026-10-31 UTC：根据完整micro32单种子结果，B1晋级与A5(B0)一起做原A0配对三种子三epoch确认；B2/B3虽然条件CE更低，整链AAR/长度退化，不晋级。固定最终权重在confirm留出评估，六项比较99.1667%区间/3seed同向、生成≥2%相对CE改善加解码guard，表征AUROC≥0.005且AUPRC不回退；仅声明通过方向。模型、数据形式保持，不按新confirm结果改候选/阈值。方案 /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/ARCH70M_STABLE_VALIDATION.md。
 
 > 2026-10-29 UTC：共同micro32的B2/B3/A5(B0)/B1全部GPU资格通过；层次B2已正式训练，B3和两个同micro对照排队。原85%显存门槛保持，新增的是执行协议和共同micro对照，模型实现/数据/目标保持。当前无本轮终点结果。证据 /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/arch70m_results/hierarchy_m32/startup_verified.json。

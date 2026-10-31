@@ -1,0 +1,542 @@
+{
+  "checked": "2026-10-31T05:29:55Z",
+  "status": "all_nine_GPU_qualifications_passed_and_formal_training_started",
+  "first_verified_step": 2,
+  "observed_step": 14,
+  "controller_pid": 307655,
+  "worker_pid": 307866,
+  "actual_commands": {
+    "307866": "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_env/bin/python -B -m architecture_confirm.runner --train-one --variant A0 --seed 42 --output-root /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_confirm_20261031 ",
+    "307655": "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_env/bin/python -B -m architecture_confirm.runner --gpu 0 "
+  },
+  "worker_cwd": "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_confirm_20261031/sources/3c9c424d816b9fda7adfba5047d9e075ac15dc036342b59461edd35031e50971",
+  "source_sha256": "3c9c424d816b9fda7adfba5047d9e075ac15dc036342b59461edd35031e50971",
+  "data_sha256": "4beaac6b54a1f46492533aeb77c2de2c6ac2a0bd8266fd57a6bb312679435c51",
+  "code_publication": {
+    "status": "pushed",
+    "exit_code": 0,
+    "transport": "runtime_proxy",
+    "error": null,
+    "commit": "7670430186cdfddb1bc857561b7cd4767dbb7d12",
+    "updated": "2026-10-31T05:25:54Z"
+  },
+  "profiles": {
+    "A0_s42": {
+      "variant": "A0",
+      "micro_batch": 32,
+      "global_batch": 512,
+      "seed": 42,
+      "grad_accum": 16,
+      "final_micro_batch": 32,
+      "length": 2048,
+      "candidates": [
+        {
+          "status": "passed",
+          "updates": 3,
+          "micro_batch": 32,
+          "allocated_bytes": 39051168768,
+          "reserved_bytes": 47257223168,
+          "external_bytes": 750977024,
+          "total_bytes": 101973950464,
+          "safe": true,
+          "seconds_per_step": 1.7364791696891189
+        }
+      ],
+      "updates": [
+        {
+          "loss": 3.913341097308489,
+          "family_loss": 5.151915073394775,
+          "total_loss": 4.428532604647966,
+          "grad_norm": 70.54188537597656,
+          "learning_rate": 0.0,
+          "selected_tokens": 9660,
+          "family_chains": 32
+        },
+        {
+          "loss": 3.913341097308489,
+          "family_loss": 5.151915073394775,
+          "total_loss": 4.428532604647966,
+          "grad_norm": 70.54188537597656,
+          "learning_rate": 2e-05,
+          "selected_tokens": 9660,
+          "family_chains": 32
+        },
+        {
+          "loss": 1.920209991265528,
+          "family_loss": 4.128846168518066,
+          "total_loss": 2.3330946081173347,
+          "grad_norm": 11.917946815490723,
+          "learning_rate": 4e-05,
+          "selected_tokens": 9660,
+          "family_chains": 32
+        }
+      ],
+      "source_sha256": "3c9c424d816b9fda7adfba5047d9e075ac15dc036342b59461edd35031e50971",
+      "data_sha256": "4beaac6b54a1f46492533aeb77c2de2c6ac2a0bd8266fd57a6bb312679435c51",
+      "device": "NVIDIA RPBZZZ6",
+      "note": "Maximum-length 3-update qualification; fresh process for formal training."
+    },
+    "B0_s42": {
+      "variant": "B0",
+      "micro_batch": 32,
+      "global_batch": 512,
+      "seed": 42,
+      "grad_accum": 16,
+      "final_micro_batch": 32,
+      "length": 2048,
+      "candidates": [
+        {
+          "status": "passed",
+          "updates": 3,
+          "micro_batch": 32,
+          "allocated_bytes": 26195227648,
+          "reserved_bytes": 34170994688,
+          "external_bytes": 750977024,
+          "total_bytes": 101973950464,
+          "safe": true,
+          "seconds_per_step": 1.5014938333382208
+        }
+      ],
+      "updates": [
+        {
+          "loss": 4.8444612933488616,
+          "family_loss": 5.3221211433410645,
+          "total_loss": 5.376673407682968,
+          "grad_norm": 77.89738464355469,
+          "learning_rate": 0.0,
+          "selected_tokens": 9660,
+          "family_chains": 32
+        },
+        {
+          "loss": 4.8444612933488616,
+          "family_loss": 5.3221211433410645,
+          "total_loss": 5.376673407682968,
+          "grad_norm": 77.89738464355469,
+          "learning_rate": 2e-05,
+          "selected_tokens": 9660,
+          "family_chains": 32
+        },
+        {
+          "loss": 2.3410554558100416,
+          "family_loss": 4.858863353729248,
+          "total_loss": 2.8269417911829664,
+          "grad_norm": 29.342721939086914,
+          "learning_rate": 4e-05,
+          "selected_tokens": 9660,
+          "family_chains": 32
+        }
+      ],
+      "source_sha256": "3c9c424d816b9fda7adfba5047d9e075ac15dc036342b59461edd35031e50971",
+      "data_sha256": "4beaac6b54a1f46492533aeb77c2de2c6ac2a0bd8266fd57a6bb312679435c51",
+      "device": "NVIDIA RPBZZZ6",
+      "note": "Maximum-length 3-update qualification; fresh process for formal training."
+    },
+    "B1_s42": {
+      "variant": "B1",
+      "micro_batch": 32,
+      "global_batch": 512,
+      "seed": 42,
+      "grad_accum": 16,
+      "final_micro_batch": 32,
+      "length": 2048,
+      "candidates": [
+        {
+          "status": "passed",
+          "updates": 3,
+          "micro_batch": 32,
+          "allocated_bytes": 26195731456,
+          "reserved_bytes": 34372321280,
+          "external_bytes": 750977024,
+          "total_bytes": 101973950464,
+          "safe": true,
+          "seconds_per_step": 1.4621270168572664
+        }
+      ],
+      "updates": [
+        {
+          "loss": 4.8444612933488616,
+          "family_loss": 5.3221211433410645,
+          "total_loss": 5.376673407682968,
+          "grad_norm": 78.34700012207031,
+          "learning_rate": 0.0,
+          "selected_tokens": 9660,
+          "family_chains": 32
+        },
+        {
+          "loss": 4.8444612933488616,
+          "family_loss": 5.3221211433410645,
+          "total_loss": 5.376673407682968,
+          "grad_norm": 78.34700012207031,
+          "learning_rate": 2e-05,
+          "selected_tokens": 9660,
+          "family_chains": 32
+        },
+        {
+          "loss": 2.343257472826087,
+          "family_loss": 4.858761310577393,
+          "total_loss": 2.829133603883826,
+          "grad_norm": 29.649330139160156,
+          "learning_rate": 4e-05,
+          "selected_tokens": 9660,
+          "family_chains": 32
+        }
+      ],
+      "source_sha256": "3c9c424d816b9fda7adfba5047d9e075ac15dc036342b59461edd35031e50971",
+      "data_sha256": "4beaac6b54a1f46492533aeb77c2de2c6ac2a0bd8266fd57a6bb312679435c51",
+      "device": "NVIDIA RPBZZZ6",
+      "note": "Maximum-length 3-update qualification; fresh process for formal training."
+    },
+    "A0_s43": {
+      "variant": "A0",
+      "micro_batch": 32,
+      "global_batch": 512,
+      "seed": 43,
+      "grad_accum": 16,
+      "final_micro_batch": 32,
+      "length": 2048,
+      "candidates": [
+        {
+          "status": "passed",
+          "updates": 3,
+          "micro_batch": 32,
+          "allocated_bytes": 39051168768,
+          "reserved_bytes": 47257223168,
+          "external_bytes": 750977024,
+          "total_bytes": 101973950464,
+          "safe": true,
+          "seconds_per_step": 1.5738220733279984
+        }
+      ],
+      "updates": [
+        {
+          "loss": 3.847547877846791,
+          "family_loss": 4.973456859588623,
+          "total_loss": 4.344893563805654,
+          "grad_norm": 67.1816177368164,
+          "learning_rate": 0.0,
+          "selected_tokens": 9660,
+          "family_chains": 32
+        },
+        {
+          "loss": 3.847547877846791,
+          "family_loss": 4.973456859588623,
+          "total_loss": 4.344893563805654,
+          "grad_norm": 67.1816177368164,
+          "learning_rate": 2e-05,
+          "selected_tokens": 9660,
+          "family_chains": 32
+        },
+        {
+          "loss": 2.017003712150621,
+          "family_loss": 4.126391410827637,
+          "total_loss": 2.4296428532333847,
+          "grad_norm": 14.035089492797852,
+          "learning_rate": 4e-05,
+          "selected_tokens": 9660,
+          "family_chains": 32
+        }
+      ],
+      "source_sha256": "3c9c424d816b9fda7adfba5047d9e075ac15dc036342b59461edd35031e50971",
+      "data_sha256": "4beaac6b54a1f46492533aeb77c2de2c6ac2a0bd8266fd57a6bb312679435c51",
+      "device": "NVIDIA RPBZZZ6",
+      "note": "Maximum-length 3-update qualification; fresh process for formal training."
+    },
+    "B0_s43": {
+      "variant": "B0",
+      "micro_batch": 32,
+      "global_batch": 512,
+      "seed": 43,
+      "grad_accum": 16,
+      "final_micro_batch": 32,
+      "length": 2048,
+      "candidates": [
+        {
+          "status": "passed",
+          "updates": 3,
+          "micro_batch": 32,
+          "allocated_bytes": 26195227648,
+          "reserved_bytes": 34170994688,
+          "external_bytes": 750977024,
+          "total_bytes": 101973950464,
+          "safe": true,
+          "seconds_per_step": 1.5237619375499587
+        }
+      ],
+      "updates": [
+        {
+          "loss": 3.770821606495859,
+          "family_loss": 4.851444721221924,
+          "total_loss": 4.2559660786180515,
+          "grad_norm": 64.13541412353516,
+          "learning_rate": 0.0,
+          "selected_tokens": 9660,
+          "family_chains": 32
+        },
+        {
+          "loss": 3.770821606495859,
+          "family_loss": 4.851444721221924,
+          "total_loss": 4.2559660786180515,
+          "grad_norm": 64.13541412353516,
+          "learning_rate": 2e-05,
+          "selected_tokens": 9660,
+          "family_chains": 32
+        },
+        {
+          "loss": 3.0693806207945133,
+          "family_loss": 4.439671516418457,
+          "total_loss": 3.513347772436359,
+          "grad_norm": 45.116146087646484,
+          "learning_rate": 4e-05,
+          "selected_tokens": 9660,
+          "family_chains": 32
+        }
+      ],
+      "source_sha256": "3c9c424d816b9fda7adfba5047d9e075ac15dc036342b59461edd35031e50971",
+      "data_sha256": "4beaac6b54a1f46492533aeb77c2de2c6ac2a0bd8266fd57a6bb312679435c51",
+      "device": "NVIDIA RPBZZZ6",
+      "note": "Maximum-length 3-update qualification; fresh process for formal training."
+    },
+    "B1_s43": {
+      "variant": "B1",
+      "micro_batch": 32,
+      "global_batch": 512,
+      "seed": 43,
+      "grad_accum": 16,
+      "final_micro_batch": 32,
+      "length": 2048,
+      "candidates": [
+        {
+          "status": "passed",
+          "updates": 3,
+          "micro_batch": 32,
+          "allocated_bytes": 26195731456,
+          "reserved_bytes": 34372321280,
+          "external_bytes": 750977024,
+          "total_bytes": 101973950464,
+          "safe": true,
+          "seconds_per_step": 1.4797679474577308
+        }
+      ],
+      "updates": [
+        {
+          "loss": 3.770821606495859,
+          "family_loss": 4.851444721221924,
+          "total_loss": 4.2559660786180515,
+          "grad_norm": 64.54698944091797,
+          "learning_rate": 0.0,
+          "selected_tokens": 9660,
+          "family_chains": 32
+        },
+        {
+          "loss": 3.770821606495859,
+          "family_loss": 4.851444721221924,
+          "total_loss": 4.2559660786180515,
+          "grad_norm": 64.54698944091797,
+          "learning_rate": 2e-05,
+          "selected_tokens": 9660,
+          "family_chains": 32
+        },
+        {
+          "loss": 3.073046875,
+          "family_loss": 4.43948221206665,
+          "total_loss": 3.5169950962066654,
+          "grad_norm": 45.413536071777344,
+          "learning_rate": 4e-05,
+          "selected_tokens": 9660,
+          "family_chains": 32
+        }
+      ],
+      "source_sha256": "3c9c424d816b9fda7adfba5047d9e075ac15dc036342b59461edd35031e50971",
+      "data_sha256": "4beaac6b54a1f46492533aeb77c2de2c6ac2a0bd8266fd57a6bb312679435c51",
+      "device": "NVIDIA RPBZZZ6",
+      "note": "Maximum-length 3-update qualification; fresh process for formal training."
+    },
+    "A0_s44": {
+      "variant": "A0",
+      "micro_batch": 32,
+      "global_batch": 512,
+      "seed": 44,
+      "grad_accum": 16,
+      "final_micro_batch": 32,
+      "length": 2048,
+      "candidates": [
+        {
+          "status": "passed",
+          "updates": 3,
+          "micro_batch": 32,
+          "allocated_bytes": 39051168768,
+          "reserved_bytes": 47257223168,
+          "external_bytes": 750977024,
+          "total_bytes": 101973950464,
+          "safe": true,
+          "seconds_per_step": 1.5420257916363578
+        }
+      ],
+      "updates": [
+        {
+          "loss": 4.299704807194617,
+          "family_loss": 4.676506042480469,
+          "total_loss": 4.767355411442664,
+          "grad_norm": 63.41476058959961,
+          "learning_rate": 0.0,
+          "selected_tokens": 9660,
+          "family_chains": 32
+        },
+        {
+          "loss": 4.299704807194617,
+          "family_loss": 4.676506042480469,
+          "total_loss": 4.767355411442664,
+          "grad_norm": 63.41476058959961,
+          "learning_rate": 2e-05,
+          "selected_tokens": 9660,
+          "family_chains": 32
+        },
+        {
+          "loss": 1.9156672570522775,
+          "family_loss": 3.7533202171325684,
+          "total_loss": 2.2909992787655344,
+          "grad_norm": 12.621509552001953,
+          "learning_rate": 4e-05,
+          "selected_tokens": 9660,
+          "family_chains": 32
+        }
+      ],
+      "source_sha256": "3c9c424d816b9fda7adfba5047d9e075ac15dc036342b59461edd35031e50971",
+      "data_sha256": "4beaac6b54a1f46492533aeb77c2de2c6ac2a0bd8266fd57a6bb312679435c51",
+      "device": "NVIDIA RPBZZZ6",
+      "note": "Maximum-length 3-update qualification; fresh process for formal training."
+    },
+    "B0_s44": {
+      "variant": "B0",
+      "micro_batch": 32,
+      "global_batch": 512,
+      "seed": 44,
+      "grad_accum": 16,
+      "final_micro_batch": 32,
+      "length": 2048,
+      "candidates": [
+        {
+          "status": "passed",
+          "updates": 3,
+          "micro_batch": 32,
+          "allocated_bytes": 26195227648,
+          "reserved_bytes": 34170994688,
+          "external_bytes": 750977024,
+          "total_bytes": 101973950464,
+          "safe": true,
+          "seconds_per_step": 1.4877852597273886
+        }
+      ],
+      "updates": [
+        {
+          "loss": 4.308235879270186,
+          "family_loss": 4.651736259460449,
+          "total_loss": 4.7734095052162315,
+          "grad_norm": 70.34685516357422,
+          "learning_rate": 0.0,
+          "selected_tokens": 9660,
+          "family_chains": 32
+        },
+        {
+          "loss": 4.308235879270186,
+          "family_loss": 4.651736259460449,
+          "total_loss": 4.7734095052162315,
+          "grad_norm": 70.34685516357422,
+          "learning_rate": 2e-05,
+          "selected_tokens": 9660,
+          "family_chains": 32
+        },
+        {
+          "loss": 2.380370689376294,
+          "family_loss": 4.113224983215332,
+          "total_loss": 2.791693187697827,
+          "grad_norm": 32.86534881591797,
+          "learning_rate": 4e-05,
+          "selected_tokens": 9660,
+          "family_chains": 32
+        }
+      ],
+      "source_sha256": "3c9c424d816b9fda7adfba5047d9e075ac15dc036342b59461edd35031e50971",
+      "data_sha256": "4beaac6b54a1f46492533aeb77c2de2c6ac2a0bd8266fd57a6bb312679435c51",
+      "device": "NVIDIA RPBZZZ6",
+      "note": "Maximum-length 3-update qualification; fresh process for formal training."
+    },
+    "B1_s44": {
+      "variant": "B1",
+      "micro_batch": 32,
+      "global_batch": 512,
+      "seed": 44,
+      "grad_accum": 16,
+      "final_micro_batch": 32,
+      "length": 2048,
+      "candidates": [
+        {
+          "status": "passed",
+          "updates": 3,
+          "micro_batch": 32,
+          "allocated_bytes": 26195731456,
+          "reserved_bytes": 34372321280,
+          "external_bytes": 750977024,
+          "total_bytes": 101973950464,
+          "safe": true,
+          "seconds_per_step": 1.4849054332201679
+        }
+      ],
+      "updates": [
+        {
+          "loss": 4.308235879270186,
+          "family_loss": 4.651736259460449,
+          "total_loss": 4.7734095052162315,
+          "grad_norm": 70.77185821533203,
+          "learning_rate": 0.0,
+          "selected_tokens": 9660,
+          "family_chains": 32
+        },
+        {
+          "loss": 4.308235879270186,
+          "family_loss": 4.651736259460449,
+          "total_loss": 4.7734095052162315,
+          "grad_norm": 70.77185821533203,
+          "learning_rate": 2e-05,
+          "selected_tokens": 9660,
+          "family_chains": 32
+        },
+        {
+          "loss": 2.383008216873706,
+          "family_loss": 4.111526012420654,
+          "total_loss": 2.7941608181157713,
+          "grad_norm": 33.21170425415039,
+          "learning_rate": 4e-05,
+          "selected_tokens": 9660,
+          "family_chains": 32
+        }
+      ],
+      "source_sha256": "3c9c424d816b9fda7adfba5047d9e075ac15dc036342b59461edd35031e50971",
+      "data_sha256": "4beaac6b54a1f46492533aeb77c2de2c6ac2a0bd8266fd57a6bb312679435c51",
+      "device": "NVIDIA RPBZZZ6",
+      "note": "Maximum-length 3-update qualification; fresh process for formal training."
+    }
+  },
+  "latest_training": {
+    "loss": 3.0886654384423013,
+    "family_loss": 4.688505936108934,
+    "total_loss": 3.557516032053195,
+    "grad_norm": 6.72114896774292,
+    "learning_rate": 6.770833333333333e-06,
+    "selected_tokens": 12627,
+    "family_chains": 867,
+    "step": 14,
+    "epoch": 0,
+    "seen_records": 7168,
+    "seen_tokens": 2351316,
+    "gpu_hours": 0.02770375200262707,
+    "seconds_per_step": 5.490491076372564,
+    "micro_batch": 32,
+    "records": 512,
+    "allocated_bytes": 8292706816,
+    "reserved_bytes": 38612762624
+  },
+  "cpu_checks": 6,
+  "goal_complete": false,
+  "limitation": "Startup verification only. All nine three-epoch confirm runs and paired statistical decisions remain outstanding."
+}
