@@ -1,3 +1,5 @@
+> Last updated: 2026-10-31T14:01:36Z (UTC)。完整确认 3/9 完成；A0 seed43 completed on GPU3；decision=not_assessed。A0/A5(B0)/B1×seed42/43/44，各3epoch/3828步、micro32/global512；原V8数据保持。报告 /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/arch70m_results/confirmation_20261031/REPORT.md。未达到冻结判据不宣告稳定提升。
+
 > Last updated: 2026-10-31T14:00:37Z (UTC)。完整确认 2/9 完成；B1 seed42 completed on GPU2；decision=not_assessed。A0/A5(B0)/B1×seed42/43/44，各3epoch/3828步、micro32/global512；原V8数据保持。报告 /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/arch70m_results/confirmation_20261031/REPORT.md。未达到冻结判据不宣告稳定提升。
 
 > Last updated: 2026-10-31T13:56:46Z (UTC)。完整确认 1/9 完成；B0 seed42 completed on GPU1；decision=not_assessed。A0/A5(B0)/B1×seed42/43/44，各3epoch/3828步、micro32/global512；原V8数据保持。报告 /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/arch70m_results/confirmation_20261031/REPORT.md。未达到冻结判据不宣告稳定提升。
