@@ -1,6 +1,6 @@
 # 三种子完整架构确认
 
-更新时间：2026-10-31T14:01:50Z UTC；完成4/9；decision=not_assessed。
+更新时间：2026-10-31T21:48:49Z UTC；完成5/9；decision=not_assessed。
 
 A0原架构、B0=A5全局注意力、B1=全局＋可学习残差。配对seed42/43/44，各随机初始化3epoch/3828步；共同micro32/global512，原V8形式与固定10%数据。
 候选来自既有screen筛选；所有九组完成后才对confirm留出终点作配对统计。训练过程中只用screen曲线观察，不按confirm结果选checkpoint。原抗体特异性五折评估一并保留，属于辅助验证。
@@ -12,10 +12,10 @@ A0原架构、B0=A5全局注意力、B1=全局＋可学习残差。配对seed42/
 | B0 | 42 | completed | 3828 | 0.3486 | 0.8040 | 0.8843 | 0.7318 |
 | B1 | 42 | completed | 3828 | 0.3340 | 0.8061 | 0.8807 | 0.7327 |
 | A0 | 43 | completed | 3828 | 0.0301 | 0.8048 | 0.8925 | 0.8260 |
-| B0 | 43 | qualified | 0 | — | — | — | — |
-| B1 | 43 | training | 38 | — | — | — | — |
-| A0 | 44 | training | 6 | — | — | — | — |
-| B0 | 44 | initial_evaluation | 0 | — | — | — | — |
+| B0 | 43 | training | 3828 | — | — | — | — |
+| B1 | 43 | completed | 3828 | 0.3509 | 0.8039 | 0.8871 | 0.7841 |
+| A0 | 44 | training | 3828 | — | — | — | — |
+| B0 | 44 | training | 3828 | — | — | — | — |
 | B1 | 44 | qualified | 0 | — | — | — | — |
 
 ![完整screen训练/验证曲线](/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/arch70m_results/confirmation_20261031/curves.png)
