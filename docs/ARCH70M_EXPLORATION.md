@@ -1,3 +1,5 @@
+> 2026-10-31T05:56:00Z UTC：用户取消本地串行确认，GPU已释放。新的四卡独立并行入口待用户提交，验证矩阵与判据保持；本地日志/完整checkpoint已保留。见[四卡运行说明](/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/ARCH70M_CONFIRM_4GPU.md)。下文启动状态为历史。
+
 > 2026-10-31T05:23:46Z UTC：micro32四组全部完成且最终checkpoint核验通过；B1成为完整确认候选，层次B2/B3未晋级。用户授权开展三种子三epoch完整确认，见[当前计划](/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/ARCH70M_STABLE_VALIDATION.md)。下文启动进度为历史。
 
 > 2026-10-29T14:09:23Z UTC：用户授权继续本地探索；新micro32四组共同对照队列B2→B3→A5(B0)→B1准备启动，旧micro56证据保持。见[本轮方案](/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/ARCH70M_HIERARCHY_M32.md)。

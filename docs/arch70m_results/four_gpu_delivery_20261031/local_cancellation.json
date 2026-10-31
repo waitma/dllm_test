@@ -1,0 +1,17 @@
+{
+  "stopped": "2026-10-31T05:46:04Z",
+  "reason": "User requested cancel local and deliver four-GPU submission script.",
+  "processes": {
+    "controller_command": "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_env/bin/python -B -m architecture_confirm.runner --gpu 0 ",
+    "worker_command": "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_env/bin/python -B -m architecture_confirm.runner --train-one --variant A0 --seed 42 --output-root /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_confirm_20261031 ",
+    "controller_pid": 307655,
+    "worker_pid": 307866,
+    "pgid": 307655
+  },
+  "last_observed_step": 150,
+  "last_complete_checkpoint_step": 0,
+  "resume_checkpoint": "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_confirm_20261031/trials/confirm_A0_s42/checkpoints/step_000000",
+  "archive": "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_confirm_20261031/local_cancelled_20261031T054604Z",
+  "controller_exited": true,
+  "worker_exited": true
+}

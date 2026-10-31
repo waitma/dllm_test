@@ -1,0 +1,106 @@
+{
+  "checked": "2026-10-31T05:56:00Z",
+  "status": "eight_CPU_scheduler_checks_and_shell_dry_run_passed",
+  "tests": 8,
+  "source_sha256": "3c9c424d816b9fda7adfba5047d9e075ac15dc036342b59461edd35031e50971",
+  "data_sha256": "4beaac6b54a1f46492533aeb77c2de2c6ac2a0bd8266fd57a6bb312679435c51",
+  "scheduler_files": {
+    "arch70m_confirm_4gpu.py": "f336e2d7ebfbdf355d2a6be8837bfb218e7e89728f2894a7ff79a715a79f2e8f",
+    "launch_arch70m_confirm_4gpu.sh": "3fab1348a2379f784f6898c48e9a5e0889aa4d8cca0738ed100d551e0a09e7fb",
+    "test_arch70m_confirm_4gpu.py": "20fee5af06409eed0d8387f3881f5861b8355044051c58662d4fb95bfe18aa7e"
+  },
+  "gpus_started_locally": 0,
+  "actual_four_gpu_run": "pending user submission",
+  "assignments": [
+    {
+      "variant": "A0",
+      "seed": 42,
+      "gpu": "0",
+      "stage": "confirm",
+      "epochs": 3,
+      "total_steps": 3828,
+      "micro_batch": 32,
+      "global_batch": 512
+    },
+    {
+      "variant": "B0",
+      "seed": 42,
+      "gpu": "1",
+      "stage": "confirm",
+      "epochs": 3,
+      "total_steps": 3828,
+      "micro_batch": 32,
+      "global_batch": 512
+    },
+    {
+      "variant": "B1",
+      "seed": 42,
+      "gpu": "2",
+      "stage": "confirm",
+      "epochs": 3,
+      "total_steps": 3828,
+      "micro_batch": 32,
+      "global_batch": 512
+    },
+    {
+      "variant": "A0",
+      "seed": 43,
+      "gpu": "3",
+      "stage": "confirm",
+      "epochs": 3,
+      "total_steps": 3828,
+      "micro_batch": 32,
+      "global_batch": 512
+    },
+    {
+      "variant": "B0",
+      "seed": 43,
+      "gpu": "0",
+      "stage": "confirm",
+      "epochs": 3,
+      "total_steps": 3828,
+      "micro_batch": 32,
+      "global_batch": 512
+    },
+    {
+      "variant": "B1",
+      "seed": 43,
+      "gpu": "1",
+      "stage": "confirm",
+      "epochs": 3,
+      "total_steps": 3828,
+      "micro_batch": 32,
+      "global_batch": 512
+    },
+    {
+      "variant": "A0",
+      "seed": 44,
+      "gpu": "2",
+      "stage": "confirm",
+      "epochs": 3,
+      "total_steps": 3828,
+      "micro_batch": 32,
+      "global_batch": 512
+    },
+    {
+      "variant": "B0",
+      "seed": 44,
+      "gpu": "3",
+      "stage": "confirm",
+      "epochs": 3,
+      "total_steps": 3828,
+      "micro_batch": 32,
+      "global_batch": 512
+    },
+    {
+      "variant": "B1",
+      "seed": 44,
+      "gpu": "0",
+      "stage": "confirm",
+      "epochs": 3,
+      "total_steps": 3828,
+      "micro_batch": 32,
+      "global_batch": 512
+    }
+  ]
+}

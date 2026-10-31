@@ -1,3 +1,5 @@
+> 2026-10-31 UTC：用户将当前稳定架构确认从本地串行改为用户提交的四卡独立单GPU并行。候选A0/A5(B0)/B1、42/43/44三seed、各3epoch/3828步、micro32/global512及原confirm/统计门槛保持，仅新增外部调度器；冻结源码SHA仍为3c9c424d816b9fda7adfba5047d9e075ac15dc036342b59461edd35031e50971。默认新输出隔离本地取消记录，实际四卡资格由作业执行。说明 /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/ARCH70M_CONFIRM_4GPU.md。
+
 > 2026-10-31 UTC：新三种子三epoch确认9/9 GPU资格通过并进入首组A0 seed42训练。原模型/数据保持，六项同时配对比较及效应量/三seed方向/解码guard已冻结；只有完整confirm和辅助验证产物齐全后判断，启动成功不算架构目标达成。回执 /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/arch70m_results/confirmation_20261031/startup_verified.json。
 
 > 2026-10-31 UTC：根据完整micro32单种子结果，B1晋级与A5(B0)一起做原A0配对三种子三epoch确认；B2/B3虽然条件CE更低，整链AAR/长度退化，不晋级。固定最终权重在confirm留出评估，六项比较99.1667%区间/3seed同向、生成≥2%相对CE改善加解码guard，表征AUROC≥0.005且AUPRC不回退；仅声明通过方向。模型、数据形式保持，不按新confirm结果改候选/阈值。方案 /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/ARCH70M_STABLE_VALIDATION.md。
