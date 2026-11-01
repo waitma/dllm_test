@@ -1,7 +1,117 @@
 {
-  "status": "pending",
-  "remaining": [
-    "B1_s44"
-  ],
-  "decision": "not_assessed"
+  "status": "complete",
+  "repetitions": 5000,
+  "familywise_alpha": 0.05,
+  "comparisons": 6,
+  "interval": "99.1667% two-sided paired hierarchical percentile interval; Bonferroni over 3 pairs x 2 endpoints",
+  "resampling": "training seeds, then exact receptor clusters within each source; paired observations",
+  "pairs": {
+    "B0_vs_A0": {
+      "generation": {
+        "mean_gain": 0.08552894034525689,
+        "sample_sd": 0.12091203298795576,
+        "per_seed_gain": [
+          0.09946187285749285,
+          0.19887093083673257,
+          -0.04174598265845472
+        ],
+        "adjusted_ci": [
+          -0.04399713217576945,
+          0.20158070341393722
+        ],
+        "all_three_seeds_improve": false,
+        "decoder_guard_passes": 1,
+        "stable_improvement": false
+      },
+      "representation": {
+        "mean_gain": 0.007893139040680008,
+        "sample_sd": 0.012793750762419866,
+        "per_seed_gain": [
+          -0.0054644808743170015,
+          0.02003642987249543,
+          0.009107468123861595
+        ],
+        "adjusted_ci": [
+          -0.03333462103263492,
+          0.050580418870566614
+        ],
+        "all_three_seeds_improve": false,
+        "mean_auprc_gain": -0.02505537641201631,
+        "stable_improvement": false
+      }
+    },
+    "B1_vs_A0": {
+      "generation": {
+        "mean_gain": 0.08854932917883214,
+        "sample_sd": 0.11232874805148635,
+        "per_seed_gain": [
+          0.09946595346214625,
+          0.19502121012423723,
+          -0.028839176049887068
+        ],
+        "adjusted_ci": [
+          -0.03190530630771728,
+          0.19815742589086904
+        ],
+        "all_three_seeds_improve": false,
+        "decoder_guard_passes": 2,
+        "stable_improvement": false
+      },
+      "representation": {
+        "mean_gain": -0.0033394049787492386,
+        "sample_sd": 0.0070741834837468355,
+        "per_seed_gain": [
+          -0.009107468123861595,
+          -0.0054644808743168904,
+          0.00455373406193077
+        ],
+        "adjusted_ci": [
+          -0.04141548948958332,
+          0.03326624872387736
+        ],
+        "all_three_seeds_improve": false,
+        "mean_auprc_gain": -0.03470114483528867,
+        "stable_improvement": false
+      }
+    },
+    "B1_vs_B0": {
+      "generation": {
+        "mean_gain": 0.00203219172382984,
+        "sample_sd": 0.00909726823900887,
+        "per_seed_gain": [
+          0.00028352060767400226,
+          -0.006063807238505696,
+          0.011876861802321214
+        ],
+        "adjusted_ci": [
+          -0.007492041235139404,
+          0.012873703415219163
+        ],
+        "all_three_seeds_improve": false,
+        "decoder_guard_passes": 1,
+        "stable_improvement": false
+      },
+      "representation": {
+        "mean_gain": -0.011232544019429247,
+        "sample_sd": 0.012365155952893891,
+        "per_seed_gain": [
+          -0.0036429872495445936,
+          -0.025500910746812322,
+          -0.004553734061930825
+        ],
+        "adjusted_ci": [
+          -0.045625114849823886,
+          0.01828039340783749
+        ],
+        "all_three_seeds_improve": false,
+        "mean_auprc_gain": -0.00964576842327236,
+        "stable_improvement": false
+      }
+    }
+  },
+  "limitation": "Three seeds; fixed small protected probes; exact receptor clustering is not homology-independent validation.",
+  "accepted_vs_original": {},
+  "decision": "not_yet_stable",
+  "next_action": "Goal remains unfinished: inspect failure directions and preregister a new architecture batch; do not lower thresholds or claim success.",
+  "observations_sha256": "a28cf365680bce930007d49a9f70cb48cdaf829af24160b13cc7ce46bade398e"
 }
