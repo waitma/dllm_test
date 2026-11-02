@@ -1,0 +1,358 @@
+{
+  "status": "passed",
+  "updated": "2026-11-02T15:16:52Z",
+  "trials": [
+    {
+      "variant": "A0",
+      "seed": 44,
+      "generation_summary_exact": true,
+      "probe_metrics_exact": true,
+      "ab_fivefold_metrics_close": true,
+      "ab_head_files": [
+        {
+          "fold": 0,
+          "sha256": "6580df325c78556afdcb142800003b85f58b9db28c867f09c8f60f56fd5dcfc1",
+          "test_records": 880
+        },
+        {
+          "fold": 1,
+          "sha256": "10ed232e45d5c6df4ee13c960fbd4882e492e4c3a0cf3faac998777a14917725",
+          "test_records": 880
+        },
+        {
+          "fold": 2,
+          "sha256": "99dd4287a4ec38a08f677de46c0850d37fa603d88c668ed4c108b2d6a3150b27",
+          "test_records": 880
+        },
+        {
+          "fold": 3,
+          "sha256": "807b339e422d84fd81d761fa03d5914fdb30ae591d419210da25e81fa5ac3651",
+          "test_records": 879
+        },
+        {
+          "fold": 4,
+          "sha256": "244373dbec9aa86bceb8c1803433930fb89cf9c14592f7d8ba75af8f0d74fbf5",
+          "test_records": 879
+        }
+      ],
+      "ab_records": 4398,
+      "ab_feature_shape": [
+        4398,
+        768
+      ]
+    },
+    {
+      "variant": "B0",
+      "seed": 44,
+      "generation_summary_exact": true,
+      "probe_metrics_exact": true,
+      "ab_fivefold_metrics_close": true,
+      "ab_head_files": [
+        {
+          "fold": 0,
+          "sha256": "ba50228ca68b6180e4f3706c7c0a5098c38aa7cbc09a05010c67da2d46c57894",
+          "test_records": 880
+        },
+        {
+          "fold": 1,
+          "sha256": "10eee4da8baf659ecb9faca0d734fd96ff5cc86f48ddef99509c22fa1e71451b",
+          "test_records": 880
+        },
+        {
+          "fold": 2,
+          "sha256": "44ae00e047b4f5b52e7fa977ce10fb0eb0eb433d74f224eec7cc20ccfae93b16",
+          "test_records": 880
+        },
+        {
+          "fold": 3,
+          "sha256": "5be8954717fee8a4af59f9c06bb732d215732d0150f2add8aff70a5966894f14",
+          "test_records": 879
+        },
+        {
+          "fold": 4,
+          "sha256": "c5efaba676bcc8441471424ef1ab151a0fd3f76a8bce856078c32121281c84ca",
+          "test_records": 879
+        }
+      ],
+      "ab_records": 4398,
+      "ab_feature_shape": [
+        4398,
+        768
+      ]
+    },
+    {
+      "variant": "B1",
+      "seed": 44,
+      "generation_summary_exact": true,
+      "probe_metrics_exact": true,
+      "ab_fivefold_metrics_close": true,
+      "ab_head_files": [
+        {
+          "fold": 0,
+          "sha256": "a36fd67669154fe4ca81e54a731ec858386d3656c29cf166a49beb26820bdb37",
+          "test_records": 880
+        },
+        {
+          "fold": 1,
+          "sha256": "f5312a96bd1bf8eaac5735de2cc9fae6e276a63ecbb5f2742666934584501e2a",
+          "test_records": 880
+        },
+        {
+          "fold": 2,
+          "sha256": "e2377b940c13fe07521c3b7c538c0afaca423f9e611585fb75e6305e88f8b12d",
+          "test_records": 880
+        },
+        {
+          "fold": 3,
+          "sha256": "24c93d6b05dc3c251c535846f3ff6ecc799b67167a811b52c13649882bd33775",
+          "test_records": 879
+        },
+        {
+          "fold": 4,
+          "sha256": "5ec8e5f3f4b8897cb911271042a71b43fb6e9beeaba5d67c8df767f33ee96ea9",
+          "test_records": 879
+        }
+      ],
+      "ab_records": 4398,
+      "ab_feature_shape": [
+        4398,
+        768
+      ]
+    },
+    {
+      "variant": "A0",
+      "seed": 42,
+      "generation_summary_exact": true,
+      "probe_metrics_exact": true,
+      "ab_fivefold_metrics_close": true,
+      "ab_head_files": [
+        {
+          "fold": 0,
+          "sha256": "e766471820b60b800f105a2fce9b360180fcd927ccff6df372041ccb7d166932",
+          "test_records": 880
+        },
+        {
+          "fold": 1,
+          "sha256": "61c8170ae1cb6a07a720011ea35477db9fecc99da993bd6b9622bf167c83cd19",
+          "test_records": 880
+        },
+        {
+          "fold": 2,
+          "sha256": "b91fbcf4781f8e8d5467ad2ff5b7fa6f3a79b35e5a1c61fff581b05e56d3c6ca",
+          "test_records": 880
+        },
+        {
+          "fold": 3,
+          "sha256": "9a45c7d8d8bbff65f4f6753eb3b770cd6ca270b37c18566038a962bc89caf2c7",
+          "test_records": 879
+        },
+        {
+          "fold": 4,
+          "sha256": "8fc78afc839e9638b2196cfdb260bb0544d94c31d74f0531c57c1c0325f977ad",
+          "test_records": 879
+        }
+      ],
+      "ab_records": 4398,
+      "ab_feature_shape": [
+        4398,
+        768
+      ]
+    },
+    {
+      "variant": "B0",
+      "seed": 42,
+      "generation_summary_exact": true,
+      "probe_metrics_exact": true,
+      "ab_fivefold_metrics_close": true,
+      "ab_head_files": [
+        {
+          "fold": 0,
+          "sha256": "085e0c2ad4cecab32df67a2f7fab67a3efaa7753a9592a4e8a51fbcf274ffb55",
+          "test_records": 880
+        },
+        {
+          "fold": 1,
+          "sha256": "ce47a1bbac4b17102987668b990e99e435fc930b1758b6fe81806a12bc2665a2",
+          "test_records": 880
+        },
+        {
+          "fold": 2,
+          "sha256": "507acfcb71b83a210aaa81769498856cc75b5fe074595bd21eb3f1de26c308c7",
+          "test_records": 880
+        },
+        {
+          "fold": 3,
+          "sha256": "69441ef63811394a15faeeea31489cad561c4583dbd5f2587d211a21946358f8",
+          "test_records": 879
+        },
+        {
+          "fold": 4,
+          "sha256": "fc6cc540f06ebdcf16e103b40a961f4556fbf18b215f7929fe14345ebaf0d5e3",
+          "test_records": 879
+        }
+      ],
+      "ab_records": 4398,
+      "ab_feature_shape": [
+        4398,
+        768
+      ]
+    },
+    {
+      "variant": "B1",
+      "seed": 42,
+      "generation_summary_exact": true,
+      "probe_metrics_exact": true,
+      "ab_fivefold_metrics_close": true,
+      "ab_head_files": [
+        {
+          "fold": 0,
+          "sha256": "424ba123030a5817056eed17270f3a8c46a44db1bb9285c7f8343bb22be529f5",
+          "test_records": 880
+        },
+        {
+          "fold": 1,
+          "sha256": "64254b39f4ffa579794954e98341ea1b517f48b8107d9f38cd90c339256cb78d",
+          "test_records": 880
+        },
+        {
+          "fold": 2,
+          "sha256": "450a4496e73ea8bdc927145de2f00264725a1d2abf99ebd0d746d5975a95721f",
+          "test_records": 880
+        },
+        {
+          "fold": 3,
+          "sha256": "f5261751ec2aad4f999eb82b1bbbd78e0f3cc43124d31f5cbbf1adff031d350d",
+          "test_records": 879
+        },
+        {
+          "fold": 4,
+          "sha256": "1c27831e97078db137f0a84124f969d4979b030c4bb33e37254e8fd4951d528f",
+          "test_records": 879
+        }
+      ],
+      "ab_records": 4398,
+      "ab_feature_shape": [
+        4398,
+        768
+      ]
+    },
+    {
+      "variant": "A0",
+      "seed": 43,
+      "generation_summary_exact": true,
+      "probe_metrics_exact": true,
+      "ab_fivefold_metrics_close": true,
+      "ab_head_files": [
+        {
+          "fold": 0,
+          "sha256": "c4c25879bd0da3ccaa7f1de279933ee7b6b4fa62dc8f4ce772778879080cee53",
+          "test_records": 880
+        },
+        {
+          "fold": 1,
+          "sha256": "711b64af82062a11968b4f29d6374d7b83ad256a4f27677e3c319e0dc2aead36",
+          "test_records": 880
+        },
+        {
+          "fold": 2,
+          "sha256": "d1c232ddada33fc450b9d810a670356af57083488fc3617e4e107f6d32050ce4",
+          "test_records": 880
+        },
+        {
+          "fold": 3,
+          "sha256": "a53da9b908b6f56e5b1d8cadfb491ae9759fd440822218e13dfb41d303d980ee",
+          "test_records": 879
+        },
+        {
+          "fold": 4,
+          "sha256": "a808b9aad0571cf0a2213601f2d17c0d479fd3514dfa66a60f2365b7d789cce1",
+          "test_records": 879
+        }
+      ],
+      "ab_records": 4398,
+      "ab_feature_shape": [
+        4398,
+        768
+      ]
+    },
+    {
+      "variant": "B0",
+      "seed": 43,
+      "generation_summary_exact": true,
+      "probe_metrics_exact": true,
+      "ab_fivefold_metrics_close": true,
+      "ab_head_files": [
+        {
+          "fold": 0,
+          "sha256": "6d17b982d16576b7fa56a686b16145842a0f24f9eebbbf8b7f05489e6730f4f3",
+          "test_records": 880
+        },
+        {
+          "fold": 1,
+          "sha256": "ea28343a68c59951b5ad7405ee905a5a4a749a1b4acee08d661d1058aad56c44",
+          "test_records": 880
+        },
+        {
+          "fold": 2,
+          "sha256": "ef014f6ec61a0ecb8e618e51c0c6c1ce6d92a81d8ff606088e87d51e2e2e8bdb",
+          "test_records": 880
+        },
+        {
+          "fold": 3,
+          "sha256": "d287ede34e314e26dd0ad4805715d7f08fb16ec03b38a8ba0df486b227919ffe",
+          "test_records": 879
+        },
+        {
+          "fold": 4,
+          "sha256": "368d2cc5902a5e7192265d665ca04111e879afa1ac64c920b87836e23d69d1de",
+          "test_records": 879
+        }
+      ],
+      "ab_records": 4398,
+      "ab_feature_shape": [
+        4398,
+        768
+      ]
+    },
+    {
+      "variant": "B1",
+      "seed": 43,
+      "generation_summary_exact": true,
+      "probe_metrics_exact": true,
+      "ab_fivefold_metrics_close": true,
+      "ab_head_files": [
+        {
+          "fold": 0,
+          "sha256": "062e0e9b5fac0bdd22eb7acdc68fff37f1e515f7851225d55836ce0c239b9d03",
+          "test_records": 880
+        },
+        {
+          "fold": 1,
+          "sha256": "e5930495cbded365cd953e23af74419b38728cd9fc995d9fd75d16b223765d0a",
+          "test_records": 880
+        },
+        {
+          "fold": 2,
+          "sha256": "f7a9640a914594be5e3127a5f00636f9c9242ec80d9c993fae182880cc3245ad",
+          "test_records": 880
+        },
+        {
+          "fold": 3,
+          "sha256": "88b0d25f30bd07ca6570f56eb8f4809c2c11fea1d80ecf699c56c119a669f91a",
+          "test_records": 879
+        },
+        {
+          "fold": 4,
+          "sha256": "ade04251968ccde431b2302d3b43b4c36711f1853af40ee3804be8bac7d25f97",
+          "test_records": 879
+        }
+      ],
+      "ab_records": 4398,
+      "ab_feature_shape": [
+        4398,
+        768
+      ]
+    }
+  ],
+  "notes": "Recomputed source-macro generation and probe metrics from saved observations; independently checked 45 AB head file hashes and all fivefold predictions/metrics. No AB head retraining."
+}

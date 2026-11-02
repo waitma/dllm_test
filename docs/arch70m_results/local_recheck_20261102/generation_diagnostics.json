@@ -1,0 +1,403 @@
+{
+  "updated": "2026-11-02T15:18:03Z",
+  "status": "passed",
+  "task_file_sha256": "cbec5d809ae846abe604d2f3ce664ff7d644f3e7d30a753dc0dd04f2f047d14d",
+  "trials": [
+    {
+      "variant": "A0",
+      "seed": 44,
+      "macro": {
+        "reference_coverage": 0.528481124879584,
+        "covered_position_accuracy": 0.395219082393923,
+        "shorter_than_half": 0.618966090425532,
+        "signed_length_error": -55.067017619680854,
+        "aar": 0.17372958761204713
+      },
+      "by_source": {
+        "asd_antibody": {
+          "reference_coverage": 0.3356632889077705,
+          "covered_position_accuracy": 0.3735580868381421,
+          "shorter_than_half": 0.6914893617021277,
+          "signed_length_error": -78.1063829787234,
+          "aar": 0.09791740557345947
+        },
+        "oas": {
+          "reference_coverage": 0.6624840332987612,
+          "covered_position_accuracy": 0.43010692021997604,
+          "shorter_than_half": 0.5,
+          "signed_length_error": -41.0625,
+          "aar": 0.22779984166400646
+        },
+        "ots": {
+          "reference_coverage": 0.6674629866171617,
+          "covered_position_accuracy": 0.33895789488301403,
+          "shorter_than_half": 0.484375,
+          "signed_length_error": -37.8671875,
+          "aar": 0.19878059506977663
+        },
+        "tcr_native": {
+          "reference_coverage": 0.4483141906946425,
+          "covered_position_accuracy": 0.4382534276345597,
+          "shorter_than_half": 0.8,
+          "signed_length_error": -63.232,
+          "aar": 0.1704205081409459
+        }
+      },
+      "conditional_ce": 3.560687848389941,
+      "cdr_ce": 0.73176740607596
+    },
+    {
+      "variant": "B0",
+      "seed": 44,
+      "macro": {
+        "reference_coverage": 0.9323370928391074,
+        "covered_position_accuracy": 0.3753891934651426,
+        "shorter_than_half": 0.015957446808510637,
+        "signed_length_error": -7.779210106382979,
+        "aar": 0.34536311951689064
+      },
+      "by_source": {
+        "asd_antibody": {
+          "reference_coverage": 0.8902262130172517,
+          "covered_position_accuracy": 0.3992867150061202,
+          "shorter_than_half": 0.06382978723404255,
+          "signed_length_error": -12.372340425531915,
+          "aar": 0.3438570214193061
+        },
+        "oas": {
+          "reference_coverage": 0.9309156324394756,
+          "covered_position_accuracy": 0.3928652812601912,
+          "shorter_than_half": 0.0,
+          "signed_length_error": -8.2734375,
+          "aar": 0.3616552315219155
+        },
+        "ots": {
+          "reference_coverage": 0.95562431057701,
+          "covered_position_accuracy": 0.27435971135880305,
+          "shorter_than_half": 0.0,
+          "signed_length_error": -5.0390625,
+          "aar": 0.2629779085501779
+        },
+        "tcr_native": {
+          "reference_coverage": 0.9525822153226922,
+          "covered_position_accuracy": 0.4350450662354559,
+          "shorter_than_half": 0.0,
+          "signed_length_error": -5.432,
+          "aar": 0.41296231657616306
+        }
+      },
+      "conditional_ce": 3.8475940875868373,
+      "cdr_ce": 0.7339011620206293
+    },
+    {
+      "variant": "B1",
+      "seed": 44,
+      "macro": {
+        "reference_coverage": 0.941736258156768,
+        "covered_position_accuracy": 0.38922378575547667,
+        "shorter_than_half": 0.018617021276595744,
+        "signed_length_error": -6.501885970744681,
+        "aar": 0.36221061915802577
+      },
+      "by_source": {
+        "asd_antibody": {
+          "reference_coverage": 0.907664910271839,
+          "covered_position_accuracy": 0.3931097761658988,
+          "shorter_than_half": 0.07446808510638298,
+          "signed_length_error": -10.085106382978724,
+          "aar": 0.34408746788829225
+        },
+        "oas": {
+          "reference_coverage": 0.9483920676250787,
+          "covered_position_accuracy": 0.38911292065968994,
+          "shorter_than_half": 0.0,
+          "signed_length_error": -5.7578125,
+          "aar": 0.36515553943473505
+        },
+        "ots": {
+          "reference_coverage": 0.9547666729930413,
+          "covered_position_accuracy": 0.3018632656066625,
+          "shorter_than_half": 0.0,
+          "signed_length_error": -5.140625,
+          "aar": 0.28884430280645906
+        },
+        "tcr_native": {
+          "reference_coverage": 0.9561213817371128,
+          "covered_position_accuracy": 0.47280918058965554,
+          "shorter_than_half": 0.0,
+          "signed_length_error": -5.024,
+          "aar": 0.4507551665026167
+        }
+      },
+      "conditional_ce": 3.748970544537886,
+      "cdr_ce": 0.7352800149092218
+    },
+    {
+      "variant": "A0",
+      "seed": 42,
+      "macro": {
+        "reference_coverage": 0.27324814994474783,
+        "covered_position_accuracy": 0.42344687776165923,
+        "shorter_than_half": 0.9893617021276596,
+        "signed_length_error": -83.66751961436171,
+        "aar": 0.10956494343203081
+      },
+      "by_source": {
+        "asd_antibody": {
+          "reference_coverage": 0.2662954066867427,
+          "covered_position_accuracy": 0.4134047438049607,
+          "shorter_than_half": 0.9574468085106383,
+          "signed_length_error": -85.2127659574468,
+          "aar": 0.09215565982900113
+        },
+        "oas": {
+          "reference_coverage": 0.21522686125957288,
+          "covered_position_accuracy": 0.42802800722713363,
+          "shorter_than_half": 1.0,
+          "signed_length_error": -91.6796875,
+          "aar": 0.07742826211718734
+        },
+        "ots": {
+          "reference_coverage": 0.29981864008331466,
+          "covered_position_accuracy": 0.3875478336076162,
+          "shorter_than_half": 1.0,
+          "signed_length_error": -79.265625,
+          "aar": 0.11869475022551305
+        },
+        "tcr_native": {
+          "reference_coverage": 0.3116516917493612,
+          "covered_position_accuracy": 0.4648069264069264,
+          "shorter_than_half": 1.0,
+          "signed_length_error": -78.512,
+          "aar": 0.14998110155642172
+        }
+      },
+      "conditional_ce": 5.065201679095309,
+      "cdr_ce": 0.7386357097275322
+    },
+    {
+      "variant": "B0",
+      "seed": 42,
+      "macro": {
+        "reference_coverage": 0.9196536148968961,
+        "covered_position_accuracy": 0.3823324435020641,
+        "shorter_than_half": 0.02597872340425532,
+        "signed_length_error": -9.04258477393617,
+        "aar": 0.3486100196505662
+      },
+      "by_source": {
+        "asd_antibody": {
+          "reference_coverage": 0.8897737596503403,
+          "covered_position_accuracy": 0.3622845344315551,
+          "shorter_than_half": 0.031914893617021274,
+          "signed_length_error": -12.52127659574468,
+          "aar": 0.3123092223762987
+        },
+        "oas": {
+          "reference_coverage": 0.9395925028945193,
+          "covered_position_accuracy": 0.3566289260768058,
+          "shorter_than_half": 0.0,
+          "signed_length_error": -6.6171875,
+          "aar": 0.33017059801682513
+        },
+        "ots": {
+          "reference_coverage": 0.9585959961311232,
+          "covered_position_accuracy": 0.3051250522873056,
+          "shorter_than_half": 0.0,
+          "signed_length_error": -4.671875,
+          "aar": 0.2925509993316173
+        },
+        "tcr_native": {
+          "reference_coverage": 0.8906522009116015,
+          "covered_position_accuracy": 0.5052912612125898,
+          "shorter_than_half": 0.072,
+          "signed_length_error": -12.36,
+          "aar": 0.45940925887752365
+        }
+      },
+      "conditional_ce": 3.998714485885219,
+      "cdr_ce": 0.7472245857788948
+    },
+    {
+      "variant": "B1",
+      "seed": 42,
+      "macro": {
+        "reference_coverage": 0.9121926961522718,
+        "covered_position_accuracy": 0.37045079244407636,
+        "shorter_than_half": 0.04294414893617021,
+        "signed_length_error": -10.008275930851063,
+        "aar": 0.33400436274208584
+      },
+      "by_source": {
+        "asd_antibody": {
+          "reference_coverage": 0.9019978060508332,
+          "covered_position_accuracy": 0.37164829737107913,
+          "shorter_than_half": 0.02127659574468085,
+          "signed_length_error": -11.382978723404255,
+          "aar": 0.32589315393691365
+        },
+        "oas": {
+          "reference_coverage": 0.9402815143914519,
+          "covered_position_accuracy": 0.3639010902751809,
+          "shorter_than_half": 0.0,
+          "signed_length_error": -6.6796875,
+          "aar": 0.3369356665060592
+        },
+        "ots": {
+          "reference_coverage": 0.9122954075095425,
+          "covered_position_accuracy": 0.2879213629682402,
+          "shorter_than_half": 0.0625,
+          "signed_length_error": -9.8984375,
+          "aar": 0.2622436553229039
+        },
+        "tcr_native": {
+          "reference_coverage": 0.8941960566572598,
+          "covered_position_accuracy": 0.4583324191618051,
+          "shorter_than_half": 0.088,
+          "signed_length_error": -12.072,
+          "aar": 0.4109449752024666
+        }
+      },
+      "conditional_ce": 3.988537289834086,
+      "cdr_ce": 0.7487026526068803
+    },
+    {
+      "variant": "A0",
+      "seed": 43,
+      "macro": {
+        "reference_coverage": 0.08332490321545301,
+        "covered_position_accuracy": 0.31657502518970365,
+        "shorter_than_half": 0.99609375,
+        "signed_length_error": -105.12106914893617,
+        "aar": 0.030143510959895658
+      },
+      "by_source": {
+        "asd_antibody": {
+          "reference_coverage": 0.07249478469168856,
+          "covered_position_accuracy": 0.3161467645914917,
+          "shorter_than_half": 1.0,
+          "signed_length_error": -107.02127659574468,
+          "aar": 0.03377998439395551
+        },
+        "oas": {
+          "reference_coverage": 0.11091264812310005,
+          "covered_position_accuracy": 0.5224260754072495,
+          "shorter_than_half": 0.984375,
+          "signed_length_error": -103.1796875,
+          "aar": 0.052818202920811824
+        },
+        "ots": {
+          "reference_coverage": 0.07954873876667463,
+          "covered_position_accuracy": 0.297841546474359,
+          "shorter_than_half": 1.0,
+          "signed_length_error": -104.1953125,
+          "aar": 0.02630137312456739
+        },
+        "tcr_native": {
+          "reference_coverage": 0.07034344128034878,
+          "covered_position_accuracy": 0.1298857142857143,
+          "shorter_than_half": 1.0,
+          "signed_length_error": -106.088,
+          "aar": 0.007674483400247906
+        }
+      },
+      "conditional_ce": 6.1611462060909,
+      "cdr_ce": 0.7479024019266944
+    },
+    {
+      "variant": "B0",
+      "seed": 43,
+      "macro": {
+        "reference_coverage": 0.9545697132842156,
+        "covered_position_accuracy": 0.3624833481424327,
+        "shorter_than_half": 0.005319148936170213,
+        "signed_length_error": -4.759589760638298,
+        "aar": 0.3436476261328498
+      },
+      "by_source": {
+        "asd_antibody": {
+          "reference_coverage": 0.9377235746891416,
+          "covered_position_accuracy": 0.34607503448247745,
+          "shorter_than_half": 0.02127659574468085,
+          "signed_length_error": -5.787234042553192,
+          "aar": 0.32043672165325854
+        },
+        "oas": {
+          "reference_coverage": 0.92823110580696,
+          "covered_position_accuracy": 0.38319135249960157,
+          "shorter_than_half": 0.0,
+          "signed_length_error": -8.1640625,
+          "aar": 0.35164935488620813
+        },
+        "ots": {
+          "reference_coverage": 0.9797020592441213,
+          "covered_position_accuracy": 0.2933486593812333,
+          "shorter_than_half": 0.0,
+          "signed_length_error": -2.0390625,
+          "aar": 0.2870030163381844
+        },
+        "tcr_native": {
+          "reference_coverage": 0.9726221133966393,
+          "covered_position_accuracy": 0.4273183462064185,
+          "shorter_than_half": 0.0,
+          "signed_length_error": -3.048,
+          "aar": 0.4155014116537481
+        }
+      },
+      "conditional_ce": 3.7539714792727477,
+      "cdr_ce": 0.7426375858776737
+    },
+    {
+      "variant": "B1",
+      "seed": 43,
+      "macro": {
+        "reference_coverage": 0.9437368099799491,
+        "covered_position_accuracy": 0.37521947180377335,
+        "shorter_than_half": 0.007978723404255319,
+        "signed_length_error": -6.0870003324468085,
+        "aar": 0.3508824643323647
+      },
+      "by_source": {
+        "asd_antibody": {
+          "reference_coverage": 0.9102344891905826,
+          "covered_position_accuracy": 0.37787568317567366,
+          "shorter_than_half": 0.031914893617021274,
+          "signed_length_error": -8.851063829787234,
+          "aar": 0.3379581609375882
+        },
+        "oas": {
+          "reference_coverage": 0.9096137677993015,
+          "covered_position_accuracy": 0.4119295129703677,
+          "shorter_than_half": 0.0,
+          "signed_length_error": -10.6328125,
+          "aar": 0.3721485120618246
+        },
+        "ots": {
+          "reference_coverage": 0.97811220358336,
+          "covered_position_accuracy": 0.3075947024028597,
+          "shorter_than_half": 0.0,
+          "signed_length_error": -2.328125,
+          "aar": 0.30063155181347867
+        },
+        "tcr_native": {
+          "reference_coverage": 0.9769867793465525,
+          "covered_position_accuracy": 0.4034779886661924,
+          "shorter_than_half": 0.0,
+          "signed_length_error": -2.536,
+          "aar": 0.39279163251656724
+        }
+      },
+      "conditional_ce": 3.7964638583115597,
+      "cdr_ce": 0.743237860762747
+    }
+  ],
+  "definitions": {
+    "reference_coverage": "min(valid prediction length, reference length)/reference length; invalid is zero",
+    "covered_position_accuracy": "correct positional matches/min(valid prediction length, reference length), zero if empty; source-macro average",
+    "signed_length_error": "prediction length minus reference length; invalid treated as empty"
+  },
+  "limitations": [
+    "Post hoc descriptive analysis of the same protected observations; does not change frozen endpoints or statistical decision.",
+    "Coverage and covered-position accuracy averages are not a causal decomposition; AAR does not prove binding specificity."
+  ]
+}

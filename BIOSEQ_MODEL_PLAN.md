@@ -1,3 +1,5 @@
+> 2026-11-02T15:23:27Z 本地描述性复核：三个种子平均参考长度覆盖率A0=29.50%、A5=93.55%、B1=93.26%，整链AAR分别10.45%/34.59%/34.90%。原逐样本AAR已按预测/参考重新计算一致；诊断支持生成完整性改善，不是结合特异性或表征提升证据，不改原稳定性统计门槛。9组本地GPU重评估与原指标/逐样本完全相等。图表及定义见 /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/arch70m_results/local_recheck_20261102/REVIEW.md。
+
 > 2026-11-02T15:14:15Z 本地复核方法：已完成四卡A0/B0(A5)/B1×42/43/44固定终点3828；当前只重载该9组权重，复用原冻结evaluate对同一confirm数据重算token/16轮生成/表征probe，独立保存逐样本严格比较和5000次冻结配对统计，不选择新checkpoint、不增加训练seed、不改原门槛。原抗体五折head仅核验输入/保存结果。详见 /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/ARCH70M_LOCAL_RECHECK.md。
 
 > 2026-10-31 UTC：用户将当前稳定架构确认从本地串行改为用户提交的四卡独立单GPU并行。候选A0/A5(B0)/B1、42/43/44三seed、各3epoch/3828步、micro32/global512及原confirm/统计门槛保持，仅新增外部调度器；冻结源码SHA仍为3c9c424d816b9fda7adfba5047d9e075ac15dc036342b59461edd35031e50971。默认新输出隔离本地取消记录，实际四卡资格由作业执行。说明 /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/ARCH70M_CONFIRM_4GPU.md。

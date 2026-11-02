@@ -1,8 +1,6 @@
 {
-  "status": "gpu_evaluation",
-  "updated": "2026-11-02T15:14:04Z",
+  "status": "recomputing_statistics",
+  "updated": "2026-11-02T15:21:17Z",
   "pid": 32781,
-  "variant": "B0",
-  "seed": 44,
-  "completed": 1
+  "completed": 9
 }

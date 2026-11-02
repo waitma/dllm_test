@@ -1,6 +1,6 @@
 {
-  "updated": "2026-11-02T15:14:04Z",
-  "completed": 1,
+  "updated": "2026-11-02T15:21:17Z",
+  "completed": 9,
   "total": 9,
   "trials": [
     {
@@ -63,6 +63,494 @@
       },
       "peak_allocated_bytes": 1892495360,
       "peak_reserved_bytes": 5081399296
+    },
+    {
+      "variant": "B0",
+      "seed": 44,
+      "seconds": 47.58024579193443,
+      "metrics": {
+        "exact_equal": true,
+        "strict_close": true,
+        "atol": 1e-08,
+        "rtol": 1e-06,
+        "numeric_values": 502,
+        "max_absolute_difference": 0.0,
+        "difference_count": 0,
+        "differences": []
+      },
+      "observations": {
+        "exact_equal": true,
+        "strict_close": true,
+        "atol": 1e-08,
+        "rtol": 1e-06,
+        "numeric_values": 3353,
+        "max_absolute_difference": 0.0,
+        "difference_count": 0,
+        "differences": []
+      },
+      "endpoints": {
+        "generation.conditional_aar": {
+          "original": 0.3453631195168906,
+          "replay": 0.3453631195168906
+        },
+        "generation.cdr_aar": {
+          "original": 0.80209816317074,
+          "replay": 0.80209816317074
+        },
+        "generation.conditional_length_mae": {
+          "original": 8.052076462765957,
+          "replay": 8.052076462765957
+        },
+        "generation.conditional_validity": {
+          "original": 1.0,
+          "replay": 1.0
+        },
+        "generation.conditional_ce": {
+          "original": 3.8475940875868373,
+          "replay": 3.8475940875868373
+        },
+        "generation.cdr_ce": {
+          "original": 0.7339011620206293,
+          "replay": 0.7339011620206293
+        },
+        "representation.macro_auroc": {
+          "original": 0.8715846994535519,
+          "replay": 0.8715846994535519
+        },
+        "representation.macro_auprc": {
+          "original": 0.7711750781518223,
+          "replay": 0.7711750781518223
+        }
+      },
+      "peak_allocated_bytes": 1678450688,
+      "peak_reserved_bytes": 4871684096
+    },
+    {
+      "variant": "B1",
+      "seed": 44,
+      "seconds": 47.140710371080786,
+      "metrics": {
+        "exact_equal": true,
+        "strict_close": true,
+        "atol": 1e-08,
+        "rtol": 1e-06,
+        "numeric_values": 502,
+        "max_absolute_difference": 0.0,
+        "difference_count": 0,
+        "differences": []
+      },
+      "observations": {
+        "exact_equal": true,
+        "strict_close": true,
+        "atol": 1e-08,
+        "rtol": 1e-06,
+        "numeric_values": 3353,
+        "max_absolute_difference": 0.0,
+        "difference_count": 0,
+        "differences": []
+      },
+      "endpoints": {
+        "generation.conditional_aar": {
+          "original": 0.36221061915802577,
+          "replay": 0.36221061915802577
+        },
+        "generation.cdr_aar": {
+          "original": 0.8036963117774576,
+          "replay": 0.8036963117774576
+        },
+        "generation.conditional_length_mae": {
+          "original": 7.143518949468085,
+          "replay": 7.143518949468085
+        },
+        "generation.conditional_validity": {
+          "original": 1.0,
+          "replay": 1.0
+        },
+        "generation.conditional_ce": {
+          "original": 3.748970544537886,
+          "replay": 3.748970544537886
+        },
+        "generation.cdr_ce": {
+          "original": 0.7352800149092218,
+          "replay": 0.7352800149092218
+        },
+        "representation.macro_auroc": {
+          "original": 0.8670309653916211,
+          "replay": 0.8670309653916211
+        },
+        "representation.macro_auprc": {
+          "original": 0.740065772897853,
+          "replay": 0.740065772897853
+        }
+      },
+      "peak_allocated_bytes": 1678450688,
+      "peak_reserved_bytes": 4871684096
+    },
+    {
+      "variant": "A0",
+      "seed": 42,
+      "seconds": 47.496717147063464,
+      "metrics": {
+        "exact_equal": true,
+        "strict_close": true,
+        "atol": 1e-08,
+        "rtol": 1e-06,
+        "numeric_values": 502,
+        "max_absolute_difference": 0.0,
+        "difference_count": 0,
+        "differences": []
+      },
+      "observations": {
+        "exact_equal": true,
+        "strict_close": true,
+        "atol": 1e-08,
+        "rtol": 1e-06,
+        "numeric_values": 3353,
+        "max_absolute_difference": 0.0,
+        "difference_count": 0,
+        "differences": []
+      },
+      "endpoints": {
+        "generation.conditional_aar": {
+          "original": 0.10956494343203081,
+          "replay": 0.10956494343203081
+        },
+        "generation.cdr_aar": {
+          "original": 0.8041770219570026,
+          "replay": 0.8041770219570026
+        },
+        "generation.conditional_length_mae": {
+          "original": 83.67283876329788,
+          "replay": 83.67283876329788
+        },
+        "generation.conditional_validity": {
+          "original": 1.0,
+          "replay": 1.0
+        },
+        "generation.conditional_ce": {
+          "original": 5.065201679095309,
+          "replay": 5.065201679095309
+        },
+        "generation.cdr_ce": {
+          "original": 0.7386357097275322,
+          "replay": 0.7386357097275322
+        },
+        "representation.macro_auroc": {
+          "original": 0.8897996357012751,
+          "replay": 0.8897996357012751
+        },
+        "representation.macro_auprc": {
+          "original": 0.8021514514254985,
+          "replay": 0.8021514514254985
+        }
+      },
+      "peak_allocated_bytes": 1892495360,
+      "peak_reserved_bytes": 5081399296
+    },
+    {
+      "variant": "B0",
+      "seed": 42,
+      "seconds": 47.87031103018671,
+      "metrics": {
+        "exact_equal": true,
+        "strict_close": true,
+        "atol": 1e-08,
+        "rtol": 1e-06,
+        "numeric_values": 502,
+        "max_absolute_difference": 0.0,
+        "difference_count": 0,
+        "differences": []
+      },
+      "observations": {
+        "exact_equal": true,
+        "strict_close": true,
+        "atol": 1e-08,
+        "rtol": 1e-06,
+        "numeric_values": 3353,
+        "max_absolute_difference": 0.0,
+        "difference_count": 0,
+        "differences": []
+      },
+      "endpoints": {
+        "generation.conditional_aar": {
+          "original": 0.3486100196505662,
+          "replay": 0.3486100196505662
+        },
+        "generation.cdr_aar": {
+          "original": 0.8039965635398403,
+          "replay": 0.8039965635398403
+        },
+        "generation.conditional_length_mae": {
+          "original": 9.642069481382979,
+          "replay": 9.642069481382979
+        },
+        "generation.conditional_validity": {
+          "original": 1.0,
+          "replay": 1.0
+        },
+        "generation.conditional_ce": {
+          "original": 3.998714485885219,
+          "replay": 3.998714485885219
+        },
+        "generation.cdr_ce": {
+          "original": 0.7472245857788948,
+          "replay": 0.7472245857788948
+        },
+        "representation.macro_auroc": {
+          "original": 0.884335154826958,
+          "replay": 0.884335154826958
+        },
+        "representation.macro_auprc": {
+          "original": 0.73180492347159,
+          "replay": 0.73180492347159
+        }
+      },
+      "peak_allocated_bytes": 1678450688,
+      "peak_reserved_bytes": 4871684096
+    },
+    {
+      "variant": "B1",
+      "seed": 42,
+      "seconds": 47.46226350730285,
+      "metrics": {
+        "exact_equal": true,
+        "strict_close": true,
+        "atol": 1e-08,
+        "rtol": 1e-06,
+        "numeric_values": 502,
+        "max_absolute_difference": 0.0,
+        "difference_count": 0,
+        "differences": []
+      },
+      "observations": {
+        "exact_equal": true,
+        "strict_close": true,
+        "atol": 1e-08,
+        "rtol": 1e-06,
+        "numeric_values": 3353,
+        "max_absolute_difference": 0.0,
+        "difference_count": 0,
+        "differences": []
+      },
+      "endpoints": {
+        "generation.conditional_aar": {
+          "original": 0.33400436274208584,
+          "replay": 0.33400436274208584
+        },
+        "generation.cdr_aar": {
+          "original": 0.8060654466971755,
+          "replay": 0.8060654466971755
+        },
+        "generation.conditional_length_mae": {
+          "original": 10.43779720744681,
+          "replay": 10.43779720744681
+        },
+        "generation.conditional_validity": {
+          "original": 1.0,
+          "replay": 1.0
+        },
+        "generation.conditional_ce": {
+          "original": 3.988537289834086,
+          "replay": 3.988537289834086
+        },
+        "generation.cdr_ce": {
+          "original": 0.7487026526068803,
+          "replay": 0.7487026526068803
+        },
+        "representation.macro_auroc": {
+          "original": 0.8806921675774135,
+          "replay": 0.8806921675774135
+        },
+        "representation.macro_auprc": {
+          "original": 0.7326819077799469,
+          "replay": 0.7326819077799469
+        }
+      },
+      "peak_allocated_bytes": 1678450688,
+      "peak_reserved_bytes": 4871684096
+    },
+    {
+      "variant": "A0",
+      "seed": 43,
+      "seconds": 47.9474913822487,
+      "metrics": {
+        "exact_equal": true,
+        "strict_close": true,
+        "atol": 1e-08,
+        "rtol": 1e-06,
+        "numeric_values": 502,
+        "max_absolute_difference": 0.0,
+        "difference_count": 0,
+        "differences": []
+      },
+      "observations": {
+        "exact_equal": true,
+        "strict_close": true,
+        "atol": 1e-08,
+        "rtol": 1e-06,
+        "numeric_values": 3316,
+        "max_absolute_difference": 0.0,
+        "difference_count": 0,
+        "differences": []
+      },
+      "endpoints": {
+        "generation.conditional_aar": {
+          "original": 0.030143510959895658,
+          "replay": 0.030143510959895658
+        },
+        "generation.cdr_aar": {
+          "original": 0.8047704122727737,
+          "replay": 0.8047704122727737
+        },
+        "generation.conditional_length_mae": {
+          "original": 103.46742549070248,
+          "replay": 103.46742549070248
+        },
+        "generation.conditional_validity": {
+          "original": 0.9065408909574468,
+          "replay": 0.9065408909574468
+        },
+        "generation.conditional_ce": {
+          "original": 6.1611462060909,
+          "replay": 6.1611462060909
+        },
+        "generation.cdr_ce": {
+          "original": 0.7479024019266944,
+          "replay": 0.7479024019266944
+        },
+        "representation.macro_auroc": {
+          "original": 0.8925318761384335,
+          "replay": 0.8925318761384335
+        },
+        "representation.macro_auprc": {
+          "original": 0.8259843290560636,
+          "replay": 0.8259843290560636
+        }
+      },
+      "peak_allocated_bytes": 1892495360,
+      "peak_reserved_bytes": 5081399296
+    },
+    {
+      "variant": "B0",
+      "seed": 43,
+      "seconds": 47.59664840903133,
+      "metrics": {
+        "exact_equal": true,
+        "strict_close": true,
+        "atol": 1e-08,
+        "rtol": 1e-06,
+        "numeric_values": 502,
+        "max_absolute_difference": 0.0,
+        "difference_count": 0,
+        "differences": []
+      },
+      "observations": {
+        "exact_equal": true,
+        "strict_close": true,
+        "atol": 1e-08,
+        "rtol": 1e-06,
+        "numeric_values": 3353,
+        "max_absolute_difference": 0.0,
+        "difference_count": 0,
+        "differences": []
+      },
+      "endpoints": {
+        "generation.conditional_aar": {
+          "original": 0.34364762613284977,
+          "replay": 0.34364762613284977
+        },
+        "generation.cdr_aar": {
+          "original": 0.8012327791657299,
+          "replay": 0.8012327791657299
+        },
+        "generation.conditional_length_mae": {
+          "original": 6.042878989361702,
+          "replay": 6.042878989361702
+        },
+        "generation.conditional_validity": {
+          "original": 1.0,
+          "replay": 1.0
+        },
+        "generation.conditional_ce": {
+          "original": 3.7539714792727477,
+          "replay": 3.7539714792727477
+        },
+        "generation.cdr_ce": {
+          "original": 0.7426375858776737,
+          "replay": 0.7426375858776737
+        },
+        "representation.macro_auroc": {
+          "original": 0.9125683060109289,
+          "replay": 0.9125683060109289
+        },
+        "representation.macro_auprc": {
+          "original": 0.7827756477181763,
+          "replay": 0.7827756477181763
+        }
+      },
+      "peak_allocated_bytes": 1678450688,
+      "peak_reserved_bytes": 4871684096
+    },
+    {
+      "variant": "B1",
+      "seed": 43,
+      "seconds": 47.4770363420248,
+      "metrics": {
+        "exact_equal": true,
+        "strict_close": true,
+        "atol": 1e-08,
+        "rtol": 1e-06,
+        "numeric_values": 502,
+        "max_absolute_difference": 0.0,
+        "difference_count": 0,
+        "differences": []
+      },
+      "observations": {
+        "exact_equal": true,
+        "strict_close": true,
+        "atol": 1e-08,
+        "rtol": 1e-06,
+        "numeric_values": 3353,
+        "max_absolute_difference": 0.0,
+        "difference_count": 0,
+        "differences": []
+      },
+      "endpoints": {
+        "generation.conditional_aar": {
+          "original": 0.35088246433236464,
+          "replay": 0.35088246433236464
+        },
+        "generation.cdr_aar": {
+          "original": 0.8039322615368292,
+          "replay": 0.8039322615368292
+        },
+        "generation.conditional_length_mae": {
+          "original": 7.231608045212766,
+          "replay": 7.231608045212766
+        },
+        "generation.conditional_validity": {
+          "original": 1.0,
+          "replay": 1.0
+        },
+        "generation.conditional_ce": {
+          "original": 3.7964638583115597,
+          "replay": 3.7964638583115597
+        },
+        "generation.cdr_ce": {
+          "original": 0.743237860762747,
+          "replay": 0.743237860762747
+        },
+        "representation.macro_auroc": {
+          "original": 0.8870673952641166,
+          "replay": 0.8870673952641166
+        },
+        "representation.macro_auprc": {
+          "original": 0.7840706633939716,
+          "replay": 0.7840706633939716
+        }
+      },
+      "peak_allocated_bytes": 1678450688,
+      "peak_reserved_bytes": 4871684096
     }
   ]
 }
