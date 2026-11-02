@@ -1,6 +1,6 @@
-global_batch,label,micro_batch,parameters,seed,status,step,total_steps,variant
-512,A5 control,32,75741903,43,pending,0,1276,C0
-512,A5 + QK RMS norm,32,75742927,43,pending,0,1276,C1
-512,A5 + unit output gate,32,75815727,43,pending,0,1276,C2
-512,A5 + both factors,32,75816751,43,pending,0,1276,C3
-512,Original architecture control,32,75741903,43,pending,0,1276,A0
+global_batch,label,last_train_ce,micro_batch,parameters,profile_allocated_gib,profile_reserved_gib,profile_safe,seed,status,step,total_steps,training_gpu_hours,variant
+512,A5 control,2.7794445270947374,32,75741903,24.396206855773926,31.82421875,True,43,training,21,1276,0.04292212701247384,C0
+512,A5 + QK RMS norm,,32,75742927,25.533559799194336,33.13671875,True,43,qualified,0,1276,,C1
+512,A5 + unit output gate,,32,75815727,24.587541580200195,32.013671875,True,43,qualified,0,1276,,C2
+512,A5 + both factors,,32,75816751,25.717204093933105,33.138671875,True,43,qualified,0,1276,,C3
+512,Original architecture control,,32,75741903,36.369235038757324,44.01171875,True,43,qualified,0,1276,,A0

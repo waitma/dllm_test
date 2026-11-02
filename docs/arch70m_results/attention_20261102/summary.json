@@ -1,5 +1,5 @@
 {
-  "updated": "2026-11-02T16:00:51Z",
+  "updated": "2026-11-02T16:05:52Z",
   "output_root": "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_attention_20261102",
   "completed": 0,
   "trials": [
@@ -7,56 +7,73 @@
       "variant": "C0",
       "label": "A5 control",
       "parameters": 75741903,
-      "status": "pending",
-      "step": 0,
+      "status": "training",
+      "step": 21,
       "total_steps": 1276,
       "seed": 43,
       "micro_batch": 32,
-      "global_batch": 512
+      "global_batch": 512,
+      "training_gpu_hours": 0.04292212701247384,
+      "last_train_ce": 2.7794445270947374,
+      "profile_safe": true,
+      "profile_allocated_gib": 24.396206855773926,
+      "profile_reserved_gib": 31.82421875
     },
     {
       "variant": "C1",
       "label": "A5 + QK RMS norm",
       "parameters": 75742927,
-      "status": "pending",
+      "status": "qualified",
       "step": 0,
       "total_steps": 1276,
       "seed": 43,
       "micro_batch": 32,
-      "global_batch": 512
+      "global_batch": 512,
+      "profile_safe": true,
+      "profile_allocated_gib": 25.533559799194336,
+      "profile_reserved_gib": 33.13671875
     },
     {
       "variant": "C2",
       "label": "A5 + unit output gate",
       "parameters": 75815727,
-      "status": "pending",
+      "status": "qualified",
       "step": 0,
       "total_steps": 1276,
       "seed": 43,
       "micro_batch": 32,
-      "global_batch": 512
+      "global_batch": 512,
+      "profile_safe": true,
+      "profile_allocated_gib": 24.587541580200195,
+      "profile_reserved_gib": 32.013671875
     },
     {
       "variant": "C3",
       "label": "A5 + both factors",
       "parameters": 75816751,
-      "status": "pending",
+      "status": "qualified",
       "step": 0,
       "total_steps": 1276,
       "seed": 43,
       "micro_batch": 32,
-      "global_batch": 512
+      "global_batch": 512,
+      "profile_safe": true,
+      "profile_allocated_gib": 25.717204093933105,
+      "profile_reserved_gib": 33.138671875
     },
     {
       "variant": "A0",
       "label": "Original architecture control",
       "parameters": 75741903,
-      "status": "pending",
+      "status": "qualified",
       "step": 0,
       "total_steps": 1276,
       "seed": 43,
       "micro_batch": 32,
-      "global_batch": 512
+      "global_batch": 512,
+      "profile_safe": true,
+      "profile_allocated_gib": 36.369235038757324,
+      "profile_reserved_gib": 44.01171875
     }
   ],
   "stable_improvement_assessed": false,

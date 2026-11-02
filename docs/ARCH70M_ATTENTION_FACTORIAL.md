@@ -47,3 +47,17 @@ bash /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/launch_arch70m
 历史冻结模型/训练/评估源码保持SHA `3c9c424d816b9fda7adfba5047d9e075ac15dc036342b59461edd35031e50971`；本轮在其上单独加入新包和入口。原生产训练目录、1B模型和所有旧输出保持只读。新内容只提交 `explore/arch70m-v8-20261028`。
 
 启动前CPU回归、shell/dry-run、快照导入及GPU资格的实际状态见同目录验证回执与PROJECT_PROCESS.md，不把尚未运行的检查算作通过。
+
+## 实际启动核验
+
+2026-11-02T16:05:54Z UTC：controller PID38976；首组C0 worker PID39291；实际冻结cwd和命令核验，首组step21，loss/梯度有限。CPU9项、shell/dry-run与快照核验均通过。
+
+| 资格组 | allocated GiB | reserved GiB | 更新数 | safe |
+|---|---:|---:|---:|---|
+| C0 | 24.40 | 31.82 | 3 | True |
+| C1 | 25.53 | 33.14 | 3 | True |
+| C2 | 24.59 | 32.01 | 3 | True |
+| C3 | 25.72 | 33.14 | 3 | True |
+| A0 | 36.37 | 44.01 | 3 | True |
+
+新冻结源码SHA `28609d7f776013915561eb038396d54181dcee7b1c32d071be0a9da5dc12faad`；原历史SHA保持。后续由后台队列执行，不持续人工监督。详见 [启动回执](/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/arch70m_results/attention_20261102/startup_verified.json)。

@@ -1,6 +1,6 @@
 # A5全局注意力：QK归一化×单位初始门控，加原始A0对照
 
-更新时间：2026-11-02T16:00:54Z UTC；完成0/5。
+更新时间：2026-11-02T16:05:54Z UTC；完成0/5。
 
 五组均随机初始化，seed43/1epoch/1276步、micro32/global512；原V8形式与固定653,288条10%子集。
 C0为全新A5对照；C1仅Q/K每头RMS归一化；C2仅SDPA输出2sigmoid门控，零初始化使初始输出与A5相同；C3组合。
@@ -9,11 +9,11 @@ C0-C3的8层全局注意力、链内RoPE、chain bias、FFN3072、目标/数据/
 
 | 模型 | 状态 | step | 整链AAR | CDR AAR | AUROC | AUPRC |
 |---|---|---:|---:|---:|---:|---:|
-| C0 | pending | 0 | — | — | — | — |
-| C1 | pending | 0 | — | — | — | — |
-| C2 | pending | 0 | — | — | — | — |
-| C3 | pending | 0 | — | — | — | — |
-| A0 | pending | 0 | — | — | — | — |
+| C0 | training | 21 | — | — | — | — |
+| C1 | qualified | 0 | — | — | — | — |
+| C2 | qualified | 0 | — | — | — | — |
+| C3 | qualified | 0 | — | — | — | — |
+| A0 | qualified | 0 | — | — | — | — |
 
 ![完整loss/生成/表征曲线](/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/arch70m_results/attention_20261102/curves.png)
 ![重点任务曲线](/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/arch70m_results/attention_20261102/target_curves.png)
