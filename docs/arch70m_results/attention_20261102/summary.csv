@@ -1,0 +1,6 @@
+global_batch,label,micro_batch,parameters,seed,status,step,total_steps,variant
+512,A5 control,32,75741903,43,pending,0,1276,C0
+512,A5 + QK RMS norm,32,75742927,43,pending,0,1276,C1
+512,A5 + unit output gate,32,75815727,43,pending,0,1276,C2
+512,A5 + both factors,32,75816751,43,pending,0,1276,C3
+512,Original architecture control,32,75741903,43,pending,0,1276,A0

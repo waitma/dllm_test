@@ -1,0 +1,64 @@
+{
+  "updated": "2026-11-02T16:00:51Z",
+  "output_root": "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_attention_20261102",
+  "completed": 0,
+  "trials": [
+    {
+      "variant": "C0",
+      "label": "A5 control",
+      "parameters": 75741903,
+      "status": "pending",
+      "step": 0,
+      "total_steps": 1276,
+      "seed": 43,
+      "micro_batch": 32,
+      "global_batch": 512
+    },
+    {
+      "variant": "C1",
+      "label": "A5 + QK RMS norm",
+      "parameters": 75742927,
+      "status": "pending",
+      "step": 0,
+      "total_steps": 1276,
+      "seed": 43,
+      "micro_batch": 32,
+      "global_batch": 512
+    },
+    {
+      "variant": "C2",
+      "label": "A5 + unit output gate",
+      "parameters": 75815727,
+      "status": "pending",
+      "step": 0,
+      "total_steps": 1276,
+      "seed": 43,
+      "micro_batch": 32,
+      "global_batch": 512
+    },
+    {
+      "variant": "C3",
+      "label": "A5 + both factors",
+      "parameters": 75816751,
+      "status": "pending",
+      "step": 0,
+      "total_steps": 1276,
+      "seed": 43,
+      "micro_batch": 32,
+      "global_batch": 512
+    },
+    {
+      "variant": "A0",
+      "label": "Original architecture control",
+      "parameters": 75741903,
+      "status": "pending",
+      "step": 0,
+      "total_steps": 1276,
+      "seed": 43,
+      "micro_batch": 32,
+      "global_batch": 512
+    }
+  ],
+  "stable_improvement_assessed": false,
+  "inference": "Exploratory single-seed screen; no confirm data or stable claim."
+}

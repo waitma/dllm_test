@@ -1,3 +1,7 @@
+## Latest local architecture exploration (2026-11-02)
+
+The user requested more architecture exploration after exact local replay. The new allocation is a local single-GPU screen: C0(A5), C1(global+QK RMS norm), C2(global+unit-initialized output gate), C3(both), and fresh original A0, each seed43/one epoch/1276 updates/micro32/global512, using the unchanged V8 format and fixed10% index. All five must pass maxlen2048/three-update/85% GPU qualification before training. New code in architecture_attention and launch_arch70m_attention.sh; output output/arch70m_attention_20261102. This authorizes this new local queue, superseding the earlier local cancellation for this queue only; do not restart old queues or submit remote jobs. Keep old frozen sources and production read-only. Use screen only, final epoch; no single-seed stability claim. The previously inspected confirm set is not a fresh holdout for new architecture selection. Publish records on the exploration branch; avoid continuous manual polling after startup validation. See docs/ARCH70M_ATTENTION_FACTORIAL.md.
+
 ## Architecture exploration scope (2026-10-28)
 
 The user explicitly authorized local single-GPU ablations and publication to `explore/arch70m-v8-20261028`. This worktree is `/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore`. Keep the production worktree and active training bundles read-only. Update documentation in this exploration worktree. Four GPUs run independent trials. See docs/ARCH70M_EXPLORATION.md for the approved protocol.
