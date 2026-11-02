@@ -1,3 +1,5 @@
+> 2026-11-02T15:14:15Z 本地复核方法：已完成四卡A0/B0(A5)/B1×42/43/44固定终点3828；当前只重载该9组权重，复用原冻结evaluate对同一confirm数据重算token/16轮生成/表征probe，独立保存逐样本严格比较和5000次冻结配对统计，不选择新checkpoint、不增加训练seed、不改原门槛。原抗体五折head仅核验输入/保存结果。详见 /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/ARCH70M_LOCAL_RECHECK.md。
+
 > 2026-10-31 UTC：用户将当前稳定架构确认从本地串行改为用户提交的四卡独立单GPU并行。候选A0/A5(B0)/B1、42/43/44三seed、各3epoch/3828步、micro32/global512及原confirm/统计门槛保持，仅新增外部调度器；冻结源码SHA仍为3c9c424d816b9fda7adfba5047d9e075ac15dc036342b59461edd35031e50971。默认新输出隔离本地取消记录，实际四卡资格由作业执行。说明 /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/ARCH70M_CONFIRM_4GPU.md。
 
 > 2026-10-31 UTC：新三种子三epoch确认9/9 GPU资格通过并进入首组A0 seed42训练。原模型/数据保持，六项同时配对比较及效应量/三seed方向/解码guard已冻结；只有完整confirm和辅助验证产物齐全后判断，启动成功不算架构目标达成。回执 /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/arch70m_results/confirmation_20261031/startup_verified.json。

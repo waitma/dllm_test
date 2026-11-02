@@ -1,3 +1,5 @@
+> Last updated: 2026-11-02T15:14:15Z (UTC)。用户授权本机再次验证，独立本地复核已启动PID32781；9组最终checkpoint的54份文件SHA、冻结快照、固定10%索引、全部评估文件及完整3828步日志核验通过。当前B0 seed44 GPU重评估，已确认从原快照导入并严格加载最终权重。入口 /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/launch_arch70m_local_recheck.sh --gpu 0；输出 /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_local_recheck_20261102，原四卡产物/生产版本只读，不增加训练seed、不改变稳定性判据。5项CPU回归及实际CUDA小算子通过；后续自动串行复核全部9组并重算统计，结果见 /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_local_recheck_20261102/REPORT.md。
+
 > Last updated: 2026-11-01T05:45:36Z (UTC)。完整确认 9/9 完成；B1 seed44 completed on GPU0；decision=not_yet_stable。A0/A5(B0)/B1×seed42/43/44，各3epoch/3828步、micro32/global512；原V8数据保持。报告 /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/arch70m_results/confirmation_20261031/REPORT.md。未达到冻结判据不宣告稳定提升。
 
 > Last updated: 2026-10-31T21:52:41Z (UTC)。完整确认 8/9 完成；A0 seed44 completed on GPU2；decision=not_assessed。A0/A5(B0)/B1×seed42/43/44，各3epoch/3828步、micro32/global512；原V8数据保持。报告 /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/arch70m_results/confirmation_20261031/REPORT.md。未达到冻结判据不宣告稳定提升。

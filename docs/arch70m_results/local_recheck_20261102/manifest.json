@@ -1,0 +1,46 @@
+{
+  "original": "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_confirm_4gpu_20261031",
+  "source": "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_confirm_4gpu_20261031/sources/3c9c424d816b9fda7adfba5047d9e075ac15dc036342b59461edd35031e50971",
+  "source_sha256": "3c9c424d816b9fda7adfba5047d9e075ac15dc036342b59461edd35031e50971",
+  "jobs": [
+    [
+      "A0",
+      44
+    ],
+    [
+      "B0",
+      44
+    ],
+    [
+      "B1",
+      44
+    ],
+    [
+      "A0",
+      42
+    ],
+    [
+      "B0",
+      42
+    ],
+    [
+      "B1",
+      42
+    ],
+    [
+      "A0",
+      43
+    ],
+    [
+      "B0",
+      43
+    ],
+    [
+      "B1",
+      43
+    ]
+  ],
+  "adapter_sha256": "3ef4e9a97fd2e19c4d8848b3b598ee482e4292eeeb2af3d885a2fecf1404c848",
+  "atol": 1e-08,
+  "rtol": 1e-06
+}

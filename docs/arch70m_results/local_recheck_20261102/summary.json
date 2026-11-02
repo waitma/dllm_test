@@ -1,0 +1,68 @@
+{
+  "updated": "2026-11-02T15:14:04Z",
+  "completed": 1,
+  "total": 9,
+  "trials": [
+    {
+      "variant": "A0",
+      "seed": 44,
+      "seconds": 48.315914816223085,
+      "metrics": {
+        "exact_equal": true,
+        "strict_close": true,
+        "atol": 1e-08,
+        "rtol": 1e-06,
+        "numeric_values": 502,
+        "max_absolute_difference": 0.0,
+        "difference_count": 0,
+        "differences": []
+      },
+      "observations": {
+        "exact_equal": true,
+        "strict_close": true,
+        "atol": 1e-08,
+        "rtol": 1e-06,
+        "numeric_values": 3350,
+        "max_absolute_difference": 0.0,
+        "difference_count": 0,
+        "differences": []
+      },
+      "endpoints": {
+        "generation.conditional_aar": {
+          "original": 0.17372958761204713,
+          "replay": 0.17372958761204713
+        },
+        "generation.cdr_aar": {
+          "original": 0.8016528362641111,
+          "replay": 0.8016528362641111
+        },
+        "generation.conditional_length_mae": {
+          "original": 54.94222338598901,
+          "replay": 54.94222338598901
+        },
+        "generation.conditional_validity": {
+          "original": 0.9920212765957447,
+          "replay": 0.9920212765957447
+        },
+        "generation.conditional_ce": {
+          "original": 3.560687848389941,
+          "replay": 3.560687848389941
+        },
+        "generation.cdr_ce": {
+          "original": 0.73176740607596,
+          "replay": 0.73176740607596
+        },
+        "representation.macro_auroc": {
+          "original": 0.8624772313296903,
+          "replay": 0.8624772313296903
+        },
+        "representation.macro_auprc": {
+          "original": 0.7327859980960755,
+          "replay": 0.7327859980960755
+        }
+      },
+      "peak_allocated_bytes": 1892495360,
+      "peak_reserved_bytes": 5081399296
+    }
+  ]
+}

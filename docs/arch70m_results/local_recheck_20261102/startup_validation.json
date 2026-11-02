@@ -1,0 +1,31 @@
+{
+  "updated": "2026-11-02T15:14:15Z",
+  "cpu_tests": 5,
+  "cpu_tests_status": "passed",
+  "bash_syntax": "passed",
+  "cuda_tiny_kernel": "passed",
+  "integrity_status": "passed",
+  "checkpoint_files": 54,
+  "controller_pid": 32781,
+  "worker_runtime": {
+    "torch": "2.7.1+cu128",
+    "cuda": "12.8",
+    "device": "NVIDIA RPBZZZ6",
+    "capability": [
+      12,
+      0
+    ],
+    "packages": {
+      "numpy": "2.2.6",
+      "transformers": "4.57.0",
+      "safetensors": "0.8.0",
+      "scikit-learn": "1.9.1"
+    },
+    "cuda_uuid": "08e50a17-eab7-71b5-a784-aa902a5928ce",
+    "evaluator": "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_confirm_4gpu_20261031/sources/3c9c424d816b9fda7adfba5047d9e075ac15dc036342b59461edd35031e50971/experiments/arch70m/evaluate.py",
+    "source_sha256": "3c9c424d816b9fda7adfba5047d9e075ac15dc036342b59461edd35031e50971",
+    "model_sha256": "7320c25b550c4f36d72988d66f9e60d405d819ba350cc6cd49dc546aa1550fbf"
+  },
+  "frozen_source_sha256": "3c9c424d816b9fda7adfba5047d9e075ac15dc036342b59461edd35031e50971",
+  "adapter_sha256": "3ef4e9a97fd2e19c4d8848b3b598ee482e4292eeeb2af3d885a2fecf1404c848"
+}
