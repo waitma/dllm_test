@@ -1,0 +1,22 @@
+{
+  "reviewed": "2026-11-02T15:27:02Z",
+  "status": "passed",
+  "gpu_replayed_trials": 9,
+  "all_metrics_exact": true,
+  "all_observations_exact": true,
+  "statistics_exact": true,
+  "statistic_numeric_values": 51,
+  "bootstrap_repetitions": 5000,
+  "decision": "not_yet_stable",
+  "checkpoint_files_verified": 54,
+  "ab_head_files_verified": 45,
+  "original_artifacts_unchanged": true,
+  "source_sha256": "3c9c424d816b9fda7adfba5047d9e075ac15dc036342b59461edd35031e50971",
+  "artifacts": {
+    "integrity.json": "457bbe0f74def38681cc8531fc030602517975a65c82da656a0925e2a8cd303e",
+    "summary.json": "3fc8c4f3b4a42cc1e80813dd822c10ab715396f7552029b135e9e59c1919d098",
+    "decision_comparison.json": "7bb3611614bdcc6ee1b8d6b9478d526096ac710cfd558b8bc71caf6882554b75",
+    "secondary_artifact_checks.json": "34f679cf8397355eaeedf1106b8f487d2d6514c268d053030cb8ac74584f2767",
+    "generation_diagnostics.json": "42d823f32dacf87cbc145da4dc10c9ee92b0493a15e4f9b962a754bfdcaccc70"
+  }
+}

@@ -20,4 +20,4 @@ bash /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/launch_arch70m
 
 代码在原冻结绑定之外。启动前5项CPU回归与shell语法通过；原冻结源码SHA保持 `3c9c424d816b9fda7adfba5047d9e075ac15dc036342b59461edd35031e50971`。本机实际CUDA初始化和小算子已通过。实际启动PID32781；9组54份checkpoint文件与全部评估输入/日志核验通过；首组A0 seed44已在本地GPU加载原最终权重，开始重评估。
 
-本次GPU重评估9/9已完成，全部指标/逐样本完全相等；额外CPU独立重算生成、AUROC/AUPRC和抗体五折预测指标，并核验45个五折head权重SHA通过。诊断与图见docs/arch70m_results/local_recheck_20261102/REVIEW.md；冻结统计正独立重算，最终状态见execution.json。
+本次GPU重评估9/9已完成，全部指标/逐样本完全相等；额外CPU独立重算生成、AUROC/AUPRC和抗体五折预测指标，并核验45个五折head权重SHA通过。诊断与图见docs/arch70m_results/local_recheck_20261102/REVIEW.md；5000次冻结统计已独立重算，全部51项数值与原判定完全相同；最终状态completed，原产物哈希保持，decision仍为not_yet_stable。
