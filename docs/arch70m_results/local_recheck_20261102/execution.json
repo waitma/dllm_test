@@ -1,6 +1,9 @@
 {
-  "status": "recomputing_statistics",
-  "updated": "2026-11-02T15:21:17Z",
+  "status": "completed",
+  "finished": "2026-11-02T15:25:42Z",
   "pid": 32781,
-  "completed": 9
+  "completed": 9,
+  "strict_reproduction": true,
+  "decision": "not_yet_stable",
+  "original_artifacts_unchanged": true
 }

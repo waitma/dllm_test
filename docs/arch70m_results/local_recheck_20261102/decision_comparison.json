@@ -1,0 +1,14 @@
+{
+  "original_decision": "not_yet_stable",
+  "replay_decision": "not_yet_stable",
+  "comparison": {
+    "exact_equal": true,
+    "strict_close": true,
+    "atol": 1e-08,
+    "rtol": 1e-06,
+    "numeric_values": 51,
+    "max_absolute_difference": 0.0,
+    "difference_count": 0,
+    "differences": []
+  }
+}
