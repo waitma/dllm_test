@@ -1,3 +1,5 @@
+> Last updated: 2026-11-03T05:37:45Z (UTC)。新增seed42配对复核0/5完成；all five qualified; training starts；C0/C1/C2/C3/A0、1epoch/1276步/micro32/global512，原V8固定10%保持，与seed43双种子比较，不作稳定显著性结论；报告 /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/arch70m_results/attention_seed42_20261103/REPORT.md。
+
 > Last updated: 2026-11-03T05:36:28Z (UTC)。全局注意力2×2探索及原始对照5/5完成；A0 completed；C0=A5、C1=QK归一化、C2=单位初始门控、C3=组合，seed43/1epoch/micro32/global512；原V8固定10%保持，只读screen，不作稳定提升结论；报告 /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/arch70m_results/attention_20261102/REPORT.md。
 
 > Last updated: 2026-11-03T05:24:49Z (UTC)。新增seed42五架构复核已实际排队：控制器PID74329，phase=waiting_for_gpu；/proc真实命令和cwd已核验，wait_channel=locks_lock_inode_wait，尚未创建GPU worker。原seed43 A0核验时step1174/1276正常继续。旧队列完整结束后自动五组seed42资格→同配方1epoch训练；7项CPU回归和shell/dry-run通过，旧冻结源码/原V8固定10%不变。报告 /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/arch70m_results/attention_seed42_20261103/REPORT.md；不追加其他seed，不持续人工轮询。
