@@ -29,3 +29,7 @@ seed42五组重新执行maxlen2048/micro32、每组三次真实optimizer更新�
 报告 `/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/arch70m_results/attention_seed42_20261103/REPORT.md`；PNG/PDF/SVG、CSV和配对结果逐组更新并commit/push `explore/arch70m-v8-20261028`。推送失败只记录publication pending，保留训练真实状态；后台排队与运行，无需持续人工轮询。
 
 CPU检查覆盖同一模型/训练实现、42种子传递、新旧profile拒绝、完整恢复绑定/权重校验、全矩阵配对、真实GPU文件锁排队、旧源码保护和快照导入。实际通过状态、控制器PID和队列阶段见同目录validation.json、queue_verified.json与PROJECT_PROCESS.md。
+
+## 实际排队核验
+
+2026-11-03T05:23:33Z UTC：seed42控制器PID74329，实际命令及cwd已核验；状态waiting_for_gpu，内核等待点locks_lock_inode_wait，未创建GPU worker。原seed43 A0核验时step1174，保持正常运行。7项CPU回归、shell语法、dry-run与快照导入通过；新source SHA `258dd11e8895c3b6d4fbb9c00e526de67e6bc9ccbef43948970790f5a00d8fed`。GPU资格和正式训练尚未开始，将在旧队列结束后自动运行。

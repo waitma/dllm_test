@@ -1,10 +1,30 @@
 {
-  "updated": "2026-11-03T05:21:40Z",
+  "updated": "2026-11-03T05:24:45Z",
   "output_root": "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_attention_seed42_20261103",
   "seed42_completed": 0,
   "seed43_completed": 4,
   "execution": {
-    "phase": "not_started"
+    "started": "2026-11-03T05:23:06Z",
+    "controller_pid": 74329,
+    "seed": 42,
+    "reference_seed": 43,
+    "variants": [
+      "C0",
+      "C1",
+      "C2",
+      "C3",
+      "A0"
+    ],
+    "epochs": 1,
+    "total_steps": 1276,
+    "micro_batch": 32,
+    "global_batch": 512,
+    "source_sha256": "258dd11e8895c3b6d4fbb9c00e526de67e6bc9ccbef43948970790f5a00d8fed",
+    "previous_source_sha256": "28609d7f776013915561eb038396d54181dcee7b1c32d071be0a9da5dc12faad",
+    "data_sha256": "4beaac6b54a1f46492533aeb77c2de2c6ac2a0bd8266fd57a6bb312679435c51",
+    "gpu": "0",
+    "predecessor_output": "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_attention_20261102",
+    "phase": "waiting_for_gpu"
   },
   "trials": [
     {
@@ -1937,13 +1957,13 @@
       "variant": "A0",
       "seed": 43,
       "status": "training",
-      "step": 1157,
+      "step": 1183,
       "total_steps": 1276,
       "micro_batch": 32,
       "global_batch": 512,
       "epochs": 1,
-      "training_gpu_hours": 2.3157224302616024,
-      "last_train_ce": 0.2841633902671419
+      "training_gpu_hours": 2.3675788774012796,
+      "last_train_ce": 0.3129073978556093
     }
   ],
   "stable_improvement_assessed": false
