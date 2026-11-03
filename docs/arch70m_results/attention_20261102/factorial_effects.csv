@@ -1,1 +1,73 @@
-trial,curve,step
+comparison,difference,metric
+C1-C0,0.014204635823574896,token.all.loss
+C2-C0,-0.0025294803302715607,token.all.loss
+C3-C2,0.01568294853237262,token.all.loss
+C3-C1,-0.0010511676214738364,token.all.loss
+interaction C3-C2-C1+C0,0.0014783127087977244,token.all.loss
+C0-A0,0.034930375742029285,token.all.loss
+C1-A0,0.04913501156560418,token.all.loss
+C2-A0,0.032400895411757724,token.all.loss
+C3-A0,0.048083843944130344,token.all.loss
+C1-C0,-0.159844060776674,generation.conditional_ce
+C2-C0,0.021513401279630973,generation.conditional_ce
+C3-C2,0.03705226282818597,generation.conditional_ce
+C3-C1,0.21840972488449095,generation.conditional_ce
+interaction C3-C2-C1+C0,0.19689632360485998,generation.conditional_ce
+C0-A0,-3.099467831202175,generation.conditional_ce
+C1-A0,-3.259311891978849,generation.conditional_ce
+C2-A0,-3.077954429922544,generation.conditional_ce
+C3-A0,-3.040902167094358,generation.conditional_ce
+C1-C0,0.05879264953546226,generation.cdr_ce
+C2-C0,-0.0187304790597409,generation.cdr_ce
+C3-C2,0.0764666514005512,generation.cdr_ce
+C3-C1,-0.0010564771946519613,generation.cdr_ce
+interaction C3-C2-C1+C0,0.01767400186508894,generation.cdr_ce
+C0-A0,0.011657810304313898,generation.cdr_ce
+C1-A0,0.07045045983977616,generation.cdr_ce
+C2-A0,-0.007072668755427003,generation.cdr_ce
+C3-A0,0.0693939826451242,generation.cdr_ce
+C1-C0,0.020235424867695362,generation.conditional_aar
+C2-C0,-0.01406273071487174,generation.conditional_aar
+C3-C2,0.007186506042197338,generation.conditional_aar
+C3-C1,-0.027111649540369764,generation.conditional_aar
+interaction C3-C2-C1+C0,-0.013048918825498024,generation.conditional_aar
+C0-A0,0.32485447051313143,generation.conditional_aar
+C1-A0,0.3450898953808268,generation.conditional_aar
+C2-A0,0.3107917397982597,generation.conditional_aar
+C3-A0,0.317978245840457,generation.conditional_aar
+C1-C0,-0.01884634606540203,generation.cdr_aar
+C2-C0,-0.003659692592918873,generation.cdr_aar
+C3-C2,-0.01340530626475811,generation.cdr_aar
+C3-C1,0.001781347207725048,generation.cdr_aar
+interaction C3-C2-C1+C0,0.005441039800643921,generation.cdr_aar
+C0-A0,0.009366577956825495,generation.cdr_aar
+C1-A0,-0.009479768108576536,generation.cdr_aar
+C2-A0,0.005706885363906622,generation.cdr_aar
+C3-A0,-0.007698420900851488,generation.cdr_aar
+C1-C0,-0.08455615942029038,generation.conditional_length_mae
+C2-C0,5.206544384057969,generation.conditional_length_mae
+C3-C2,-6.782586050724635,generation.conditional_length_mae
+C3-C1,-1.4914855072463764,generation.conditional_length_mae
+interaction C3-C2-C1+C0,-6.698029891304344,generation.conditional_length_mae
+C0-A0,-94.10818687652927,generation.conditional_length_mae
+C1-A0,-94.19274303594956,generation.conditional_length_mae
+C2-A0,-88.9016424924713,generation.conditional_length_mae
+C3-A0,-95.68422854319594,generation.conditional_length_mae
+C1-C0,-0.0024515415140415886,representation.macro_auroc
+C2-C0,0.020680708180708107,representation.macro_auroc
+C3-C2,0.01100808913308915,representation.macro_auroc
+C3-C1,0.034140338827838845,representation.macro_auroc
+interaction C3-C2-C1+C0,0.013459630647130738,representation.macro_auroc
+C0-A0,-0.019955738705738635,representation.macro_auroc
+C1-A0,-0.022407280219780223,representation.macro_auroc
+C2-A0,0.0007249694749694724,representation.macro_auroc
+C3-A0,0.011733058608058622,representation.macro_auroc
+C1-C0,0.03474362636097461,representation.macro_auprc
+C2-C0,-0.006962983004649703,representation.macro_auprc
+C3-C2,0.06957371332371343,representation.macro_auprc
+C3-C1,0.027867103958089112,representation.macro_auprc
+interaction C3-C2-C1+C0,0.034830086962738815,representation.macro_auprc
+C0-A0,-0.003683365841282926,representation.macro_auprc
+C1-A0,0.031060260519691685,representation.macro_auprc
+C2-A0,-0.01064634884593263,representation.macro_auprc
+C3-A0,0.0589273644777808,representation.macro_auprc

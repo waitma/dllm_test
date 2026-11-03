@@ -1,6 +1,6 @@
 # A5全局注意力：QK归一化×单位初始门控，加原始A0对照
 
-更新时间：2026-11-03T03:00:17Z UTC；完成4/5。
+更新时间：2026-11-03T05:36:28Z UTC；完成5/5。
 
 五组均随机初始化，seed43/1epoch/1276步、micro32/global512；原V8形式与固定653,288条10%子集。
 C0为全新A5对照；C1仅Q/K每头RMS归一化；C2仅SDPA输出2sigmoid门控，零初始化使初始输出与A5相同；C3组合。
@@ -13,7 +13,7 @@ C0-C3的8层全局注意力、链内RoPE、chain bias、FFN3072、目标/数据/
 | C1 | completed | 1276 | 0.3805 | 0.7867 | 0.8228 | 0.7077 |
 | C2 | completed | 1276 | 0.3462 | 0.8019 | 0.8459 | 0.6660 |
 | C3 | completed | 1276 | 0.3534 | 0.7885 | 0.8569 | 0.7356 |
-| A0 | qualified | 0 | — | — | — | — |
+| A0 | completed | 1276 | 0.0354 | 0.7962 | 0.8452 | 0.6767 |
 
 ![完整loss/生成/表征曲线](/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/arch70m_results/attention_20261102/curves.png)
 ![重点任务曲线](/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/arch70m_results/attention_20261102/target_curves.png)
