@@ -1,0 +1,19 @@
+{
+  "added_seed": 42,
+  "reference_seed": 43,
+  "variants": ["C0", "C1", "C2", "C3", "A0"],
+  "epochs": 1,
+  "steps": 1276,
+  "micro_batch": 32,
+  "global_batch": 512,
+  "records": 653288,
+  "tokens": 214482921,
+  "data_sha256": "4beaac6b54a1f46492533aeb77c2de2c6ac2a0bd8266fd57a6bb312679435c51",
+  "previous_source_sha256": "28609d7f776013915561eb038396d54181dcee7b1c32d071be0a9da5dc12faad",
+  "changes": "Only one additional training seed. Identical frozen model constructors, data index, reader/collator, one-epoch schedule, micro/global batch, corruption/objectives and evaluation math.",
+  "initialization": "random_weights using seed42; never continue a seed43 or earlier screening checkpoint",
+  "queue": "Block on the same local GPU0 lease until the existing seed43 controller finishes; validate all five original results before GPU qualification. Do not interrupt or duplicate seed43.",
+  "qualification": "Five fresh seed42 maxlen2048/micro32 profiles; three real updates each and unchanged85% memory gate; then formal training in new processes.",
+  "evaluation": "Original screen partition only; final fixed step1276; report both seeds and paired deltas versus same-seed C0 and A0; no best seed/checkpoint selection.",
+  "inference": "Two-seed replication only, not the previous three-seed stable-improvement test. No additional seeds or automatic confirm runs. The previously inspected confirm partition is not a fresh holdout."
+}

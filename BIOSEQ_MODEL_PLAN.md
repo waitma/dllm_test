@@ -1,3 +1,5 @@
+> 2026-11-03T05:21:44Z 用户新增一组seed42对照：同一冻结五架构和1epoch/micro32/global512配方，仅训练seed变化；单独适配，不修改seed43训练源码。旧队列结束后自动五组资格与训练；固定screen终点双seed配对，不复用早期不同micro/长日程结果，不增加更多seed或沿用旧confirm作独立留出。详见 /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/ARCH70M_ATTENTION_SEED42.md。
+
 > 2026-11-02T16:00:54Z 新探索预注册：在A5全局骨干上做Q/K每头RMS归一化×SDPA输出单位初始门控2×2，并从头运行同配方A0。C0/C1/C2/C3/A0约75.74–75.82M；门控2sigmoid、零初始化保持初始attention输出，FFN和残差0.1不变；仅单种子screen固定epoch末比较CDR/表征/生成和完整因子交互，不改数据/目标/确认门槛。旧confirm已查看，不当成新候选全新留出。参考及限定见 /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/ARCH70M_ATTENTION_FACTORIAL.md。
 
 > 2026-11-02T15:23:27Z 本地描述性复核：三个种子平均参考长度覆盖率A0=29.50%、A5=93.55%、B1=93.26%，整链AAR分别10.45%/34.59%/34.90%。原逐样本AAR已按预测/参考重新计算一致；诊断支持生成完整性改善，不是结合特异性或表征提升证据，不改原稳定性统计门槛。9组本地GPU重评估与原指标/逐样本完全相等。图表及定义见 /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/arch70m_results/local_recheck_20261102/REVIEW.md。

@@ -1,3 +1,5 @@
+> Last updated: 2026-11-03T05:21:44Z (UTC)。用户要求再一组种子对照：只新增seed42，C0/C1/C2/C3/A0各1epoch/1276步/micro32/global512，原V8与固定10%数据保持。7项CPU回归、真实GPU文件锁排队、shell/dry-run/快照导入通过；原seed43源码SHA28609d7f776013915561eb038396d54181dcee7b1c32d071be0a9da5dc12faad未变，新适配SHA258dd11e8895c3b6d4fbb9c00e526de67e6bc9ccbef43948970790f5a00d8fed。当前seed43 A0为training/step1158，新控制器待启动排队，不打断旧队列；计划 /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/ARCH70M_ATTENTION_SEED42.md。
+
 > Last updated: 2026-11-03T03:00:17Z (UTC)。全局注意力2×2探索及原始对照4/5完成；C3 completed；C0=A5、C1=QK归一化、C2=单位初始门控、C3=组合，seed43/1epoch/micro32/global512；原V8固定10%保持，只读screen，不作稳定提升结论；报告 /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/arch70m_results/attention_20261102/REPORT.md。
 
 > Last updated: 2026-11-03T00:05:51Z (UTC)。全局注意力2×2探索及原始对照3/5完成；C2 completed；C0=A5、C1=QK归一化、C2=单位初始门控、C3=组合，seed43/1epoch/micro32/global512；原V8固定10%保持，只读screen，不作稳定提升结论；报告 /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/arch70m_results/attention_20261102/REPORT.md。
