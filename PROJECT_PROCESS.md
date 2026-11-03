@@ -1,3 +1,5 @@
+> Last updated: 2026-11-03T11:05:25Z (UTC)。新增seed42配对复核2/5完成；C1 completed；C0/C1/C2/C3/A0、1epoch/1276步/micro32/global512，原V8固定10%保持，与seed43双种子比较，不作稳定显著性结论；报告 /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/arch70m_results/attention_seed42_20261103/REPORT.md。
+
 > Last updated: 2026-11-03T08:12:47Z (UTC)。新增seed42配对复核1/5完成；C0 completed；C0/C1/C2/C3/A0、1epoch/1276步/micro32/global512，原V8固定10%保持，与seed43双种子比较，不作稳定显著性结论；报告 /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/arch70m_results/attention_seed42_20261103/REPORT.md。
 
 > Last updated: 2026-11-03T05:37:45Z (UTC)。新增seed42配对复核0/5完成；all five qualified; training starts；C0/C1/C2/C3/A0、1epoch/1276步/micro32/global512，原V8固定10%保持，与seed43双种子比较，不作稳定显著性结论；报告 /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/arch70m_results/attention_seed42_20261103/REPORT.md。
