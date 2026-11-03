@@ -1,3 +1,5 @@
+> Last updated: 2026-11-03T00:05:51Z (UTC)。全局注意力2×2探索及原始对照3/5完成；C2 completed；C0=A5、C1=QK归一化、C2=单位初始门控、C3=组合，seed43/1epoch/micro32/global512；原V8固定10%保持，只读screen，不作稳定提升结论；报告 /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/arch70m_results/attention_20261102/REPORT.md。
+
 > Last updated: 2026-11-02T21:28:56Z (UTC)。全局注意力2×2探索及原始对照2/5完成；C1 completed；C0=A5、C1=QK归一化、C2=单位初始门控、C3=组合，seed43/1epoch/micro32/global512；原V8固定10%保持，只读screen，不作稳定提升结论；报告 /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/arch70m_results/attention_20261102/REPORT.md。
 
 > Last updated: 2026-11-02T18:37:08Z (UTC)。全局注意力2×2探索及原始对照1/5完成；C0 completed；C0=A5、C1=QK归一化、C2=单位初始门控、C3=组合，seed43/1epoch/micro32/global512；原V8固定10%保持，只读screen，不作稳定提升结论；报告 /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/arch70m_results/attention_20261102/REPORT.md。
