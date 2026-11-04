@@ -1,5 +1,5 @@
 {
-  "updated": "2026-11-03T19:14:52Z",
+  "updated": "2026-11-04T00:44:43Z",
   "output_root": "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_attention_seed42_20261103",
   "seed42_completed": 5,
   "seed43_completed": 5,
@@ -24,8 +24,10 @@
     "data_sha256": "4beaac6b54a1f46492533aeb77c2de2c6ac2a0bd8266fd57a6bb312679435c51",
     "gpu": "0",
     "predecessor_output": "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_attention_20261102",
-    "phase": "training",
-    "qualified": "2026-11-03T05:37:41Z"
+    "phase": "finished",
+    "finished": "2026-11-03T19:15:01Z",
+    "failed_variants": [],
+    "stable_improvement_assessed": false
   },
   "trials": [
     {

@@ -1,0 +1,96 @@
+{
+  "updated": "2026-11-04T00:44:48Z",
+  "status": "passed",
+  "completed_trials": 10,
+  "checkpoint_files_verified": 60,
+  "all_training_steps": 1276,
+  "all_training_records": 653288,
+  "all_training_tokens": 214482921,
+  "data_sha256": "4beaac6b54a1f46492533aeb77c2de2c6ac2a0bd8266fd57a6bb312679435c51",
+  "seed43_source_sha256": "28609d7f776013915561eb038396d54181dcee7b1c32d071be0a9da5dc12faad",
+  "seed42_source_sha256": "258dd11e8895c3b6d4fbb9c00e526de67e6bc9ccbef43948970790f5a00d8fed",
+  "checkpoints": [
+    {
+      "variant": "A0",
+      "seed": 42,
+      "checkpoint_files_verified": 6,
+      "verification": "Completed helper full SHA/cursor/binding review passed in this turn before summary generation.",
+      "receipt_sha256": "c8f3787ce2ba92e808503d9bcd7bb645534976c0c7874243af4123ec266443a7",
+      "metrics_sha256": "513a448afa4313953b556dfba8ef0b15d7e6648006a3f586c506464f3d10e52a"
+    },
+    {
+      "variant": "C0",
+      "seed": 42,
+      "checkpoint_files_verified": 6,
+      "verification": "Completed helper full SHA/cursor/binding review passed in this turn before summary generation.",
+      "receipt_sha256": "525987ab7450870c6a0b5687c120638a96719b818b845e297816c6bee57b1a4f",
+      "metrics_sha256": "6b02516593531c52529efa65af1d87380d30070e752f1961f7241ff5ddf1738d"
+    },
+    {
+      "variant": "C1",
+      "seed": 42,
+      "checkpoint_files_verified": 6,
+      "verification": "Completed helper full SHA/cursor/binding review passed in this turn before summary generation.",
+      "receipt_sha256": "a0db7a2760fe687bfa8cad6d78d7b096f5919d92955294f876d6765d501faa96",
+      "metrics_sha256": "87ca770ea8906349361faa7b026f4f17c94cc7f3b37c635cc1bc6d3cc0ef4426"
+    },
+    {
+      "variant": "C2",
+      "seed": 42,
+      "checkpoint_files_verified": 6,
+      "verification": "Completed helper full SHA/cursor/binding review passed in this turn before summary generation.",
+      "receipt_sha256": "7f3d1aa9017a76a1c3aceee74358c8798b21f59e930293acddceafb298120523",
+      "metrics_sha256": "449cb412586f03eaa12799567dadf7245565cdeac0206c1124402f92fca142bf"
+    },
+    {
+      "variant": "C3",
+      "seed": 42,
+      "checkpoint_files_verified": 6,
+      "verification": "Completed helper full SHA/cursor/binding review passed in this turn before summary generation.",
+      "receipt_sha256": "fa10d15c06fdda3daacb587e67a01deab1abcca99d19aa6a598b4bba9fe92bd3",
+      "metrics_sha256": "bbd67f6059f776049768c07d1864f4c270ba2772eae54eaad56e519dd691092e"
+    },
+    {
+      "variant": "A0",
+      "seed": 43,
+      "checkpoint_files_verified": 6,
+      "verification": "Completed helper full SHA/cursor/binding review passed in this turn before summary generation.",
+      "receipt_sha256": "2165d23363c3e05273d0aef84c106203f413503e8073aec05d838875c1c4148d",
+      "metrics_sha256": "7da1c552041609e71551cd3accdb1c37bce35acc41c68de36a0914e50a64602e"
+    },
+    {
+      "variant": "C0",
+      "seed": 43,
+      "checkpoint_files_verified": 6,
+      "verification": "Completed helper full SHA/cursor/binding review passed in this turn before summary generation.",
+      "receipt_sha256": "85e5b2ed8fed01344dc45d97ca42a61bb5504b86a0e8f7074ca7bf6f738d62ab",
+      "metrics_sha256": "b4ff687ea0c4acaba0c0d45857e09d490daa9cc44b8dcfbf6547de1199a22779"
+    },
+    {
+      "variant": "C1",
+      "seed": 43,
+      "checkpoint_files_verified": 6,
+      "verification": "Completed helper full SHA/cursor/binding review passed in this turn before summary generation.",
+      "receipt_sha256": "c7045813a1f09258098d6da8890e136eb0d0a62495d9eef139b48fc64e62e227",
+      "metrics_sha256": "a49dc7214bae89018240b6aca852f4ca2fb05a5e8307a57b93fa677f4f73ac46"
+    },
+    {
+      "variant": "C2",
+      "seed": 43,
+      "checkpoint_files_verified": 6,
+      "verification": "Completed helper full SHA/cursor/binding review passed in this turn before summary generation.",
+      "receipt_sha256": "c007e7f2f40f4ed2187bbf474e61d6af2c6cb0f2a446bf98b3859e4e91e50b22",
+      "metrics_sha256": "a0f3da41727f40f6a0f00fa6bba67de65dec3f2e41423ec051aef9c1ef0fc2ca"
+    },
+    {
+      "variant": "C3",
+      "seed": 43,
+      "checkpoint_files_verified": 6,
+      "verification": "Completed helper full SHA/cursor/binding review passed in this turn before summary generation.",
+      "receipt_sha256": "cef9b23885ef1f922740e6d4de5820fe543c9017295ecbaea3025371369b7204",
+      "metrics_sha256": "3aab77196392e07bd5985661938825baad211433a891fad9ebc939c2ed0c83f3"
+    }
+  ],
+  "stable_improvement_assessed": false,
+  "historical_confirm_decision": "not_yet_stable"
+}

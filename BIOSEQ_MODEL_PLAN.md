@@ -1,3 +1,5 @@
+> 2026-11-04T00:44:49Z 双seed探索结论：A5继续作生成对照，C2(仅单位初始输出门控)是表征方向候选；相对A5 AUROC在42/43增0.02286/0.02068，PR降0.00311/0.00696；相对A0平均AUROC增0.00333。C3此前单seed优势未复现，C1与C3的CDR双seed均回退。只有方向证据，未满足原稳定判据，不自动增seed/确认。完整配对图表见 /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/arch70m_results/review_20261104/REPORT.md。
+
 > 2026-11-03T05:21:44Z 用户新增一组seed42对照：同一冻结五架构和1epoch/micro32/global512配方，仅训练seed变化；单独适配，不修改seed43训练源码。旧队列结束后自动五组资格与训练；固定screen终点双seed配对，不复用早期不同micro/长日程结果，不增加更多seed或沿用旧confirm作独立留出。详见 /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/ARCH70M_ATTENTION_SEED42.md。
 
 > 2026-11-02T16:00:54Z 新探索预注册：在A5全局骨干上做Q/K每头RMS归一化×SDPA输出单位初始门控2×2，并从头运行同配方A0。C0/C1/C2/C3/A0约75.74–75.82M；门控2sigmoid、零初始化保持初始attention输出，FFN和残差0.1不变；仅单种子screen固定epoch末比较CDR/表征/生成和完整因子交互，不改数据/目标/确认门槛。旧confirm已查看，不当成新候选全新留出。参考及限定见 /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/ARCH70M_ATTENTION_FACTORIAL.md。
