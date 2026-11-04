@@ -1,0 +1,23 @@
+{
+  "created": "2026-11-04T07:00:19+00:00",
+  "a0_full_aar": 0.07916482938790749,
+  "a0_cdr_aar": 0.7971016124356538,
+  "a0_regions": {
+    "CDR1": 0.949457464274019,
+    "CDR2": 0.9239676357246935,
+    "CDR3": 0.6510136271826923
+  },
+  "a0_cdr3_by_role": {
+    "antibody_heavy": 0.40723958564922214,
+    "antibody_light": 0.7808396555483341,
+    "tcr_alpha": 0.7766195675358176,
+    "tcr_beta": 0.6393556999973953
+  },
+  "a0_initial_macro_auroc": 0.8205557463369964,
+  "a0_final_macro_auroc": 0.8434018238705738,
+  "cdr_exact_chain_overlap": 10,
+  "cdr_exact_cdr3_overlap": 20,
+  "decision": "Existing probe ranking cannot establish representation generalization",
+  "inputs_unchanged": true,
+  "training_started": false
+}

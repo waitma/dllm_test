@@ -1,0 +1,1776 @@
+{
+  "task_counts": {
+    "conditional:asd_antibody": 23,
+    "conditional:oas": 32,
+    "cdr:oas": 32,
+    "conditional:ots": 32,
+    "cdr:ots": 32,
+    "conditional:tcr_native": 30
+  },
+  "exclusions": {
+    "no_exact_cdr_annotation": 53,
+    "nonbinding": 28,
+    "synthetic_chain": 50
+  },
+  "checks": {
+    "chain_alignment": true,
+    "cdr_alignment": true,
+    "score_only_masked_residues": true,
+    "unmasked_conditions_unchanged": true,
+    "relation_flip_invariant_records": 489,
+    "probability_metric_checks": 40
+  },
+  "probe_counts": {
+    "tcr_papers": {
+      "train": {
+        "binding": 30,
+        "nonbinding": 112
+      },
+      "valid": {
+        "binding": 7,
+        "nonbinding": 26
+      }
+    },
+    "trait": {
+      "train": {
+        "binding": 29,
+        "nonbinding": 212
+      },
+      "valid": {
+        "binding": 9,
+        "nonbinding": 64
+      }
+    }
+  },
+  "probe_overlap": {
+    "tcr_papers": {
+      "full_receptor_overlap": 0,
+      "tcr_beta": {
+        "unique_nonempty_observed_chain_overlap": 0,
+        "valid_records_with_seen_nonempty_chain": 0,
+        "unique_observed_chain_overlap_including_empty": 0,
+        "valid_records_with_seen_chain": 0,
+        "valid_unique_chains": 33
+      },
+      "tcr_alpha": {
+        "unique_nonempty_observed_chain_overlap": 0,
+        "valid_records_with_seen_nonempty_chain": 0,
+        "unique_observed_chain_overlap_including_empty": 1,
+        "valid_records_with_seen_chain": 6,
+        "valid_unique_chains": 28
+      },
+      "alpha_observation_by_label": {
+        "train": {
+          "binding": {
+            "observed": 18,
+            "missing": 12
+          },
+          "nonbinding": {
+            "observed": 112
+          }
+        },
+        "valid": {
+          "binding": {
+            "missing": 6,
+            "observed": 1
+          },
+          "nonbinding": {
+            "observed": 26
+          }
+        }
+      },
+      "metadata_subsources": {
+        "train": {
+          "tcrdiff:binding": 6,
+          "tcrdesign26_paired:binding": 12,
+          "tcrt5:binding": 12,
+          "tcrdesign26_pmhc:nonbinding": 75,
+          "tcrdiff:nonbinding": 37
+        },
+        "valid": {
+          "tcrt5:binding": 6,
+          "tcrdiff:binding": 1,
+          "tcrdiff:nonbinding": 9,
+          "tcrdesign26_pmhc:nonbinding": 17
+        }
+      }
+    },
+    "trait": {
+      "full_receptor_overlap": 0,
+      "tcr_beta": {
+        "unique_nonempty_observed_chain_overlap": 0,
+        "valid_records_with_seen_nonempty_chain": 0,
+        "unique_observed_chain_overlap_including_empty": 0,
+        "valid_records_with_seen_chain": 0,
+        "valid_unique_chains": 73
+      },
+      "tcr_alpha": {
+        "unique_nonempty_observed_chain_overlap": 1,
+        "valid_records_with_seen_nonempty_chain": 1,
+        "unique_observed_chain_overlap_including_empty": 2,
+        "valid_records_with_seen_chain": 2,
+        "valid_unique_chains": 73
+      },
+      "alpha_observation_by_label": {
+        "train": {
+          "binding": {
+            "observed": 27,
+            "missing": 2
+          },
+          "nonbinding": {
+            "observed": 212
+          }
+        },
+        "valid": {
+          "binding": {
+            "observed": 8,
+            "missing": 1
+          },
+          "nonbinding": {
+            "observed": 64
+          }
+        }
+      },
+      "metadata_subsources": {
+        "train": {
+          "unspecified:binding": 29,
+          "unspecified:nonbinding": 212
+        },
+        "valid": {
+          "unspecified:binding": 9,
+          "unspecified:nonbinding": 64
+        }
+      }
+    }
+  },
+  "baselines": {
+    "tcr_papers": {
+      "missing_alpha_only": {
+        "auroc": 0.9285714285714286,
+        "auprc": 0.8874458874458874
+      },
+      "layout": {
+        "auroc": 0.8791208791208791,
+        "auprc": 0.7447278911564625
+      },
+      "receptor_composition": {
+        "auroc": 0.9065934065934066,
+        "auprc": 0.8988095238095237
+      },
+      "context_composition": {
+        "auroc": 0.8021978021978022,
+        "auprc": 0.5341880341880341
+      },
+      "all_composition": {
+        "auroc": 0.9120879120879121,
+        "auprc": 0.8605442176870748
+      }
+    },
+    "trait": {
+      "missing_alpha_only": {
+        "auroc": 0.5555555555555556,
+        "auprc": 0.2207001522070015
+      },
+      "layout": {
+        "auroc": 0.43229166666666663,
+        "auprc": 0.21260194952078537
+      },
+      "receptor_composition": {
+        "auroc": 0.5920138888888888,
+        "auprc": 0.24910160683643717
+      },
+      "context_composition": {
+        "auroc": 0.6493055555555556,
+        "auprc": 0.19123259678541327
+      },
+      "all_composition": {
+        "auroc": 0.6944444444444444,
+        "auprc": 0.21556437389770722
+      }
+    }
+  },
+  "endpoints": [
+    {
+      "seed": 42,
+      "variant": "A0",
+      "initial_representation": {
+        "sources": {
+          "tcr_papers": {
+            "auroc": 0.9065934065934066,
+            "auprc": 0.8988095238095237,
+            "shuffled_auroc": 0.0824175824175824,
+            "train_records": 142,
+            "valid_records": 33
+          },
+          "trait": {
+            "auroc": 0.7274305555555556,
+            "auprc": 0.22334825668159003,
+            "shuffled_auroc": 0.6215277777777778,
+            "train_records": 241,
+            "valid_records": 73
+          }
+        },
+        "macro_auroc": 0.8170119810744811,
+        "macro_auprc": 0.5610788902455569,
+        "excluded_single_class_sources": []
+      },
+      "final_representation": {
+        "sources": {
+          "tcr_papers": {
+            "auroc": 0.9505494505494505,
+            "auprc": 0.919642857142857,
+            "shuffled_auroc": 0.14285714285714285,
+            "train_records": 142,
+            "valid_records": 33
+          },
+          "trait": {
+            "auroc": 0.7326388888888888,
+            "auprc": 0.2808471620971621,
+            "shuffled_auroc": 0.3923611111111111,
+            "train_records": 241,
+            "valid_records": 73
+          }
+        },
+        "macro_auroc": 0.8415941697191697,
+        "macro_auprc": 0.6002450096200096,
+        "excluded_single_class_sources": []
+      },
+      "generation": {
+        "sources": {
+          "cdr": {
+            "oas": {
+              "records": 32,
+              "ce": 1.0099136368371546,
+              "aar": 0.738480350933969
+            },
+            "ots": {
+              "records": 32,
+              "ce": 0.6348677966743708,
+              "aar": 0.8575550224632025
+            }
+          },
+          "conditional": {
+            "asd_antibody": {
+              "records": 23,
+              "ce": 4.57275016411491,
+              "aar": 0.06011634781514439,
+              "validity": 1.0,
+              "length_mae": 91.52173913043478,
+              "missing_eos": 0
+            },
+            "oas": {
+              "records": 32,
+              "ce": 4.846151828765869,
+              "aar": 0.11725714038642722,
+              "validity": 1.0,
+              "length_mae": 80.96875,
+              "missing_eos": 0
+            },
+            "ots": {
+              "records": 32,
+              "ce": 5.074019983410835,
+              "aar": 0.15719944777698924,
+              "validity": 1.0,
+              "length_mae": 66.40625,
+              "missing_eos": 0
+            },
+            "tcr_native": {
+              "records": 30,
+              "ce": 4.308955605824789,
+              "aar": 0.15715189301307542,
+              "validity": 1.0,
+              "length_mae": 69.4,
+              "missing_eos": 0
+            }
+          }
+        },
+        "cdr_ce": 0.8223907167557627,
+        "cdr_aar": 0.7980176866985857,
+        "conditional_ce": 4.700469395529101,
+        "conditional_aar": 0.12293120724790907,
+        "conditional_validity": 1.0,
+        "conditional_length_mae": 77.0741847826087
+      }
+    },
+    {
+      "seed": 42,
+      "variant": "C0",
+      "initial_representation": {
+        "sources": {
+          "tcr_papers": {
+            "auroc": 0.9230769230769231,
+            "auprc": 0.9047619047619047,
+            "shuffled_auroc": 0.06593406593406592,
+            "train_records": 142,
+            "valid_records": 33
+          },
+          "trait": {
+            "auroc": 0.7413194444444444,
+            "auprc": 0.23436958829115692,
+            "shuffled_auroc": 0.6527777777777778,
+            "train_records": 241,
+            "valid_records": 73
+          }
+        },
+        "macro_auroc": 0.8321981837606838,
+        "macro_auprc": 0.5695657465265308,
+        "excluded_single_class_sources": []
+      },
+      "final_representation": {
+        "sources": {
+          "tcr_papers": {
+            "auroc": 0.9010989010989011,
+            "auprc": 0.897142857142857,
+            "shuffled_auroc": 0.1648351648351648,
+            "train_records": 142,
+            "valid_records": 33
+          },
+          "trait": {
+            "auroc": 0.7482638888888888,
+            "auprc": 0.477666327187531,
+            "shuffled_auroc": 0.4409722222222222,
+            "train_records": 241,
+            "valid_records": 73
+          }
+        },
+        "macro_auroc": 0.8246813949938949,
+        "macro_auprc": 0.687404592165194,
+        "excluded_single_class_sources": []
+      },
+      "generation": {
+        "sources": {
+          "cdr": {
+            "oas": {
+              "records": 32,
+              "ce": 1.0152599276043475,
+              "aar": 0.7377615319564939
+            },
+            "ots": {
+              "records": 32,
+              "ce": 0.6383116124197841,
+              "aar": 0.8410424124449492
+            }
+          },
+          "conditional": {
+            "asd_antibody": {
+              "records": 23,
+              "ce": 3.624555142029472,
+              "aar": 0.3114282812531008,
+              "validity": 1.0,
+              "length_mae": 9.782608695652174,
+              "missing_eos": 0
+            },
+            "oas": {
+              "records": 32,
+              "ce": 3.158694937825203,
+              "aar": 0.37272689094274336,
+              "validity": 1.0,
+              "length_mae": 7.46875,
+              "missing_eos": 0
+            },
+            "ots": {
+              "records": 32,
+              "ce": 3.9344935193657875,
+              "aar": 0.30749801049591385,
+              "validity": 1.0,
+              "length_mae": 3.34375,
+              "missing_eos": 0
+            },
+            "tcr_native": {
+              "records": 30,
+              "ce": 3.151626968383789,
+              "aar": 0.4718785627067976,
+              "validity": 1.0,
+              "length_mae": 4.333333333333333,
+              "missing_eos": 0
+            }
+          }
+        },
+        "cdr_ce": 0.8267857700120658,
+        "cdr_aar": 0.7894019722007215,
+        "conditional_ce": 3.467342641901063,
+        "conditional_aar": 0.36588293634963887,
+        "conditional_validity": 1.0,
+        "conditional_length_mae": 6.232110507246376
+      }
+    },
+    {
+      "seed": 42,
+      "variant": "C1",
+      "initial_representation": {
+        "sources": {
+          "tcr_papers": {
+            "auroc": 0.9230769230769231,
+            "auprc": 0.9047619047619047,
+            "shuffled_auroc": 0.060439560439560426,
+            "train_records": 142,
+            "valid_records": 33
+          },
+          "trait": {
+            "auroc": 0.7534722222222222,
+            "auprc": 0.24774169659080145,
+            "shuffled_auroc": 0.6649305555555556,
+            "train_records": 241,
+            "valid_records": 73
+          }
+        },
+        "macro_auroc": 0.8382745726495726,
+        "macro_auprc": 0.5762518006763531,
+        "excluded_single_class_sources": []
+      },
+      "final_representation": {
+        "sources": {
+          "tcr_papers": {
+            "auroc": 0.9065934065934066,
+            "auprc": 0.8988095238095237,
+            "shuffled_auroc": 0.06593406593406592,
+            "train_records": 142,
+            "valid_records": 33
+          },
+          "trait": {
+            "auroc": 0.7065972222222223,
+            "auprc": 0.3166425446068435,
+            "shuffled_auroc": 0.34548611111111105,
+            "train_records": 241,
+            "valid_records": 73
+          }
+        },
+        "macro_auroc": 0.8065953144078144,
+        "macro_auprc": 0.6077260342081836,
+        "excluded_single_class_sources": []
+      },
+      "generation": {
+        "sources": {
+          "cdr": {
+            "oas": {
+              "records": 32,
+              "ce": 1.0352759859524667,
+              "aar": 0.7247081147506833
+            },
+            "ots": {
+              "records": 32,
+              "ce": 0.6975599499419332,
+              "aar": 0.8443324863910675
+            }
+          },
+          "conditional": {
+            "asd_antibody": {
+              "records": 23,
+              "ce": 3.216007014979487,
+              "aar": 0.2992397682096025,
+              "validity": 1.0,
+              "length_mae": 7.304347826086956,
+              "missing_eos": 0
+            },
+            "oas": {
+              "records": 32,
+              "ce": 3.432627394795418,
+              "aar": 0.37149671135844675,
+              "validity": 1.0,
+              "length_mae": 10.9375,
+              "missing_eos": 0
+            },
+            "ots": {
+              "records": 32,
+              "ce": 3.826409712433815,
+              "aar": 0.2941636511638391,
+              "validity": 1.0,
+              "length_mae": 2.53125,
+              "missing_eos": 0
+            },
+            "tcr_native": {
+              "records": 30,
+              "ce": 3.288189721107483,
+              "aar": 0.4755108685367145,
+              "validity": 1.0,
+              "length_mae": 2.933333333333333,
+              "missing_eos": 0
+            }
+          }
+        },
+        "cdr_ce": 0.8664179679471999,
+        "cdr_aar": 0.7845203005708754,
+        "conditional_ce": 3.440808460829051,
+        "conditional_aar": 0.3601027498171507,
+        "conditional_validity": 1.0,
+        "conditional_length_mae": 5.926607789855073
+      }
+    },
+    {
+      "seed": 42,
+      "variant": "C2",
+      "initial_representation": {
+        "sources": {
+          "tcr_papers": {
+            "auroc": 0.9230769230769231,
+            "auprc": 0.9047619047619047,
+            "shuffled_auroc": 0.06593406593406592,
+            "train_records": 142,
+            "valid_records": 33
+          },
+          "trait": {
+            "auroc": 0.7413194444444444,
+            "auprc": 0.23436958829115692,
+            "shuffled_auroc": 0.6527777777777778,
+            "train_records": 241,
+            "valid_records": 73
+          }
+        },
+        "macro_auroc": 0.8321981837606838,
+        "macro_auprc": 0.5695657465265308,
+        "excluded_single_class_sources": []
+      },
+      "final_representation": {
+        "sources": {
+          "tcr_papers": {
+            "auroc": 0.9120879120879121,
+            "auprc": 0.9006211180124222,
+            "shuffled_auroc": 0.18681318681318682,
+            "train_records": 142,
+            "valid_records": 33
+          },
+          "trait": {
+            "auroc": 0.7829861111111112,
+            "auprc": 0.46797544617312054,
+            "shuffled_auroc": 0.4548611111111111,
+            "train_records": 241,
+            "valid_records": 73
+          }
+        },
+        "macro_auroc": 0.8475370115995116,
+        "macro_auprc": 0.6842982820927713,
+        "excluded_single_class_sources": []
+      },
+      "generation": {
+        "sources": {
+          "cdr": {
+            "oas": {
+              "records": 32,
+              "ce": 1.0128049054183066,
+              "aar": 0.7388744251802564
+            },
+            "ots": {
+              "records": 32,
+              "ce": 0.6190296425484121,
+              "aar": 0.861957723274827
+            }
+          },
+          "conditional": {
+            "asd_antibody": {
+              "records": 23,
+              "ce": 3.519850191862687,
+              "aar": 0.3595703658103905,
+              "validity": 1.0,
+              "length_mae": 8.130434782608695,
+              "missing_eos": 0
+            },
+            "oas": {
+              "records": 32,
+              "ce": 3.0760738998651505,
+              "aar": 0.3802755051519143,
+              "validity": 1.0,
+              "length_mae": 7.25,
+              "missing_eos": 0
+            },
+            "ots": {
+              "records": 32,
+              "ce": 3.7904390767216682,
+              "aar": 0.294175774462348,
+              "validity": 1.0,
+              "length_mae": 2.8125,
+              "missing_eos": 0
+            },
+            "tcr_native": {
+              "records": 30,
+              "ce": 3.4415875832239786,
+              "aar": 0.4736605527146554,
+              "validity": 1.0,
+              "length_mae": 4.533333333333333,
+              "missing_eos": 0
+            }
+          }
+        },
+        "cdr_ce": 0.8159172739833593,
+        "cdr_aar": 0.8004160742275417,
+        "conditional_ce": 3.456987687918371,
+        "conditional_aar": 0.37692054953482707,
+        "conditional_validity": 1.0,
+        "conditional_length_mae": 5.681567028985507
+      }
+    },
+    {
+      "seed": 42,
+      "variant": "C3",
+      "initial_representation": {
+        "sources": {
+          "tcr_papers": {
+            "auroc": 0.9230769230769231,
+            "auprc": 0.9047619047619047,
+            "shuffled_auroc": 0.060439560439560426,
+            "train_records": 142,
+            "valid_records": 33
+          },
+          "trait": {
+            "auroc": 0.7534722222222222,
+            "auprc": 0.24774169659080145,
+            "shuffled_auroc": 0.6649305555555556,
+            "train_records": 241,
+            "valid_records": 73
+          }
+        },
+        "macro_auroc": 0.8382745726495726,
+        "macro_auprc": 0.5762518006763531,
+        "excluded_single_class_sources": []
+      },
+      "final_representation": {
+        "sources": {
+          "tcr_papers": {
+            "auroc": 0.9120879120879121,
+            "auprc": 0.9006211180124222,
+            "shuffled_auroc": 0.04395604395604394,
+            "train_records": 142,
+            "valid_records": 33
+          },
+          "trait": {
+            "auroc": 0.7170138888888888,
+            "auprc": 0.4146453583088316,
+            "shuffled_auroc": 0.42534722222222215,
+            "train_records": 241,
+            "valid_records": 73
+          }
+        },
+        "macro_auroc": 0.8145509004884004,
+        "macro_auprc": 0.6576332381606269,
+        "excluded_single_class_sources": []
+      },
+      "generation": {
+        "sources": {
+          "cdr": {
+            "oas": {
+              "records": 32,
+              "ce": 1.0342991058714688,
+              "aar": 0.7316155610606074
+            },
+            "ots": {
+              "records": 32,
+              "ce": 0.7028497671708465,
+              "aar": 0.8329507112503052
+            }
+          },
+          "conditional": {
+            "asd_antibody": {
+              "records": 23,
+              "ce": 3.37972733248835,
+              "aar": 0.3086057681983773,
+              "validity": 1.0,
+              "length_mae": 11.652173913043478,
+              "missing_eos": 0
+            },
+            "oas": {
+              "records": 32,
+              "ce": 3.295173428952694,
+              "aar": 0.36623161178719466,
+              "validity": 1.0,
+              "length_mae": 8.0,
+              "missing_eos": 0
+            },
+            "ots": {
+              "records": 32,
+              "ce": 3.8066355139017105,
+              "aar": 0.2837069188040108,
+              "validity": 1.0,
+              "length_mae": 2.53125,
+              "missing_eos": 0
+            },
+            "tcr_native": {
+              "records": 30,
+              "ce": 3.373553466796875,
+              "aar": 0.3984218519547798,
+              "validity": 1.0,
+              "length_mae": 3.4,
+              "missing_eos": 0
+            }
+          }
+        },
+        "cdr_ce": 0.8685744365211576,
+        "cdr_aar": 0.7822831361554563,
+        "conditional_ce": 3.4637724355349073,
+        "conditional_aar": 0.33924153768609067,
+        "conditional_validity": 1.0,
+        "conditional_length_mae": 6.395855978260869
+      }
+    },
+    {
+      "seed": 43,
+      "variant": "A0",
+      "initial_representation": {
+        "sources": {
+          "tcr_papers": {
+            "auroc": 0.9120879120879121,
+            "auprc": 0.9006211180124222,
+            "shuffled_auroc": 0.07142857142857141,
+            "train_records": 142,
+            "valid_records": 33
+          },
+          "trait": {
+            "auroc": 0.7361111111111112,
+            "auprc": 0.22013003005330373,
+            "shuffled_auroc": 0.5607638888888888,
+            "train_records": 241,
+            "valid_records": 73
+          }
+        },
+        "macro_auroc": 0.8240995115995116,
+        "macro_auprc": 0.560375574032863,
+        "excluded_single_class_sources": []
+      },
+      "final_representation": {
+        "sources": {
+          "tcr_papers": {
+            "auroc": 0.956043956043956,
+            "auprc": 0.9238095238095236,
+            "shuffled_auroc": 0.09890109890109888,
+            "train_records": 142,
+            "valid_records": 33
+          },
+          "trait": {
+            "auroc": 0.734375,
+            "auprc": 0.42951179341096085,
+            "shuffled_auroc": 0.3923611111111111,
+            "train_records": 241,
+            "valid_records": 73
+          }
+        },
+        "macro_auroc": 0.845209478021978,
+        "macro_auprc": 0.6766606586102423,
+        "excluded_single_class_sources": []
+      },
+      "generation": {
+        "sources": {
+          "cdr": {
+            "oas": {
+              "records": 32,
+              "ce": 0.9905758602544665,
+              "aar": 0.7469543144106865
+            },
+            "ots": {
+              "records": 32,
+              "ce": 0.6368793621659279,
+              "aar": 0.8454167619347572
+            }
+          },
+          "conditional": {
+            "asd_antibody": {
+              "records": 23,
+              "ce": 6.41533026487931,
+              "aar": 0.023155336396530682,
+              "validity": 0.9565217391304348,
+              "length_mae": 104.54545454545455,
+              "missing_eos": 0
+            },
+            "oas": {
+              "records": 32,
+              "ce": 7.19068455696106,
+              "aar": 0.05733625419755325,
+              "validity": 0.875,
+              "length_mae": 93.71428571428571,
+              "missing_eos": 0
+            },
+            "ots": {
+              "records": 32,
+              "ce": 6.873359978199005,
+              "aar": 0.030205645654829666,
+              "validity": 1.0,
+              "length_mae": 103.75,
+              "missing_eos": 0
+            },
+            "tcr_native": {
+              "records": 30,
+              "ce": 5.8891862233479815,
+              "aar": 0.030896569862710044,
+              "validity": 1.0,
+              "length_mae": 104.7,
+              "missing_eos": 0
+            }
+          }
+        },
+        "cdr_ce": 0.8137276112101972,
+        "cdr_aar": 0.7961855381727219,
+        "conditional_ce": 6.5921402558468385,
+        "conditional_aar": 0.03539845152790591,
+        "conditional_validity": 0.9578804347826086,
+        "conditional_length_mae": 101.67743506493507
+      }
+    },
+    {
+      "seed": 43,
+      "variant": "C0",
+      "initial_representation": {
+        "sources": {
+          "tcr_papers": {
+            "auroc": 0.9065934065934066,
+            "auprc": 0.8988095238095237,
+            "shuffled_auroc": 0.0769230769230769,
+            "train_records": 142,
+            "valid_records": 33
+          },
+          "trait": {
+            "auroc": 0.7378472222222223,
+            "auprc": 0.22604736257487681,
+            "shuffled_auroc": 0.625,
+            "train_records": 241,
+            "valid_records": 73
+          }
+        },
+        "macro_auroc": 0.8222203144078144,
+        "macro_auprc": 0.5624284431922003,
+        "excluded_single_class_sources": []
+      },
+      "final_representation": {
+        "sources": {
+          "tcr_papers": {
+            "auroc": 0.9230769230769231,
+            "auprc": 0.9047619047619047,
+            "shuffled_auroc": 0.1208791208791209,
+            "train_records": 142,
+            "valid_records": 33
+          },
+          "trait": {
+            "auroc": 0.7274305555555556,
+            "auprc": 0.4411926807760141,
+            "shuffled_auroc": 0.4635416666666667,
+            "train_records": 241,
+            "valid_records": 73
+          }
+        },
+        "macro_auroc": 0.8252537393162394,
+        "macro_auprc": 0.6729772927689593,
+        "excluded_single_class_sources": []
+      },
+      "generation": {
+        "sources": {
+          "cdr": {
+            "oas": {
+              "records": 32,
+              "ce": 1.0090941525995731,
+              "aar": 0.7461356716230512
+            },
+            "ots": {
+              "records": 32,
+              "ce": 0.6416766904294491,
+              "aar": 0.8649685606360435
+            }
+          },
+          "conditional": {
+            "asd_antibody": {
+              "records": 23,
+              "ce": 3.2914685373720913,
+              "aar": 0.30461514067367174,
+              "validity": 1.0,
+              "length_mae": 9.347826086956522,
+              "missing_eos": 0
+            },
+            "oas": {
+              "records": 32,
+              "ce": 3.0682067945599556,
+              "aar": 0.3764667124619647,
+              "validity": 1.0,
+              "length_mae": 8.6875,
+              "missing_eos": 0
+            },
+            "ots": {
+              "records": 32,
+              "ce": 4.383634082973003,
+              "aar": 0.2934654608697396,
+              "validity": 1.0,
+              "length_mae": 8.875,
+              "missing_eos": 0
+            },
+            "tcr_native": {
+              "records": 30,
+              "ce": 3.2273802836736043,
+              "aar": 0.4664643741587733,
+              "validity": 1.0,
+              "length_mae": 3.3666666666666667,
+              "missing_eos": 0
+            }
+          }
+        },
+        "cdr_ce": 0.8253854215145111,
+        "cdr_aar": 0.8055521161295474,
+        "conditional_ce": 3.4926724246446637,
+        "conditional_aar": 0.3602529220410373,
+        "conditional_validity": 1.0,
+        "conditional_length_mae": 7.569248188405798
+      }
+    },
+    {
+      "seed": 43,
+      "variant": "C1",
+      "initial_representation": {
+        "sources": {
+          "tcr_papers": {
+            "auroc": 0.9065934065934066,
+            "auprc": 0.8988095238095237,
+            "shuffled_auroc": 0.0879120879120879,
+            "train_records": 142,
+            "valid_records": 33
+          },
+          "trait": {
+            "auroc": 0.7378472222222221,
+            "auprc": 0.22707918592202164,
+            "shuffled_auroc": 0.625,
+            "train_records": 241,
+            "valid_records": 73
+          }
+        },
+        "macro_auroc": 0.8222203144078144,
+        "macro_auprc": 0.5629443548657727,
+        "excluded_single_class_sources": []
+      },
+      "final_representation": {
+        "sources": {
+          "tcr_papers": {
+            "auroc": 0.8956043956043955,
+            "auprc": 0.8956043956043955,
+            "shuffled_auroc": 0.14835164835164838,
+            "train_records": 142,
+            "valid_records": 33
+          },
+          "trait": {
+            "auroc": 0.75,
+            "auprc": 0.5198374426554724,
+            "shuffled_auroc": 0.4322916666666667,
+            "train_records": 241,
+            "valid_records": 73
+          }
+        },
+        "macro_auroc": 0.8228021978021978,
+        "macro_auprc": 0.707720919129934,
+        "excluded_single_class_sources": []
+      },
+      "generation": {
+        "sources": {
+          "cdr": {
+            "oas": {
+              "records": 32,
+              "ce": 1.0336849321611226,
+              "aar": 0.7472802409902215
+            },
+            "ots": {
+              "records": 32,
+              "ce": 0.7346712099388242,
+              "aar": 0.8261312991380692
+            }
+          },
+          "conditional": {
+            "asd_antibody": {
+              "records": 23,
+              "ce": 3.277497550715571,
+              "aar": 0.3500199477896021,
+              "validity": 1.0,
+              "length_mae": 13.130434782608695,
+              "missing_eos": 0
+            },
+            "oas": {
+              "records": 32,
+              "ce": 2.9454740285873413,
+              "aar": 0.3737703909451815,
+              "validity": 1.0,
+              "length_mae": 8.71875,
+              "missing_eos": 0
+            },
+            "ots": {
+              "records": 32,
+              "ce": 4.002148635685444,
+              "aar": 0.30167566208794505,
+              "validity": 1.0,
+              "length_mae": 3.15625,
+              "missing_eos": 0
+            },
+            "tcr_native": {
+              "records": 30,
+              "ce": 3.1061932404836017,
+              "aar": 0.49648738681220206,
+              "validity": 1.0,
+              "length_mae": 4.933333333333334,
+              "missing_eos": 0
+            }
+          }
+        },
+        "cdr_ce": 0.8841780710499734,
+        "cdr_aar": 0.7867057700641453,
+        "conditional_ce": 3.3328283638679896,
+        "conditional_aar": 0.3804883469087327,
+        "conditional_validity": 1.0,
+        "conditional_length_mae": 7.484692028985507
+      }
+    },
+    {
+      "seed": 43,
+      "variant": "C2",
+      "initial_representation": {
+        "sources": {
+          "tcr_papers": {
+            "auroc": 0.9065934065934066,
+            "auprc": 0.8988095238095237,
+            "shuffled_auroc": 0.0769230769230769,
+            "train_records": 142,
+            "valid_records": 33
+          },
+          "trait": {
+            "auroc": 0.7378472222222223,
+            "auprc": 0.22604736257487681,
+            "shuffled_auroc": 0.625,
+            "train_records": 241,
+            "valid_records": 73
+          }
+        },
+        "macro_auroc": 0.8222203144078144,
+        "macro_auprc": 0.5624284431922003,
+        "excluded_single_class_sources": []
+      },
+      "final_representation": {
+        "sources": {
+          "tcr_papers": {
+            "auroc": 0.9505494505494505,
+            "auprc": 0.919642857142857,
+            "shuffled_auroc": 0.14285714285714285,
+            "train_records": 142,
+            "valid_records": 33
+          },
+          "trait": {
+            "auroc": 0.7413194444444444,
+            "auprc": 0.41238576238576236,
+            "shuffled_auroc": 0.4253472222222222,
+            "train_records": 241,
+            "valid_records": 73
+          }
+        },
+        "macro_auroc": 0.8459344474969475,
+        "macro_auprc": 0.6660143097643096,
+        "excluded_single_class_sources": []
+      },
+      "generation": {
+        "sources": {
+          "cdr": {
+            "oas": {
+              "records": 32,
+              "ce": 1.0095511875115335,
+              "aar": 0.738874482922256
+            },
+            "ots": {
+              "records": 32,
+              "ce": 0.6037586973980069,
+              "aar": 0.864910364151001
+            }
+          },
+          "conditional": {
+            "asd_antibody": {
+              "records": 23,
+              "ce": 3.421007830163707,
+              "aar": 0.30357768733226953,
+              "validity": 1.0,
+              "length_mae": 20.82608695652174,
+              "missing_eos": 0
+            },
+            "oas": {
+              "records": 32,
+              "ce": 3.0935865566134453,
+              "aar": 0.3608071754087081,
+              "validity": 1.0,
+              "length_mae": 12.25,
+              "missing_eos": 0
+            },
+            "ots": {
+              "records": 32,
+              "ce": 4.428674444556236,
+              "aar": 0.28950608201068895,
+              "validity": 1.0,
+              "length_mae": 15.09375,
+              "missing_eos": 0
+            },
+            "tcr_native": {
+              "records": 30,
+              "ce": 3.11347447236379,
+              "aar": 0.4308698205529958,
+              "validity": 1.0,
+              "length_mae": 2.933333333333333,
+              "missing_eos": 0
+            }
+          }
+        },
+        "cdr_ce": 0.8066549424547702,
+        "cdr_aar": 0.8018924235366285,
+        "conditional_ce": 3.5141858259242946,
+        "conditional_aar": 0.3461901913261656,
+        "conditional_validity": 1.0,
+        "conditional_length_mae": 12.775792572463766
+      }
+    },
+    {
+      "seed": 43,
+      "variant": "C3",
+      "initial_representation": {
+        "sources": {
+          "tcr_papers": {
+            "auroc": 0.9065934065934066,
+            "auprc": 0.8988095238095237,
+            "shuffled_auroc": 0.0879120879120879,
+            "train_records": 142,
+            "valid_records": 33
+          },
+          "trait": {
+            "auroc": 0.7378472222222221,
+            "auprc": 0.22707918592202164,
+            "shuffled_auroc": 0.625,
+            "train_records": 241,
+            "valid_records": 73
+          }
+        },
+        "macro_auroc": 0.8222203144078144,
+        "macro_auprc": 0.5629443548657727,
+        "excluded_single_class_sources": []
+      },
+      "final_representation": {
+        "sources": {
+          "tcr_papers": {
+            "auroc": 0.9065934065934066,
+            "auprc": 0.8988095238095237,
+            "shuffled_auroc": 0.12087912087912087,
+            "train_records": 142,
+            "valid_records": 33
+          },
+          "trait": {
+            "auroc": 0.8072916666666666,
+            "auprc": 0.5723665223665224,
+            "shuffled_auroc": 0.40798611111111116,
+            "train_records": 241,
+            "valid_records": 73
+          }
+        },
+        "macro_auroc": 0.8569425366300366,
+        "macro_auprc": 0.7355880230880231,
+        "excluded_single_class_sources": []
+      },
+      "generation": {
+        "sources": {
+          "cdr": {
+            "oas": {
+              "records": 32,
+              "ce": 1.0527579514309764,
+              "aar": 0.7431251564994454
+            },
+            "ots": {
+              "records": 32,
+              "ce": 0.7134852362796664,
+              "aar": 0.8338490780442953
+            }
+          },
+          "conditional": {
+            "asd_antibody": {
+              "records": 23,
+              "ce": 3.40178048092386,
+              "aar": 0.35675740256848876,
+              "validity": 1.0,
+              "length_mae": 9.347826086956522,
+              "missing_eos": 0
+            },
+            "oas": {
+              "records": 32,
+              "ce": 3.1576834842562675,
+              "aar": 0.34363996338250913,
+              "validity": 1.0,
+              "length_mae": 7.625,
+              "missing_eos": 0
+            },
+            "ots": {
+              "records": 32,
+              "ce": 4.486873500049114,
+              "aar": 0.3015588928625812,
+              "validity": 1.0,
+              "length_mae": 3.5,
+              "missing_eos": 0
+            },
+            "tcr_native": {
+              "records": 30,
+              "ce": 3.1586148897806803,
+              "aar": 0.4115505306598726,
+              "validity": 1.0,
+              "length_mae": 3.5,
+              "missing_eos": 0
+            }
+          }
+        },
+        "cdr_ce": 0.8831215938553214,
+        "cdr_aar": 0.7884871172718704,
+        "conditional_ce": 3.5512380887524806,
+        "conditional_aar": 0.3533766973683629,
+        "conditional_validity": 1.0,
+        "conditional_length_mae": 5.993206521739131
+      }
+    }
+  ],
+  "coverage": [
+    {
+      "seed": 42,
+      "variant": "A0",
+      "records": 117,
+      "coverage": 0.330358064393015,
+      "covered_accuracy": 0.3732123194996243,
+      "shorter_than_half": 0.8940217391304348,
+      "predicted_length": 37.10323822463768,
+      "reference_length": 114.17742300724638,
+      "same_cdr_source_full_aar": 0.13722829408170822
+    },
+    {
+      "seed": 42,
+      "variant": "C0",
+      "records": 117,
+      "coverage": 0.9538556406175134,
+      "covered_accuracy": 0.38752030549227445,
+      "shorter_than_half": 0.0,
+      "predicted_length": 109.51836503623188,
+      "reference_length": 114.17742300724638,
+      "same_cdr_source_full_aar": 0.3401124507193286
+    },
+    {
+      "seed": 42,
+      "variant": "C1",
+      "records": 117,
+      "coverage": 0.9576189178742356,
+      "covered_accuracy": 0.3790278957889577,
+      "shorter_than_half": 0.0078125,
+      "predicted_length": 110.15833333333333,
+      "reference_length": 114.17742300724638,
+      "same_cdr_source_full_aar": 0.33283018126114294
+    },
+    {
+      "seed": 42,
+      "variant": "C2",
+      "records": 117,
+      "coverage": 0.9590079612512211,
+      "covered_accuracy": 0.39750863912669565,
+      "shorter_than_half": 0.010869565217391304,
+      "predicted_length": 110.11003170289855,
+      "reference_length": 114.17742300724638,
+      "same_cdr_source_full_aar": 0.33722563980713116
+    },
+    {
+      "seed": 42,
+      "variant": "C3",
+      "records": 117,
+      "coverage": 0.9517585352011833,
+      "covered_accuracy": 0.36118349521244864,
+      "shorter_than_half": 0.0,
+      "predicted_length": 109.10778985507245,
+      "reference_length": 114.17742300724638,
+      "same_cdr_source_full_aar": 0.3249692652956027
+    },
+    {
+      "seed": 43,
+      "variant": "A0",
+      "records": 117,
+      "coverage": 0.10165698233053864,
+      "covered_accuracy": 0.3376724164096454,
+      "shorter_than_half": 0.9765625,
+      "predicted_length": 11.485439311594202,
+      "reference_length": 114.17742300724638,
+      "same_cdr_source_full_aar": 0.04377094992619146
+    },
+    {
+      "seed": 43,
+      "variant": "C0",
+      "records": 117,
+      "coverage": 0.9404454654156627,
+      "covered_accuracy": 0.3835431612495073,
+      "shorter_than_half": 0.0,
+      "predicted_length": 107.77171648550724,
+      "reference_length": 114.17742300724638,
+      "same_cdr_source_full_aar": 0.33496608666585215
+    },
+    {
+      "seed": 43,
+      "variant": "C1",
+      "records": 117,
+      "coverage": 0.9544329712793594,
+      "covered_accuracy": 0.4023488692106594,
+      "shorter_than_half": 0.0,
+      "predicted_length": 110.87112771739132,
+      "reference_length": 114.17742300724638,
+      "same_cdr_source_full_aar": 0.3377230265165633
+    },
+    {
+      "seed": 43,
+      "variant": "C2",
+      "records": 117,
+      "coverage": 0.8982338001684986,
+      "covered_accuracy": 0.39241308540828373,
+      "shorter_than_half": 0.05604619565217391,
+      "predicted_length": 103.16426630434782,
+      "reference_length": 114.17742300724638,
+      "same_cdr_source_full_aar": 0.3251566287096985
+    },
+    {
+      "seed": 43,
+      "variant": "C3",
+      "records": 117,
+      "coverage": 0.9552925185222032,
+      "covered_accuracy": 0.3727103774857646,
+      "shorter_than_half": 0.0,
+      "predicted_length": 109.59377264492754,
+      "reference_length": 114.17742300724638,
+      "same_cdr_source_full_aar": 0.32259942812254516
+    }
+  ],
+  "observed_alpha_probe_subset": [
+    {
+      "seed": 42,
+      "variant": "A0",
+      "step": 0,
+      "source": "tcr_papers",
+      "records": 27,
+      "positives": 1,
+      "auroc": 0.34615384615384615,
+      "auprc": 0.05555555555555555
+    },
+    {
+      "seed": 42,
+      "variant": "A0",
+      "step": 0,
+      "source": "trait",
+      "records": 72,
+      "positives": 8,
+      "auroc": 0.705078125,
+      "auprc": 0.18832940931219266
+    },
+    {
+      "seed": 42,
+      "variant": "A0",
+      "step": 1276,
+      "source": "tcr_papers",
+      "records": 27,
+      "positives": 1,
+      "auroc": 0.6538461538461539,
+      "auprc": 0.1
+    },
+    {
+      "seed": 42,
+      "variant": "A0",
+      "step": 1276,
+      "source": "trait",
+      "records": 72,
+      "positives": 8,
+      "auroc": 0.705078125,
+      "auprc": 0.22946857475726165
+    },
+    {
+      "seed": 42,
+      "variant": "C0",
+      "step": 0,
+      "source": "tcr_papers",
+      "records": 27,
+      "positives": 1,
+      "auroc": 0.46153846153846156,
+      "auprc": 0.06666666666666667
+    },
+    {
+      "seed": 42,
+      "variant": "C0",
+      "step": 0,
+      "source": "trait",
+      "records": 72,
+      "positives": 8,
+      "auroc": 0.71875,
+      "auprc": 0.19825911636256463
+    },
+    {
+      "seed": 42,
+      "variant": "C0",
+      "step": 1276,
+      "source": "tcr_papers",
+      "records": 27,
+      "positives": 1,
+      "auroc": 0.3076923076923077,
+      "auprc": 0.05263157894736842
+    },
+    {
+      "seed": 42,
+      "variant": "C0",
+      "step": 1276,
+      "source": "trait",
+      "records": 72,
+      "positives": 8,
+      "auroc": 0.716796875,
+      "auprc": 0.39012528376095446
+    },
+    {
+      "seed": 42,
+      "variant": "C1",
+      "step": 0,
+      "source": "tcr_papers",
+      "records": 27,
+      "positives": 1,
+      "auroc": 0.46153846153846156,
+      "auprc": 0.06666666666666667
+    },
+    {
+      "seed": 42,
+      "variant": "C1",
+      "step": 0,
+      "source": "trait",
+      "records": 72,
+      "positives": 8,
+      "auroc": 0.73046875,
+      "auprc": 0.20774338209683038
+    },
+    {
+      "seed": 42,
+      "variant": "C1",
+      "step": 1276,
+      "source": "tcr_papers",
+      "records": 27,
+      "positives": 1,
+      "auroc": 0.34615384615384615,
+      "auprc": 0.05555555555555555
+    },
+    {
+      "seed": 42,
+      "variant": "C1",
+      "step": 1276,
+      "source": "trait",
+      "records": 72,
+      "positives": 8,
+      "auroc": 0.697265625,
+      "auprc": 0.3115968406593407
+    },
+    {
+      "seed": 42,
+      "variant": "C2",
+      "step": 0,
+      "source": "tcr_papers",
+      "records": 27,
+      "positives": 1,
+      "auroc": 0.46153846153846156,
+      "auprc": 0.06666666666666667
+    },
+    {
+      "seed": 42,
+      "variant": "C2",
+      "step": 0,
+      "source": "trait",
+      "records": 72,
+      "positives": 8,
+      "auroc": 0.71875,
+      "auprc": 0.19825911636256463
+    },
+    {
+      "seed": 42,
+      "variant": "C2",
+      "step": 1276,
+      "source": "tcr_papers",
+      "records": 27,
+      "positives": 1,
+      "auroc": 0.3846153846153846,
+      "auprc": 0.058823529411764705
+    },
+    {
+      "seed": 42,
+      "variant": "C2",
+      "step": 1276,
+      "source": "trait",
+      "records": 72,
+      "positives": 8,
+      "auroc": 0.755859375,
+      "auprc": 0.36194000626566414
+    },
+    {
+      "seed": 42,
+      "variant": "C3",
+      "step": 0,
+      "source": "tcr_papers",
+      "records": 27,
+      "positives": 1,
+      "auroc": 0.46153846153846156,
+      "auprc": 0.06666666666666667
+    },
+    {
+      "seed": 42,
+      "variant": "C3",
+      "step": 0,
+      "source": "trait",
+      "records": 72,
+      "positives": 8,
+      "auroc": 0.73046875,
+      "auprc": 0.20774338209683038
+    },
+    {
+      "seed": 42,
+      "variant": "C3",
+      "step": 1276,
+      "source": "tcr_papers",
+      "records": 27,
+      "positives": 1,
+      "auroc": 0.3846153846153846,
+      "auprc": 0.058823529411764705
+    },
+    {
+      "seed": 42,
+      "variant": "C3",
+      "step": 1276,
+      "source": "trait",
+      "records": 72,
+      "positives": 8,
+      "auroc": 0.6875,
+      "auprc": 0.38240248006872046
+    },
+    {
+      "seed": 43,
+      "variant": "A0",
+      "step": 0,
+      "source": "tcr_papers",
+      "records": 27,
+      "positives": 1,
+      "auroc": 0.3846153846153846,
+      "auprc": 0.058823529411764705
+    },
+    {
+      "seed": 43,
+      "variant": "A0",
+      "step": 0,
+      "source": "trait",
+      "records": 72,
+      "positives": 8,
+      "auroc": 0.720703125,
+      "auprc": 0.19271564501839988
+    },
+    {
+      "seed": 43,
+      "variant": "A0",
+      "step": 1276,
+      "source": "tcr_papers",
+      "records": 27,
+      "positives": 1,
+      "auroc": 0.6923076923076923,
+      "auprc": 0.1111111111111111
+    },
+    {
+      "seed": 43,
+      "variant": "A0",
+      "step": 1276,
+      "source": "trait",
+      "records": 72,
+      "positives": 8,
+      "auroc": 0.701171875,
+      "auprc": 0.32223657984527554
+    },
+    {
+      "seed": 43,
+      "variant": "C0",
+      "step": 0,
+      "source": "tcr_papers",
+      "records": 27,
+      "positives": 1,
+      "auroc": 0.34615384615384615,
+      "auprc": 0.05555555555555555
+    },
+    {
+      "seed": 43,
+      "variant": "C0",
+      "step": 0,
+      "source": "trait",
+      "records": 72,
+      "positives": 8,
+      "auroc": 0.724609375,
+      "auprc": 0.20050074972423937
+    },
+    {
+      "seed": 43,
+      "variant": "C0",
+      "step": 1276,
+      "source": "tcr_papers",
+      "records": 27,
+      "positives": 1,
+      "auroc": 0.46153846153846156,
+      "auprc": 0.06666666666666667
+    },
+    {
+      "seed": 43,
+      "variant": "C0",
+      "step": 1276,
+      "source": "trait",
+      "records": 72,
+      "positives": 8,
+      "auroc": 0.693359375,
+      "auprc": 0.34003208483166275
+    },
+    {
+      "seed": 43,
+      "variant": "C1",
+      "step": 0,
+      "source": "tcr_papers",
+      "records": 27,
+      "positives": 1,
+      "auroc": 0.34615384615384615,
+      "auprc": 0.05555555555555555
+    },
+    {
+      "seed": 43,
+      "variant": "C1",
+      "step": 0,
+      "source": "trait",
+      "records": 72,
+      "positives": 8,
+      "auroc": 0.724609375,
+      "auprc": 0.2015293370312552
+    },
+    {
+      "seed": 43,
+      "variant": "C1",
+      "step": 1276,
+      "source": "tcr_papers",
+      "records": 27,
+      "positives": 1,
+      "auroc": 0.2692307692307693,
+      "auprc": 0.05
+    },
+    {
+      "seed": 43,
+      "variant": "C1",
+      "step": 1276,
+      "source": "trait",
+      "records": 72,
+      "positives": 8,
+      "auroc": 0.71875,
+      "auprc": 0.4336976151089054
+    },
+    {
+      "seed": 43,
+      "variant": "C2",
+      "step": 0,
+      "source": "tcr_papers",
+      "records": 27,
+      "positives": 1,
+      "auroc": 0.34615384615384615,
+      "auprc": 0.05555555555555555
+    },
+    {
+      "seed": 43,
+      "variant": "C2",
+      "step": 0,
+      "source": "trait",
+      "records": 72,
+      "positives": 8,
+      "auroc": 0.724609375,
+      "auprc": 0.20050074972423937
+    },
+    {
+      "seed": 43,
+      "variant": "C2",
+      "step": 1276,
+      "source": "tcr_papers",
+      "records": 27,
+      "positives": 1,
+      "auroc": 0.6538461538461539,
+      "auprc": 0.1
+    },
+    {
+      "seed": 43,
+      "variant": "C2",
+      "step": 1276,
+      "source": "trait",
+      "records": 72,
+      "positives": 8,
+      "auroc": 0.7109375,
+      "auprc": 0.3482920670805637
+    },
+    {
+      "seed": 43,
+      "variant": "C3",
+      "step": 0,
+      "source": "tcr_papers",
+      "records": 27,
+      "positives": 1,
+      "auroc": 0.34615384615384615,
+      "auprc": 0.05555555555555555
+    },
+    {
+      "seed": 43,
+      "variant": "C3",
+      "step": 0,
+      "source": "trait",
+      "records": 72,
+      "positives": 8,
+      "auroc": 0.724609375,
+      "auprc": 0.2015293370312552
+    },
+    {
+      "seed": 43,
+      "variant": "C3",
+      "step": 1276,
+      "source": "tcr_papers",
+      "records": 27,
+      "positives": 1,
+      "auroc": 0.34615384615384615,
+      "auprc": 0.05555555555555555
+    },
+    {
+      "seed": 43,
+      "variant": "C3",
+      "step": 1276,
+      "source": "trait",
+      "records": 72,
+      "positives": 8,
+      "auroc": 0.783203125,
+      "auprc": 0.49025580601550434
+    }
+  ],
+  "evidence": {
+    "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/experiments/arch70m/base.json": "a1b52db2dc98bdb921a7681bb047495795b4797c12f4cc247c1dc6a59b12848f",
+    "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_v8_20261028/data/index.json": "4beaac6b54a1f46492533aeb77c2de2c6ac2a0bd8266fd57a6bb312679435c51",
+    "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_v8_20261028/data/screen_token.jsonl": "aa06f2deb9ad5f81ac30dfd2d6f0aca21b6e13920d478b7c74d6e5297dd4b575",
+    "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_v8_20261028/data/screen_tasks.jsonl": "90b9d5f524612779a0b2e13ef5e56d3826071d5ec559390fd6ead846e05b4877",
+    "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_v8_20261028/data/screen_probe_train.jsonl": "320791fbefc5da892e5a9e45cdbe698cb890b3b73e1e26d1c46c2d3f1878d289",
+    "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_v8_20261028/data/screen_probe_valid.jsonl": "0f096e8046780455994713e7f20138908298e43e4b4ca4d9274e48c4bfc996f2",
+    "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_attention_seed42_20261103/trials/screen_A0_s42/metrics/screen_000000.json": "d1bb35a23926dcd15a726c34452c24b25f1c19b03530142c738b4049c06362b3",
+    "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_attention_seed42_20261103/trials/screen_A0_s42/metrics/screen_001276.json": "513a448afa4313953b556dfba8ef0b15d7e6648006a3f586c506464f3d10e52a",
+    "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_attention_seed42_20261103/trials/screen_A0_s42/metrics/screen_000000_observations.json": "f32dfb415b20247614edad5714c97c527707308e5ebb35685cad25da7a542daf",
+    "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_attention_seed42_20261103/trials/screen_A0_s42/metrics/screen_001276_observations.json": "84a4fbfd32626726b91cb0d41d61a78877eb47403e87a72ddbcaaa78e0e60697",
+    "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_attention_seed42_20261103/trials/screen_C0_s42/metrics/screen_000000.json": "3cde7290e44e511e475d305ee9caf4b4dafe6efc3a1bf463e90c72a38ec4ec59",
+    "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_attention_seed42_20261103/trials/screen_C0_s42/metrics/screen_001276.json": "6b02516593531c52529efa65af1d87380d30070e752f1961f7241ff5ddf1738d",
+    "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_attention_seed42_20261103/trials/screen_C0_s42/metrics/screen_000000_observations.json": "f4f0d1a13d6cc2e4ca575c47761c387bf306a9746dfcbdff08e2730de6271666",
+    "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_attention_seed42_20261103/trials/screen_C0_s42/metrics/screen_001276_observations.json": "273c39d918332af5451441a908a06f4cf8265e83ca59c7922dba2d8280fec61b",
+    "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_attention_seed42_20261103/trials/screen_C1_s42/metrics/screen_000000.json": "c992744ee17be134f1b125f4d52208b3454b1ec8841b0d393af565d6e6363855",
+    "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_attention_seed42_20261103/trials/screen_C1_s42/metrics/screen_001276.json": "87ca770ea8906349361faa7b026f4f17c94cc7f3b37c635cc1bc6d3cc0ef4426",
+    "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_attention_seed42_20261103/trials/screen_C1_s42/metrics/screen_000000_observations.json": "900b41b1ad6b475646646217cfa653af2587ee6f4d814269da2ae6ee1b4dc059",
+    "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_attention_seed42_20261103/trials/screen_C1_s42/metrics/screen_001276_observations.json": "f442e65cf7fabfcc96a1c6e2c07ebb2ce97bae743c4c51b013b816fd3163713e",
+    "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_attention_seed42_20261103/trials/screen_C2_s42/metrics/screen_000000.json": "3cde7290e44e511e475d305ee9caf4b4dafe6efc3a1bf463e90c72a38ec4ec59",
+    "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_attention_seed42_20261103/trials/screen_C2_s42/metrics/screen_001276.json": "449cb412586f03eaa12799567dadf7245565cdeac0206c1124402f92fca142bf",
+    "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_attention_seed42_20261103/trials/screen_C2_s42/metrics/screen_000000_observations.json": "f4f0d1a13d6cc2e4ca575c47761c387bf306a9746dfcbdff08e2730de6271666",
+    "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_attention_seed42_20261103/trials/screen_C2_s42/metrics/screen_001276_observations.json": "6b6de7d6b612b2e74d311c097f2996d4b10cbb4c75f38e4efa47cc5eee27e2fd",
+    "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_attention_seed42_20261103/trials/screen_C3_s42/metrics/screen_000000.json": "c992744ee17be134f1b125f4d52208b3454b1ec8841b0d393af565d6e6363855",
+    "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_attention_seed42_20261103/trials/screen_C3_s42/metrics/screen_001276.json": "bbd67f6059f776049768c07d1864f4c270ba2772eae54eaad56e519dd691092e",
+    "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_attention_seed42_20261103/trials/screen_C3_s42/metrics/screen_000000_observations.json": "900b41b1ad6b475646646217cfa653af2587ee6f4d814269da2ae6ee1b4dc059",
+    "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_attention_seed42_20261103/trials/screen_C3_s42/metrics/screen_001276_observations.json": "95cd6b7439bcc46e27cfd55b4d623412ce0f94ae5a900e7fffe7a37ffbd618d9",
+    "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_attention_20261102/trials/screen_A0_s43/metrics/screen_000000.json": "1e05a8ea4226591b4381f024eabee3228523f39ff15556eed13e2f7d57598241",
+    "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_attention_20261102/trials/screen_A0_s43/metrics/screen_001276.json": "7da1c552041609e71551cd3accdb1c37bce35acc41c68de36a0914e50a64602e",
+    "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_attention_20261102/trials/screen_A0_s43/metrics/screen_000000_observations.json": "9c934d97fad621f1f064d5999a6f07d89fd2e1e21b8a5c6645020ab0703ede23",
+    "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_attention_20261102/trials/screen_A0_s43/metrics/screen_001276_observations.json": "73d363dba27110f1a7c124c64db86b2a8c94ff8f96872df6419ba4c0f5bff730",
+    "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_attention_20261102/trials/screen_C0_s43/metrics/screen_000000.json": "f7cf3a2581d47008a87fd64bb6a2ed4cba2329ed4a547f9d5bd77b4f40bdf94b",
+    "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_attention_20261102/trials/screen_C0_s43/metrics/screen_001276.json": "b4ff687ea0c4acaba0c0d45857e09d490daa9cc44b8dcfbf6547de1199a22779",
+    "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_attention_20261102/trials/screen_C0_s43/metrics/screen_000000_observations.json": "8ba6df33a833fc54d54bc26f07581c334bb45294fc37ff3bab1c1ed8b2971679",
+    "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_attention_20261102/trials/screen_C0_s43/metrics/screen_001276_observations.json": "159117b7e2e7a47f67ec5fb5a0694481f7ecea0c0a5b4d2d132dcae240b1d925",
+    "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_attention_20261102/trials/screen_C1_s43/metrics/screen_000000.json": "576a7992b6d47abcf3b8240e7f269e4a6005475ae1325fa74751dcee8730d9d0",
+    "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_attention_20261102/trials/screen_C1_s43/metrics/screen_001276.json": "a49dc7214bae89018240b6aca852f4ca2fb05a5e8307a57b93fa677f4f73ac46",
+    "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_attention_20261102/trials/screen_C1_s43/metrics/screen_000000_observations.json": "3368a14ce261de03ba49e479f043649ee26b1a0f12829427e6e7018627415003",
+    "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_attention_20261102/trials/screen_C1_s43/metrics/screen_001276_observations.json": "0d27c7d1c3b7f528dc6f3812ade46716cf12df83e88a98bd121454543d155551",
+    "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_attention_20261102/trials/screen_C2_s43/metrics/screen_000000.json": "f7cf3a2581d47008a87fd64bb6a2ed4cba2329ed4a547f9d5bd77b4f40bdf94b",
+    "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_attention_20261102/trials/screen_C2_s43/metrics/screen_001276.json": "a0f3da41727f40f6a0f00fa6bba67de65dec3f2e41423ec051aef9c1ef0fc2ca",
+    "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_attention_20261102/trials/screen_C2_s43/metrics/screen_000000_observations.json": "8ba6df33a833fc54d54bc26f07581c334bb45294fc37ff3bab1c1ed8b2971679",
+    "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_attention_20261102/trials/screen_C2_s43/metrics/screen_001276_observations.json": "cc7a16e63a38c76cd8718b502504aae320383f05cd8ed19237f2dba05d7f0048",
+    "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_attention_20261102/trials/screen_C3_s43/metrics/screen_000000.json": "576a7992b6d47abcf3b8240e7f269e4a6005475ae1325fa74751dcee8730d9d0",
+    "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_attention_20261102/trials/screen_C3_s43/metrics/screen_001276.json": "3aab77196392e07bd5985661938825baad211433a891fad9ebc939c2ed0c83f3",
+    "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_attention_20261102/trials/screen_C3_s43/metrics/screen_000000_observations.json": "3368a14ce261de03ba49e479f043649ee26b1a0f12829427e6e7018627415003",
+    "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_attention_20261102/trials/screen_C3_s43/metrics/screen_001276_observations.json": "176f23463b5e839c8acc485f1b5f6d2f1814d61dd147dc8bb38c2877d5f6ea81"
+  }
+}

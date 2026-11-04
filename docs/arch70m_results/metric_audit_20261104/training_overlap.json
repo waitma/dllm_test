@@ -1,0 +1,201 @@
+{
+  "scanned_selected_training_records": 653288,
+  "full_receptor_overlap": 0,
+  "task_receptor_overlap": 0,
+  "probe_receptor_overlap": 0,
+  "exact_full_chain_matches": [
+    {
+      "source": "oas",
+      "key": "3ae8148263a17aa2ae1c3eb81a16c94018e15042e181815655652b15779e52b0",
+      "role": "antibody_light"
+    },
+    {
+      "source": "oas",
+      "key": "22a8450f7b9d4d73eca1b2ca8154415d23717c87f6d32856593d93af51cc29ec",
+      "role": "antibody_light"
+    },
+    {
+      "source": "oas",
+      "key": "c69e489427ad8e7f0835bafe05bcbf9562d83afd711fa7b1acfb55e655489d56",
+      "role": "antibody_light"
+    },
+    {
+      "source": "oas",
+      "key": "d7127cb37c9bfee6332835b22f37e7ea6d2fa497395f63b2aa286c87885a32ce",
+      "role": "antibody_light"
+    },
+    {
+      "source": "oas",
+      "key": "44c388393a91b19f378c53370064512a1ff5c93d514fc27f79183982daddfacb",
+      "role": "antibody_light"
+    },
+    {
+      "source": "oas",
+      "key": "ad7aee73591c157c0096dd8a4d0d000488e54f12d1fcc35a42829efcce018991",
+      "role": "antibody_light"
+    },
+    {
+      "source": "ots",
+      "key": "10f62b66f994945cc04c7e39400baf5760214dea718040e5d6bf4a4361148b8f",
+      "role": "tcr_alpha"
+    },
+    {
+      "source": "ots",
+      "key": "870562786d0c8b0ff61e0369a3bef30cd87c090eb986e3ad1d5e34175f40b20d",
+      "role": "tcr_beta"
+    },
+    {
+      "source": "ots",
+      "key": "bf15ae860cc01d8b8748c0093f403545ea7f0b9f250c1e85cb35e061b9c88b84",
+      "role": "tcr_alpha"
+    },
+    {
+      "source": "ots",
+      "key": "3b9d1f9e5e0c4c207320babaeb2269e8d76f95e1c4313381b6eea9ed49236c05",
+      "role": "tcr_alpha"
+    },
+    {
+      "source": "tcr_native",
+      "key": "cda4c9f1142cafbefd9e9949f3c53f806f39fdda240a6262dfbf13381c39ff5c",
+      "role": "tcr_alpha"
+    },
+    {
+      "source": "tcr_native",
+      "key": "988d3e632faef16098de4b28c549dd4f5ab38eb0176bed1f1bbe53f768a7ad90",
+      "role": "tcr_alpha"
+    },
+    {
+      "source": "tcr_native",
+      "key": "d9bead044fca3c6a900f4f3b56e16a8dd834f61876408e2427560a736c993492",
+      "role": "tcr_alpha"
+    },
+    {
+      "source": "tcr_native",
+      "key": "a44de7856fe2d6e633f20fd9085c9cc34b25c5688913354b83174ed35c13ac83",
+      "role": "tcr_alpha"
+    },
+    {
+      "source": "tcr_native",
+      "key": "a92910102097693874c86f64660be35a07ebafb78b5dcb87bedb5d27d301e4da",
+      "role": "tcr_alpha"
+    },
+    {
+      "source": "tcr_native",
+      "key": "9bc362dae5c3c05958c538ce160756fdf19f712704ca386d67e4cef9de0b2962",
+      "role": "tcr_alpha"
+    }
+  ],
+  "exact_cdr3_matches": [
+    {
+      "source": "oas",
+      "key": "d7dae08e77b6816ecdafdf581091bd54b28baa6da4167f342e0ab04c5d14efde",
+      "role": "antibody_light"
+    },
+    {
+      "source": "oas",
+      "key": "d93d2ab7aea03a79cb5d0b0f178acc1031208d6c0a2374e87b8b3d0a29fa4e17",
+      "role": "antibody_light"
+    },
+    {
+      "source": "oas",
+      "key": "ddb83d03d19cdd2a0bba33f3f70579de8b26cd57994b95861d8a90de650cd130",
+      "role": "antibody_light"
+    },
+    {
+      "source": "oas",
+      "key": "3ae8148263a17aa2ae1c3eb81a16c94018e15042e181815655652b15779e52b0",
+      "role": "antibody_light"
+    },
+    {
+      "source": "oas",
+      "key": "22a8450f7b9d4d73eca1b2ca8154415d23717c87f6d32856593d93af51cc29ec",
+      "role": "antibody_light"
+    },
+    {
+      "source": "oas",
+      "key": "c69e489427ad8e7f0835bafe05bcbf9562d83afd711fa7b1acfb55e655489d56",
+      "role": "antibody_light"
+    },
+    {
+      "source": "oas",
+      "key": "d7127cb37c9bfee6332835b22f37e7ea6d2fa497395f63b2aa286c87885a32ce",
+      "role": "antibody_light"
+    },
+    {
+      "source": "oas",
+      "key": "8acc7a2a78c1704d135db9b97c4a31ded016e1bf222dca691a691f373a87abc0",
+      "role": "antibody_light"
+    },
+    {
+      "source": "oas",
+      "key": "aefd288a1269ced1c224767f92889c169d6d942d3ca85bccf0a0dff6b5708428",
+      "role": "antibody_light"
+    },
+    {
+      "source": "oas",
+      "key": "dce553bb1ec1082bf32ed9b8a54b41e7144c67d75e241dbbf5136894a97d5281",
+      "role": "antibody_light"
+    },
+    {
+      "source": "oas",
+      "key": "44c388393a91b19f378c53370064512a1ff5c93d514fc27f79183982daddfacb",
+      "role": "antibody_heavy"
+    },
+    {
+      "source": "oas",
+      "key": "44c388393a91b19f378c53370064512a1ff5c93d514fc27f79183982daddfacb",
+      "role": "antibody_light"
+    },
+    {
+      "source": "oas",
+      "key": "ad7aee73591c157c0096dd8a4d0d000488e54f12d1fcc35a42829efcce018991",
+      "role": "antibody_light"
+    },
+    {
+      "source": "oas",
+      "key": "72fc5f255c8326ef5684abf25692e31a2b35de0d4ed00b2d42a3ee6ee290ccae",
+      "role": "antibody_light"
+    },
+    {
+      "source": "ots",
+      "key": "10f62b66f994945cc04c7e39400baf5760214dea718040e5d6bf4a4361148b8f",
+      "role": "tcr_alpha"
+    },
+    {
+      "source": "ots",
+      "key": "870562786d0c8b0ff61e0369a3bef30cd87c090eb986e3ad1d5e34175f40b20d",
+      "role": "tcr_beta"
+    },
+    {
+      "source": "ots",
+      "key": "9f5323d110828f83acb6d4ad85146afd829d5ca8067d9e67b6377fe95364cf66",
+      "role": "tcr_beta"
+    },
+    {
+      "source": "ots",
+      "key": "bf15ae860cc01d8b8748c0093f403545ea7f0b9f250c1e85cb35e061b9c88b84",
+      "role": "tcr_alpha"
+    },
+    {
+      "source": "ots",
+      "key": "3b9d1f9e5e0c4c207320babaeb2269e8d76f95e1c4313381b6eea9ed49236c05",
+      "role": "tcr_alpha"
+    },
+    {
+      "source": "ots",
+      "key": "a7e048611359dce5d3cadabe48db3027e8cc8728c3757be7b4ce42d2083f18a9",
+      "role": "tcr_alpha"
+    }
+  ],
+  "conditional_chain_tasks": 117,
+  "cdr_chain_tasks": 64,
+  "limitation": "Exact identity audit only; homologous/germline/CDR1-2 similarity is not excluded.",
+  "evidence": {
+    "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/experiments/arch70m/base.json": "a1b52db2dc98bdb921a7681bb047495795b4797c12f4cc247c1dc6a59b12848f",
+    "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_v8_20261028/data/index.json": "4beaac6b54a1f46492533aeb77c2de2c6ac2a0bd8266fd57a6bb312679435c51",
+    "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_v8_20261028/data/screen_token.jsonl": "aa06f2deb9ad5f81ac30dfd2d6f0aca21b6e13920d478b7c74d6e5297dd4b575",
+    "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_v8_20261028/data/screen_tasks.jsonl": "90b9d5f524612779a0b2e13ef5e56d3826071d5ec559390fd6ead846e05b4877",
+    "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_v8_20261028/data/screen_probe_train.jsonl": "320791fbefc5da892e5a9e45cdbe698cb890b3b73e1e26d1c46c2d3f1878d289",
+    "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_v8_20261028/data/screen_probe_valid.jsonl": "0f096e8046780455994713e7f20138908298e43e4b4ca4d9274e48c4bfc996f2"
+  }
+}

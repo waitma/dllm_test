@@ -1,0 +1,28 @@
+{
+  "frozen_source_sha256": {
+    "seed42": "258dd11e8895c3b6d4fbb9c00e526de67e6bc9ccbef43948970790f5a00d8fed",
+    "seed43": "28609d7f776013915561eb038396d54181dcee7b1c32d071be0a9da5dc12faad"
+  },
+  "audit_code_sha256": {
+    "metric_audit_20261104.py": "a45a853eaf66d7792e5163495d77e2e5c6801092be39bc5bf93b8a65dc06d764",
+    "render_metric_audit_20261104.py": "fbfbc2483d1f6e48519695c51cf465b5cf24c889b4c5e1757bd9b5bd8ab0e3ca"
+  },
+  "artifacts_sha256": {
+    "gpu_audit.json": "a84551156d284c0606448e9e5754fdd50a6a38b924445412573f48dfd662ded7",
+    "cdr_regions.csv": "410aa239faffdb4844665ccabc5a6295e9cd56551f05214083197d484a6a31f0",
+    "replay_A0_42.json": "91546df82cfe7efb40dc8508cd11c9b3b3baa813a54b21032069e4aa16f4b59b",
+    "audit.png": "f6e6327e196621b40172ee5f6bf9943b626e0c9fb376bc21e2aae0801a929758",
+    "replay_C0_42.json": "014df65034475a9adeedfc695765b0b4d3e868927e6c14d17a2d4ac90837c0b3",
+    "probe_controls.csv": "8ba9aec2f0c2fddb278e5cb40eb1ab074c056b54dd8b6c4d52a84dbccb0582fc",
+    "training_overlap.json": "ce63e187df96c88e7eb95ab4ba125d9cf83f3bc179724cf419c87c1fcb6b7690",
+    "REPORT.md": "4683e900e44fc1fbedaf0c208e3cc9c89fc26aada4bae030684423b4708e6fa5",
+    "audit.svg": "054a6cc701b18fa7e4ebdf66932400808fdb74a6c7529b116e04fda172890126",
+    "replay_A0_43.json": "36762bda86a63e560ecbbf92a735f639319aece352a984d1748457bb34bd375b",
+    "audit.pdf": "cbcbcbda7dfbad4edc43d545c50ed23c6d4f2a361e030fcafe5ec957dca7dd16",
+    "summary.json": "73ee9952c704d651261a504a423b746b9b60fd2e07e09aa269af1aba7bf82cab",
+    "cpu_audit.json": "99886ce8c7a0bc0a7000ee5ec991edd319c2e39af8a7d4b20737e00f85ce08de"
+  },
+  "no_training": true,
+  "data_format_unchanged": true,
+  "known_limit": "A0 seed42 differs on 2 conditional sequences; all CDR AAR replay exactly. This audit does not assert exact full replay for that checkpoint."
+}
