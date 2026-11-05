@@ -1,0 +1,53 @@
+{
+  "status": "passed",
+  "gpu": "NVIDIA RPBZZZ6",
+  "parameters": 75741903,
+  "script_sha256": "8cd41ca62a69bf0c593e35400fcc1750857ca78625ef89048b8ea475630e8170",
+  "source": "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/v11_a5_75m_300k_20261105/bundle/source",
+  "synthetic_capacity_probe": true,
+  "sequence_length": 2048,
+  "world_size": 1,
+  "local_records_per_update": 64,
+  "micro_batch": 16,
+  "gradient_accumulation": 4,
+  "whole_layer_checkpointing": false,
+  "bf16": true,
+  "updates": [
+    {
+      "loss": 5.082137147771742,
+      "selected_tokens": 19421,
+      "grad_norm": 103.18123626708984,
+      "learning_rate": 0.0,
+      "family_loss": 5.83910596370697,
+      "family_chains": 128,
+      "family_accuracy": 0.0,
+      "total_loss": 5.666047744142439
+    },
+    {
+      "loss": 5.082137147771742,
+      "selected_tokens": 19421,
+      "grad_norm": 103.18123626708984,
+      "learning_rate": 6.666666666666668e-09,
+      "family_loss": 5.83910596370697,
+      "family_chains": 128,
+      "family_accuracy": 0.0,
+      "total_loss": 5.666047744142439
+    },
+    {
+      "loss": 5.080219221461305,
+      "selected_tokens": 19421,
+      "grad_norm": 103.18305969238281,
+      "learning_rate": 1.3333333333333335e-08,
+      "family_loss": 5.839037179946899,
+      "family_chains": 128,
+      "family_accuracy": 0.0,
+      "total_loss": 5.664122939455995
+    }
+  ],
+  "peak_allocated_gib": 35.60299825668335,
+  "peak_reserved_gib": 40.796875,
+  "total_gib": 94.97064208984375,
+  "external_gib": 1.24627685546875,
+  "formal_training_changed": false,
+  "limitation": "Local maximum-shape memory only; eight-rank performance and resume remain unqualified."
+}

@@ -1,3 +1,5 @@
+> Last updated: 2026-11-05T09:16:00.576504+00:00。V11速度独立诊断完成：当前step10850，最近200日志点均值0.8509秒；local重计算开/关/开0.7432/0.5771/0.7373秒，20更新参数哈希一致，耗时约减22%。micro32/64没有提速；no-checkpoint maxlen2048三更新reserved40.80GiB通过本地容量检查。GPU已释放，正式8卡未改/未中断，八卡性能与恢复未资格。报告 /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/v11_a5_75m_20261105/speed_diagnosis_20261105/README.md。
+
 > Last updated: 2026-11-05T08:49:23+00:00。用户提交的V11已确认正式八卡训练：step9000/300000（3.00%），epoch0.705，seen4608000；最新完整checkpoint8000，8rank参数哈希一致。最新MLM验证step9000 loss=0.580162；最近80个记录点均值0.838秒/更新。8份NCCL日志SHM_DISABLE=0且实际SHM/direct，未修改或重启训练。回执 /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/v11_a5_75m_20261105/training_first_review_20261105.json。
 
 > Last updated: 2026-11-05T05:03:51+00:00。V11修复先前1B已定位的通信慢因：外层入口改NCCL_SHM_DISABLE=0，保持P2P/IB禁用和NCCL2.31.2，清除CUDA_LAUNCH_BLOCKING，NCCL启动通道日志单独落盘。实际Shell子进程环境回归、bash语法、冻结V11计划与1B训练参数不变检查通过；未启动正式训练，未宣称本机单卡验证了8卡提速。1B历史同输入8卡实测8.0676→6.7087秒/步（吞吐+20.26%），复核SHA匹配。回执 /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/v11_a5_75m_20261105/transport_fix.json。

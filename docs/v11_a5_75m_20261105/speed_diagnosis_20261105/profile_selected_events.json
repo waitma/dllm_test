@@ -1,0 +1,74 @@
+[
+  {
+    "name": "aten::fill_",
+    "count": 3594,
+    "cpu_total_us": 25079.35000000429,
+    "self_cpu_us": 8987.828000005975,
+    "device_total_us": 80790.76100000134,
+    "self_device_us": 80790.76100000134
+  },
+  {
+    "name": "aten::copy_",
+    "count": 2393,
+    "cpu_total_us": 19296.57200000016,
+    "self_cpu_us": 7741.382999999951,
+    "device_total_us": 144991.46700000105,
+    "self_device_us": 144991.46700000105
+  },
+  {
+    "name": "cudaLaunchKernel",
+    "count": 10551,
+    "cpu_total_us": 54074.42399999741,
+    "self_cpu_us": 54074.42399999741,
+    "device_total_us": 0,
+    "self_device_us": 0
+  },
+  {
+    "name": "cudaStreamSynchronize",
+    "count": 198,
+    "cpu_total_us": 317948.1819999996,
+    "self_cpu_us": 317913.5259999996,
+    "device_total_us": 108.32000000000698,
+    "self_device_us": 0.0
+  },
+  {
+    "name": "aten::item",
+    "count": 324,
+    "cpu_total_us": 320684.66399999923,
+    "self_cpu_us": 389.90199999969263,
+    "device_total_us": 195.68399999960593,
+    "self_device_us": 0.0
+  },
+  {
+    "name": "aten::_local_scalar_dense",
+    "count": 324,
+    "cpu_total_us": 320294.7619999995,
+    "self_cpu_us": 1092.3520000002823,
+    "device_total_us": 195.68399999960593,
+    "self_device_us": 87.36399999959895
+  },
+  {
+    "name": "aten::mm",
+    "count": 916,
+    "cpu_total_us": 69441.65099999937,
+    "self_cpu_us": 62723.48699999924,
+    "device_total_us": 98962.73199999977,
+    "self_device_us": 98962.73199999977
+  },
+  {
+    "name": "aten::_scaled_dot_product_efficient_attention",
+    "count": 64,
+    "cpu_total_us": 6403.1559999999645,
+    "self_cpu_us": 2698.0940000000865,
+    "device_total_us": 21339.894000000215,
+    "self_device_us": 0.0
+  },
+  {
+    "name": "aten::_efficient_attention_backward",
+    "count": 32,
+    "cpu_total_us": 2996.5029999999097,
+    "self_cpu_us": 542.0359999996726,
+    "device_total_us": 65993.12999999977,
+    "self_device_us": 60142.05099999962
+  }
+]

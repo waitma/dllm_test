@@ -1,0 +1,83 @@
+{
+  "reviewed_at": "2026-11-05T09:16:00.576504+00:00",
+  "formal_status": {
+    "status": "training",
+    "step": 10850,
+    "target_steps": 300000,
+    "completed_epochs": 0,
+    "epoch_fraction": 0.8503134796238244,
+    "seen_records": 5555200,
+    "world_size": 8,
+    "time_unix": 1793870148.8865826,
+    "seconds_per_step": 1.0145747650003614,
+    "allocated_gib": 5.554934501647949,
+    "reserved_gib": 6.537109375,
+    "loss": 0.27130784713914036,
+    "selected_tokens": 13550,
+    "grad_norm": 0.38463112711906433,
+    "learning_rate": 7.232666666666667e-05,
+    "family_loss": 0.00550504134867413,
+    "family_chains": 871,
+    "family_accuracy": 0.9965556831228473,
+    "total_loss": 0.27185835127400776
+  },
+  "formal_latest": {
+    "checkpoint": "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/v11_a5_75m_300k_20261105/train/checkpoint-10000",
+    "step": 10000,
+    "epoch": 0,
+    "next_batch": 10000,
+    "seen_records": 5120000,
+    "best_score": 0.8638998778998779,
+    "best_step": 0
+  },
+  "formal_timing_scope": "Last 200 logged updates (log every 25), excludes validation/checkpoint/data wait; not every update.",
+  "formal_logged_updates": {
+    "count": 200,
+    "first": 5875,
+    "last": 10850,
+    "mean_seconds": 0.8508867726749805,
+    "median_seconds": 0.8605819290000909
+  },
+  "transport": {
+    "rank_log_files": 8,
+    "shm_direct_channels": 64
+  },
+  "historical_a100": {
+    "config": "/mnt/project-storage/fset-rN4kfh/251105016/dllm_test/configs/models/v7_bert_full_token_75m_300k_20261017/README.md",
+    "micro_batch": 32,
+    "gradient_accumulation": 2,
+    "world_size": 8,
+    "global_batch": 512,
+    "raw_a100_084_timing_not_recovered": true,
+    "matched_cross_hardware_comparison": false
+  },
+  "checkpointing_comparison": {
+    "on_seconds": 0.7432364395353943,
+    "off_seconds": 0.5771340662031434,
+    "repeat_on_seconds": 0.7373380348435603,
+    "walltime_reduction_percent": 22.348523901234362,
+    "throughput_gain_percent": 28.780552571607345,
+    "exact_final_parameter_hash": true,
+    "max_token_loss_difference": 0.0
+  },
+  "limitations": [
+    "Single local GPU, no eight-rank communication or resume qualification.",
+    "Weights from checkpoint10000, each case fresh AdamW and scheduler; parity covers these 20 short updates only.",
+    "Four real batches at lengths788/1029/787/789; maximum2048 separately tested with synthetic capacity input.",
+    "Profiler synchronization time includes waiting for useful GPU work; do not treat it as removable wall time.",
+    "No controlled A100/PRO6000 same-software/data benchmark; actual virtual GPU SKU not independently identified."
+  ],
+  "formal_training_modified": false,
+  "local_gpu_released": true,
+  "hardware_primary_sources": [
+    "https://www.nvidia.com/en-us/data-center/rtx-pro-6000-blackwell-server-edition/",
+    "https://www.nvidia.com/en-eu/data-center/a100/"
+  ],
+  "files_sha256": {
+    "profile_selected_events.json": "0d120bfe5db68a6da9c268693b0a0c34cba6ed1016d6a64e5c4c85293dca4d29",
+    "checkpointing.json": "4eb7fd46cb138ef74a959870dba8ee2ff2562793dd49e73c556c6fa4e5a56589",
+    "maximum_length.json": "3f97a6fae6a0eaca541db2b3060449d899907bc9c1c1589a5b9e6daec93ac85e",
+    "microbatch.json": "b1cf78c0b41d7e21014f3031260a774278567cb18dc8255f6d0598e3a9d2d223",
+    "executed_checkpoint_benchmark.py": "b7f6f7c296ea3f8f647900ff012ba963dec5b4bf6a6cb20c70cdd66a5c501261"
+  }
+}
