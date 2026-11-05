@@ -1,3 +1,5 @@
+> 2026-11-05T04:56:04+00:00：V11固定为A5全8层全局双向attention、8×768/12heads/SwiGLU3072、固定残差0.1，75,741,903参数；沿用1B正式超参数及全量V8 reader/collator/objective/family183，非10%探索配方。V11独立checkpoint schema/loader防止误载为A0，正常八卡DDP共训一个模型。模型绑定索引只改新目录metadata，原分片/偏移/划分不改；仅交付，未启动长训。详见 /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/v11_a5_75m_20261105/README.md。
+
 > 2026-11-04 指标审计更正：CDR是已知框架/位置的补全，不能与未知长度整链AAR直接比较；tcr_papers仅缺α链指示器AUROC已0.9286，A0随机骨干宏AUROC已0.8206。64条CDR任务中10条整链、20条CDR3与固定10%训练子集精确重复；现有AUROC排序不能作为表征泛化提升证据。详见 /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/arch70m_results/metric_audit_20261104/REPORT.md。
 
 > 2026-11-04T00:44:49Z 双seed探索结论：A5继续作生成对照，C2(仅单位初始输出门控)是表征方向候选；相对A5 AUROC在42/43增0.02286/0.02068，PR降0.00311/0.00696；相对A0平均AUROC增0.00333。C3此前单seed优势未复现，C1与C3的CDR双seed均回退。只有方向证据，未满足原稳定判据，不自动增seed/确认。完整配对图表见 /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/arch70m_results/review_20261104/REPORT.md。

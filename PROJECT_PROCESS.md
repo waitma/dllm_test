@@ -1,3 +1,5 @@
+> Last updated: 2026-11-05T04:56:04+00:00。按用户要求交付V11=A5约75M正式可训练版本，参数75,741,903；完整复用1B全量6,533,037训练记录、300k步/micro16×GA4×8/global512/LR1e-4/warmup15k/每1000步验证保存。7项CPU、冻结全量数据/环境检查及单卡真实更新/保存恢复精确重放通过；八卡正式训练未启动。入口 /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/launch_v11_a5_75m.sh；说明 /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/v11_a5_75m_20261105/README.md。
+
 > Last updated: 2026-11-04T07:00:19+00:00。完成用户提出的A0指标疑点审计：489条标签翻转输入不变、40组概率指标复算一致、3份既有权重逐CDR核对、653288条训练精确重叠检查；确认缺α链捷径（仅该指示器AUROC0.9286）及目标单链/CDR3隔离缺口。旧表征泛化结论降级，未训练新任务。报告 /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/arch70m_results/metric_audit_20261104/REPORT.md。
 
 > Last updated: 2026-11-04T00:44:49Z (UTC)。整体探索复核：五架构×seed42/43共10/10全部完成、两个队列finished且无失败，60份最终checkpoint及完整1276步/数据游标核验通过。C2相对A5的AUROC两seed均增加，但AUPRC均小幅下降；C3的seed43表征优势未在seed42复现，当前仍无通过预设稳定提升标准的架构。原V8固定10%及训练版本保持；报告 /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/arch70m_results/review_20261104/REPORT.md。未启动新任务。

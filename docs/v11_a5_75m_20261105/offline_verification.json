@@ -1,0 +1,44 @@
+{
+  "status": "passed",
+  "version": "V11",
+  "parameters": 75741903,
+  "plan_sha256": "cbf8b79eadd80982f505755fc493d97a71f41b533cd8b7cbdf9b2da2a6022118",
+  "architecture": "8 all-global layers",
+  "training_identical_to_1b": true,
+  "training": {
+    "budget_mode": "steps",
+    "minimum_epochs": 0,
+    "epochs": 24,
+    "max_steps": 300000,
+    "global_batch": 512,
+    "micro_batch": 16,
+    "grad_accum": 4,
+    "seed": 42,
+    "learning_rate": 0.0001,
+    "warmup_steps": 15000,
+    "scheduler": "cosine",
+    "weight_decay": 0.01,
+    "adam_betas": [
+      0.9,
+      0.999
+    ],
+    "adam_epsilon": 1e-08,
+    "gradient_clip": 1.0,
+    "bf16": true,
+    "eval_every": 1000,
+    "log_every": 25,
+    "loader_workers": 4,
+    "sampler": "complete_epoch_no_replacement_no_padding_no_drop_last_then_partial_final_epoch",
+    "validation_micro_batch": 1,
+    "oracle_micro_batch": 1
+  },
+  "data": {
+    "status": "passed",
+    "shards": 121,
+    "rows": 6604459,
+    "train": 6533037,
+    "manifest_sha256": "4f121884eeeb8aad83db8f245955a7924f1219ebb3308483e7c7f9d63c9152b0"
+  },
+  "wandb": "not_contacted",
+  "gpu_training": "not_started"
+}

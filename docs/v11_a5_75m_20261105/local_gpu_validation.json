@@ -1,0 +1,49 @@
+{
+  "status": "passed",
+  "version": "V11",
+  "parameters": 75741903,
+  "actual_gpu": "NVIDIA RPBZZZ6",
+  "world_size": 1,
+  "records": 16,
+  "micro_batch": 16,
+  "formal_training_started": false,
+  "global_batch_validation_only": 16,
+  "formal_global_batch": 512,
+  "family_targets": 24,
+  "updates": 2,
+  "replay_updates": 1,
+  "first": {
+    "loss": 4.260877854021641,
+    "selected_tokens": 826,
+    "grad_norm": 22.628658294677734,
+    "learning_rate": 0.0,
+    "family_loss": 5.136415799458821,
+    "family_chains": 24,
+    "family_accuracy": 0.0,
+    "total_loss": 4.774519433967523
+  },
+  "second": {
+    "loss": 4.193388819095477,
+    "selected_tokens": 796,
+    "grad_norm": 22.311634063720703,
+    "learning_rate": 6.666666666666668e-09,
+    "family_loss": 5.149431228637695,
+    "family_chains": 24,
+    "family_accuracy": 0.0,
+    "total_loss": 4.708331941959247
+  },
+  "replay": {
+    "loss": 4.193388819095477,
+    "selected_tokens": 796,
+    "grad_norm": 22.311634063720703,
+    "learning_rate": 6.666666666666668e-09,
+    "family_loss": 5.149431228637695,
+    "family_chains": 24,
+    "family_accuracy": 0.0,
+    "total_loss": 4.708331941959247
+  },
+  "exact_replay_parameters": true,
+  "peak_allocated_gib": 3.4193849563598633,
+  "peak_reserved_gib": 3.798828125,
+  "limitation": "One-GPU validation does not qualify eight-rank execution or worst-case max-length memory."
+}

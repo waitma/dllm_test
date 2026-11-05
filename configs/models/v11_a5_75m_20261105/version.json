@@ -1,0 +1,20 @@
+{
+  "version": "V11",
+  "architecture": "A5 all-global bidirectional attention",
+  "model_class": "v11_a5.model.V11A5Model",
+  "parameters": 75741903,
+  "d_model": 768,
+  "n_layers": 8,
+  "n_heads": 12,
+  "mlp_hidden_size": 3072,
+  "residual_scale": 0.1,
+  "max_length": 2048,
+  "initialization": "random weights",
+  "training_reference": "1B micro16 300k formal plan",
+  "training_config_sha256": "513fac8568b61dc8d13daf5d00b82cfb07e8bb9679bac752a02a36f172a7edc3",
+  "frozen_plan_sha256": "cbf8b79eadd80982f505755fc493d97a71f41b533cd8b7cbdf9b2da2a6022118",
+  "data_schema_unchanged": true,
+  "train_records": 6533037,
+  "formal_training_started": false,
+  "validation": "7 CPU tests + full data/source/env checks + one-GPU DDP update/checkpoint/resume exact"
+}

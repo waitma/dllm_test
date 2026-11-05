@@ -1,0 +1,16 @@
+test_all_layers_can_read_other_chains_and_hide_padded_keys (v11_a5.tests.V11Tests.test_all_layers_can_read_other_chains_and_hide_padded_keys) ... ok
+test_checkpointing_preserves_backward (v11_a5.tests.V11Tests.test_checkpointing_preserves_backward) ... /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/dllm/pipelines/llada/models/modeling_llada.py:626: DeprecationWarning: torch.is_autocast_cpu_enabled() is deprecated. Please use torch.is_autocast_enabled('cpu') instead. (Triggered internally at /pytorch/torch/csrc/autograd/init.cpp:702.)
+  elif bias.device.type == "cpu" and torch.is_autocast_cpu_enabled():
+/mnt/project-storage/fset-rN4kfh/251105016/conda/envs/pllm/lib/python3.11/site-packages/torch/autograd/graph.py:824: UserWarning: CUDA initialization: Unexpected error from cudaGetDeviceCount(). Did you run some cuda functions before calling NumCudaDevices() that might have already set an error? Error 304: OS call failed or operation not supported on this OS (Triggered internally at /pytorch/c10/cuda/CUDAFunctions.cpp:109.)
+  return Variable._execution_engine.run_backward(  # Calls into the C++ engine to run the backward pass
+ok
+test_frozen_plan_detects_dependency_corruption (v11_a5.tests.V11Tests.test_frozen_plan_detects_dependency_corruption) ... ok
+test_full_size_count_and_trainer_adapter (v11_a5.tests.V11Tests.test_full_size_count_and_trainer_adapter) ... ok
+test_same_a5_weights_logits_inputs_and_gradients (v11_a5.tests.V11Tests.test_same_a5_weights_logits_inputs_and_gradients) ... ok
+test_training_and_data_exactly_match_1b_except_model_binding (v11_a5.tests.V11Tests.test_training_and_data_exactly_match_1b_except_model_binding) ... ok
+test_v11_checkpoint_cannot_silently_load_as_a0 (v11_a5.tests.V11Tests.test_v11_checkpoint_cannot_silently_load_as_a0) ... ok
+
+----------------------------------------------------------------------
+Ran 7 tests in 1.707s
+
+OK

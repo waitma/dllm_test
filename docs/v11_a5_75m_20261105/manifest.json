@@ -1,0 +1,26 @@
+{
+  "created": "2026-11-05T04:58:15+00:00",
+  "version": "V11",
+  "run_root": "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/v11_a5_75m_300k_20261105",
+  "plan_sha256": "cbf8b79eadd80982f505755fc493d97a71f41b533cd8b7cbdf9b2da2a6022118",
+  "code": {
+    "v11_a5/__init__.py": "2ff416bc5f2e8cbb875255bebfddb40768484d4e72914b6b145ea7af10e092ce",
+    "v11_a5/launch.py": "e94fd24b85a2405f63b50febb49032c68bf5590b0967280f65c8890cf9539a3a",
+    "v11_a5/local_validation.py": "00aaa62bde26114e664109a08a99bfe2127aae40638c064907f0e356a2bbb464",
+    "v11_a5/model.py": "a1c54b3049676d595fbdc8d67c86c77464b6e9b04bb4df4ff1e5f24bc1c58c48",
+    "v11_a5/prepare.py": "d973e30485fe80743af02cd2580f4cc8053750d307b62b900758dcb1dc15a6c7",
+    "v11_a5/release.py": "91bcc82fe77a10257f6fb47966941aa023df60ef35f335103622a098c93b96f9",
+    "v11_a5/tests.py": "c503bb95ab663f558156b02064f56c0b6922b87356a18c40369f91ac8e3b6f54"
+  },
+  "launch_script_sha256": "490285c380ab7e99e24a507482577334ac176056247be1aa671011151ffb3e0d",
+  "artifacts": {
+    "local_gpu_validation.json": "7111d7fad6d3901828d003c0cb93995512f7ec734607c5cbbcdace0a1e045c77",
+    "offline_verification.json": "105ab263f1ba8e2ed91c0a454d4431837ae6fc33566a12174e1b69d11fbba9d4",
+    "cpu_tests.log": "a960efaf7a200df9d38c7c7edfeb154f83f1ffeb3951f9a3dcdb9a20cbe9b51b",
+    "release.json": "d0c50d79ee2fc8f62195e924ce64894da708cada580854c678a4093cdde8b3c2",
+    "README.md": "1b0cfce697df40c9cca0dbfc83013094aff44e4ddedb3792b9fe536a78a9108a"
+  },
+  "original_1b_and_exploration_frozen_sources_unchanged": true,
+  "formal_training_started": false,
+  "eight_rank_validation": "not_run_on_this_single_gpu_host"
+}
