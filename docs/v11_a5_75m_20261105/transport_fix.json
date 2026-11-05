@@ -1,0 +1,81 @@
+{
+  "status": "implemented_and_launcher_regression_passed",
+  "updated": "2026-11-05T05:03:51+00:00",
+  "version": "V11",
+  "evidence": {
+    "review": "/mnt/project-storage/fset-rN4kfh/251105016/dllm_test/output/bert_v8_1b_comm_diagnosis_20261029/analysis_review.json",
+    "review_sha256": "018366b8af496ffc97efdb8ddda7181d51fc0d07c819ac87db87960378ce0a7f",
+    "summary_sha256": "f61e6c60b02e46b4a7f36fed7f1e0ea8ec48942035c25b495c44736e13add23c"
+  },
+  "original_1b_comparison": {
+    "cached_A_socket": {
+      "mean_seconds": 8.056643716688267,
+      "samples": 20,
+      "transport": [
+        "NET/Socket/0"
+      ]
+    },
+    "cached_B_shm": {
+      "mean_seconds": 6.700291936891153,
+      "samples": 20,
+      "transport": [
+        "SHM/direct"
+      ]
+    },
+    "cached_C_p2p_auto": {
+      "mean_seconds": 6.700512130046263,
+      "samples": 20,
+      "transport": [
+        "SHM/direct"
+      ]
+    },
+    "repeat_A_socket": {
+      "mean_seconds": 8.088714607362636,
+      "samples": 20,
+      "transport": [
+        "NET/Socket/0"
+      ]
+    },
+    "repeat_B_shm": {
+      "mean_seconds": 6.701846553501673,
+      "samples": 20,
+      "transport": [
+        "SHM/direct"
+      ]
+    },
+    "loader_A_socket": {
+      "mean_seconds": 8.067576938285493,
+      "samples": 20,
+      "transport": [
+        "NET/Socket/0"
+      ]
+    },
+    "loader_B_shm": {
+      "mean_seconds": 6.7086605335818605,
+      "samples": 20,
+      "transport": [
+        "SHM/direct"
+      ]
+    }
+  },
+  "original_1b_throughput_gain_percent": 20.256150954445218,
+  "transport_environment": {
+    "NCCL_SHM_DISABLE": "0",
+    "NCCL_P2P_DISABLE": "1",
+    "NCCL_IB_DISABLE": "1",
+    "NCCL_NET": "Socket",
+    "NCCL_CUMEM_HOST_ENABLE": "0",
+    "NCCL_VERSION": "2.31.2",
+    "NCCL_DEBUG": "INFO",
+    "NCCL_DEBUG_SUBSYS": "INIT,ENV,GRAPH"
+  },
+  "cleared_environment": [
+    "CUDA_LAUNCH_BLOCKING"
+  ],
+  "launch_script_sha256": "3b5545f68fdc060e7920e88d83ee8001680ce8d93b4c36df346ba8a7df688979",
+  "frozen_plan_sha256": "cbf8b79eadd80982f505755fc493d97a71f41b533cd8b7cbdf9b2da2a6022118",
+  "v11_eight_gpu_speed_measurement": "not_run_single_gpu_host",
+  "formal_training_started": false,
+  "architecture_data_and_training_hyperparameters_unchanged": true,
+  "production_1b_modified": false
+}

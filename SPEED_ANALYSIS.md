@@ -1,3 +1,5 @@
+> 2026-11-05T05:03:51+00:00 V11通信性能修复：原1B八卡匹配实验已定位SHM禁用造成Socket瓶颈（真实loader完整步8.0676→6.7087秒，+20.26%吞吐，loss等最大差0）。V11入口已恢复SHM=0，保留P2P_DISABLE=1/IB_DISABLE=1/NCCL2.31.2，移除CUDA_LAUNCH_BLOCKING并记录启动通道日志；Shell传参回归通过，V11实际八卡收益未测。证据 /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/v11_a5_75m_20261105/transport_fix.json。
+
 # Training Speed Analysis（current immune LLaDA line）
 
 ## 2026-10-06T22:21:08.237756+00:00 恢复后完整5000步：包含恢复、验证、保存与退出的平均0.750700秒/步

@@ -1,3 +1,5 @@
+> 2026-11-05T05:03:51+00:00：V11执行层恢复1B已受控证实有效的SHM通信，解决原同时禁用SHM/P2P导致Socket同步的瓶颈；仅改外层通信与调试环境，A5架构/75M参数/全量V8/损失/global512/micro16×GA4×8均保持。1B历史+20.26%吞吐不可外推为V11实测；V11八卡速度与实际SHM通道待目标机执行。详见 /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/v11_a5_75m_20261105/transport_fix.json。
+
 > 2026-11-05T04:56:04+00:00：V11固定为A5全8层全局双向attention、8×768/12heads/SwiGLU3072、固定残差0.1，75,741,903参数；沿用1B正式超参数及全量V8 reader/collator/objective/family183，非10%探索配方。V11独立checkpoint schema/loader防止误载为A0，正常八卡DDP共训一个模型。模型绑定索引只改新目录metadata，原分片/偏移/划分不改；仅交付，未启动长训。详见 /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/v11_a5_75m_20261105/README.md。
 
 > 2026-11-04 指标审计更正：CDR是已知框架/位置的补全，不能与未知长度整链AAR直接比较；tcr_papers仅缺α链指示器AUROC已0.9286，A0随机骨干宏AUROC已0.8206。64条CDR任务中10条整链、20条CDR3与固定10%训练子集精确重复；现有AUROC排序不能作为表征泛化提升证据。详见 /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/arch70m_results/metric_audit_20261104/REPORT.md。

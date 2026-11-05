@@ -1,0 +1,6 @@
+test_actual_torchrun_child_gets_shm_and_no_stale_debug_blocking (test_v11_a5_transport.TransportTests.test_actual_torchrun_child_gets_shm_and_no_stale_debug_blocking) ... ok
+
+----------------------------------------------------------------------
+Ran 1 test in 0.073s
+
+OK

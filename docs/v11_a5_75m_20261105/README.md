@@ -1,3 +1,5 @@
+> 2026-11-05T05:03:51+00:00 通信性能修复已应用到同一个启动脚本：`NCCL_SHM_DISABLE=0`，保留P2P/IB禁用与NCCL2.31.2；清除`CUDA_LAUNCH_BLOCKING`，只记录NCCL初始化/环境/拓扑通道日志。1B已完成八卡受控对照：8.0676→6.7087秒/步；该数值不作为V11实测速度。V11模型、数据、batch、优化器、确定性和保存逻辑保持。
+
 # V11：A5 全局注意力 75M 可训练版本
 
 入口：`/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/launch_v11_a5_75m.sh`。当前已打包并验证，未启动正式训练或提交远程任务。
@@ -46,7 +48,7 @@ MLM仍是15%选择、80%MASK/10%随机其他token/10%原样；显式关系始终
 - 模型绑定索引：`/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/v11_a5_75m_300k_20261105/bundle/data/index.json`
 - 正式结果将写入：`/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/v11_a5_75m_300k_20261105/train`
 - W&B：`pressure_jian/dllm-immune`，沿用已验证的waitma账户凭据，V11使用独立随机run ID；新run不与旧smoke冲突，恢复绑定原checkpoint的run ID。
-- CUDA/NCCL：沿用1B环境，独立复制NCCL2.31.2并校验文件SHA与加载路径。
+- CUDA/NCCL：独立复制NCCL2.31.2并校验文件SHA与加载路径；默认SHM启用（NCCL_SHM_DISABLE=0）、P2P/IB禁用，修复原1B入口中的Socket瓶颈。
 
 ```bash
 # 查看实际命令，不训练
@@ -81,3 +83,15 @@ model = V11A5Model.from_pretrained("/mnt/project-storage/fset-rN4kfh/251105016/d
 内置probe和best保留逻辑为保持1B配方而沿用；这些探针仍受此前发现的缺链捷径/隔离范围限制，不将其作为新架构泛化提升的证据。V11是用户选择的A5版本化训练交付，不是已证明整体胜出的模型。
 
 [离线回执](/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/v11_a5_75m_20261105/offline_verification.json) · [单卡训练/恢复回执](/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/v11_a5_75m_20261105/local_gpu_validation.json) · [CPU测试](/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/v11_a5_75m_20261105/cpu_tests.log) · [指标审计](/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/arch70m_results/metric_audit_20261104/REPORT.md)
+
+## 通信速度修复的依据与验收（2026-11-05）
+
+之前1B诊断已独立完成8卡、同输入/初始化/掩码、每组5步预热＋20步计时的比较。原入口同时禁用SHM和P2P，实际走NET/Socket/0；打开SHM后走SHM/direct，四worker真实DataLoader的完整更新均值8.06757694→6.70866053秒，耗时下降16.84%、吞吐提高20.26%，逐步loss/family_loss/grad_norm等最大差为0。独立重复与缓存批次得到相同方向；这些证据支持只恢复SHM，不更改模型或训练配方。
+
+V11外层启动器现在明确设置SHM=0、P2P_DISABLE=1、IB_DISABLE=1、CUMEM_HOST_ENABLE=0；NCCL_NET=Socket仍保留作为网络后备，不会阻止本机SHM通道。清除CUDA_LAUNCH_BLOCKING调试环境，保持efficient attention与原确定性设置。
+NCCL_DEBUG_FILE写入运行目录的`nccl.%h.%p.log`，仅INIT/ENV/GRAPH；实际是否使用共享内存以日志中的`SHM/direct`为准。没有启用每次collective日志。
+
+实际执行完整Shell入口的隔离CPU回归通过：即使继承SHM_DISABLE=1、P2P_DISABLE=0、CUDA_LAUNCH_BLOCKING=1，最终torchrun子进程也收到SHM=0/P2P_DISABLE=1及无blocking标记；8rank参数和冻结V11入口路径保持。此回归使用假解释器，仅测试进程传参，不把它称作CUDA/NCCL多卡验收。
+本机只有单卡，未重跑V11八卡速度比较；1B收益不能直接外推为75M的提速比例。V11正式train目录仍不存在，未修改/重启原1B训练。外层入口修复直接作用于现有V11 bundle，不改冻结plan/模型源码，plan SHA仍为`cbf8b79eadd80982f505755fc493d97a71f41b533cd8b7cbdf9b2da2a6022118`；此次外层脚本SHA单独记录在回执中。
+
+[1B受控诊断报告](/mnt/project-storage/fset-rN4kfh/251105016/dllm_test/output/bert_v8_1b_comm_diagnosis_20261029/report.md) · [独立复核](/mnt/project-storage/fset-rN4kfh/251105016/dllm_test/output/bert_v8_1b_comm_diagnosis_20261029/analysis_review.json) · [V11修复回执](/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/v11_a5_75m_20261105/transport_fix.json) · [进程环境回归](/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/v11_a5_75m_20261105/transport_regression.log)

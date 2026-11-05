@@ -12,15 +12,99 @@
     "v11_a5/release.py": "91bcc82fe77a10257f6fb47966941aa023df60ef35f335103622a098c93b96f9",
     "v11_a5/tests.py": "c503bb95ab663f558156b02064f56c0b6922b87356a18c40369f91ac8e3b6f54"
   },
-  "launch_script_sha256": "490285c380ab7e99e24a507482577334ac176056247be1aa671011151ffb3e0d",
+  "launch_script_sha256": "3b5545f68fdc060e7920e88d83ee8001680ce8d93b4c36df346ba8a7df688979",
   "artifacts": {
+    "transport_regression.log": "c9bbe01ded9d75f9909fe31a0a4fbdb0bdbaf42ff0cfdb815c58bc1d6cb3f272",
+    "transport_fix.json": "cb97d02a346d1141686c578f5dd0422db58ff869792e3fd44efa1ef2cc0e1e33",
     "local_gpu_validation.json": "7111d7fad6d3901828d003c0cb93995512f7ec734607c5cbbcdace0a1e045c77",
     "offline_verification.json": "105ab263f1ba8e2ed91c0a454d4431837ae6fc33566a12174e1b69d11fbba9d4",
     "cpu_tests.log": "a960efaf7a200df9d38c7c7edfeb154f83f1ffeb3951f9a3dcdb9a20cbe9b51b",
     "release.json": "d0c50d79ee2fc8f62195e924ce64894da708cada580854c678a4093cdde8b3c2",
-    "README.md": "1b0cfce697df40c9cca0dbfc83013094aff44e4ddedb3792b9fe536a78a9108a"
+    "README.md": "570eb4f4c3922bf0e3cfde4fddc5e803c57a459579cc71d0783dab4c4ae07a31"
   },
   "original_1b_and_exploration_frozen_sources_unchanged": true,
   "formal_training_started": false,
-  "eight_rank_validation": "not_run_on_this_single_gpu_host"
+  "eight_rank_validation": "not_run_on_this_single_gpu_host",
+  "transport_fix": {
+    "status": "implemented_and_launcher_regression_passed",
+    "updated": "2026-11-05T05:03:51+00:00",
+    "version": "V11",
+    "evidence": {
+      "review": "/mnt/project-storage/fset-rN4kfh/251105016/dllm_test/output/bert_v8_1b_comm_diagnosis_20261029/analysis_review.json",
+      "review_sha256": "018366b8af496ffc97efdb8ddda7181d51fc0d07c819ac87db87960378ce0a7f",
+      "summary_sha256": "f61e6c60b02e46b4a7f36fed7f1e0ea8ec48942035c25b495c44736e13add23c"
+    },
+    "original_1b_comparison": {
+      "cached_A_socket": {
+        "mean_seconds": 8.056643716688267,
+        "samples": 20,
+        "transport": [
+          "NET/Socket/0"
+        ]
+      },
+      "cached_B_shm": {
+        "mean_seconds": 6.700291936891153,
+        "samples": 20,
+        "transport": [
+          "SHM/direct"
+        ]
+      },
+      "cached_C_p2p_auto": {
+        "mean_seconds": 6.700512130046263,
+        "samples": 20,
+        "transport": [
+          "SHM/direct"
+        ]
+      },
+      "repeat_A_socket": {
+        "mean_seconds": 8.088714607362636,
+        "samples": 20,
+        "transport": [
+          "NET/Socket/0"
+        ]
+      },
+      "repeat_B_shm": {
+        "mean_seconds": 6.701846553501673,
+        "samples": 20,
+        "transport": [
+          "SHM/direct"
+        ]
+      },
+      "loader_A_socket": {
+        "mean_seconds": 8.067576938285493,
+        "samples": 20,
+        "transport": [
+          "NET/Socket/0"
+        ]
+      },
+      "loader_B_shm": {
+        "mean_seconds": 6.7086605335818605,
+        "samples": 20,
+        "transport": [
+          "SHM/direct"
+        ]
+      }
+    },
+    "original_1b_throughput_gain_percent": 20.256150954445218,
+    "transport_environment": {
+      "NCCL_SHM_DISABLE": "0",
+      "NCCL_P2P_DISABLE": "1",
+      "NCCL_IB_DISABLE": "1",
+      "NCCL_NET": "Socket",
+      "NCCL_CUMEM_HOST_ENABLE": "0",
+      "NCCL_VERSION": "2.31.2",
+      "NCCL_DEBUG": "INFO",
+      "NCCL_DEBUG_SUBSYS": "INIT,ENV,GRAPH"
+    },
+    "cleared_environment": [
+      "CUDA_LAUNCH_BLOCKING"
+    ],
+    "launch_script_sha256": "3b5545f68fdc060e7920e88d83ee8001680ce8d93b4c36df346ba8a7df688979",
+    "frozen_plan_sha256": "cbf8b79eadd80982f505755fc493d97a71f41b533cd8b7cbdf9b2da2a6022118",
+    "v11_eight_gpu_speed_measurement": "not_run_single_gpu_host",
+    "formal_training_started": false,
+    "architecture_data_and_training_hyperparameters_unchanged": true,
+    "production_1b_modified": false
+  },
+  "transport_regression_code_sha256": "fd8d8eacdf2de022c1bd85399a1ea51a4139f27c923e0900210035474a3e1e5b"
 }

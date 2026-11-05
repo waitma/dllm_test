@@ -29,12 +29,19 @@ export USE_TF=0 PYTHONDONTWRITEBYTECODE=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 OP
 export HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 IMMUNE_SDPA_BACKEND=efficient
 export CUBLAS_WORKSPACE_CONFIG=:4096:8 PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 export WANDB_X_DISABLE_VIEWER=true
-unset PYTHONPATH PYTHONHOME
+# The matched 1B eight-rank diagnosis showed a Socket bottleneck with SHM disabled.
+# Keep the proven SHM path; P2P/IB and host-cuMem settings remain unchanged.
+export NCCL_SHM_DISABLE=0 NCCL_P2P_DISABLE=1 NCCL_IB_DISABLE=1 NCCL_NET=Socket
+export NCCL_CUMEM_HOST_ENABLE=0 NCCL_VERSION=2.31.2
+unset PYTHONPATH PYTHONHOME CUDA_LAUNCH_BLOCKING
 export PATH="$(dirname -- "$V11_PY"):$PATH"
 export CONDA_PREFIX="$(dirname -- "$(dirname -- "$V11_PY")")"
 "$V11_PY" -I -B "$V11_ROOT/v11_a5/prepare.py" --run-root "$V11_RUN"
 V11_BUNDLE="$V11_RUN/bundle"
 V11_FROZEN="$V11_BUNDLE/source/v11_a5/launch.py"
+# Only initialization/environment/graph messages are logged; no per-collective trace.
+export NCCL_DEBUG=INFO NCCL_DEBUG_SUBSYS=INIT,ENV,GRAPH
+export NCCL_DEBUG_FILE="$V11_RUN/nccl.%h.%p.log"
 V11_COMMAND=("$V11_PY" -I -B -m torch.distributed.run --standalone --nnodes=1 --nproc_per_node=8 --max_restarts=0 --no_python
     "$V11_PY" -I -B "$V11_FROZEN" --bundle "$V11_BUNDLE")
 [[ -z "$V11_RESUME" ]] || V11_COMMAND+=(--resume "$V11_RESUME")
@@ -52,8 +59,6 @@ fi
 if [[ ! -e "$V11_RUN/train" && -n "$V11_RESUME" ]]; then
     echo 'Resume output is missing.' >&2; exit 2
 fi
-export NCCL_SHM_DISABLE=1 NCCL_P2P_DISABLE=1 NCCL_IB_DISABLE=1 NCCL_NET=Socket
-export NCCL_CUMEM_HOST_ENABLE=0 NCCL_DEBUG=WARN NCCL_VERSION=2.31.2
 [[ -z "${LD_PRELOAD:-}" ]] || { echo 'V11 requires LD_PRELOAD to be initially empty.' >&2; exit 2; }
 V11_LIBRARY="$V11_BUNDLE/runtime/libnccl.so.2"
 export LD_PRELOAD="$V11_LIBRARY"
@@ -68,4 +73,6 @@ if code or v.value!=23102 or loaded!={expected}:raise RuntimeError('V11 NCCL run
 print(json.dumps(dict(stage='V11_nccl_verified',runtime=v.value)),flush=True)
 NCCL
 exec > >(tee -a "$V11_RUN/entrypoint.log") 2>&1
+printf '%s\n' 'V11 transport: NCCL 2.31.2, SHM enabled, P2P/IB disabled; CUDA_LAUNCH_BLOCKING unset.'
+printf 'NCCL channel logs: %s/nccl.*.log (look for SHM/direct).\n' "$V11_RUN"
 exec "${V11_COMMAND[@]}"
