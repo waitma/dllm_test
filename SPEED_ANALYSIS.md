@@ -1,3 +1,5 @@
+> 2026-11-05T08:49:23+00:00 V11首次正式八卡速度核实：最近80个日志采样更新（step7025至9000）均值0.8382秒/更新，实际8rank SHM/direct。只统计已记录的更新时间，不含验证/保存/数据等待，不是V11 Socket/SHM受控A/B，不能由此换算SHM提速比例。证据 /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/v11_a5_75m_20261105/training_first_review_20261105.json。
+
 > 2026-11-05T05:03:51+00:00 V11通信性能修复：原1B八卡匹配实验已定位SHM禁用造成Socket瓶颈（真实loader完整步8.0676→6.7087秒，+20.26%吞吐，loss等最大差0）。V11入口已恢复SHM=0，保留P2P_DISABLE=1/IB_DISABLE=1/NCCL2.31.2，移除CUDA_LAUNCH_BLOCKING并记录启动通道日志；Shell传参回归通过，V11实际八卡收益未测。证据 /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/v11_a5_75m_20261105/transport_fix.json。
 
 # Training Speed Analysis（current immune LLaDA line）

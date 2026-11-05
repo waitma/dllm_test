@@ -1,8 +1,10 @@
+> Last updated: 2026-11-05T08:49:23+00:00。用户提交的V11已确认正式八卡训练：step9000/300000（3.00%），epoch0.705，seen4608000；最新完整checkpoint8000，8rank参数哈希一致。最新MLM验证step9000 loss=0.580162；最近80个记录点均值0.838秒/更新。8份NCCL日志SHM_DISABLE=0且实际SHM/direct，未修改或重启训练。回执 /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/v11_a5_75m_20261105/training_first_review_20261105.json。
+
 > 2026-11-05T05:03:51+00:00 通信性能修复已应用到同一个启动脚本：`NCCL_SHM_DISABLE=0`，保留P2P/IB禁用与NCCL2.31.2；清除`CUDA_LAUNCH_BLOCKING`，只记录NCCL初始化/环境/拓扑通道日志。1B已完成八卡受控对照：8.0676→6.7087秒/步；该数值不作为V11实测速度。V11模型、数据、batch、优化器、确定性和保存逻辑保持。
 
 # V11：A5 全局注意力 75M 可训练版本
 
-入口：`/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/launch_v11_a5_75m.sh`。当前已打包并验证，未启动正式训练或提交远程任务。
+入口：`/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/launch_v11_a5_75m.sh`。用户已提交八卡正式训练；当前运行核实见顶部，实时进度以train/status.json为准。
 
 ```bash
 bash /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/launch_v11_a5_75m.sh
@@ -78,7 +80,7 @@ model = V11A5Model.from_pretrained("/mnt/project-storage/fset-rN4kfh/251105016/d
 1. 7项CPU回归通过：与探索A5同初始化权重/logit/梯度精确一致；全部8层跨链可见性及padding屏蔽；梯度重计算一致；V11保存/加载；旧A0 loader拒绝V11；1B训练配置/数据一致；冻结文件损坏检测。
 2. 冻结源、运行环境、完整121分片与6,604,459条索引记录检查通过；训练记录6,533,037。
 3. 本地单卡使用16条真实记录、micro16，包含24个family目标，做2次更新与1次恢复重放；目标、梯度范数、恢复后参数精确一致。实测峰值allocated **3.42GiB**、reserved **3.80GiB**，仅对应这些实际样本。
-4. 单卡验证的global batch为16，仅验证训练器路径；正式配置仍为八卡global512。未将其当作八rank资格或maxlen2048最坏情况显存测试。正式train目录尚不存在。
+4. 单卡验证的global batch为16，仅验证训练器路径；正式配置仍为八卡global512。未将其当作八rank资格或maxlen2048最坏情况显存测试。交付时正式train目录尚不存在；后续开训状态见顶部。
 
 内置probe和best保留逻辑为保持1B配方而沿用；这些探针仍受此前发现的缺链捷径/隔离范围限制，不将其作为新架构泛化提升的证据。V11是用户选择的A5版本化训练交付，不是已证明整体胜出的模型。
 
@@ -92,6 +94,6 @@ V11外层启动器现在明确设置SHM=0、P2P_DISABLE=1、IB_DISABLE=1、CUMEM
 NCCL_DEBUG_FILE写入运行目录的`nccl.%h.%p.log`，仅INIT/ENV/GRAPH；实际是否使用共享内存以日志中的`SHM/direct`为准。没有启用每次collective日志。
 
 实际执行完整Shell入口的隔离CPU回归通过：即使继承SHM_DISABLE=1、P2P_DISABLE=0、CUDA_LAUNCH_BLOCKING=1，最终torchrun子进程也收到SHM=0/P2P_DISABLE=1及无blocking标记；8rank参数和冻结V11入口路径保持。此回归使用假解释器，仅测试进程传参，不把它称作CUDA/NCCL多卡验收。
-本机只有单卡，未重跑V11八卡速度比较；1B收益不能直接外推为75M的提速比例。V11正式train目录仍不存在，未修改/重启原1B训练。外层入口修复直接作用于现有V11 bundle，不改冻结plan/模型源码，plan SHA仍为`cbf8b79eadd80982f505755fc493d97a71f41b533cd8b7cbdf9b2da2a6022118`；此次外层脚本SHA单独记录在回执中。
+本机只有单卡，未重跑V11八卡速度比较；1B收益不能直接外推为75M的提速比例。通信修复时V11正式train目录尚不存在；后续开训状态见顶部。未修改/重启原1B训练。外层入口修复直接作用于现有V11 bundle，不改冻结plan/模型源码，plan SHA仍为`cbf8b79eadd80982f505755fc493d97a71f41b533cd8b7cbdf9b2da2a6022118`；此次外层脚本SHA单独记录在回执中。
 
 [1B受控诊断报告](/mnt/project-storage/fset-rN4kfh/251105016/dllm_test/output/bert_v8_1b_comm_diagnosis_20261029/report.md) · [独立复核](/mnt/project-storage/fset-rN4kfh/251105016/dllm_test/output/bert_v8_1b_comm_diagnosis_20261029/analysis_review.json) · [V11修复回执](/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/v11_a5_75m_20261105/transport_fix.json) · [进程环境回归](/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/v11_a5_75m_20261105/transport_regression.log)

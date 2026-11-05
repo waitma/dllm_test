@@ -1,0 +1,185 @@
+{
+  "observed_utc": "2026-11-05T08:49:23+00:00",
+  "observed_beijing": "2026-11-05T16:49:23+08:00",
+  "status": {
+    "status": "training",
+    "step": 9000,
+    "target_steps": 300000,
+    "completed_epochs": 0,
+    "epoch_fraction": 0.7053291536050157,
+    "seen_records": 4608000,
+    "world_size": 8,
+    "time_unix": 1793868558.6219149,
+    "seconds_per_step": 0.9735633259997485,
+    "allocated_gib": 5.554934501647949,
+    "reserved_gib": 6.537109375,
+    "loss": 0.3103063911685749,
+    "selected_tokens": 13118,
+    "grad_norm": 0.4244086742401123,
+    "learning_rate": 5.9993333333333334e-05,
+    "family_loss": 0.008752631041936057,
+    "family_chains": 860,
+    "family_accuracy": 0.9988372093023256,
+    "total_loss": 0.3111816542727685
+  },
+  "percent_complete": 3.0,
+  "latest_checkpoint": {
+    "checkpoint": "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/v11_a5_75m_300k_20261105/train/checkpoint-8000",
+    "step": 8000,
+    "epoch": 0,
+    "next_batch": 8000,
+    "seen_records": 4096000,
+    "best_score": 0.8638998778998779,
+    "best_step": 0
+  },
+  "checkpoint_receipt": {
+    "status": "complete",
+    "step": 8000,
+    "world_size": 8,
+    "all_rank_parameters_equal": true,
+    "files": 17
+  },
+  "recent_logged_update_timing": {
+    "samples": 80,
+    "first_step": 7025,
+    "last_step": 9000,
+    "mean_seconds_per_update": 0.8381897257623905,
+    "median_seconds_per_update": 0.8439282314998309,
+    "scope": "80 logged update samples; excludes validation/checkpoint/data-wait overhead; not a controlled Socket/SHM A/B"
+  },
+  "validation": [
+    {
+      "step": 0,
+      "valid/loss": 4.102140035333778,
+      "valid/mask_accuracy": 0.04734607218683652,
+      "valid/relation_accuracy": 0.0,
+      "valid/family_loss": 4.68204585507004
+    },
+    {
+      "step": 1000,
+      "valid/loss": 2.221086513581134,
+      "valid/mask_accuracy": 0.31279951471034273,
+      "valid/relation_accuracy": 0.7827997489014438,
+      "valid/family_loss": 0.6714484002515116
+    },
+    {
+      "step": 2000,
+      "valid/loss": 1.1593565887364166,
+      "valid/mask_accuracy": 0.7020018198362148,
+      "valid/relation_accuracy": 0.783427495291902,
+      "valid/family_loss": 0.22276523762363754
+    },
+    {
+      "step": 3000,
+      "valid/loss": 0.8972037363768759,
+      "valid/mask_accuracy": 0.764846830451926,
+      "valid/relation_accuracy": 0.7771500313873195,
+      "valid/family_loss": 0.04857904531643943
+    },
+    {
+      "step": 4000,
+      "valid/loss": 0.7387096236425167,
+      "valid/mask_accuracy": 0.7797391568092205,
+      "valid/relation_accuracy": 0.7633396107972379,
+      "valid/family_loss": 0.022079509502213268
+    },
+    {
+      "step": 5000,
+      "valid/loss": 0.6727914759430175,
+      "valid/mask_accuracy": 0.7898089171974523,
+      "valid/relation_accuracy": 0.7715003138731952,
+      "valid/family_loss": 0.010617713550146566
+    },
+    {
+      "step": 6000,
+      "valid/loss": 0.6280856836692962,
+      "valid/mask_accuracy": 0.7984834698210495,
+      "valid/relation_accuracy": 0.7865662272441933,
+      "valid/family_loss": 0.00527833006324409
+    },
+    {
+      "step": 7000,
+      "valid/loss": 0.6087197352262367,
+      "valid/mask_accuracy": 0.802729754322111,
+      "valid/relation_accuracy": 0.778405524168236,
+      "valid/family_loss": 0.003910207013008818
+    },
+    {
+      "step": 8000,
+      "valid/loss": 0.6006879197606337,
+      "valid/mask_accuracy": 0.805368516833485,
+      "valid/relation_accuracy": 0.7903327055869429,
+      "valid/family_loss": 0.004439311961567813
+    },
+    {
+      "step": 9000,
+      "valid/loss": 0.5801624208216887,
+      "valid/mask_accuracy": 0.8092205034880194,
+      "valid/relation_accuracy": 0.7984934086629002,
+      "valid/family_loss": 0.004453759091860659
+    }
+  ],
+  "all_logged_train_metrics_finite": true,
+  "observed_nccl_channels": {
+    "SHM/direct": 64
+  },
+  "nccl_logs": [
+    {
+      "path": "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/v11_a5_75m_300k_20261105/nccl.job-7dyduxu11iz5-master-0.422.log",
+      "sha256": "122da9879cc9115cc9de888b14db2c799d1b2405a274973567df5df305af6ca5",
+      "shm_disable_explicit_zero": true,
+      "nccl_warn_count": 0
+    },
+    {
+      "path": "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/v11_a5_75m_300k_20261105/nccl.job-7dyduxu11iz5-master-0.423.log",
+      "sha256": "789ab8c9da772c95f6b4ef83459b58eb1389d8657582b96b734528aad238bce8",
+      "shm_disable_explicit_zero": true,
+      "nccl_warn_count": 0
+    },
+    {
+      "path": "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/v11_a5_75m_300k_20261105/nccl.job-7dyduxu11iz5-master-0.424.log",
+      "sha256": "afcac51461a8ff88a592d8be098bc8e6710ba439b74ba83afbd0a946165874d8",
+      "shm_disable_explicit_zero": true,
+      "nccl_warn_count": 0
+    },
+    {
+      "path": "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/v11_a5_75m_300k_20261105/nccl.job-7dyduxu11iz5-master-0.425.log",
+      "sha256": "2952bcb27cb610318940528adc550ff3aa8d00d580050c3dc0a2486764601a19",
+      "shm_disable_explicit_zero": true,
+      "nccl_warn_count": 0
+    },
+    {
+      "path": "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/v11_a5_75m_300k_20261105/nccl.job-7dyduxu11iz5-master-0.426.log",
+      "sha256": "1e728996e1cb8cb104396aef780f52c2938776ecda8cf9ce45eb8815f670d853",
+      "shm_disable_explicit_zero": true,
+      "nccl_warn_count": 0
+    },
+    {
+      "path": "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/v11_a5_75m_300k_20261105/nccl.job-7dyduxu11iz5-master-0.427.log",
+      "sha256": "525cbca83bb4142e30792d0bf79077f28b1fe4205cb7fed7c97e1920fb17a87c",
+      "shm_disable_explicit_zero": true,
+      "nccl_warn_count": 0
+    },
+    {
+      "path": "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/v11_a5_75m_300k_20261105/nccl.job-7dyduxu11iz5-master-0.428.log",
+      "sha256": "5bdb11c782aefd2a4af2b9a5591033fb3db31c67f88eb868a2b8e79704315c3f",
+      "shm_disable_explicit_zero": true,
+      "nccl_warn_count": 0
+    },
+    {
+      "path": "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/v11_a5_75m_300k_20261105/nccl.job-7dyduxu11iz5-master-0.429.log",
+      "sha256": "ae7626505d0a6b351b1e1c96437d1f92c7cbcd647e73e5d95a7c2e6132670e65",
+      "shm_disable_explicit_zero": true,
+      "nccl_warn_count": 0
+    }
+  ],
+  "wandb": {
+    "url": "https://wandb.ai/pressure_jian/dllm-immune/runs/v11a5-75m-d8b0195ba03045d6b8b3ba634c89aec4",
+    "id": "v11a5-75m-d8b0195ba03045d6b8b3ba634c89aec4",
+    "entity": "pressure_jian",
+    "project": "dllm-immune",
+    "username": "waitma",
+    "sdk_version": "0.23.1"
+  },
+  "no_training_or_configuration_mutation": true
+}

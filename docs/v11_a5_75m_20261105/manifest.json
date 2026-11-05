@@ -20,11 +20,12 @@
     "offline_verification.json": "105ab263f1ba8e2ed91c0a454d4431837ae6fc33566a12174e1b69d11fbba9d4",
     "cpu_tests.log": "a960efaf7a200df9d38c7c7edfeb154f83f1ffeb3951f9a3dcdb9a20cbe9b51b",
     "release.json": "d0c50d79ee2fc8f62195e924ce64894da708cada580854c678a4093cdde8b3c2",
-    "README.md": "570eb4f4c3922bf0e3cfde4fddc5e803c57a459579cc71d0783dab4c4ae07a31"
+    "README.md": "954216841c4cff4db4434d0b8d25e012d23b369f0c5784179273675748f0f731",
+    "training_first_review_20261105.json": "397fdc70e809dad21ca275cb7605b8e37f10fb57569237bf9646dae9b8bd1553"
   },
   "original_1b_and_exploration_frozen_sources_unchanged": true,
-  "formal_training_started": false,
-  "eight_rank_validation": "not_run_on_this_single_gpu_host",
+  "formal_training_started": true,
+  "eight_rank_validation": "Formal training and complete eight-rank checkpoints observed; separate preflight was not run.",
   "transport_fix": {
     "status": "implemented_and_launcher_regression_passed",
     "updated": "2026-11-05T05:03:51+00:00",
@@ -106,5 +107,12 @@
     "architecture_data_and_training_hyperparameters_unchanged": true,
     "production_1b_modified": false
   },
-  "transport_regression_code_sha256": "fd8d8eacdf2de022c1bd85399a1ea51a4139f27c923e0900210035474a3e1e5b"
+  "transport_regression_code_sha256": "fd8d8eacdf2de022c1bd85399a1ea51a4139f27c923e0900210035474a3e1e5b",
+  "first_formal_training_review": {
+    "path": "/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/v11_a5_75m_20261105/training_first_review_20261105.json",
+    "sha256": "397fdc70e809dad21ca275cb7605b8e37f10fb57569237bf9646dae9b8bd1553",
+    "observed_utc": "2026-11-05T08:49:23+00:00"
+  },
+  "updated": "2026-11-05T08:49:23+00:00",
+  "eight_rank_execution_observed": true
 }
