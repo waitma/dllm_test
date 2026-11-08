@@ -1,3 +1,5 @@
+> 2026-11-08T13:42:15.661756+00:00：完成表征模型文献/官方代码调研，优先线索为SCEPTR序列级目标与读出、ProteinBERT局部/全局表示交换、AMPLIFY深宽分配；已实现的RMSNorm/SwiGLU/RoPE及分链mean不重复记为新功能。纯架构、读出与训练目标分开消融；所有移植收益待测。调研 /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/REPRESENTATION_MODEL_SURVEY_20261108.md，原V8形式/10%索引保持，无GPU任务。
+
 > 2026-11-08T13:04:16.458295+00:00：用户明确架构探索主目标为下游表征能力。后续以已核实V9为基线，先对齐冻结编码器/读出/任务头与真实下游划分，再独立比较架构因素；MLM loss、整链/CDR生成只作辅助观察。历史A5稳定性未通过，旧探针有缺链捷径，不能据生成完整性晋级表征候选。修订 /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/ARCH70M_REPRESENTATION_PRIORITY_20261108.md；V9/V11结果路径待补，未启动新实验。
 
 > 2026-11-05T09:16:00.576504+00:00：V11性能候选保留原A5架构/75M/全量V8/micro16×GA4/global512，仅考虑取消整层激活重计算；单卡同输入开/关/开证实约22%更新时间减少，短窗参数完全相同，maxlen2048本地显存通过。尚未部署，不更改运行中冻结源；正式切换需独立恢复包及八卡同输入/容量/恢复资格。/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/v11_a5_75m_20261105/speed_diagnosis_20261105/README.md。

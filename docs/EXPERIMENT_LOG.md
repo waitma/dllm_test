@@ -1,3 +1,5 @@
+> 2026-11-08T13:42:15.661756+00:00：表征方向文献调研完成，报告 /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/REPRESENTATION_MODEL_SURVEY_20261108.md；SCEPTR支持区分MLM与直接表征信号，ProteinBERT提供局部/全局交换思路，AMPLIFY提供深宽配置参照。均为研究线索，未新增实验结果或模型训练；保持原数据形式和历史负结果。
+
 > 2026-11-08T13:04:16.458295+00:00：用户纠正探索目标为表征能力。旧三种子decision=not_yet_stable与2026-11-04偏差审计保持；A5的生成完整性证据不外推为表征优势。新增目标修订 /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/ARCH70M_REPRESENTATION_PRIORITY_20261108.md，待V9/V11实际结果与checkpoint对齐后确定后续消融。没有新增训练、推理或改历史结果。
 
 > 2026-10-28T10:28:12Z：用户完成 GitHub CLI 设备验证，API 核实登录账号 waitma 且可写 waitma/dllm_test。初次网络推送 HTTP 408，核查远端未创建分支后，使用 HTTP/1.1、64 MiB 缓冲和本机 HTTP 代理重试成功；远端探索分支与本地 4ecc061 完全一致。GitHub credential helper 和专用传输配置已保存。历史 pending/publication_error 文件保留为失败证据，当前发布状态以 output/arch70m_v8_20261028/publication_status.json 为准；未修改原 main 或训练代码。
