@@ -1,3 +1,5 @@
+> 2026-11-08T13:04:16.458295+00:00：用户明确架构探索主目标为下游表征能力。后续以已核实V9为基线，先对齐冻结编码器/读出/任务头与真实下游划分，再独立比较架构因素；MLM loss、整链/CDR生成只作辅助观察。历史A5稳定性未通过，旧探针有缺链捷径，不能据生成完整性晋级表征候选。修订 /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/ARCH70M_REPRESENTATION_PRIORITY_20261108.md；V9/V11结果路径待补，未启动新实验。
+
 > 2026-11-05T09:16:00.576504+00:00：V11性能候选保留原A5架构/75M/全量V8/micro16×GA4/global512，仅考虑取消整层激活重计算；单卡同输入开/关/开证实约22%更新时间减少，短窗参数完全相同，maxlen2048本地显存通过。尚未部署，不更改运行中冻结源；正式切换需独立恢复包及八卡同输入/容量/恢复资格。/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/v11_a5_75m_20261105/speed_diagnosis_20261105/README.md。
 
 > 2026-11-05T05:03:51+00:00：V11执行层恢复1B已受控证实有效的SHM通信，解决原同时禁用SHM/P2P导致Socket同步的瓶颈；仅改外层通信与调试环境，A5架构/75M参数/全量V8/损失/global512/micro16×GA4×8均保持。1B历史+20.26%吞吐不可外推为V11实测；V11八卡速度与实际SHM通道待目标机执行。详见 /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/v11_a5_75m_20261105/transport_fix.json。

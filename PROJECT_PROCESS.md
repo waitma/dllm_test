@@ -1,3 +1,5 @@
+> Last updated: 2026-11-08T13:04:16.458295+00:00。研究目标修订为表征能力优先，V9为用户报告的下游基线、V11为实验候选；本次复核现有负结果并记录对齐/去偏/受控消融流程，未启动训练或评测。当前仍缺V9/V11正式下游对比产物，未独立核验具体差值。计划 /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/ARCH70M_REPRESENTATION_PRIORITY_20261108.md。
+
 > Last updated: 2026-11-05T09:16:00.576504+00:00。V11速度独立诊断完成：当前step10850，最近200日志点均值0.8509秒；local重计算开/关/开0.7432/0.5771/0.7373秒，20更新参数哈希一致，耗时约减22%。micro32/64没有提速；no-checkpoint maxlen2048三更新reserved40.80GiB通过本地容量检查。GPU已释放，正式8卡未改/未中断，八卡性能与恢复未资格。报告 /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/v11_a5_75m_20261105/speed_diagnosis_20261105/README.md。
 
 > Last updated: 2026-11-05T08:49:23+00:00。用户提交的V11已确认正式八卡训练：step9000/300000（3.00%），epoch0.705，seen4608000；最新完整checkpoint8000，8rank参数哈希一致。最新MLM验证step9000 loss=0.580162；最近80个记录点均值0.838秒/更新。8份NCCL日志SHM_DISABLE=0且实际SHM/direct，未修改或重启训练。回执 /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/v11_a5_75m_20261105/training_first_review_20261105.json。

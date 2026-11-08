@@ -1,3 +1,5 @@
+> 2026-11-08T13:04:16.458295+00:00：用户纠正探索目标为表征能力。旧三种子decision=not_yet_stable与2026-11-04偏差审计保持；A5的生成完整性证据不外推为表征优势。新增目标修订 /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/ARCH70M_REPRESENTATION_PRIORITY_20261108.md，待V9/V11实际结果与checkpoint对齐后确定后续消融。没有新增训练、推理或改历史结果。
+
 > 2026-10-28T10:28:12Z：用户完成 GitHub CLI 设备验证，API 核实登录账号 waitma 且可写 waitma/dllm_test。初次网络推送 HTTP 408，核查远端未创建分支后，使用 HTTP/1.1、64 MiB 缓冲和本机 HTTP 代理重试成功；远端探索分支与本地 4ecc061 完全一致。GitHub credential helper 和专用传输配置已保存。历史 pending/publication_error 文件保留为失败证据，当前发布状态以 output/arch70m_v8_20261028/publication_status.json 为准；未修改原 main 或训练代码。
 
 > 2026-10-28T10:14:19Z：用户要求开发机继续验证、剩余提交四卡。10:12:43Z 在空闲 GPU0 启动 A2 单卡筛选，控制器 PID 92411；profile 选择 micro56/global512，初始完整评估、checkpoint-0 和实际训练 5 步完成。A0/A1 保持完成，远端分配 A3–A7（等待用户提交）。四卡脚本默认 screen 列表改为 A3–A7，dry-run 确认本地/远端不重叠，confirm 不受筛选列表限制。复核当前源码 SHA 仍为 053297983e0f2ece2aaad807032695fb5aebd1e0f221138a9bf0d202cc9b9ac4，训练数据形式不变。新控制台：[local_A2_20261028T101243Z.console.log](/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/arch70m_v8_20261028/local_A2_20261028T101243Z.console.log)。

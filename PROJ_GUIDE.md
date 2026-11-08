@@ -1,3 +1,5 @@
+> 2026-11-08T13:04:16.458295+00:00：表征架构探索当前目标说明 /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/ARCH70M_REPRESENTATION_PRIORITY_20261108.md。沿用原V8数据形式和固定10%索引；V9真实配置未核实前禁止将其等同A0。下游真实任务、统一读出/探针及偏差控制决定候选晋级，生成AAR与MLM loss不能替代表征验证。新预算/任务矩阵尚未冻结，本次无GPU执行。
+
 > 2026-11-05T09:16:00.576504+00:00：V11独立短时性能诊断入口 /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/benchmark_v11_microbatch.py（micro与--compare-checkpointing），/mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/profile_v11_without_checkpointing.py（maxlen2048）；只在独占空闲本地GPU、同GPU lease、NCCL2.31.2预加载下运行，输出新目录，不触碰正式train。证据 /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/v11_a5_75m_20261105/speed_diagnosis_20261105/README.md，禁止把单卡提速直接宣称为八卡已提速。
 
 > 2026-11-05T08:49:23+00:00 V11已进入正式八卡训练，输出 /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/output/v11_a5_75m_300k_20261105/train；实际NCCL通道SHM/direct已核实，原“尚未启动”段落为交付时历史状态。后续查询读取train/status.json、latest.json及metrics.jsonl，运行中不重复执行scratch入口；此次未重启/改配置。首次运行回执 /mnt/project-storage/fset-rN4kfh/251105016/dllm_arch_explore/docs/v11_a5_75m_20261105/training_first_review_20261105.json。
