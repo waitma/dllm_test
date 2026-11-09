@@ -26,15 +26,25 @@ def synthetic_batch(config, micro, length):
                         BioSeqChain(residues[:config.second_chain_capacity-1], "antibody_light")],
                        "antibody_antigen", "synthetic_mlm_profile")
     batch = collator([row])
+    if 'family_labels' in batch:
+        for slot, prefix in ((0, 'human:IGHV'), (1, 'human:IGKV')):
+            batch['family_labels'][0, slot] = next(i for name, i in collator.class_ids.items() if name.startswith(prefix))
     extra = length - batch["input_ids"].shape[1]
     if extra < 0:
         raise ValueError("Synthetic length too short")
     index = int((batch["role_ids"][0].eq(7) & batch["residue_mask"][0]).nonzero()[0])
     for key, value in batch.items():
+        if key == 'family_labels':
+            batch[key] = value.repeat(micro, 1)
+            continue
         extension = value[:, index:index+1].expand(1, extra).clone()
         if key == "position_ids":
             extension[:] = torch.arange(201, 201+extra)
         batch[key] = torch.cat([value[:, :index], extension, value[:, index:]], 1).repeat(micro, 1)
+        if key == 'type_token_indices':
+            # These values point into the sequence. Inserting context before a
+            # marker must shift its references, while -1 remains unmapped.
+            batch[key] = torch.where(batch[key] >= index, batch[key] + extra, batch[key])
     return batch, collator.tokenizer
 
 
@@ -51,7 +61,10 @@ def attempt(config, micro, length, device):
     for _ in range(3):
         optimizer.zero_grad(set_to_none=True)
         with torch.autocast("cuda", dtype=torch.bfloat16):
-            loss = model(**batch)["loss_sum"] / batch["labels"].ne(-100).sum()
+            result = model(**batch)
+            loss = result["loss_sum"] / batch["labels"].ne(-100).sum()
+            if 'family_loss_sum' in result:
+                loss = loss + model.family_loss_weight * result['family_loss_sum'] / batch['family_labels'].ne(-100).sum().clamp_min(1)
         loss.backward()
         norm = torch.nn.utils.clip_grad_norm_(model.parameters(), 1., error_if_nonfinite=True)
         optimizer.step()
@@ -70,7 +83,7 @@ def attempt(config, micro, length, device):
 
 def main(plan, device, rank, world):
     global BertMLMCollator, BertMLMModel, corrupt
-    BertMLMCollator, BertMLMModel, corrupt, _ = components(plan.get("objective", "receptor_aa"))
+    BertMLMCollator, BertMLMModel, corrupt, _ = components(plan.get("objective", "receptor_aa"), plan.get('family_prediction'), plan.get('architecture'))
     config = FixedChainConfig(**plan["model"])
     reports, selected = [], None
     for micro in (64, 32, 16, 8):

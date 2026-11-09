@@ -19,10 +19,19 @@ INDEX_DIR = ROOT / 'output/bert_unbinding_v8_from287000_20261026/data'
 BINDING_SCHEMA = 'immune.bert_mlm.v8_binding.v1'
 
 
-def release_binding(data_dir):
+def release_binding(data_dir, *, _allow_superseded_ancestor=False):
     data_dir = Path(data_dir)
+    if (data_dir / 'SUPERSEDED.json').exists() and not _allow_superseded_ancestor:
+        raise ValueError('Superseded data release is not eligible for a new training binding: ' + str(data_dir))
     manifest_path = data_dir / 'dataset_manifest.json'
     manifest = json.loads(manifest_path.read_text())
+    if 'binding_unseen_filter' in manifest:
+        from scripts.research.bert_mlm_filtered_data import filtered_release_binding
+        return filtered_release_binding(data_dir, manifest)
+    if 'paired_repertoire_expansion' in manifest or 'single_chain_expansion' in manifest:
+        return paired_repertoire_release_binding(data_dir, manifest)
+    if 'four_relation_expansion' in manifest:
+        return four_relation_release_binding(data_dir, manifest)
     if 'antibody_expansion' in manifest:
         return antibody_release_binding(data_dir, manifest)
     if 'mhc_completion' in manifest:
@@ -76,6 +85,134 @@ def release_binding(data_dir):
                 manifest_sha256=digest, config_path=str(config_path), config_sha256=sha(config_path),
                 model=model, evidence=evidence, shards=shards,
                 records={s: b['records'] for s, b in manifest['splits'].items()})
+
+
+def paired_repertoire_release_binding(data_dir, manifest):
+    """Bind checked paired-repertoire or role-aware single-chain V8 additions."""
+    single = 'single_chain_expansion' in manifest
+    expansion = manifest['single_chain_expansion' if single else 'paired_repertoire_expansion']
+    allowed_sources = ({'tcrdesign_alpha_repertoire', 'tcrdesign_alpha_epitope',
+                        'tcrdesign_alpha_pmhc', 'tcrdesign_beta_repertoire_full',
+                        'tcrdesign_beta_repertoire_clustered'} if single else
+                       {'tcrdiff_repertoire_paired'})
+    prefix = 'tdsingle-' if single else 'tcrdiffrep-'
+    parent_dir = Path(expansion['parent'])
+    if parent_dir.resolve() == data_dir.resolve():
+        raise ValueError('Cyclic repertoire parent')
+    parent = release_binding(parent_dir)
+    digest = sha(data_dir / 'dataset_manifest.json')
+    config = data_dir / manifest['reader_contract']['config_path']
+    if (parent['manifest_sha256'] != expansion['parent_manifest_sha256']
+            or sha(config) != parent['config_sha256']
+            or manifest['reader_contract'] != json.loads(Path(parent['manifest']).read_text())['reader_contract']):
+        raise ValueError('Repertoire parent/config changed')
+    evidence = {}
+    for name in ('verification.json', 'reader_acceptance.json', 'independent_acceptance.json'):
+        path = data_dir / name
+        check = json.loads(path.read_text())
+        if (check['status'] != 'passed' or check['dataset_manifest_sha256'] != digest
+                or check['config_sha256'] != parent['config_sha256']):
+            raise ValueError('Repertoire acceptance changed')
+        for key, filename in (('collator_sha256', 'layout.py'), ('objective_sha256', 'unbinding_mlm.py'),
+                              ('vhh_objective_sha256', 'unbinding_vhh.py')):
+            if check[key] != sha(ROOT / 'dllm/pipelines/immune_llada/fixed_chain' / filename):
+                raise ValueError('Repertoire reader changed')
+        evidence[str(path)] = sha(path)
+    previous = {str(Path(s['path']).relative_to(parent_dir)): s for s in parent['shards']}
+    additions = {s['path']: s for s in expansion['added_shards']}
+    if set(previous) & set(additions) or len(additions) != len(expansion['added_shards']):
+        raise ValueError('Overlapping repertoire additions')
+    shards, seen = [], set()
+    for split, block in manifest['splits'].items():
+        if (sum(s['records'] for s in block['shards']) != block['records'] or block['records'] !=
+                parent['records'][split] + sum(s['records'] for s in additions.values() if s['split'] == split)):
+            raise ValueError('Repertoire counts changed')
+        for spec in block['shards']:
+            path = data_dir / spec['path']; resolved = path.resolve(strict=True)
+            if spec['path'] in seen:
+                raise ValueError('Repeated repertoire shard')
+            seen.add(spec['path'])
+            if spec['path'] in previous:
+                old = previous[spec['path']]
+                if resolved != Path(old['resolved_path']) or any(spec[k] != old[k] for k in ('records','sha256','source','split')):
+                    raise ValueError('Repertoire parent shard changed')
+            elif spec['path'] in additions:
+                if (spec != additions[spec['path']] or resolved != path or not path.name.startswith(prefix)
+                        or spec['source'] not in allowed_sources):
+                    raise ValueError('Unexpected repertoire addition')
+            else:
+                raise ValueError('Unbound repertoire shard')
+            shards.append(dict(path=str(path), resolved_path=str(resolved), split=split,
+                               source=spec['source'], records=spec['records'], sha256=spec['sha256']))
+    if seen != set(previous) | set(additions):
+        raise ValueError('Incomplete repertoire coverage')
+    return dict(schema=BINDING_SCHEMA, data_dir=str(data_dir), manifest=str(data_dir / 'dataset_manifest.json'),
+                manifest_sha256=digest, config_path=str(config), config_sha256=parent['config_sha256'],
+                model=parent['model'], evidence=evidence, shards=shards,
+                records={s: b['records'] for s,b in manifest['splits'].items()},
+                required_objective=parent['required_objective'])
+
+
+def four_relation_release_binding(data_dir, manifest):
+    """Require explicit VHH objective acceptance and immutable parent coverage."""
+    expansion = manifest['four_relation_expansion']
+    parent_dir = Path(expansion['parent'])
+    if parent_dir.resolve() == data_dir.resolve():
+        raise ValueError('Cyclic four-relation parent')
+    parent = release_binding(parent_dir)
+    if parent['manifest_sha256'] != expansion['parent_manifest_sha256']:
+        raise ValueError('Four-relation parent changed')
+    digest = sha(data_dir / 'dataset_manifest.json')
+    config = data_dir / manifest['reader_contract']['config_path']
+    if (sha(config) != parent['config_sha256'] or manifest['reader_contract'] !=
+            json.loads(Path(parent['manifest']).read_text())['reader_contract']):
+        raise ValueError('Four-relation layout changed')
+    evidence = {}
+    for name in ('verification.json', 'reader_acceptance.json', 'independent_acceptance.json'):
+        path = data_dir / name
+        check = json.loads(path.read_text())
+        if (check['status'] != 'passed' or check['dataset_manifest_sha256'] != digest
+                or check['config_sha256'] != parent['config_sha256']):
+            raise ValueError('Four-relation acceptance changed')
+        for key, filename in (('collator_sha256', 'layout.py'), ('objective_sha256', 'unbinding_mlm.py'),
+                              ('vhh_objective_sha256', 'unbinding_vhh.py')):
+            if check[key] != sha(ROOT / 'dllm/pipelines/immune_llada/fixed_chain' / filename):
+                raise ValueError('Four-relation reader changed')
+        evidence[str(path)] = sha(path)
+    previous = {str(Path(s['path']).relative_to(parent_dir)): s for s in parent['shards']}
+    additions = {s['path']: s for s in expansion['added_shards']}
+    if set(previous) & set(additions) or len(additions) != len(expansion['added_shards']):
+        raise ValueError('Overlapping additions')
+    shards, seen = [], set()
+    for split, block in manifest['splits'].items():
+        if (sum(s['records'] for s in block['shards']) != block['records'] or block['records'] !=
+                parent['records'][split] + sum(s['records'] for s in additions.values() if s['split'] == split)):
+            raise ValueError('Four-relation counts changed')
+        for spec in block['shards']:
+            path = data_dir / spec['path']; resolved = path.resolve(strict=True)
+            if spec['path'] in seen:
+                raise ValueError('Repeated shard')
+            seen.add(spec['path'])
+            if spec['path'] in previous:
+                old = previous[spec['path']]
+                if (resolved != Path(old['resolved_path']) or
+                        any(spec[k] != old[k] for k in ('records', 'sha256', 'source', 'split'))):
+                    raise ValueError('Parent shard changed')
+            elif spec['path'] in additions:
+                if spec != additions[spec['path']] or resolved != path or not path.name.startswith('negx_'):
+                    raise ValueError('Unbound addition')
+            else:
+                raise ValueError('Unexpected shard')
+            shards.append(dict(path=str(path), resolved_path=str(resolved), split=split,
+                source=spec['source'], records=spec['records'], sha256=spec['sha256']))
+    if seen != set(previous) | set(additions):
+        raise ValueError('Incomplete shard coverage')
+    return dict(schema=BINDING_SCHEMA, data_dir=str(data_dir), manifest=str(data_dir / 'dataset_manifest.json'),
+        manifest_sha256=digest, config_path=str(config), config_sha256=parent['config_sha256'],
+        model=parent['model'], evidence=evidence, shards=shards,
+        records={s: b['records'] for s, b in manifest['splits'].items()},
+        required_objective=expansion['objective'],
+        four_relation_parent_binding_sha256=hashlib.sha256(json.dumps(parent, sort_keys=True).encode()).hexdigest())
 
 
 def antibody_release_binding(data_dir, manifest):
@@ -230,10 +367,13 @@ def prepare(workers=8, data_dir=OUTPUT, output_dir=INDEX_DIR):
             raise ValueError('V7 development file changed')
         files[name] = deepcopy(reference)
     manifest = json.loads((data_dir / 'dataset_manifest.json').read_text())
-    jobs = [(str(data_dir), dict(s, split=split, receptor_capacities=dict(
-                antibody_heavy=167, antibody_light=135, tcr_beta=167, tcr_alpha=135)), str(output_dir), held)
+    roles = ('antibody_heavy', 'antibody_light', 'tcr_beta', 'tcr_alpha')
+    if 'four_relation_expansion' in manifest:
+        roles += ('nanobody_vhh',)
+    jobs = [(str(data_dir), dict(s, split=split, receptor_roles=roles, receptor_capacities=dict(
+                antibody_heavy=167, antibody_light=135, tcr_beta=167, tcr_alpha=135, nanobody_vhh=167)), str(output_dir), held)
             for split, block in manifest['splits'].items() for s in block['shards']
-            if Path(s['path']).name.startswith(('unbind_', 'abexp_'))]
+            if Path(s['path']).name.startswith(('unbind_', 'abexp_', 'negx_'))]
     negatives = []
     with ProcessPoolExecutor(max_workers=workers) as pool:
         for result in pool.map(scan_shard, jobs):
@@ -249,7 +389,8 @@ def prepare(workers=8, data_dir=OUTPUT, output_dir=INDEX_DIR):
         raise ValueError('V8 offset coverage differs')
     token_rows = [json.loads(line) for line in Path(files['token_valid']['path']).read_text().splitlines()]
     token_rows.extend(negatives)
-    from dllm.pipelines.immune_llada.fixed_chain.unbinding_mlm import UnbindingMLMCollator
+    from scripts.research.bert_mlm_objectives import components
+    UnbindingMLMCollator = components(bound.get('required_objective', 'binding_mlm_nonbinding_relation_only'))[0]
     from dllm.pipelines.immune_llada.fixed_chain.model import FixedChainConfig
     collator = UnbindingMLMCollator(FixedChainConfig(**bound['model']))
     for row in token_rows:

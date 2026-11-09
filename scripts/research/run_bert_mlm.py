@@ -15,6 +15,7 @@ from pathlib import Path
 import random
 import shutil
 import time
+import traceback
 
 import numpy as np
 import torch
@@ -88,7 +89,7 @@ def rank_zero(operation, rank):
         try:
             packet[0] = {"value": operation(), "error": None}
         except Exception as exc:
-            packet[0] = {"value": None, "error": repr(exc)}
+            packet[0] = {"value": None, "error": traceback.format_exc()}
     torch.distributed.broadcast_object_list(packet, src=0)
     if packet[0]["error"]:
         raise RuntimeError(packet[0]["error"])
@@ -104,7 +105,22 @@ def data_gate(plan):
             from scripts.research.bert_mlm_v8_data import verify_binding
         else:
             from scripts.research.bert_mlm_v7_data import verify_binding
-        binding = verify_binding(index["binding"], index["binding_sha256"], plan["model"])
+        binding = verify_binding(index["binding"], index["binding_sha256"], data_model_for_plan(plan))
+        required = binding.get('required_objective')
+        compatible_family = (required == 'binding_mlm_nonbinding_relation_only_vhh'
+                             and plan.get('objective') in (required + '_v_family',
+                                                          required + '_v_family_label_independent'))
+        from dllm.pipelines.immune_llada.fixed_chain.v10_airgen_qk_swiglu_bias import (
+            ARCHITECTURE as NO_FAMILY_ARCHITECTURE, OBJECTIVE as NO_FAMILY_OBJECTIVE)
+        from dllm.pipelines.immune_llada.fixed_chain.v12_airgen import ARCHITECTURE as V12_ARCHITECTURE
+        compatible_no_family = (required == 'binding_mlm_nonbinding_relation_only_vhh'
+                                and plan.get('architecture') in (NO_FAMILY_ARCHITECTURE, V12_ARCHITECTURE)
+                                and plan.get('objective') == NO_FAMILY_OBJECTIVE)
+        if compatible_family:
+            from dllm.pipelines.immune_llada.fixed_chain.v_family import validate_spec
+            validate_spec(plan.get('family_prediction'))
+        if required and plan.get('objective') != required and not (compatible_family or compatible_no_family):
+            raise ValueError('Data release requires the VHH-aware relation-only objective')
         expected = {x["path"]: x for x in binding["shards"]}
         if set(expected) != {x["path"] for x in index["shards"]}:
             raise ValueError("BERT index does not cover exactly the bound V7 shards")
@@ -170,6 +186,12 @@ def save_checkpoint(output, model, optimizer, scheduler, noise, state, provenanc
         # Only checkpoints created by this run are eligible for automatic retention.
         candidates = sorted(output.glob("checkpoint-*"), key=lambda p: int(p.name.split("-")[-1]))
         keep = set(candidates[-2:]) | {output / ("checkpoint-" + str(state["best_step"]))}
+        # Optional downstream winners belong to this same immutable run. Keep
+        # their complete optimizer/RNG states alongside the usual CE winner.
+        pinned = state.get("cdr_checkpoint_steps", [])
+        if any(type(step) is not int or step < 0 or step > state["step"] for step in pinned):
+            raise ValueError("Invalid downstream checkpoint retention step")
+        keep.update(output / ("checkpoint-" + str(step)) for step in pinned)
         for old in candidates:
             if old not in keep and (old / "checkpoint_receipt.json").exists():
                 if json.loads((old / "run_provenance.json").read_text()) != provenance:
@@ -227,10 +249,16 @@ def update(ddp, batch, optimizer, scheduler, micro, world, *, bf16=True):
     device = next(ddp.parameters()).device
     denominator = batch["labels"].ne(-100).sum().to(device)
     torch.distributed.all_reduce(denominator)
-    if not denominator.item():
+    family = 'family_labels' in batch
+    family_count = batch['family_labels'].ne(-100).sum().to(device) if family else torch.zeros((), device=device)
+    if family:
+        torch.distributed.all_reduce(family_count)
+    if not denominator.item() and not family_count.item():
         raise ValueError("Optimizer step has no selected target on any rank")
     optimizer.zero_grad(set_to_none=True)
     local_sum = torch.zeros((), device=device, dtype=torch.float64)
+    family_sum = torch.zeros((), device=device, dtype=torch.float64)
+    family_correct = torch.zeros((), device=device, dtype=torch.float64)
     rows = len(batch["input_ids"])
     for offset in range(0, rows, micro):
         last = offset + micro >= rows
@@ -238,17 +266,44 @@ def update(ddp, batch, optimizer, scheduler, micro, world, *, bf16=True):
             part = {k: v[offset:offset+micro].to(device, non_blocking=True) for k, v in batch.items()}
             with torch.autocast("cuda", dtype=torch.bfloat16, enabled=bf16):
                 result = ddp(**part)
-                loss = result["loss_sum"] * world / denominator
+                loss = result["loss_sum"] * world / denominator.clamp_min(1)
+                if family:
+                    loss = loss + ddp.module.family_loss_weight * result['family_loss_sum'] * world / family_count.clamp_min(1)
             loss.backward()
             local_sum += result["loss_sum"].detach().double()
+            if family:
+                family_sum += result['family_loss_sum'].detach().double()
+                family_correct += result['family_correct'].detach().double()
             del result, loss, part
     norm = torch.nn.utils.clip_grad_norm_(ddp.parameters(), 1., error_if_nonfinite=True)
     lr_used = optimizer.param_groups[0]["lr"]
     optimizer.step()
     scheduler.step()
     torch.distributed.all_reduce(local_sum)
-    return dict(loss=float(local_sum/denominator), selected_tokens=int(denominator),
-                grad_norm=float(norm), learning_rate=lr_used)
+    metrics = dict(loss=float(local_sum/denominator.clamp_min(1)), selected_tokens=int(denominator),
+                   grad_norm=float(norm), learning_rate=lr_used)
+    if 'corruption_mode' in batch:
+        available = batch['cdr_region_ids'].gt(0).any(1)
+        supervised = batch['labels'].ne(-100)
+        modes = batch['corruption_mode'][:, 0]
+        counts = [available.sum(), (~available).sum()]
+        for mode in range(3):
+            chosen = modes.eq(mode)
+            counts.extend((chosen.sum(), (supervised & chosen[:, None]).sum(),
+                           (supervised & batch['span_mask'] & chosen[:, None]).sum()))
+        counts = torch.stack(counts).to(device)
+        torch.distributed.all_reduce(counts)
+        metrics.update(span_eligible_records=int(counts[0]), span_unavailable_records=int(counts[1]))
+        for mode, name in enumerate(('mlm', 'span_mask', 'span_mutation')):
+            for offset, suffix in enumerate(('records', 'target_tokens', 'span_target_tokens')):
+                metrics[name+'_'+suffix] = int(counts[2+3*mode+offset])
+    if family:
+        torch.distributed.all_reduce(family_sum)
+        torch.distributed.all_reduce(family_correct)
+        metrics.update(family_loss=float(family_sum/family_count.clamp_min(1)), family_chains=int(family_count),
+                       family_accuracy=float(family_correct/family_count.clamp_min(1)))
+        metrics['total_loss'] = metrics['loss'] + ddp.module.family_loss_weight * metrics['family_loss']
+    return metrics
 
 
 def math_resume_oracle(checkpoint, ddp, optimizer, scheduler, noise, provenance, raw, micro, rank, world):
@@ -297,6 +352,9 @@ def math_resume_oracle(checkpoint, ddp, optimizer, scheduler, noise, provenance,
 
 
 def wandb_start(plan, provenance, output, resume):
+    if plan.get('wandb_startup') == 'bounded_retry_v1':
+        from scripts.research.bert_wandb_start import start_training
+        return start_training(plan, provenance, output, resume)
     import wandb
     spec = plan["wandb"]
     key = Path(spec["credential_file"]).read_text().strip()
@@ -322,7 +380,8 @@ def wandb_start(plan, provenance, output, resume):
 def verify_initial_checkpoint(plan):
     """Verify the original full-token BERT287000 before a new V8 stage."""
     from dllm.pipelines.immune_llada.fixed_chain.unbinding_mlm import OBJECTIVE
-    if plan.get("objective") != OBJECTIVE or plan.get("parent_step") != 287000:
+    from dllm.pipelines.immune_llada.fixed_chain.unbinding_vhh import OBJECTIVE as VHH_OBJECTIVE
+    if plan.get("objective") not in (OBJECTIVE, VHH_OBJECTIVE) or plan.get("parent_step") != 287000:
         raise ValueError("Parent initialization requires the explicit V8/BERT287000 contract")
     parent = Path(plan["parent_checkpoint"])
     if sha(parent / "checkpoint_receipt.json") != plan["parent_receipt_sha256"]:
@@ -343,10 +402,65 @@ def verify_initial_checkpoint(plan):
     return dict(status="passed", step=287000, model_sha256=plan["parent_model_sha256"])
 
 
+def data_model_for_plan(plan):
+    """Versioned V10 backbones reuse the exact V9 data-layout binding."""
+    if not plan.get('architecture'):
+        return plan['model']
+    from dllm.pipelines.immune_llada.fixed_chain.v10_airgen import ARCHITECTURE, OBJECTIVE, RECIPE
+    from dllm.pipelines.immune_llada.fixed_chain.v10_airgen_qk_swiglu_bias import (
+        ARCHITECTURE as QK_ARCHITECTURE, INPUT_FEATURES, OBJECTIVE as QK_OBJECTIVE,
+        RECIPE as QK_RECIPE, swiglu_hidden_size)
+    from dllm.pipelines.immune_llada.fixed_chain.v12_airgen import ARCHITECTURE as V12_ARCHITECTURE
+    qk_architectures = (QK_ARCHITECTURE, V12_ARCHITECTURE)
+    if plan['architecture'] in qk_architectures and plan.get('input_features') != list(INPUT_FEATURES):
+        raise ValueError('V10 QK/SwiGLU/bias input features must match the versioned no-scope/type-routing contract')
+    if plan['architecture'] in qk_architectures and any(k in plan for k in
+            ('family_prediction', 'family_spec_path', 'family_spec_sha256', 'smoke_family_records')):
+        raise ValueError('The current AirGen plan must not contain family prediction fields')
+    reference = plan.get('data_model', {})
+    middle = swiglu_hidden_size(1280) if plan['architecture'] in qk_architectures else 5120
+    dimensions = dict(d_model=1280, n_layers=3, n_heads=20, mlp_hidden_size=middle)
+    objective, recipe = (QK_OBJECTIVE, QK_RECIPE) if plan['architecture'] in qk_architectures else (OBJECTIVE, RECIPE)
+    if (plan['architecture'] not in (ARCHITECTURE, *qk_architectures) or plan.get('objective') != objective
+            or plan.get('recipe') != recipe or not reference
+            or plan['model'] != dict(reference, **dimensions)
+            or any(reference[k] != v for k,v in dict(d_model=768,n_layers=8,n_heads=12,mlp_hidden_size=3072).items())):
+        raise ValueError('V10 may change only the explicit AirGen backbone dimensions')
+    expected_parameter_count(plan)
+    return reference
+
+
+def expected_parameter_count(plan):
+    """Keep legacy counts exact; V10's independently checked budget is explicit."""
+    if plan.get('architecture'):
+        from dllm.pipelines.immune_llada.fixed_chain.v10_airgen_qk_swiglu_bias import (
+            ARCHITECTURE as QK_ARCHITECTURE, parameter_count)
+        from dllm.pipelines.immune_llada.fixed_chain.v12_airgen import ARCHITECTURE as V12_ARCHITECTURE
+        if plan['architecture'] in (QK_ARCHITECTURE, V12_ARCHITECTURE):
+            count = parameter_count(FixedChainConfig(**plan['model']))
+            budget = plan.get('parameter_budget', {})
+            if (type(budget.get('parameters')) is not int or budget['parameters'] != count
+                    or budget.get('reference_parameters') != 75755753):
+                raise ValueError('V10 QK/SwiGLU/bias parameter budget differs from its exact architecture')
+            return count
+        from dllm.pipelines.immune_llada.fixed_chain.v10_airgen import ARCHITECTURE
+        budget = plan.get('parameter_budget', {})
+        count = budget.get('parameters')
+        if (plan['architecture'] != ARCHITECTURE or type(count) is not int or count <= 0
+                or budget.get('reference_parameters') != 75741903
+                or abs(count / budget['reference_parameters'] - 1) > .01):
+            raise ValueError('V10 must match the V9 parameter budget within 1 percent')
+        return count
+    count = 75601176
+    if plan.get('family_prediction'):
+        count += len(plan['family_prediction']['classes']) * (plan['model']['d_model'] + 1)
+    return count
+
+
 def main(plan, device, rank, world):
     # Bind one immutable objective per process, including resume/oracle helpers.
     global BertMLMCollator, BertMLMModel, corrupt, RECIPE
-    BertMLMCollator, BertMLMModel, corrupt, RECIPE = components(plan.get("objective", "receptor_aa"))
+    BertMLMCollator, BertMLMModel, corrupt, RECIPE = components(plan.get("objective", "receptor_aa"), plan.get('family_prediction'), plan.get('architecture'))
     settings = plan["training"]
     out = Path(plan["output_dir"])
     resume = plan.get("resume_checkpoint")
@@ -369,18 +483,23 @@ def main(plan, device, rank, world):
                       objective=plan.get("objective", "receptor_aa"),
                       eval_script=str(Path(plan["source_root"])/"scripts/research/bert_mlm_eval.py"),
                       wandb={k: v for k, v in plan["wandb"].items() if k != "credential_file"})
+    if plan.get('architecture'):
+        provenance.update(architecture=plan['architecture'], parameter_budget=plan['parameter_budget'])
     if plan.get("parent_checkpoint"):
         rank_zero(lambda: verify_initial_checkpoint(plan), rank)
         provenance.update({k: plan[k] for k in ("parent_checkpoint", "parent_step",
                            "parent_receipt_sha256", "parent_model_sha256")})
         provenance["initialization"] = "parent_weights; fresh_optimizer_scheduler_sampler_rng"
+    if plan.get('family_prediction'):
+        provenance['family_prediction'] = plan['family_prediction']
     random.seed(settings["seed"])
     np.random.seed(settings["seed"])
     torch.manual_seed(settings["seed"])
     model = (BertMLMModel.from_parent(plan["parent_checkpoint"]) if plan.get("parent_checkpoint")
              else BertMLMModel(FixedChainConfig(**plan["model"]))).to(device)
-    if sum(p.numel() for p in model.parameters()) != 75601176:
-        raise ValueError("Parameter count differs from the 75.6M architecture")
+    expected_parameters = expected_parameter_count(plan)
+    if sum(p.numel() for p in model.parameters()) != expected_parameters:
+        raise ValueError("Parameter count differs from the frozen architecture")
     model.backbone.set_activation_checkpointing(ActivationCheckpointingStrategy.whole_layer)
     ddp = DistributedDataParallel(model, device_ids=[device.index], broadcast_buffers=False,
                                   find_unused_parameters=False, gradient_as_bucket_view=True)
@@ -413,7 +532,9 @@ def main(plan, device, rank, world):
                 wandb_metrics = {key: value for key, value in metrics.items()
                                  if not key.startswith("valid/")
                                  or key in ("valid/loss", "valid/mask_accuracy")
-                                 or (key.count("/") == 2 and key.endswith("/loss"))}
+                                 or key in {f"valid/{source}/loss" for source in (
+                                     "asd_antibody", "oas", "ots", "tcr_native",
+                                     "tcr_papers", "tcr_repertoire", "trait")}}
                 run.log(wandb_metrics, step=state["step"])
     def evaluate(probe):
         rng = capture_rng(noise)

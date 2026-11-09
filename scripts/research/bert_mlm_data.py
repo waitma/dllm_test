@@ -38,11 +38,11 @@ def write_json(path, value):
     temporary.replace(path)
 
 
-def receptor_key(row):
+def receptor_key(row, roles=ROLES):
     """Observed sequence identity, ignoring synthetic template and condition labels."""
     parts = []
     for i, (role, sequence) in enumerate(zip(row["chain_roles"], row["chains"])):
-        if role in ROLES:
+        if role in roles:
             synthetic = row.get("chain_metadata", {}).get(str(i), {}).get("synthetic_residue_mask", [])
             observed = "".join(aa for j, aa in enumerate(sequence) if not synthetic or not synthetic[j])
             parts.append((role, observed))
@@ -60,6 +60,7 @@ def keep_smallest(heap, score, row, limit):
 
 def scan_shard(job):
     directory, entry, output, held_keys = job
+    receptor_roles = entry.get('receptor_roles', ROLES)
     path = Path(directory) / entry["path"]
     try:
         import orjson
@@ -83,7 +84,7 @@ def scan_shard(job):
                 raise ValueError("Explicit nonbinding row in cleaned pretraining data: " + str(path))
             eligible = 0
             for i, (role, sequence) in enumerate(zip(row["chain_roles"], row["chains"])):
-                if role not in ROLES:
+                if role not in receptor_roles:
                     continue
                 capacities = entry.get("receptor_capacities", {})
                 if role in capacities and len(sequence) + 1 > capacities[role]:
@@ -98,7 +99,7 @@ def scan_shard(job):
                 reasons["zero_observed_receptor_residues"] += 1
                 continue
             offsets.append(offset)
-            key = receptor_key(row)
+            key = receptor_key(row, receptor_roles)
             if key in held_keys:
                 overlap.add(key)
             label = row.get("labels", {}).get("relation")

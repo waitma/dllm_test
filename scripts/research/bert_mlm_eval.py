@@ -40,7 +40,9 @@ def fixed_corruption(batch, tokenizer, sample_indices, seed=41016, corrupt_fn=co
         length = int(batch["attention_mask"][row].sum())
         item = {key: value[row:row+1, :length] for key, value in batch.items()}
         noisy = corrupt_fn(item, tokenizer, torch.Generator().manual_seed(seed+sample))
-        for key in ("input_ids", "labels", "noise_kind"):
+        for key, value in noisy.items():
+            if key not in result:
+                result[key] = torch.zeros_like(batch['input_ids'], dtype=value.dtype)
             result[key][row, :length] = noisy[key][0]
     return result
 
@@ -50,8 +52,13 @@ def token_validation(model, index, device, rank=0, world=1, batch_size=8):
     collator_cls, _, corrupt_fn, _ = for_model(model)
     samples = read_samples(index["files"]["token_valid"])
     sources = sorted({x["source_group"] for x in samples})
-    groups = ("receptor_aa", "context_aa", "eos", "relation", "type", "separator", "null_context")
+    groups = ("receptor_aa", "context_aa", "eos", "relation", "type", "separator", "null_context", "cdr_span")
     totals = torch.zeros((len(sources)+1, 17+3*len(groups)), dtype=torch.float64, device=device)
+    span_totals = torch.zeros((len(sources)+1, 3, 4), dtype=torch.float64, device=device)
+    span_available = torch.zeros(len(sources)+1, dtype=torch.float64, device=device)
+    family_classes = len(model.family_spec['classes']) if hasattr(model, 'family_spec') else 0
+    confusion = torch.zeros((len(sources)+1, family_classes, family_classes), dtype=torch.float64, device=device)
+    family_losses = torch.zeros(len(sources)+1, dtype=torch.float64, device=device)
     collator = collator_cls(model.config)
     was_training = model.training
     model.eval()
@@ -62,14 +69,31 @@ def token_validation(model, index, device, rank=0, world=1, batch_size=8):
         noisy = fixed_corruption(clean, model.tokenizer, indices, corrupt_fn=corrupt_fn)
         batch = {k: v.to(device) for k, v in noisy.items()}
         with autocast(device):
-            logits, _ = model.denoise(**model.feature_args(batch))
+            if family_classes:
+                output = model(**batch)
+                logits = output['logits']
+            else:
+                logits, _ = model.denoise(**model.feature_args(batch))
         pred = logits.argmax(-1)
         truth = clean["input_ids"].to(device)
         probability = logits.float().softmax(-1).amax(-1)
         for row, sample_id in enumerate(indices):
+            if family_classes:
+                labels = batch['family_labels'][row]
+                selected = labels.ne(-100)
+                if selected.any():
+                    scores = output['family_logits'][row, selected].float()
+                    targets = labels[selected]
+                    counts = torch.bincount(targets * family_classes + scores.argmax(-1),
+                                            minlength=family_classes**2).reshape(family_classes, family_classes)
+                    loss = F.cross_entropy(scores, targets, reduction='sum')
+                    for group_id in (0, sources.index(samples[sample_id]['source_group'])+1):
+                        confusion[group_id] += counts
+                        family_losses[group_id] += loss
             values = torch.zeros(17+3*len(groups), dtype=torch.float64, device=device)
+            supervised = batch['labels'][row].ne(-100)
             for kind in (1, 2, 3):
-                mask = batch["noise_kind"][row].eq(kind)
+                mask = batch["noise_kind"][row].eq(kind) & supervised
                 column = (kind-1)*3
                 if mask.any():
                     values[column] = F.cross_entropy(logits[row, mask].float(), truth[row, mask], reduction="sum")
@@ -80,7 +104,7 @@ def token_validation(model, index, device, rank=0, world=1, batch_size=8):
             values[9] = correct_input.sum()
             values[10] = edited.sum()
             values[11] = batch["eligible_mask"][row].sum()
-            values[12] = batch["noise_kind"][row].ne(0).sum()
+            values[12] = supervised.sum()
             values[13] = 1
             editable = batch["eligible_mask"][row] & ~batch["noise_kind"][row].eq(1)
             edits = editable & pred[row].ne(batch["input_ids"][row]) & (probability[row] >= .9)
@@ -95,7 +119,8 @@ def token_validation(model, index, device, rank=0, world=1, batch_size=8):
                      truth[row].eq(model.tokenizer.eos_token_id),
                      batch.get("relation_mask", torch.zeros_like(truth, dtype=torch.bool))[row],
                      type_mask, truth[row].eq(model.tokenizer.chain_separator_id()),
-                     truth[row].eq(model.tokenizer.special_id("<null>")))
+                     truth[row].eq(model.tokenizer.special_id("<null>")),
+                     batch.get('span_mask', torch.zeros_like(truth, dtype=torch.bool))[row])
             for number, population in enumerate(masks):
                 mask = population & batch["labels"][row].ne(-100)
                 if mask.any():
@@ -105,11 +130,25 @@ def token_validation(model, index, device, rank=0, world=1, batch_size=8):
                     values[column+2] = pred[row, mask].eq(truth[row, mask]).sum()
             totals[0] += values
             totals[sources.index(samples[sample_id]["source_group"])+1] += values
+            if 'corruption_mode' in batch:
+                mode = int(batch['corruption_mode'][row, 0])
+                data = torch.stack((torch.ones((), device=device), supervised.sum(),
+                                    F.cross_entropy(logits[row, supervised].float(), truth[row, supervised], reduction='sum')
+                                    if supervised.any() else torch.zeros((), device=device),
+                                    pred[row, supervised].eq(truth[row, supervised]).sum()))
+                for group_id in (0, sources.index(samples[sample_id]['source_group'])+1):
+                    span_totals[group_id, mode] += data
+                    span_available[group_id] += batch['cdr_region_ids'][row].gt(0).any()
     if world > 1:
         torch.distributed.all_reduce(totals)
+        torch.distributed.all_reduce(span_totals)
+        torch.distributed.all_reduce(span_available)
+        if family_classes:
+            torch.distributed.all_reduce(confusion)
+            torch.distributed.all_reduce(family_losses)
     model.train(was_training)
     result = {}
-    for name, values in zip(["all", *sources], totals.cpu().tolist()):
+    for group_id, (name, values) in enumerate(zip(["all", *sources], totals.cpu().tolist())):
         count = sum(values[i] for i in (1, 4, 7))
         metrics = {"loss": sum(values[i] for i in (0, 3, 6))/max(count, 1),
                    "selected_tokens": int(count), "records": int(values[13]),
@@ -126,6 +165,29 @@ def token_validation(model, index, device, rank=0, world=1, batch_size=8):
             metrics[group+"_loss"] = values[column]/max(values[column+1], 1)
             metrics[group+"_tokens"] = int(values[column+1])
             metrics[group+"_accuracy"] = values[column+2]/max(values[column+1], 1)
+        if span_totals[group_id].sum() > 0:
+            metrics['span_eligible_records'] = int(span_available[group_id])
+            metrics['span_unavailable_records'] = metrics['records'] - int(span_available[group_id])
+            for mode, mode_name in enumerate(('mlm', 'span_mask', 'span_mutation')):
+                records, tokens, loss, correct = span_totals[group_id, mode].tolist()
+                metrics.update({mode_name+'_records': int(records), mode_name+'_target_tokens': int(tokens),
+                                mode_name+'_loss': loss/max(tokens, 1), mode_name+'_accuracy': correct/max(tokens, 1)})
+        if family_classes:
+            matrix = confusion[group_id]
+            support, predicted = matrix.sum(1), matrix.sum(0)
+            supported = support.gt(0)
+            f1 = 2 * matrix.diag() / (support + predicted).clamp_min(1)
+            metrics.update(family_loss=float(family_losses[group_id]/support.sum().clamp_min(1)),
+                           family_accuracy=float(matrix.diag().sum()/support.sum().clamp_min(1)),
+                           family_macro_f1=float(f1[supported].mean()) if supported.any() else 0.,
+                           family_chains=int(support.sum()), family_supported_classes=int(supported.sum()))
+            if 'unknown' in model.family_spec['classes']:
+                unknown = model.family_spec['classes'].index('unknown')
+                known = supported.clone(); known[unknown] = False
+                metrics.update(family_known_accuracy=float(matrix.diag()[known].sum()/support[known].sum().clamp_min(1)),
+                               family_known_macro_f1=float(f1[known].mean()) if known.any() else 0.,
+                               family_unknown_chains=int(support[unknown]),
+                               family_unknown_recall=float(matrix[unknown, unknown]/support[unknown].clamp_min(1)))
         result[name] = metrics
     return result
 
@@ -168,7 +230,7 @@ def representation_validation(model, index, device, rank=0, world=1, batch_size=
     collator_cls, _, _, _ = for_model(model)
     from dllm.pipelines.immune_llada.fixed_chain.full_token_mlm import FullTokenMLMCollator
     collator = collator_cls(model.config, **({"hide_relation": True}
-                           if issubclass(collator_cls, FullTokenMLMCollator) else {}))
+                           if issubclass(getattr(collator_cls, 'func', collator_cls), FullTokenMLMCollator) else {}))
     was_training = model.training
     model.eval()
     for split, rows in samples.items():
@@ -213,7 +275,7 @@ if __name__ == "__main__":
         raise ValueError("Checkpoint data binding changed")
     index = json.loads(Path(provenance["data_index"]).read_text())
     device = torch.device(args.device)
-    _, model_cls, _, _ = components(provenance.get("objective", "receptor_aa"))
+    _, model_cls, _, _ = components(provenance.get("objective", "receptor_aa"), architecture=provenance.get('architecture'))
     model = model_cls.from_pretrained(args.checkpoint).to(device).eval()
     write_json(args.output, dict(token=token_validation(model, index, device),
                                 representation=representation_validation(model, index, device)))

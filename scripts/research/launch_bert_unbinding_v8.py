@@ -1,4 +1,4 @@
-"""Run frozen V8 profile, mixed-data DDP replay checks, then BERT continuation.
+"""Run frozen V8 profile, DDP replay checks, then scratch or continued BERT.
 
 Run with eight torchrun ranks: THIS_FILE --bundle ABS --phase all
 Separate phases profile/smoke/train are available; train requires matching
@@ -29,10 +29,32 @@ def checked_plan(bundle):
     return plan, launch['plan_sha256']
 
 
+def verify_initialization(plan):
+    """Require an explicit scratch contract or the original parent contract."""
+    from scripts.research.run_bert_mlm import verify_initial_checkpoint
+    if plan.get('initialization') == 'random_weights; fresh_optimizer_scheduler_sampler_rng':
+        if (any(k.startswith('parent_') for k in plan) or plan.get('resume_checkpoint')
+                or plan.get('target_pretraining_step') != plan['training']['max_steps']
+                or plan.get('objective') not in ('binding_mlm_nonbinding_relation_only_vhh',
+                                               'binding_mlm_nonbinding_relation_only_vhh_v_family',
+                                               'binding_mlm_nonbinding_relation_only_vhh_v_family_label_independent',
+                                               'binding_mlm_nonbinding_relation_only_vhh_label_independent')):
+            raise ValueError('Scratch plan contains parent/resume state or an incompatible target')
+        if '_v_family' in plan['objective']:
+            from dllm.pipelines.immune_llada.fixed_chain.v_family import validate_spec
+            validate_spec(plan.get('family_prediction'))
+        if plan.get('architecture'):
+            from scripts.research.run_bert_mlm import data_model_for_plan
+            data_model_for_plan(plan)
+        return dict(status='passed', initialization='random_weights', step=0)
+    return verify_initial_checkpoint(plan)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--bundle', type=Path, required=True)
     parser.add_argument('--phase', choices=('profile', 'smoke', 'train', 'all'), default='all')
+    parser.add_argument('--verify-only', action='store_true', help='Verify frozen inputs on CPU; no training')
     args = parser.parse_args()
     plan, plan_sha = checked_plan(args.bundle.resolve())
     sys.path.insert(0, plan['source_root'])
@@ -43,15 +65,19 @@ def main():
     from scripts.research.bert_mlm_data import write_json, sha
     from scripts.research.run_bert_mlm import main as train, rank_zero, data_gate, verify_initial_checkpoint
     from scripts.research.profile_bert_mlm import main as profile
+    if args.verify_only:
+        print(json.dumps(dict(status='passed', initialization=verify_initialization(plan),
+                              data_gate=data_gate(plan), plan_sha256=plan_sha)), flush=True)
+        return
     rank, world, local = (int(os.environ[k]) for k in ('RANK', 'WORLD_SIZE', 'LOCAL_RANK'))
     if world != 8 or torch.cuda.device_count() != 8:
-        raise ValueError('Formal V8 continuation requires one node with eight GPUs')
+        raise ValueError('Formal V8 training requires one node with eight GPUs')
     torch.cuda.set_device(local)
     device = torch.device('cuda', local)
     torch.distributed.init_process_group('nccl', timeout=timedelta(minutes=30))
     root = Path(plan['run_root'])
     try:
-        rank_zero(lambda: verify_initial_checkpoint(plan), rank)
+        rank_zero(lambda: verify_initialization(plan), rank)
         rank_zero(lambda: data_gate(plan), rank)
         if args.phase in ('all', 'profile'):
             phase_plan = dict(plan, phase='profile', output_dir=str(root / 'profile'))
